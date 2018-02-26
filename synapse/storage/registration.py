@@ -67,7 +67,7 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
         )
 
     def register(self, user_id, token=None, password_hash=None,
-                 was_guest=False, make_guest=False, appservice_id=None,
+                 was_guest=False, make_guest=False, make_partner=False, appservice_id=None,
                  create_profile_with_localpart=None, admin=False):
         """Attempts to register an account.
 
@@ -95,6 +95,7 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
             password_hash,
             was_guest,
             make_guest,
+            make_partner,
             appservice_id,
             create_profile_with_localpart,
             admin
@@ -108,6 +109,7 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
         password_hash,
         was_guest,
         make_guest,
+        make_partner,
         appservice_id,
         create_profile_with_localpart,
         admin,
@@ -156,6 +158,7 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
                         "password_hash": password_hash,
                         "creation_ts": now,
                         "is_guest": 1 if make_guest else 0,
+                        "is_partner": 1 if make_partner else 0,
                         "appservice_id": appservice_id,
                         "admin": 1 if admin else 0,
                     }
@@ -194,7 +197,7 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
             keyvalues={
                 "name": user_id,
             },
-            retcols=["name", "password_hash", "is_guest"],
+            retcols=["name", "password_hash", "is_guest", "is_partner"],
             allow_none=True,
             desc="get_user_by_id",
         )
@@ -346,7 +349,7 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
 
     def _query_for_auth(self, txn, token):
         sql = (
-            "SELECT users.name, users.is_guest, access_tokens.id as token_id,"
+            "SELECT users.name, users.is_guest, users.is_partner, access_tokens.id as token_id,"
             " access_tokens.device_id"
             " FROM users"
             " INNER JOIN access_tokens on users.name = access_tokens.user_id"

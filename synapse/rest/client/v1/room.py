@@ -63,6 +63,9 @@ class RoomCreateRestServlet(ClientV1RestServlet):
     def on_POST(self, request):
         requester = yield self.auth.get_user_by_req(request)
 
+        if requester.is_partner:
+            raise AuthError(403, "Partners are not allowed to create rooms")
+
         handler = self.handlers.room_creation_handler
         info = yield handler.create_room(
             requester, self.get_room_config(request)
@@ -326,7 +329,10 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        yield self.auth.get_user_by_req(request, allow_guest=True)
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+
+        if requester.is_partner:
+            raise AuthError(403, "Partners cannot gain access to the room directory")
 
         server = parse_string(request, "server", default=None)
         content = parse_json_object_from_request(request)
@@ -608,11 +614,14 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             allow_guest=True,
         )
 
-        if requester.is_guest and membership_action not in {
+        if (requester.is_guest or requester.is_partner) and membership_action not in {
             Membership.JOIN,
             Membership.LEAVE
         }:
-            raise AuthError(403, "Guest access not allowed")
+            if requester.is_guest:
+                raise AuthError(403, "Guest access not allowed")
+            else:
+                raise AuthError(403, "Partners can only join and leave rooms")
 
         try:
             content = parse_json_object_from_request(request)
@@ -622,6 +631,19 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             content = {}
 
         if membership_action == "invite" and self._has_3pid_invite_keys(content):
+            logger.info("invitation: inviter id=%s, device_id=%s",
+                        requester.user, requester.device_id)
+
+            content["user_id"] = yield self.handlers.invite_external_handler.invite(
+                room_id=room_id,
+                inviter=requester.user,
+                inviter_device_id=str(requester.device_id),
+                invitee=content["address"]
+            )
+            logger.info("invitee email=%s has been invited as %s in room_id=%s",
+                        content["address"], content["user_id"], room_id)
+
+            """
             yield self.handlers.room_member_handler.do_3pid_invite(
                 room_id,
                 requester.user,
@@ -631,8 +653,9 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
                 requester,
                 txn_id
             )
-            defer.returnValue((200, {}))
-            return
+            """
+            #defer.returnValue((200, {}))
+            #return
 
         target = requester.user
         if membership_action in ["invite", "ban", "unban", "kick"]:
@@ -653,6 +676,18 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             third_party_signed=content.get("third_party_signed", None),
             content=event_content,
         )
+
+        # Trigger Automatic join room for invitee
+        if membership_action == "invite":
+            yield self.handlers.room_member_handler.update_membership(
+                requester=requester,
+                target=target,
+                room_id=room_id,
+                action="join",
+                txn_id=txn_id,
+                third_party_signed=None,
+                content=event_content,
+            )
 
         defer.returnValue((200, {}))
 

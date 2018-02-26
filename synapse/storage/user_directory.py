@@ -634,7 +634,9 @@ class UserDirectoryStore(SQLBaseStore):
                         {
                             "user_id": <user_id>,
                             "display_name": <display_name>,
-                            "avatar_url": <avatar_url>
+                            "avatar_url": <avatar_url>,
+                            "is_partner": 1 or 0
+                            "presence": depends on search_term
                         }
                     ]
                 }
@@ -658,7 +660,7 @@ class UserDirectoryStore(SQLBaseStore):
             join_args = (user_id,)
             where_clause = "(s.user_id IS NOT NULL OR p.user_id IS NOT NULL)"
 
-        if isinstance(self.database_engine, PostgresEngine):
+        if isinstance(self.database_engine, PostgresEngine) and search_term is not None:
             full_query, exact_query, prefix_query = _parse_query_postgres(search_term)
 
             # We order by rank and then if they have profile info
@@ -698,7 +700,7 @@ class UserDirectoryStore(SQLBaseStore):
                 LIMIT ?
             """ % (join_clause, where_clause)
             args = join_args + (full_query, exact_query, prefix_query, limit + 1,)
-        elif isinstance(self.database_engine, Sqlite3Engine):
+        elif isinstance(self.database_engine, Sqlite3Engine) and search_term is not None:
             search_query = _parse_query_sqlite(search_term)
 
             sql = """
@@ -716,6 +718,26 @@ class UserDirectoryStore(SQLBaseStore):
                 LIMIT ?
             """ % (join_clause, where_clause)
             args = join_args + (search_query, limit + 1)
+        elif isinstance(self.database_engine, Sqlite3Engine) and search_term is None:
+            # list the internal users, as well as the partners that have
+            # received an invitation from the users doing the query.
+            # in this query, UNION and UNION ALL give the same results
+            sql = """
+                SELECT u.name, u.is_partner, d.display_name, d.avatar_url, p.state as presence
+                FROM users AS u
+                LEFT OUTER JOIN user_directory AS d ON d.user_id = u.name
+                LEFT OUTER JOIN presence_stream AS p ON p.user_id = u.name
+                WHERE u.is_partner == 0
+                UNION ALL
+                SELECT u.name, u.is_partner, d.display_name, d.avatar_url, coalesce(p.state, "invited") as presence
+                FROM users AS u
+                INNER JOIN partners_invited_by AS pib ON pib.partner = u.name AND pib.invited_by = ?
+                LEFT OUTER JOIN user_directory AS d ON d.user_id = u.name
+                LEFT OUTER JOIN presence_stream AS p ON p.user_id = u.name
+                WHERE u.is_partner == 1
+            """
+            args = (user_id,)
+
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")
@@ -724,7 +746,10 @@ class UserDirectoryStore(SQLBaseStore):
             "search_user_dir", self.cursor_to_dict, sql, *args
         )
 
-        limited = len(results) > limit
+        if search_term is not None:
+            limited = len(results) > limit
+        else:
+            limited = False
 
         defer.returnValue({
             "limited": limited,

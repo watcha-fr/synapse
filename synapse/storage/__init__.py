@@ -26,6 +26,7 @@ from .events import EventsStore
 from .presence import PresenceStore, UserPresenceState
 from .profile import ProfileStore
 from .registration import RegistrationStore
+from .invite_external import ExternalInvitationStore
 from .room import RoomStore
 from .roommember import RoomMemberStore
 from .stream import StreamStore
@@ -66,7 +67,7 @@ logger = logging.getLogger(__name__)
 
 
 class DataStore(RoomMemberStore, RoomStore,
-                RegistrationStore, StreamStore, ProfileStore,
+                RegistrationStore, ExternalInvitationStore, StreamStore, ProfileStore,
                 PresenceStore, TransactionStore,
                 DirectoryStore, KeyStore, StateStore, SignatureStore,
                 ApplicationServiceStore,

@@ -45,33 +45,34 @@ class UserDirectorySearchRestServlet(RestServlet):
             dict of the form::
 
                 {
-                    "limited": <bool>,  # whether there were more results or not
                     "results": [  # Ordered by best match first
                         {
                             "user_id": <user_id>,
                             "display_name": <display_name>,
-                            "avatar_url": <avatar_url>
+                            "avatar_url": <avatar_url>,
+                            "is_partner": 1 or 0
+                            "presence": "invited", "offline" or "online"
                         }
                     ]
                 }
         """
-        requester = yield self.auth.get_user_by_req(request, allow_guest=False)
+        requester = yield self.auth.get_user_by_req(request, allow_guest=False, allow_partner=False)
         user_id = requester.user.to_string()
 
-        body = parse_json_object_from_request(request)
-
-        limit = body.get("limit", 10)
-        limit = min(limit, 50)
-
         try:
-            search_term = body["search_term"]
-        except Exception:
-            raise SynapseError(400, "`search_term` is required field")
+            body = parse_json_object_from_request(request)
+            limit = body.get("limit", 10)
+            #limit = min(limit, 50) # upper bound for the number of results
+            search_term = body.get("search_term", "")
+            if search_term == "":
+                search_term = None
+        except:
+            limit = None
+            search_term = None
 
         results = yield self.user_directory_handler.search_users(
             user_id, search_term, limit,
         )
-
         defer.returnValue((200, results))
 
 

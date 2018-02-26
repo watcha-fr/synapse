@@ -20,7 +20,7 @@ from collections import namedtuple
 
 
 class Requester(namedtuple("Requester", [
-    "user", "access_token_id", "is_guest", "device_id", "app_service",
+    "user", "access_token_id", "is_guest", "device_id", "is_partner", "app_service",
 ])):
     """
     Represents the user making a request
@@ -75,7 +75,7 @@ class Requester(namedtuple("Requester", [
 
 
 def create_requester(user_id, access_token_id=None, is_guest=False,
-                     device_id=None, app_service=None):
+                     device_id=None, is_partner=False, app_service=None):
     """
     Create a new ``Requester`` object
 
@@ -92,7 +92,7 @@ def create_requester(user_id, access_token_id=None, is_guest=False,
     """
     if not isinstance(user_id, UserID):
         user_id = UserID.from_string(user_id)
-    return Requester(user_id, access_token_id, is_guest, device_id, app_service)
+    return Requester(user_id, access_token_id, is_guest, device_id, is_partner, app_service)
 
 
 def get_domain_from_id(string):

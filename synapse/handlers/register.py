@@ -110,6 +110,7 @@ class RegistrationHandler(BaseHandler):
         guest_access_token=None,
         make_guest=False,
         admin=False,
+        make_partner=False
     ):
         """Registers a new client on the server.
 
@@ -161,6 +162,7 @@ class RegistrationHandler(BaseHandler):
                 password_hash=password_hash,
                 was_guest=was_guest,
                 make_guest=make_guest,
+                make_partner=make_partner,
                 create_profile_with_localpart=(
                     # If the user was a guest then they already have a profile
                     None if was_guest else user.localpart
@@ -192,6 +194,7 @@ class RegistrationHandler(BaseHandler):
                         token=token,
                         password_hash=password_hash,
                         make_guest=make_guest,
+                        make_partner=make_partner,
                         create_profile_with_localpart=user.localpart,
                     )
                 except SynapseError:

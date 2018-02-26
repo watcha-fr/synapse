@@ -24,6 +24,7 @@ from .directory import DirectoryHandler
 from .admin import AdminHandler
 from .identity import IdentityHandler
 from .search import SearchHandler
+from .invite_external import InviteExternalHandler
 
 
 class Handlers(object):
@@ -56,3 +57,4 @@ class Handlers(object):
         self.identity_handler = IdentityHandler(hs)
         self.search_handler = SearchHandler(hs)
         self.room_context_handler = RoomContextHandler(hs)
+        self.invite_external_handler = InviteExternalHandler(hs)
