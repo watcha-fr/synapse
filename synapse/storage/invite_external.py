@@ -9,8 +9,8 @@ from synapse.storage import background_updates
 
 class ExternalInvitationStore(background_updates.BackgroundUpdateStore):
 
-    def __init__(self, hs):
-        super(ExternalInvitationStore, self).__init__(hs)
+    def __init__(self, db_conn, hs):
+        super(ExternalInvitationStore, self).__init__(db_conn, hs)
 
         self.clock = hs.get_clock()
 
