@@ -26,7 +26,7 @@ from .events import EventsStore
 from .presence import PresenceStore, UserPresenceState
 from .profile import ProfileStore
 from .registration import RegistrationStore
-from .invite_external import ExternalInvitationStore
+from .invite_external import ExternalInvitationStore # Added for Watcha
 from .room import RoomStore
 from .roommember import RoomMemberStore
 from .stream import StreamStore
@@ -67,7 +67,8 @@ logger = logging.getLogger(__name__)
 
 
 class DataStore(RoomMemberStore, RoomStore,
-                RegistrationStore, ExternalInvitationStore, StreamStore, ProfileStore,
+                ExternalInvitationStore, # Added for Watcha
+                RegistrationStore, StreamStore, ProfileStore,
                 PresenceStore, TransactionStore,
                 DirectoryStore, KeyStore, StateStore, SignatureStore,
                 ApplicationServiceStore,
