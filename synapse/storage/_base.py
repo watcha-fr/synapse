@@ -34,6 +34,7 @@ sql_logger = logging.getLogger("synapse.storage.SQL")
 transaction_logger = logging.getLogger("synapse.storage.txn")
 perf_logger = logging.getLogger("synapse.storage.TIME")
 
+perf_logger.disabled = True # WATCHA disabled
 
 metrics = synapse.metrics.get_metrics_for("synapse.storage")
 

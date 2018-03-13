@@ -43,6 +43,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+logger.disabled = True # WATCHA disabled
+
 metrics = synapse.metrics.get_metrics_for(__name__)
 
 notified_presence_counter = metrics.register_counter("notified_presence")
