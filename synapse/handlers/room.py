@@ -221,6 +221,35 @@ class RoomCreationHandler(BaseHandler):
             )
 
         for invite_3pid in invite_3pid_list:
+
+            logger.info("invitation on creation: inviter id=%s, device_id=%s",
+                requester.user, requester.device_id)
+
+            invite_3pid["user_id"] = yield self.hs.get_handlers().invite_external_handler.invite(
+                room_id=room_id,
+                inviter=requester.user,
+                inviter_device_id=str(requester.device_id),
+                invitee=invite_3pid["address"]
+            )
+
+            logger.info("invitee email=%s has been invited as %s at the creation of the room with id=%s",
+                        invite_3pid["address"], invite_3pid["user_id"], room_id)
+
+            content = {}
+            is_direct = config.get("is_direct", None)
+            if is_direct:
+                content["is_direct"] = is_direct
+
+            yield room_member_handler.update_membership(
+                requester,
+                UserID.from_string(invite_3pid["user_id"]),
+                room_id,
+                "invite",
+                ratelimit=False,
+                content=content,
+            )
+
+            """ WATCHA DISABLED
             id_server = invite_3pid["id_server"]
             address = invite_3pid["address"]
             medium = invite_3pid["medium"]
@@ -233,6 +262,7 @@ class RoomCreationHandler(BaseHandler):
                 requester,
                 txn_id=None,
             )
+            """
 
         result = {"room_id": room_id}
 

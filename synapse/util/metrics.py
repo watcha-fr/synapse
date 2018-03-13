@@ -24,6 +24,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+logger.disabled = True # WATCHA disabled
 
 metrics = synapse.metrics.get_metrics_for(__name__)
 

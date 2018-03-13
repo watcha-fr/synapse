@@ -27,6 +27,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+logger.disabled = True # WATCHA disabled
 
 @defer.inlineCallbacks
 def sleep(seconds):
