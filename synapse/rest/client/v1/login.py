@@ -236,12 +236,14 @@ class LoginRestServlet(ClientV1RestServlet):
         access_token = yield auth_handler.get_access_token_for_user_id(
             canonical_user_id, device_id,
         )
+        is_partner = yield auth_handler.is_partner(canonical_user_id)
 
         result = {
             "user_id": canonical_user_id,
             "access_token": access_token,
             "home_server": self.hs.hostname,
             "device_id": device_id,
+            "is_partner": is_partner,
         }
 
         if callback is not None:
@@ -260,11 +262,14 @@ class LoginRestServlet(ClientV1RestServlet):
         access_token = yield auth_handler.get_access_token_for_user_id(
             user_id, device_id,
         )
+        is_partner = yield auth_handler.is_partner(user_id)
+
         result = {
             "user_id": user_id,  # may have changed
             "access_token": access_token,
             "home_server": self.hs.hostname,
             "device_id": device_id,
+            "is_partner": is_partner,
         }
 
         defer.returnValue((200, result))
@@ -320,6 +325,8 @@ class LoginRestServlet(ClientV1RestServlet):
                 "access_token": access_token,
                 "home_server": self.hs.hostname,
             }
+
+        result["is_partner"] = yield auth_handler.is_partner(user_id)
 
         defer.returnValue((200, result))
 

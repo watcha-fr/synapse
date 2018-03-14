@@ -56,7 +56,7 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request, allow_partner=True)
         user = UserID.from_string(user_id)
 
         if requester.user != user:

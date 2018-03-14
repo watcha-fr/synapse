@@ -54,7 +54,7 @@ class UploadResource(Resource):
     @request_handler()
     @defer.inlineCallbacks
     def _async_render_POST(self, request):
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request, allow_partner=True)
         # TODO: The checks here are a bit late. The content will have
         # already been uploaded to a tmp file at this point
         content_length = request.getHeader("Content-Length")

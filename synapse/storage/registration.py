@@ -21,6 +21,9 @@ from synapse.api.errors import StoreError, Codes
 from synapse.storage import background_updates
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class RegistrationStore(background_updates.BackgroundUpdateStore):
 
@@ -525,3 +528,16 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
         except self.database_engine.module.IntegrityError:
             ret = yield self.get_3pid_guest_access_token(medium, address)
             defer.returnValue(ret)
+
+
+    @defer.inlineCallbacks
+    def is_user_partner(self, user_id):
+
+        is_partner = yield self._simple_select_one_onecol(
+            "users",
+            keyvalues={"name": user_id},
+            retcol="is_partner",
+            desc="isUserPartner",
+        )
+        logger.warn("login from user %s. is_partner=%s", user_id, is_partner)
+        defer.returnValue(is_partner)

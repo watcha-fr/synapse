@@ -871,6 +871,12 @@ class AuthHandler(BaseHandler):
         else:
             return defer.succeed(False)
 
+    @defer.inlineCallbacks
+    def is_partner(self, user_id):
+        ret = yield self.store.is_user_partner(
+            user_id,
+        )
+        defer.returnValue(ret)
 
 class MacaroonGeneartor(object):
     def __init__(self, hs):

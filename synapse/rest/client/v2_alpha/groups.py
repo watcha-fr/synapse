@@ -672,7 +672,7 @@ class PublicisedGroupsForUserServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
-        yield self.auth.get_user_by_req(request, allow_guest=True)
+        yield self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True)
 
         result = yield self.groups_handler.get_publicised_groups_for_user(
             user_id

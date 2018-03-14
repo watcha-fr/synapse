@@ -44,7 +44,7 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True)
         user = UserID.from_string(user_id)
         is_admin = yield self.auth.is_server_admin(requester.user)
 
@@ -87,7 +87,7 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request, allow_partner=True)
         user = UserID.from_string(user_id)
         is_admin = yield self.auth.is_server_admin(requester.user)
 

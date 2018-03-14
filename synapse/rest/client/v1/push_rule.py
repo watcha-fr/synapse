@@ -122,7 +122,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request, allow_partner=True)
         user_id = requester.user.to_string()
 
         # we build up the full structure and then decide which bits of it

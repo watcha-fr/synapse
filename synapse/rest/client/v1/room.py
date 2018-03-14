@@ -198,7 +198,7 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, event_type, txn_id=None):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True)
         content = parse_json_object_from_request(request)
 
         event_dict = {
@@ -244,6 +244,7 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
         requester = yield self.auth.get_user_by_req(
             request,
             allow_guest=True,
+            allow_partner=True,
         )
 
         try:
@@ -436,7 +437,7 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True)
         pagination_config = PaginationConfig.from_request(
             request, default_limit=10,
         )
@@ -612,6 +613,7 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
         requester = yield self.auth.get_user_by_req(
             request,
             allow_guest=True,
+            allow_partner=True
         )
 
         if (requester.is_guest or requester.is_partner) and membership_action not in {
@@ -750,7 +752,7 @@ class RoomTypingRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, user_id):
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request, allow_partner=True)
 
         room_id = urllib.unquote(room_id)
         target_user = UserID.from_string(urllib.unquote(user_id))

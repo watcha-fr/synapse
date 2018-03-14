@@ -40,7 +40,7 @@ class NotificationsServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request, allow_partner=True)
         user_id = requester.user.to_string()
 
         from_token = parse_string(request, "from", required=False)
