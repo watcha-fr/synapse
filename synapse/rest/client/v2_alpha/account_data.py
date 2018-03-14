@@ -41,7 +41,7 @@ class AccountDataServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id, account_data_type):
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request, allow_partner=True)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
 
