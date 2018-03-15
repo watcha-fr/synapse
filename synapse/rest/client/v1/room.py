@@ -680,6 +680,7 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
         )
 
         # Trigger Automatic join room for invitee
+        """ WATCHA DISABLED: causes error "Cannot force another user to join."
         if membership_action == "invite":
             yield self.handlers.room_member_handler.update_membership(
                 requester=requester,
@@ -690,6 +691,7 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
                 third_party_signed=None,
                 content=event_content,
             )
+        """
 
         defer.returnValue((200, {}))
 
