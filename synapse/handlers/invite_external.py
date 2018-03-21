@@ -41,8 +41,8 @@ class EmailData:
         # if needed to customize the reply-to field
         #'reply_to': 'registration@watcha.fr,'
 
-        self.CONFIRMATION_EMAIL_SUBJECT_FR = u'''Accès à l'espace de travail sécurisé {server}'''
-        self.CONFIRMATION_EMAIL_MESSAGE_FR = u'''Bonjour,
+        self.EMAIL_SUBJECT_FR = u'''Accès à l'espace de travail sécurisé {server}'''
+        self.NEW_USER_EMAIL_MESSAGE_FR = u'''Bonjour,
 
 {inviter_name} vous a invité à participer à un espace de travail sécurisé Watcha au lien {server}.
 
@@ -58,15 +58,33 @@ Vous pouvez accéder à l’espace de travail à partir d’un navigateur sur :
 
     https://{server}
 
-Vous pouvez aussi installer un client mobile :
+Vous pouvez aussi installer un client mobile Android :
 
-    pour Android: https://play.google.com/store/apps/details?id=im.watcha
-    Pour iOS: https://itunes.apple.com/us/app/riot-im/id1083446067
+    https://play.google.com/store/apps/details?id=im.watcha
+    
+N’hésitez pas à répondre à cet email si vous avez des difficultés à utiliser Watcha,
 
-Sur l'application mobile, choisissez "Utiliser un serveur personnalisé" et entrez les valeurs :
 
-    Serveur d'accueil : https://{server}
-    Serveur d'identité : https://{server}
+L'équipe Watcha.
+'''
+
+        self.EXISTING_USER_EMAIL_MESSAGE_FR = u'''Bonjour,
+
+{inviter_name} vous a invité à participer à un espace de travail sécurisé Watcha au lien {server}.
+
+Pour y accéder, votre nom d’utilisateur est :
+
+    {user_id}
+
+et votre mot de passe est celui qui vous avait été adressé à votre première invitation sur cet espace de travail.
+
+Vous pouvez accéder à l’espace de travail à partir d’un navigateur sur :
+
+    https://{server}
+
+Vous pouvez aussi installer un client mobile Android :
+
+    https://play.google.com/store/apps/details?id=im.watcha
 
 N’hésitez pas à répondre à cet email si vous avez des difficultés à utiliser Watcha,
 
@@ -74,38 +92,69 @@ N’hésitez pas à répondre à cet email si vous avez des difficultés à util
 L'équipe Watcha.
 '''
 
-    def new_message(
+
+    def gen_message(
         self,
         inviter_name,
         invitee_email,
         user_id,
         user_password,
         server,
+        msg_type,
         locale="FR"
     ):
 
         subject_template = None
         message_template = None
-        if locale=="FR":
-            subject_template = self.CONFIRMATION_EMAIL_SUBJECT_FR
-            message_template = self.CONFIRMATION_EMAIL_MESSAGE_FR
+
+        if msg_type == "new user":
+            if locale=="FR":
+                subject_template = self.EMAIL_SUBJECT_FR
+                message_template = self.NEW_USER_EMAIL_MESSAGE_FR
+            else:
+                raise SynapseError(
+                    400,
+                    "Locale not supported"
+                )
+
+            subject = subject_template.format(**{
+                'server': server
+            })
+
+            message = message_template.format(**{
+                'inviter_name': inviter_name,
+                'invitee_email': invitee_email,
+                'user_id': user_id,
+                'user_password': user_password,
+                'server': server,
+            })
+
+        elif msg_type == "existing user":
+            if locale=="FR":
+                subject_template = self.EMAIL_SUBJECT_FR
+                message_template = self.EXISTING_USER_EMAIL_MESSAGE_FR
+            else:
+                raise SynapseError(
+                    400,
+                    "Locale not supported"
+                )
+
+            subject = subject_template.format(**{
+                'server': server
+            })
+
+            message = message_template.format(**{
+                'inviter_name': inviter_name,
+                'invitee_email': invitee_email,
+                'user_id': user_id,
+                'server': server,
+            })
+
         else:
             raise SynapseError(
                 400,
-                "Locale not supported"
+                "Unknown message type"
             )
-
-        subject = subject_template.format(**{
-            'server': server
-        })
-
-        message = message_template.format(**{
-            'inviter_name': inviter_name,
-            'invitee_email': invitee_email,
-            'user_id': user_id,
-            'user_password': user_password,
-            'server': server,
-        })
 
         msg = MIMEText(message, "plain", "utf8")
         msg['Subject'] = subject
@@ -240,7 +289,6 @@ class InviteExternalHandler(BaseHandler):
         #logger.info("THIS SHOULD NOT BE VISIBLE generate user_id:server=" + str(user_id) + ":" + str(server) + " password=" + str(user_password))
 
         # here, we will try to register the user.
-        willSendEmail = True
         try:
             new_user_id, token = yield self.hs.get_handlers().registration_handler.register(
                 localpart=user_id,
@@ -251,6 +299,8 @@ class InviteExternalHandler(BaseHandler):
                 admin=False,
                 make_partner=True,
             )
+            msg_type = "new user"
+            logger.info("invited user is not in the DB. Will send an invitation email.")
             #logger.info("THIS SHOULD NOT BE VISIBLE registration result: new_user_id=" + new_user_id + " token=" + token)
             """
             # we save the account type
@@ -262,23 +312,26 @@ class InviteExternalHandler(BaseHandler):
             """
 
         except SynapseError as detail:
-            logger.info("registration result: " + str(detail))
-            willSendEmail = False
+            if str(detail) == "400: User ID already taken.":
+                logger.info("invited user is already in the DB. Not modified. Will send a notification by email.")
+                msg_type = "existing user"
+                # the generated password above will not be sent in the email notification.
+            else:
+                logger.info("registration error: " + str(detail))
+                raise SynapseError(
+                    400,
+                    "Registration error: " + str(detail)
+                )
+
 
         # log invitation in DB
         result = yield self.store.insert_partner_invitation(
             partner_user_id="@" + user_id + ":" + server,
             inviter_user_id=inviter,
             inviter_device_id=inviter_device_id,
-            email_sent=willSendEmail
+            email_sent=True
         )
 
-        if not willSendEmail:
-            logger.info("invitation email will not be sent.")
-            defer.returnValue("@" + user_id + ":" + server)
-            return
-
-        # here, we know the user is new so we will send email
         invitation_info = yield self._get_invitation_info(
             room_id,
             inviter
@@ -292,11 +345,12 @@ class InviteExternalHandler(BaseHandler):
         else:
             invitation_name = invitation_info["inviter_id"]
 
-        msg = email_data.new_message(
+        msg = email_data.gen_message(
             inviter_name=invitation_name,
             invitee_email=invitee,
             user_id=user_id,
-            user_password=user_password,
+            user_password=user_password, # in case of msg_type == "existing user", the user_password is not in the template because irrelevant.
+            msg_type=msg_type,
             server=server
         )
 
