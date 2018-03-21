@@ -66,7 +66,7 @@ class KeyUploadServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, device_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True,allow_partner=True,)
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
 
