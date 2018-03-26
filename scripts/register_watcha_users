@@ -5,9 +5,13 @@
 # See also synapse/rest/client/v1/watcha.py
 #
 #
+
+from os.path import dirname, join
 from email.mime.text import MIMEText
 
 from matrix_client.client import MatrixClient
+
+from synapse.handlers.invite_external import generate_password
 
 # TODO: send password via SMS ("Votre mot de passe vous a été envoyé par SMS au numéro: ")
 
@@ -29,9 +33,9 @@ et votre mot de passe est:
 
 
 Vous pouvez accéder à l’espace de travail à partir d’un navigateur sur {server}.
-Vous pouvez installer aussi un client mobile:
+Vous pouvez installer aussi un client mobile :
 
-pour Android: https://play.google.com/store/apps/details?id=im.vector.alpha
+pour Android: https://play.google.com/store/apps/details?id=im.watcha
 Pour iOS: https://itunes.apple.com/us/app/riot-im/id1083446067
 
 Sur l'application mobile, choisissez "Utiliser un serveur personnalisé" et entrez les valeurs:
@@ -45,6 +49,12 @@ N’hésitez pas à répondre à cet email si vous avez des difficultés à util
 L'équipe Watcha.
 '''
 
+# TODO: include the referent name and email in the message, eg.
+#
+# '''N’hésitez pas à contacter votre référent, {{referent_first_name}} {{referent_first_last}}, {{referent_email}}, si question.
+#
+# Vous pouvez aussi à répondre à cet email si vous avez des difficultés à utiliser Watcha,'''
+#
 
 EMAIL_SETTINGS = {
     'smtphost': 'mail.infomaniak.com',
@@ -121,7 +131,7 @@ ADMIN=""
 INSTANCE=""
 
 USERS = [
-    # ['Last name', 'first name', 'email adress', 'user_name_to_create', 'password_to_create', True if 'admin' else False]
+    # ['Last name', 'first name', 'email adress', 'user name', 'password or None to generate', True if 'admin' else False]
 ]
 '''
 
@@ -130,37 +140,48 @@ def main():
     import sys
 
     if len(sys.argv) < 2:
-        print 'Usage: python -m synapse.rest.client.v1.watcha <user configuration file>'
+        print 'Usage: register_watcha_users <user configuration file>.py'
         return
     config_file = abspath(sys.argv[1])
+    if not config_file.endswith('.py'):
+        print "Config file name must finish with .py"
+        return
+
     if not exists(config_file):
         with open(config_file, 'w') as f:
             f.write(CONFIG_TEMPLATE)
-            print "Template user configuration file created at %s. Please fill it now and re-run" % config_file
-            return
+        print "Template user configuration file created at %s. Please fill it now and re-run" % config_file
+        return
+
+    # the loading of the register_new_matrix_user file, and of the config file, are **ugly**... but I don't find easier ways...
+    mylocals = {}
+    execfile(join(dirname(__file__), 'register_new_matrix_user'), {'__name__': None}, mylocals)
+    mylocals['__name__'] = None
+    execfile(join(dirname(__file__), 'register_new_matrix_user'), mylocals, mylocals)
+    register_new_user = mylocals['register_new_user']
 
     sys.path.append(dirname(config_file))
     try:
-        config = __import__(splitext(basename(config_file))[0], ['USERS', 'SERVER', 'ADMIN', 'INSTANCE'])
-    except ImportError:
+        config = __import__(splitext(basename(config_file))[0], ['USERS', 'SERVER', 'ADMIN', 'INSTANCE', 'SHARED_SECRET'])
+    except ImportError, e:
         print "Could not import users from file %s. Is it a valid file ?" % config_file
         return
 
     if not config.USERS:
         print "No user found in %s, please edit file and add users" % config_file
+    if not config.SHARED_SECRET:
+        print "No shared secret in %s, please edit file and add users" % config_file
 
     print "User creation commands to run on the server:"
     print
     for user in config.USERS:
         last_name, first_name, email, user_name, password, admin = user
         full_name = first_name + ' ' + last_name
-        print "register_new_matrix_user -u '%s' -p '%s' %s-c /etc/matrix-synapse/homeserver.yaml http://localhost:8008" % (user_name, password, '-a ' if admin else '')
-    print
-    raw_input("press enter once you have created the users: ")
-    print
-    for user in config.USERS:
-        last_name, first_name, email, user_name, password, admin = user
-        full_name = first_name + ' ' + last_name
+        if not password:
+            password = generate_password()
+
+        register_new_user(user_name, password, config.SERVER, config.SHARED_SECRET, 'y' if admin else 'n')
+
         client = MatrixClient(config.SERVER)
         token = client.login_with_password(username=user_name, password=password)
         user = client.get_user(client.user_id)

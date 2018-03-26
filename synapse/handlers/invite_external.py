@@ -1,7 +1,13 @@
 # -*- coding: utf-8 -*-
 
 import logging
+import random
+import os
+
+from smtplib import SMTP
+from email.mime.text import MIMEText
 from twisted.internet import defer
+
 import synapse.types
 from synapse.api.constants import (
     EventTypes, Membership,
@@ -14,14 +20,45 @@ from ._base import BaseHandler
 # To enable diceware, add to REQUIREMENTS in python_dependencies.py:
 #     "diceware>=0.9.3": ["diceware"],
 #import diceware # only needed if diceware password generation is enabled
-import random # only needed when local password generation is enabled
-import os
 
-from smtplib import SMTP
-from email.mime.text import MIMEText
+#
+# TODO: merge with code in scripts/register_watcha_users !
+#
 
 
 logger = logging.getLogger(__name__)
+
+def generate_password():
+    '''Generate 'good enough' password
+
+    password strength target: 1000 years of computation with 8 GTX 1080 cards.
+    hash algorithm is bcrypt, so hash speed is 105khash/s
+        (according to https://gist.github.com/epixoip/a83d38f412b4737e99bbef804a270c40)
+        log(1000 years * 105 khash/s) / log(2) = 51.6 bits of entropy.
+
+        first method: diceware password generation. you need to enable the diceware dependency.
+        the file 'wordlist_fr_5d.txt' is needed in ~/.synapse/lib/python2.7/site-packages/diceware/wordlists
+        the wordlist_fr_5d provides ~12.9bits of entropy per word
+        cf https://github.com/mbelivo/diceware-wordlists-fr
+        four words of 12.9 bits of entropy gives a password of 51.6 bits.
+        password = diceware.get_passphrase(diceware.handle_options(["-w", "fr_5d", "-n", "4", "-d", " ", "--no-caps"]))
+
+        alternate method: generate groups of random characters:
+        * lowercase alphanumeric characters
+          log(36)/log(2) = 5.17 bits / character. therefore, we need at least 10 characters.
+          dictionary = "abcdefghijklmnopqrstuvwxyz0123456789"
+        * lowercase and uppercase alphanumeric characters: log(62)/log(2) = 5.95 bits / character
+        * lowercase characters:
+          log(26)/log(2) = 4.7 bits / character. therefore, we need at least 11 characters.
+
+        here we use 12 random lowercase characters, in 3 groups of 4 characters.
+    '''
+    dictionary = "abcdefghijklmnopqrstuvwxyz"
+    grouplen = 4
+    password = "".join(random.sample(dictionary, grouplen) + ["-"] + random.sample(dictionary, grouplen) + ["-"] + random.sample(dictionary, grouplen))
+
+    return password
+
 
 # this class should probably be put somewhere else. synapse/static maybe?
 class EmailData:
@@ -61,7 +98,7 @@ Vous pouvez accéder à l’espace de travail à partir d’un navigateur sur :
 Vous pouvez aussi installer un client mobile Android :
 
     https://play.google.com/store/apps/details?id=im.watcha
-    
+
 N’hésitez pas à répondre à cet email si vous avez des difficultés à utiliser Watcha,
 
 
@@ -242,37 +279,6 @@ class InviteExternalHandler(BaseHandler):
         logger.debug("gen_user_id_from_email: email=" + str(email) + " leads to user_id=" + str(user_id))
         return local_part + "/" + domain
 
-    def gen_password(
-        self
-    ):
-        # password strength target: 1000 years of computation with 8 GTX 1080 cards.
-        # hash algorithm is bcrypt, so hash speed is 105khash/s
-        # (according to https://gist.github.com/epixoip/a83d38f412b4737e99bbef804a270c40)
-        # log(1000 years * 105 khash/s) / log(2) = 51.6 bits of entropy.
-
-        # first method: diceware password generation. you need to enable the diceware dependency.
-        # the file 'wordlist_fr_5d.txt' is needed in ~/.synapse/lib/python2.7/site-packages/diceware/wordlists
-        # the wordlist_fr_5d provides ~12.9bits of entropy per word
-        # cf https://github.com/mbelivo/diceware-wordlists-fr
-        # four words of 12.9 bits of entropy gives a password of 51.6 bits.
-        #password = diceware.get_passphrase(diceware.handle_options(["-w", "fr_5d", "-n", "4", "-d", " ", "--no-caps"]))
-
-        # alternate method: generate groups of random characters:
-        # * lowercase alphanumeric characters
-        #   log(36)/log(2) = 5.17 bits / character. therefore, we need at least 10 characters.
-        #   dictionary = "abcdefghijklmnopqrstuvwxyz0123456789"
-        # * lowercase and uppercase alphanumeric characters: log(62)/log(2) = 5.95 bits / character
-        # * lowercase characters:
-        #   log(26)/log(2) = 4.7 bits / character. therefore, we need at least 11 characters.
-
-        # here we use 12 random lowercase characters, in 3 groups of 4 characters.
-        dictionary = "abcdefghijklmnopqrstuvwxyz"
-        grouplen = 4
-        password = "".join(random.sample(dictionary, grouplen) + ["-"] + random.sample(dictionary, grouplen) + ["-"] + random.sample(dictionary, grouplen))
-
-        return password
-
-
     @defer.inlineCallbacks
     def invite(
         self,
@@ -283,7 +289,7 @@ class InviteExternalHandler(BaseHandler):
     ):
 
         user_id = self.gen_user_id_from_email(invitee)
-        user_password = self.gen_password()
+        user_password = generate_password()
         server = self.hs.get_config().server_name
         # the following line must be commented out in production.
         #logger.info("THIS SHOULD NOT BE VISIBLE generate user_id:server=" + str(user_id) + ":" + str(server) + " password=" + str(user_password))
