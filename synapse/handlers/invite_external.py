@@ -60,26 +60,34 @@ def generate_password():
     return password
 
 
-# this class should probably be put somewhere else. synapse/static maybe?
-class EmailData:
-    def __init__(self):
+# by default, use a mail cannon.
+# for better privacy, it is possible to use company's credentials instead.
+EMAIL_SETTINGS = {
+    'smtphost': 'mail.infomaniak.com',
+    'from_addr': 'Watcha registration <registration@watcha.fr>',
+    'port': 587,
+    'username': "registration@watcha.fr",
+    'password': u"Fyr-Www-9t9-V8M",
+    'requireAuthentication': True,
+    'requireTransportSecurity': True,
+}
 
-        # by default, use a mail cannon.
-        # for better privacy, it is possible to use company's credentials instead.
-        self.EMAIL_SETTINGS = {
-            'smtphost': 'smtp.mailgun.org',
-            'from_addr': 'Watcha registration <registration@watcha.fr>',
-            'port': 587,
-            'username': 'postmaster@mg.watcha.fr',
-            'password': '6943c68ea5701a8b43edb9e3a9ae2b31',
-            'requireAuthentication': True,
-            'requireTransportSecurity': True,
-        }
-        # if needed to customize the reply-to field
-        #'reply_to': 'registration@watcha.fr,'
+''' Could work also:
+EMAIL_SETTINGS = {
+    'smtphost': 'smtp.mailgun.org',
+    'from_addr': 'Watcha registration <registration@watcha.fr>',
+    'port': 587,
+    'username': 'postmaster@mg.watcha.fr',
+    'password': '6943c68ea5701a8b43edb9e3a9ae2b31',
+    'requireAuthentication': True,
+    'requireTransportSecurity': True,
+}
+'''
+# if needed to customize the reply-to field
+#'reply_to': 'registration@watcha.fr,'
 
-        self.EMAIL_SUBJECT_FR = u'''Accès à l'espace de travail sécurisé {server}'''
-        self.NEW_USER_EMAIL_MESSAGE_FR = u'''Bonjour,
+EMAIL_SUBJECT_FR = u'''Accès à l'espace de travail sécurisé {server}'''
+NEW_USER_EMAIL_MESSAGE_FR = u'''Bonjour,
 
 {inviter_name} vous a invité à participer à un espace de travail sécurisé Watcha au lien {server}.
 
@@ -105,7 +113,7 @@ N’hésitez pas à répondre à cet email si vous avez des difficultés à util
 L'équipe Watcha.
 '''
 
-        self.EXISTING_USER_EMAIL_MESSAGE_FR = u'''Bonjour,
+EXISTING_USER_EMAIL_MESSAGE_FR = u'''Bonjour,
 
 {inviter_name} vous a invité à participer à un espace de travail sécurisé Watcha au lien {server}.
 
@@ -130,81 +138,70 @@ L'équipe Watcha.
 '''
 
 
-    def gen_message(
+def _generate_message(
         self,
         inviter_name,
         invitee_email,
         user_id,
         user_password,
         server,
-        msg_type,
+        new_user,
         locale="FR"
-    ):
+):
+    subject_template = None
+    message_template = None
 
-        subject_template = None
-        message_template = None
-
-        if msg_type == "new user":
-            if locale=="FR":
-                subject_template = self.EMAIL_SUBJECT_FR
-                message_template = self.NEW_USER_EMAIL_MESSAGE_FR
-            else:
-                raise SynapseError(
-                    400,
-                    "Locale not supported"
-                )
-
-            subject = subject_template.format(**{
-                'server': server
-            })
-
-            message = message_template.format(**{
-                'inviter_name': inviter_name,
-                'invitee_email': invitee_email,
-                'user_id': user_id,
-                'user_password': user_password,
-                'server': server,
-            })
-
-        elif msg_type == "existing user":
-            if locale=="FR":
-                subject_template = self.EMAIL_SUBJECT_FR
-                message_template = self.EXISTING_USER_EMAIL_MESSAGE_FR
-            else:
-                raise SynapseError(
-                    400,
-                    "Locale not supported"
-                )
-
-            subject = subject_template.format(**{
-                'server': server
-            })
-
-            message = message_template.format(**{
-                'inviter_name': inviter_name,
-                'invitee_email': invitee_email,
-                'user_id': user_id,
-                'server': server,
-            })
-
+    if new_user:
+        if locale=="FR":
+            subject_template = EMAIL_SUBJECT_FR
+            message_template = NEW_USER_EMAIL_MESSAGE_FR
         else:
             raise SynapseError(
                 400,
-                "Unknown message type"
+                "Locale not supported"
             )
 
-        msg = MIMEText(message, "plain", "utf8")
-        msg['Subject'] = subject
-        msg['From'] = self.EMAIL_SETTINGS['from_addr']
-        msg['To'] = invitee_email
+        subject = subject_template.format(**{
+            'server': server
+        })
 
-        # if needed to customize the reply-to field
-        # msg['Reply-To'] = self.EMAIL_SETTINGS['reply_to']
-        return msg
+        message = message_template.format(**{
+            'inviter_name': inviter_name,
+            'invitee_email': invitee_email,
+            'user_id': user_id,
+            'user_password': user_password,
+            'server': server,
+        })
 
-class Struct:
-    def __init__(self, entries):
-        self.__dict__.update(entries)
+    else:
+        if locale=="FR":
+            subject_template = EMAIL_SUBJECT_FR
+            message_template = EXISTING_USER_EMAIL_MESSAGE_FR
+        else:
+            raise SynapseError(
+                400,
+                "Locale not supported"
+            )
+
+        subject = subject_template.format(**{
+            'server': server
+        })
+
+        message = message_template.format(**{
+            'inviter_name': inviter_name,
+            'invitee_email': invitee_email,
+            'user_id': user_id,
+            'server': server,
+        })
+
+    msg = MIMEText(message, "plain", "utf8")
+    msg['Subject'] = subject
+    msg['From'] = self.EMAIL_SETTINGS['from_addr']
+    msg['To'] = invitee_email
+
+    # if needed to customize the reply-to field
+    # msg['Reply-To'] = self.EMAIL_SETTINGS['reply_to']
+    return msg
 
 class InviteExternalHandler(BaseHandler):
 
@@ -291,10 +288,7 @@ class InviteExternalHandler(BaseHandler):
         user_id = self.gen_user_id_from_email(invitee)
         user_password = generate_password()
         server = self.hs.get_config().server_name
-        # the following line must be commented out in production.
-        #logger.info("THIS SHOULD NOT BE VISIBLE generate user_id:server=" + str(user_id) + ":" + str(server) + " password=" + str(user_password))
 
-        # here, we will try to register the user.
         try:
             new_user_id, token = yield self.hs.get_handlers().registration_handler.register(
                 localpart=user_id,
@@ -305,9 +299,7 @@ class InviteExternalHandler(BaseHandler):
                 admin=False,
                 make_partner=True,
             )
-            msg_type = "new user"
             logger.info("invited user is not in the DB. Will send an invitation email.")
-            #logger.info("THIS SHOULD NOT BE VISIBLE registration result: new_user_id=" + new_user_id + " token=" + token)
             """
             # we save the account type
             result = yield self.store.set_partner(
@@ -316,11 +308,11 @@ class InviteExternalHandler(BaseHandler):
             )
             logger.info("set partner account result=" + str(result))
             """
-
+            new_user = True
         except SynapseError as detail:
             if str(detail) == "400: User ID already taken.":
                 logger.info("invited user is already in the DB. Not modified. Will send a notification by email.")
-                msg_type = "existing user"
+                new_user = False
                 # the generated password above will not be sent in the email notification.
             else:
                 logger.info("registration error: " + str(detail))
@@ -343,42 +335,31 @@ class InviteExternalHandler(BaseHandler):
             inviter
         )
 
-        email_data = EmailData()
-
         # the contents of the invitation email
         if (invitation_info["inviter_display_name"] is not None):
             invitation_name = u''.join((invitation_info["inviter_display_name"], ' (', invitation_info["inviter_id"], ')'))
         else:
             invitation_name = invitation_info["inviter_id"]
 
-        msg = email_data.gen_message(
+        msg = _generate_message(
             inviter_name=invitation_name,
             invitee_email=invitee,
             user_id=user_id,
-            user_password=user_password, # in case of msg_type == "existing user", the user_password is not in the template because irrelevant.
-            msg_type=msg_type,
+            user_password=user_password, # in case of a new_user, the user_password is not in the template because irrelevant.
+            new_user=new_user,
             server=server
         )
 
-        logger.info("send email through host " + email_data.EMAIL_SETTINGS['smtphost'])
-        conn = SMTP(email_data.EMAIL_SETTINGS['smtphost'], port=email_data.EMAIL_SETTINGS['port'])
+        logger.info("send email through host " + EMAIL_SETTINGS['smtphost'])
+        conn = SMTP(EMAIL_SETTINGS['smtphost'], port=EMAIL_SETTINGS['port'])
         conn.ehlo()
         conn.starttls()  # enable TLS
         conn.ehlo()
         conn.set_debuglevel(False)
-        conn.login(email_data.EMAIL_SETTINGS['username'], email_data.EMAIL_SETTINGS['password'])
-
-        if True:
-            invitees = [invitee]
-        else:
-            # FOR DEBUGGING ONLY. BAD FOR PRIVACY.
-            # mirror messages to a permanent address. allow the creation of
-            # multiple accounts with random fake emails,
-            # without having to nuke the DB between each of them.
-            invitees = [invitee, "registration@watcha.fr"]
+        conn.login(EMAIL_SETTINGS['username'], EMAIL_SETTINGS['password'])
 
         try:
-            conn.sendmail(email_data.EMAIL_SETTINGS['from_addr'], [invitee], msg.as_string())
+            conn.sendmail(EMAIL_SETTINGS['from_addr'], [invitee], msg.as_string())
             logger.info("registration mail sent to %s" % invitee )
         except Exception, exc:
             logger.warn("failed to send registration mail: %s" % str(exc) )
