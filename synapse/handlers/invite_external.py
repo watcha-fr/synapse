@@ -140,7 +140,6 @@ L'équipe Watcha.
 
 
 def _generate_message(
-        self,
         inviter_name,
         invitee_email,
         user_id,
