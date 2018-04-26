@@ -62,23 +62,24 @@ def generate_password():
 
 # by default, use a mail cannon.
 # for better privacy, it is possible to use company's credentials instead.
-EMAIL_SETTINGS = {
-    'smtphost': 'mail.infomaniak.com',
-    'from_addr': 'Watcha registration <registration@watcha.fr>',
-    'port': 587,
-    'username': "registration@watcha.fr",
-    'password': u"Fyr-Www-9t9-V8M",
-    'requireAuthentication': True,
-    'requireTransportSecurity': True,
-}
-
-''' Could work also:
+# TODO: this info should be put in an external config file.
 EMAIL_SETTINGS = {
     'smtphost': 'smtp.mailgun.org',
     'from_addr': 'Watcha registration <registration@watcha.fr>',
     'port': 587,
     'username': 'postmaster@mg.watcha.fr',
     'password': '6943c68ea5701a8b43edb9e3a9ae2b31',
+    'requireAuthentication': True,
+    'requireTransportSecurity': True,
+}
+
+''' Could work also:
+EMAIL_SETTINGS = {
+    'smtphost': 'mail.infomaniak.com',
+    'from_addr': 'Watcha registration <registration@watcha.fr>',
+    'port': 587,
+    'username': "registration@watcha.fr",
+    'password': u"Fyr-Www-9t9-V8M",
     'requireAuthentication': True,
     'requireTransportSecurity': True,
 }
@@ -341,24 +342,26 @@ class InviteExternalHandler(BaseHandler):
         else:
             invitation_name = invitation_info["inviter_id"]
 
+        logger.info("will generate message: invitation_name=%s invitee_email=%s user_id=%s user_pw=%s new_user=%s server=%s" % (invitation_name, invitee, user_id, user_password, new_user, server));
+
         msg = _generate_message(
             inviter_name=invitation_name,
             invitee_email=invitee,
             user_id=user_id,
-            user_password=user_password, # in case of a new_user, the user_password is not in the template because irrelevant.
+            user_password=user_password, # in case of an existing user, the user_password is not in the template because irrelevant.
             new_user=new_user,
-            server=server
+            server=server,
+            locale="FR"
         )
 
         logger.info("send email through host " + EMAIL_SETTINGS['smtphost'])
-        conn = SMTP(EMAIL_SETTINGS['smtphost'], port=EMAIL_SETTINGS['port'])
-        conn.ehlo()
-        conn.starttls()  # enable TLS
-        conn.ehlo()
-        conn.set_debuglevel(False)
-        conn.login(EMAIL_SETTINGS['username'], EMAIL_SETTINGS['password'])
-
         try:
+            conn = SMTP(EMAIL_SETTINGS['smtphost'], port=EMAIL_SETTINGS['port'])
+            conn.ehlo()
+            conn.starttls()  # enable TLS
+            conn.ehlo()
+            conn.set_debuglevel(False)
+            conn.login(EMAIL_SETTINGS['username'], EMAIL_SETTINGS['password'])        
             conn.sendmail(EMAIL_SETTINGS['from_addr'], [invitee], msg.as_string())
             logger.info("registration mail sent to %s" % invitee )
         except Exception, exc:
