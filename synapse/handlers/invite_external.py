@@ -60,43 +60,17 @@ def generate_password():
     return password
 
 
-# by default, use a mail cannon.
-# for better privacy, it is possible to use company's credentials instead.
-# TODO: this info should be put in an external config file.
-EMAIL_SETTINGS = {
-    'smtphost': 'smtp.mailgun.org',
-    'from_addr': 'Watcha registration <registration@watcha.fr>',
-    'port': 587,
-    'username': 'postmaster@mg.watcha.fr',
-    'password': '6943c68ea5701a8b43edb9e3a9ae2b31',
-    'requireAuthentication': True,
-    'requireTransportSecurity': True,
-}
-
-''' Could work also:
-EMAIL_SETTINGS = {
-    'smtphost': 'mail.infomaniak.com',
-    'from_addr': 'Watcha registration <registration@watcha.fr>',
-    'port': 587,
-    'username': "registration@watcha.fr",
-    'password': u"Fyr-Www-9t9-V8M",
-    'requireAuthentication': True,
-    'requireTransportSecurity': True,
-}
-'''
-# if needed to customize the reply-to field
-#'reply_to': 'registration@watcha.fr,'
-
+# TODO use a templating engine
 EMAIL_SUBJECT_FR = u'''Accès à l'espace de travail sécurisé {server}'''
 NEW_USER_EMAIL_MESSAGE_FR = u'''Bonjour,
 
-{inviter_name} vous a invité à participer à un espace de travail sécurisé Watcha au lien {server}.
+{inviter_name} vous a invité à participer à un espace de travail sécurisé Watcha.
 
-Pour y accéder, votre nom d’utilisateur est :
+Votre nom d’utilisateur est :
 
     {user_id}
 
-et votre mot de passe est :
+et votre mot de passe :
 
     {user_password}
 
@@ -104,7 +78,7 @@ Vous pouvez accéder à l’espace de travail à partir d’un navigateur sur :
 
     https://{server}
 
-Vous pouvez aussi installer un client mobile Android :
+Vous pouvez aussi installer l'application mobile Android :
 
     https://play.google.com/store/apps/details?id=im.watcha
 
@@ -116,9 +90,9 @@ L'équipe Watcha.
 
 EXISTING_USER_EMAIL_MESSAGE_FR = u'''Bonjour,
 
-{inviter_name} vous a invité à participer à un espace de travail sécurisé Watcha au lien {server}.
+{inviter_name} vous a invité à participer à un espace de travail sécurisé Watcha.
 
-Pour y accéder, votre nom d’utilisateur est :
+Votre nom d’utilisateur est :
 
     {user_id}
 
@@ -128,7 +102,7 @@ Vous pouvez accéder à l’espace de travail à partir d’un navigateur sur :
 
     https://{server}
 
-Vous pouvez aussi installer un client mobile Android :
+Vous pouvez aussi installer l'application mobile Android :
 
     https://play.google.com/store/apps/details?id=im.watcha
 
@@ -146,6 +120,7 @@ def _generate_message(
         user_password,
         server,
         new_user,
+        email_from,
         locale="FR"
 ):
     subject_template = None
@@ -196,17 +171,29 @@ def _generate_message(
 
     msg = MIMEText(message, "plain", "utf8")
     msg['Subject'] = subject
-    msg['From'] = self.EMAIL_SETTINGS['from_addr']
+    msg['From'] = email_from
     msg['To'] = invitee_email
 
     # if needed to customize the reply-to field
-    # msg['Reply-To'] = self.EMAIL_SETTINGS['reply_to']
+    # msg['Reply-To'] = EMAIL_SETTINGS['reply_to']
     return msg
 
 class InviteExternalHandler(BaseHandler):
 
     def __init__(self, hs):
         super(InviteExternalHandler, self).__init__(hs)
+
+        # gather email settings in an object
+        self.email_settings = {
+            'smtphost': hs.config.email_smtp_host,
+            'from_addr': hs.config.email_notif_from,
+            'port': hs.config.email_smtp_port,
+            'username': hs.config.email_smtp_user,
+            'password': hs.config.email_smtp_pass,
+            'requireAuthentication': True,
+            'requireTransportSecurity': hs.config.require_transport_security
+        }
+        self.public_baseurl = hs.config.public_baseurl
 
     # from room_id and user ID, get details about who invites and where.
     # adapted from synapse/handlers/room_member.py
@@ -349,19 +336,20 @@ class InviteExternalHandler(BaseHandler):
             user_id=user_id,
             user_password=user_password, # in case of an existing user, the user_password is not in the template because irrelevant.
             new_user=new_user,
-            server=server,
+            server=self.public_baseurl,
+            email_from=self.email_settings['from_addr'],
             locale="FR"
         )
 
-        logger.info("send email through host " + EMAIL_SETTINGS['smtphost'])
+        logger.info("send email through host " + self.email_settings['smtphost'])
         try:
-            conn = SMTP(EMAIL_SETTINGS['smtphost'], port=EMAIL_SETTINGS['port'])
+            conn = SMTP(self.email_settings['smtphost'], port=self.email_settings['port'])
             conn.ehlo()
             conn.starttls()  # enable TLS
             conn.ehlo()
             conn.set_debuglevel(False)
-            conn.login(EMAIL_SETTINGS['username'], EMAIL_SETTINGS['password'])        
-            conn.sendmail(EMAIL_SETTINGS['from_addr'], [invitee], msg.as_string())
+            conn.login(self.email_settings['username'], self.email_settings['password'])
+            conn.sendmail(self.email_settings['from_addr'], [invitee], msg.as_string())
             logger.info("registration mail sent to %s" % invitee )
         except Exception, exc:
             logger.warn("failed to send registration mail: %s" % str(exc) )

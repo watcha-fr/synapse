@@ -26,7 +26,7 @@ class EmailConfig(Config):
         email_config = config.get("email", {})
         self.email_enable_notifs = email_config.get("enable_notifs", False)
 
-        if self.email_enable_notifs:
+        if True or self.email_enable_notifs: # watcha modification, so that email config is available even if notifications are disabled
             # make sure we can import the required deps
             import jinja2
             import bleach
