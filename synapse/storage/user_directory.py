@@ -327,6 +327,23 @@ class UserDirectoryStore(SQLBaseStore):
         rows = yield self._execute("get_all_local_users", None, sql)
         defer.returnValue([name for name, in rows])
 
+    # method added by watcha
+    @defer.inlineCallbacks
+    def get_count_users_partners(self):
+        """Count the users, with distinction between local users and invited partners
+        """
+        sql1 = """
+            SELECT COUNT(*) as count FROM users WHERE is_partner = 0
+        """
+        local_users = yield self._execute("get_count_users_partners", None, sql1)
+        sql2 = """
+            SELECT COUNT(*) as count FROM users WHERE is_partner = 1
+        """
+        partner_users = yield self._execute("get_count_users_partners", None, sql2)
+
+        defer.returnValue({ "local": local_users[0][0], "partners": partner_users[0][0] })
+
+
     def add_users_who_share_room(self, room_id, share_private, user_id_tuples):
         """Insert entries into the users_who_share_rooms table. The first
         user should be a local user.

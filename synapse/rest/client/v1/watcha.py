@@ -2,11 +2,15 @@
 
 from twisted.internet import defer
 
-from .base import client_path_patterns
+from .base import ClientV1RestServlet, client_path_patterns
 from synapse.http.servlet import parse_json_object_from_request
 
 from synapse.rest.client.v1.register import RegisterRestServlet
 from synapse.rest.client.v1.admin import ResetPasswordRestServlet
+
+#from subprocess import call
+import subprocess
+#from os import system
 
 import logging
 
@@ -43,6 +47,36 @@ class WatchaResetPasswordRestServlet(ResetPasswordRestServlet, RegisterRestServl
         defer.returnValue((200, response))
 
 
+class WatchaStats(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/stats")
+
+    def __init__(self, hs):
+        super(WatchaStats, self).__init__(hs)
+        self.store = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        ### fetch the number of local and external users.
+        user_stats = yield self.store.get_count_users_partners()
+
+        ### get the version of the synapse server, if installed with pip.
+
+        # this method may block the synapse process for a while, as pip does not immediately return.
+        #synapse_version = system('pip freeze | grep "matrix-synapse==="')
+
+        try:
+            proc = subprocess.Popen(['pip', 'freeze'], stdout=subprocess.PIPE)
+            output = subprocess.check_output(('grep', 'matrix-synapse==='), stdin=proc.stdout)
+            proc.wait()
+            (synapse_version, err) = output.communicate()
+
+        except subprocess.CalledProcessError as e:
+            # when grep does not find any line, this error is thrown. it is normal behaviour during development.
+            synapse_version = "unavailable"
+
+        defer.returnValue((200, { "users": user_stats, "synapse_version": synapse_version }))
+
 
 def register_servlets(hs, http_server):
+    WatchaStats(hs).register(http_server)
     WatchaResetPasswordRestServlet(hs).register(http_server)
