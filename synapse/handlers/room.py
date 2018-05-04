@@ -348,7 +348,7 @@ class RoomCreationHandler(BaseHandler):
                 "events": {
                     EventTypes.Name: 50,
                     EventTypes.PowerLevels: 100,
-                    EventTypes.RoomHistoryVisibility: 100,
+                    EventTypes.RoomHistoryVisibility: 50, # modified by watcha
                     EventTypes.CanonicalAlias: 50,
                     EventTypes.RoomAvatar: 50,
                 },
@@ -357,7 +357,7 @@ class RoomCreationHandler(BaseHandler):
                 "ban": 50,
                 "kick": 50,
                 "redact": 50,
-                "invite": 0,
+                "invite": 50, # modified by watcha
             }
 
             if config["original_invitees_have_ops"]:

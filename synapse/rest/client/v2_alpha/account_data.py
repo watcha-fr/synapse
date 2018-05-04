@@ -89,6 +89,11 @@ class RoomAccountDataServlet(RestServlet):
                 " Use /rooms/!roomId:server.name/read_markers"
             )
 
+        if account_data_type == "org.matrix.room.preview_urls":
+            logger.info("AccountDataPreviewUrls: original=" + str(body))
+            body["disable"] = True
+            logger.info("AccountDataPreviewUrls: new=" + str(body))
+
         max_id = yield self.store.add_account_data_to_room(
             user_id, room_id, account_data_type, body
         )

@@ -169,6 +169,7 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
         else:
 
             # added by watcha
+            # override history visibility incoming config requests.
             if event_type == EventTypes.RoomHistoryVisibility:
                 logger.info("RoomHistoryEvent. Original content=" + str(content))
                 if content['history_visibility'] == "world_readable":
@@ -176,6 +177,29 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
                 if content['history_visibility'] == "joined":
                     content['history_visibility'] = "invited"
                 logger.info("RoomHistoryEvent. New content=" + str(content))
+
+            # added by watcha
+            # override room permissions config requests
+            # 0 means a generic user - 50 means a moderator - 100 means an administrator
+            if event_type == EventTypes.PowerLevels:
+                logger.info("PowerLevelsEvent. Original content=" + str(content))
+                content['events'][EventTypes.RoomAvatar] = 50; # change avatar of the room
+                content['events'][EventTypes.CanonicalAlias] = 50; # change the alias of the room
+                content['events'][EventTypes.Name] = 50; # change the name of the room
+                content['events'][EventTypes.PowerLevels] = 100; # change the permissions (name, revoke moderators)
+                content['events'][EventTypes.Topic] = 50; # change topic in the room
+                content['invite'] = 50; # invite users
+                content['kick'] = 50; # kick users
+                content['ban'] = 50; # permanently kick users from the room
+                content['redact'] = 50; # TODO option to prevent people from removing their posts.
+                content['state_default'] = 50; # change config of the room
+                content['users_default'] = 0; # default permission for new users.
+                logger.info("PowerLevelsEvent. New content=" + str(content))
+
+            if event_type == "org.matrix.room.preview_urls":
+                logger.info("PreviewUrlsEvent. Original content=" + str(content))
+                content['disable'] = True;
+                logger.info("PreviewUrlsEvent. New content=" + str(content))
 
 
             event, context = yield self.event_creation_hander.create_event(
