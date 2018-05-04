@@ -94,6 +94,12 @@ class PreviewUrlResource(Resource):
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
 
+        # watcha disabled: url preview
+        raise SynapseError(
+            403, "URL preview disabled on this server",
+            Codes.UNKNOWN
+        )
+
         # XXX: if get_user_by_req fails, what should we do in an async render?
         requester = yield self.auth.get_user_by_req(request)
         url = request.args.get("url")[0]
