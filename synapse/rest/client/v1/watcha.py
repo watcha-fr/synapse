@@ -68,7 +68,12 @@ class WatchaStats(ClientV1RestServlet):
             proc = subprocess.Popen(['pip', 'freeze'], stdout=subprocess.PIPE)
             output = subprocess.check_output(('grep', 'matrix-synapse==='), stdin=proc.stdout)
             proc.wait()
-            (synapse_version, err) = output.communicate()
+            # output seems not always to be of the same type. str or object.
+            #(synapse_version, err) = output.communicate()
+            if type(output) is str:
+                synapse_version = output
+            else:
+                (synapse_version, err) = output.communicate()
 
         except subprocess.CalledProcessError as e:
             # when grep does not find any line, this error is thrown. it is normal behaviour during development.
