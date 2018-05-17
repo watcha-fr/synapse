@@ -6,6 +6,7 @@ import os
 
 from smtplib import SMTP
 from email.mime.text import MIMEText
+from email.header import Header
 from twisted.internet import defer
 
 import synapse.types
@@ -61,7 +62,7 @@ def generate_password():
 
 
 # TODO use a templating engine
-EMAIL_SUBJECT_FR = u'''Accès à l'espace de travail sécurisé {server}'''
+EMAIL_SUBJECT_FR = u'''Accès à l'espace de travail sécurisé''' # {server} workaround for email title glitches
 NEW_USER_EMAIL_MESSAGE_FR = u'''Bonjour,
 
 {inviter_name} vous a invité à participer à un espace de travail sécurisé Watcha.
@@ -171,11 +172,14 @@ def _generate_message(
 
     msg = MIMEText(message, "plain", "utf8")
     msg['Subject'] = subject
+    #msg['Subject'] = Header(subject, 'utf-8')
+    # line above is a failed attempt to fix a wrongly encoded email subject, when send through SendinBlue and read in Thunderbird
     msg['From'] = email_from
     msg['To'] = invitee_email
 
     # if needed to customize the reply-to field
     # msg['Reply-To'] = EMAIL_SETTINGS['reply_to']
+    #logger.info(msg.as_string())
     return msg
 
 class InviteExternalHandler(BaseHandler):
