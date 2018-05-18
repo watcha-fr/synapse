@@ -332,7 +332,7 @@ class InviteExternalHandler(BaseHandler):
         else:
             invitation_name = invitation_info["inviter_id"]
 
-        logger.info("will generate message: invitation_name=%s invitee_email=%s user_id=%s user_pw=%s new_user=%s server=%s" % (invitation_name, invitee, user_id, user_password, new_user, server));
+        logger.info("will generate message: invitation_name=%s invitee_email=%s user_id=%s user_pw=<REDACTED> new_user=%s server=%s" % (invitation_name, invitee, user_id, new_user, server));
 
         msg = _generate_message(
             inviter_name=invitation_name,
