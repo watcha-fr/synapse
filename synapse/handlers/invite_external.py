@@ -62,7 +62,7 @@ def generate_password():
 
 
 # TODO use a templating engine
-EMAIL_SUBJECT_FR = u'''Accès à l'espace de travail sécurisé''' # {server} workaround for email title glitches
+EMAIL_SUBJECT_FR = u'''Accès à l'espace de travail sécurisé {server}'''
 NEW_USER_EMAIL_MESSAGE_FR = u'''Bonjour,
 
 {inviter_name} vous a invité à participer à un espace de travail sécurisé Watcha.
@@ -171,9 +171,16 @@ def _generate_message(
         })
 
     msg = MIMEText(message, "plain", "utf8")
-    msg['Subject'] = subject
-    #msg['Subject'] = Header(subject, 'utf-8')
-    # line above is a failed attempt to fix a wrongly encoded email subject, when send through SendinBlue and read in Thunderbird
+    #msg['Subject'] = subject
+    msg['Subject'] = Header(subject, 'utf-8', 200)
+    # line above sets the parameter maxlinelen https://docs.python.org/2.7/library/email.header.html
+    # setting a high-enough value helps avoid glitches in the subject line (space added every 40-50 characters),
+    # when executed with Python 2.7.
+    #
+    # Semi-relevant online discussions:
+    # https://stackoverflow.com/questions/25671608/python-mail-puts-unaccounted-space-in-outlook-subject-line
+    # https://bugs.python.org/issue1974
+
     msg['From'] = email_from
     msg['To'] = invitee_email
 
