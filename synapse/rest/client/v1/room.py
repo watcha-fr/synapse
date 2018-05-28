@@ -501,6 +501,22 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
             event_filter=event_filter,
         )
 
+        # watcha: TODO enforce room parameters here, for rooms that may have been created before parameters freezing.
+        #
+        #event_dict = {
+        #    "type": event_type,
+        #    "content": {'join_rule': 'invite'},
+        #    "room_id": room_id,
+        #    "sender": requester.user.to_string(),
+        #}
+
+        # and also
+
+        #if content['history_visibility'] == "world_readable":
+        #    content['history_visibility'] = "shared"
+        #if content['history_visibility'] == "joined":
+        #    content['history_visibility'] = "invited"
+
         defer.returnValue((200, msgs))
 
 

@@ -11,6 +11,7 @@ def check_db_customization(db_conn, database_engine):
     _add_is_partner(db_conn, database_engine)
     _add_table_partners_invited_by(db_conn, database_engine)
     _check_public_rooms_private(db_conn, database_engine)
+    _check_history_visibility(db_conn, database_engine)
 
 # add "is_partner" column to the users table.
 # this is a no-op if it is already there.
@@ -70,9 +71,28 @@ def _check_public_rooms_private(db_conn, database_engine):
                 break
             else:
                 logger.warn("####################################")
-                logger.warn("_make_public_rooms_private: room %s is public", row[0])
+                logger.warn("_check_public_rooms_private: room %s is public", row[0])
                 logger.warn("####################################")
     except:
         logger.warn("_check_public_rooms_private: could not check the absence of public rooms")
+        db_conn.rollback()
+        raise
+
+# check that history visibility is one the two allowed values
+def _check_history_visibility(db_conn, database_engine):
+    try:
+        cur = db_conn.cursor()
+        cur.execute("SELECT room_id, history_visibility FROM history_visibility WHERE history_visibility = 'world_readable' OR history_visibility = 'joined';")
+        while True:
+            row = cur.fetchone()
+            if not row:
+                break
+            else:
+                betterval = "shared" if row[1] == "world_readable" else "invited"
+                logger.warn("####################################")
+                logger.warn("_check_history_visibility: room %s has illegal history_visibility: %s. should be %s", row[0], row[1], betterval)
+                logger.warn("####################################")
+    except:
+        logger.warn("_check_history_visibility: could not check the validity of history_visibility of rooms")
         db_conn.rollback()
         raise
