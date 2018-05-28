@@ -10,6 +10,7 @@ def check_db_customization(db_conn, database_engine):
     # put here the list of db customizations
     _add_is_partner(db_conn, database_engine)
     _add_table_partners_invited_by(db_conn, database_engine)
+    _check_public_rooms_private(db_conn, database_engine)
 
 # add "is_partner" column to the users table.
 # this is a no-op if it is already there.
@@ -55,5 +56,23 @@ def _add_table_partners_invited_by(db_conn, database_engine):
 
     except:
         logger.warn("check_db_customization: table partners_invited_by could not be created")
+        db_conn.rollback()
+        raise
+
+# check that no room is public
+def _check_public_rooms_private(db_conn, database_engine):
+    try:
+        cur = db_conn.cursor()
+        cur.execute("SELECT room_id FROM rooms WHERE is_public = 1;")
+        while True:
+            row = cur.fetchone()
+            if not row:
+                break
+            else:
+                logger.warn("####################################")
+                logger.warn("_make_public_rooms_private: room %s is public", row[0])
+                logger.warn("####################################")
+    except:
+        logger.warn("_check_public_rooms_private: could not check the absence of public rooms")
         db_conn.rollback()
         raise

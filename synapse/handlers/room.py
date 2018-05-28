@@ -115,7 +115,10 @@ class RoomCreationHandler(BaseHandler):
 
         invite_3pid_list = config.get("invite_3pid", [])
 
+        """ modified by watcha, to force private rooms
         visibility = config.get("visibility", None)
+        """
+        visibility = "private"
         is_public = visibility == "public"
 
         # autogen room IDs and try to create it. We may clash, so just

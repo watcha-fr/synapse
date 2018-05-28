@@ -201,6 +201,15 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
                 content['disable'] = True;
                 logger.info("PreviewUrlsEvent. New content=" + str(content))
 
+            if event_type == EventTypes.JoinRules:
+                logger.info("JoinRulesEvent. Original content=" + str(content))
+                content['join_rule'] = "invite"
+                logger.info("JoinRulesEvent. New content=" + str(content))
+
+            if event_type == EventTypes.GuestAccess:
+                logger.info("GuestAccessEvent. Original content=" + str(content))
+                content['guest_access'] = "forbidden"
+                logger.info("GuestAccessEvent. New content=" + str(content))
 
             event, context = yield self.event_creation_hander.create_event(
                 requester,
