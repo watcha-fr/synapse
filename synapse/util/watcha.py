@@ -62,8 +62,6 @@ def send_mail(config, recipient, subject, body):
     #logger.info(msg.as_string())
 
     logger.info("send email through host " + config.email_smtp_host)
-    logger.info("Subject: %s", subject)
-    logger.info("Body: %s", body)
     try:
         conn = SMTP(config.email_smtp_host, port=config.email_smtp_port)
         conn.ehlo()

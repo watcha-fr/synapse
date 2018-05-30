@@ -135,11 +135,6 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
             admin=admin,
         )
         
-        # very probably useless...
-        #session = self._get_session_info(request, None)
-        #self._remove_session(session)
-        # checks that the new password works, and get the user's full name.    
-        #display_name = _test_login(self.hs, params['user'], password, params['full_name'])
         user = UserID.from_string('@' + params['user'] + ':' + self.hs.get_config().server_name)
         self.hs.profile_handler.set_displayname(user, None, params['full_name'], by_admin=True)
 
@@ -161,9 +156,6 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        params = parse_json_object_from_request(request)
-
-        # monkeypatch the handler to do a set_password instead of a register...
         yield run_on_reactor() # not sure what it is :)
         
         parameter_json = parse_json_object_from_request(request)
