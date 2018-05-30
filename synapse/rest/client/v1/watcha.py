@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-
 import sys
 
 import hmac
@@ -135,11 +134,13 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
             admin=admin,
         )
         
-        user = UserID.from_string('@' + params['user'] + ':' + self.hs.get_config().server_name)
+        user = UserID.from_string(user_id)
         self.hs.profile_handler.set_displayname(user, None, params['full_name'], by_admin=True)
+        
+        yield self.hs.auth_handler.set_email(user_id, params['email'])
 
         display_name = yield self.hs.profile_handler.get_displayname(user)
-        # TODO: save email !!
+        
         send_mail(self.hs.config, params['email'], 
                   CONFIRMATION_EMAIL_SUBJECT_FR.format(server=self.hs.config.public_baseurl),
                   CONFIRMATION_EMAIL_MESSAGE_FR.format(

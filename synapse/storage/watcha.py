@@ -8,42 +8,30 @@ logger = logging.getLogger(__name__)
 # =================================================
 def check_db_customization(db_conn, database_engine):
     # put here the list of db customizations
-    _add_is_partner(db_conn, database_engine)
-    _add_table_partners_invited_by(db_conn, database_engine)
-    _check_public_rooms_private(db_conn, database_engine)
-    _check_history_visibility(db_conn, database_engine)
+    # (database_engine will be used later to for postgres)
+    _add_column_if_needed(db_conn, "users", "is_partner", "DEFAULT 0")
+    _add_table_partners_invited_by(db_conn)
+    _check_public_rooms_private(db_conn)
+    _check_history_visibility(db_conn)
+    _add_column_if_needed(db_conn, "users", "email", "TEXT")
 
-# add "is_partner" column to the users table.
-# this is a no-op if it is already there.
-def _add_is_partner(db_conn, database_engine):
+def _add_column_if_needed(db_conn, table, column, column_details):
     try:
         cur = db_conn.cursor()
-        cur.execute("PRAGMA table_info(users);")
-        has_is_partner = False
-        while True:
-            row = cur.fetchone()
-            if not row:
-                break
-            else:
-                #logger.info("check_db_customization: users column=" + str(row))
-                if (row[1] == "is_partner"):
-                    #logger.info("is_partner found")
-                    has_is_partner = True
-
-        if not has_is_partner:
-            logger.info("check_db_customization: column is_partner added to table users")
-            cur.execute("ALTER TABLE users ADD COLUMN is_partner DEFAULT 0;")
+        cur.execute("PRAGMA table_info(%s);" % table)
+        if column not in [row[1] for row in cur.fetchall()]:
+            cur.execute("ALTER TABLE %s ADD COLUMN %s %s;" % (table, column, column_details))
+            logger.info("check_db_customization: column %s added to table %s", column, table)
         else:
-            logger.info("check_db_customization: column is_partner is already in table users")
-
+            logger.info("check_db_customization: column %s.%s already present", column, table)
     except:
-        logger.warn("check_db_customization: could not check is_partner column")
+        logger.warn("check_db_customization: could not check %s.%s column", column, table)
         db_conn.rollback()
         raise
 
 # add "partners_invited_by" table
 # this is a no-op if it is already there.
-def _add_table_partners_invited_by(db_conn, database_engine):
+def _add_table_partners_invited_by(db_conn):
     try:
         cur = db_conn.cursor()
         cur.execute("PRAGMA table_info(partners_invited_by);")
@@ -61,7 +49,7 @@ def _add_table_partners_invited_by(db_conn, database_engine):
         raise
 
 # check that no room is public
-def _check_public_rooms_private(db_conn, database_engine):
+def _check_public_rooms_private(db_conn):
     try:
         cur = db_conn.cursor()
         cur.execute("SELECT room_id FROM rooms WHERE is_public = 1;")
@@ -79,7 +67,7 @@ def _check_public_rooms_private(db_conn, database_engine):
         raise
 
 # check that history visibility is one the two allowed values
-def _check_history_visibility(db_conn, database_engine):
+def _check_history_visibility(db_conn):
     try:
         cur = db_conn.cursor()
         cur.execute("SELECT room_id, history_visibility FROM history_visibility WHERE history_visibility = 'world_readable' OR history_visibility = 'joined';")
@@ -96,3 +84,5 @@ def _check_history_visibility(db_conn, database_engine):
         logger.warn("_check_history_visibility: could not check the validity of history_visibility of rooms")
         db_conn.rollback()
         raise
+
+

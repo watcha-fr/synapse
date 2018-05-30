@@ -200,7 +200,7 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
             keyvalues={
                 "name": user_id,
             },
-            retcols=["name", "password_hash", "is_guest", "is_partner"],
+            retcols=["name", "password_hash", "is_guest", "is_partner", "email"],
             allow_none=True,
             desc="get_user_by_id",
         )
@@ -352,7 +352,7 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
 
     def _query_for_auth(self, txn, token):
         sql = (
-            "SELECT users.name, users.is_guest, users.is_partner, access_tokens.id as token_id,"
+            "SELECT users.name, users.is_guest, users.is_partner, users.email, access_tokens.id as token_id,"
             " access_tokens.device_id"
             " FROM users"
             " INNER JOIN access_tokens on users.name = access_tokens.user_id"
@@ -541,3 +541,19 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
         )
         logger.warn("login from user %s. is_partner=%s", user_id, is_partner)
         defer.returnValue(is_partner)
+
+    @defer.inlineCallbacks
+    def user_set_email(self, user_id, email):
+        def user_set_email_txn(txn):
+            self._simple_update_one_txn(
+                txn,
+                'users', {
+                    'name': user_id
+                },
+                {
+                    'email': email
+                }
+            )
+        yield self.runInteraction(
+            "user_set_email", user_set_email_txn
+        )

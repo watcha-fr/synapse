@@ -160,6 +160,10 @@ class InviteExternalHandler(BaseHandler):
                 make_partner=True,
             )
             logger.info("invited user is not in the DB. Will send an invitation email.")
+
+            full_user_id = "@" + user_id + ":" + server
+            yield self.hs.auth_handler.set_email(full_user_id, invitee)
+            
             """
             # we save the account type
             result = yield self.store.set_partner(
@@ -184,7 +188,7 @@ class InviteExternalHandler(BaseHandler):
 
         # log invitation in DB
         result = yield self.store.insert_partner_invitation(
-            partner_user_id="@" + user_id + ":" + server,
+            partner_user_id=full_user_id,
             inviter_user_id=inviter,
             inviter_device_id=inviter_device_id,
             email_sent=True
