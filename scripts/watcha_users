@@ -118,7 +118,7 @@ def main():
         print "Config file version ({config_version}) incompatible with this version ({script_version}) of the script. Maybe pull an older version of the script ?".format(config_version=(config.VERSION if hasattr(config, 'VERSION') else 'none found'), script_version=VERSION)
         return
 
-    if not getattr(config, 'NEW_USERS', None) and getattr(config, 'RESET_PASSWORD_FOR_USERS', None):
+    if not getattr(config, 'NEW_USERS', None) and not getattr(config, 'RESET_PASSWORD_FOR_USERS', None):
         print "No user found in %s, please edit file and add users" % user_file
         return
 

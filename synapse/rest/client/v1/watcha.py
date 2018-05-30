@@ -84,7 +84,7 @@ def _decode_share_secret_parameters(hs, parameter_names, parameter_json):
     if not hs.config.registration_shared_secret:
         raise SynapseError(400, "Shared secret registration is not enabled")
 
-    parameters = { parameter_name: parameter_json[parameter_name].encode("utf-8")
+    parameters = { parameter_name: parameter_json[parameter_name]
                    for parameter_name in parameter_names }
 
     # Its important to check as we use null bytes as HMAC field separators
@@ -138,15 +138,14 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
         yield self.hs.auth_handler.set_email(user_id, params['email'])
 
         display_name = yield self.hs.profile_handler.get_displayname(user)
-        
+
         send_mail(self.hs.config, params['email'], 
-                  CONFIRMATION_EMAIL_SUBJECT_FR.format(server=self.hs.config.public_baseurl),
-                  CONFIRMATION_EMAIL_MESSAGE_FR.format(
-                      full_name=display_name,
-                      server=self.hs.config.public_baseurl,
-                      user_login=params['user'],
-                      user_password=password
-                  ))
+                  CONFIRMATION_EMAIL_SUBJECT_FR,
+                  CONFIRMATION_EMAIL_MESSAGE_FR,
+                  full_name=display_name,
+                  user_login=params['user'],
+                  user_password=password)
+        
         defer.returnValue((200, { "user_id": user_id, }))
             
     
@@ -160,23 +159,23 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
         parameter_json = parse_json_object_from_request(request)
         params = _decode_share_secret_parameters(self.hs, ['user'], parameter_json)
         password = generate_password()
-
-        logger.info("Setting password for user %s", param['user'])
+        user_id = '@' + params['user'] + ':' + self.hs.get_config().server_name
+        logger.info("Setting password for user %s", params['user'])
         self.hs.get_set_password_handler().set_password(
-            params['user'], password, None # no requester
+            user_id, password, None # no requester
         )
-        user = UserID.from_string('@' + params['user'] + ':' + self.hs.get_config().server_name)
-        display_name = yield  self.hs.profile_handler.get_displayname(user)
-        send_mail(self.hs.config, params['email'], 
-                  PASSWORD_EMAIL_SUBJECT_FR.format(server=self.hs.config.public_baseurl),
-                  PASSWORD_EMAIL_MESSAGE_FR.format(
-                      full_name=display_name,
-                      server=self.hs.config.public_baseurl,
-                      user_login=params['user'],
-                      user_password=password
-                  ))
+        user = UserID.from_string(user_id)
+        display_name = yield self.hs.profile_handler.get_displayname(user)
+        user_info = yield self.hs.get_datastore().get_user_by_id(user_id)
+        send_mail(self.hs.config, user_info['email'], 
+                  PASSWORD_EMAIL_SUBJECT_FR,
+                  PASSWORD_EMAIL_MESSAGE_FR,
+                  full_name=display_name,
+                  user_login=params['user'],
+                  user_password=password
+                  )
 
-        defer.returnValue((200, response))
+        defer.returnValue((200, {}))
 
 
 class WatchaStats(ClientV1RestServlet):
