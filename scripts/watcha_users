@@ -24,7 +24,7 @@ def _call_with_shared_secret(endpoint, parameters, server_location, shared_secre
     )
 
     for _, parameter_value in parameters:
-        mac.update(parameter_value)
+        mac.update(repr(parameter_value))
         mac.update("\x00")
 
     mac = mac.hexdigest()

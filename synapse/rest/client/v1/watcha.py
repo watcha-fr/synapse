@@ -100,7 +100,7 @@ def _decode_share_secret_parameters(hs, parameter_names, parameter_json):
         digestmod=sha1,
     )
     for parameter_name in parameter_names:
-        want_mac.update(parameters[parameter_name])
+        want_mac.update(repr(parameters[parameter_name]))
         want_mac.update("\x00")        
     if not compare_digest(want_mac.hexdigest(), got_mac):
             raise SynapseError(

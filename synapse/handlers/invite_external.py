@@ -147,7 +147,7 @@ class InviteExternalHandler(BaseHandler):
 
         user_id = self.gen_user_id_from_email(invitee)
         user_password = generate_password()
-        server = self.hs.get_config().server_name
+        core_server = self.hs.get_config().server_name
 
         try:
             new_user_id, token = yield self.hs.get_handlers().registration_handler.register(
@@ -161,7 +161,7 @@ class InviteExternalHandler(BaseHandler):
             )
             logger.info("invited user is not in the DB. Will send an invitation email.")
 
-            full_user_id = "@" + user_id + ":" + server
+            full_user_id = "@" + user_id + ":" + core_server
             yield self.hs.auth_handler.set_email(full_user_id, invitee)
             
             """
@@ -205,14 +205,15 @@ class InviteExternalHandler(BaseHandler):
         else:
             invitation_name = invitation_info["inviter_id"]
 
+        server = self.hs.config.public_baseurl.rstrip('/')
         logger.info("will generate message: invitation_name=%s invitee=%s user_id=%s user_pw=<REDACTED> new_user=%s server=%s" % (invitation_name, invitee, user_id, new_user, server));
 
         send_mail(self.hs.config, invitee,
-                  EMAIL_SUBJECT_FR.format(server=self.hs.config.public_baseurl),
+                  EMAIL_SUBJECT_FR.format(server=server),
                   (NEW_USER_EMAIL_MESSAGE_FR if new_user else EXISTING_USER_EMAIL_MESSAGE_FR).format(
                       inviter_name=invitation_name,
                       user_id=user_id,
                       user_password=user_password,
-                      server=self.hs.config.public_baseurl))
+                      server=server))
         
-        defer.returnValue("@" + user_id + ":" + server)
+        defer.returnValue("@" + user_id + ":" + core_server)
