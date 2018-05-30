@@ -131,7 +131,8 @@ def main():
 
         _call_with_shared_secret('watcha_register',
                                  [('user', user_name),
-                                  ('full_name', full_name),
+                                  # force it to be unicode in all case, to ensure hmac consistency
+                                  ('full_name', unicode(full_name)),
                                   ('email', email),
                                   ('admin', 'admin' if admin else 'notadmin')],
                                  config.CORE, config.REGISTRATION_SHARED_SECRET)

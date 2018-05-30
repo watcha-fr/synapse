@@ -91,8 +91,6 @@ def _decode_share_secret_parameters(hs, parameter_names, parameter_json):
     if any("\x00" in parameters[parameter_name] for parameter_name in parameter_names):
         raise SynapseError(400, "Invalid message")
 
-    # str() because otherwise hmac complains that 'unicode' does not
-    # have the buffer interface
     got_mac = str(parameter_json["mac"])
 
     want_mac = hmac.new(
@@ -117,6 +115,8 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
         logger.info("Adding Watcha user...")
         
         parameter_json = parse_json_object_from_request(request)
+        # parse_json will not return unicode if it's only ascii... making hmac fail. Force it to be unicode.
+        parameter_json['full_name'] = unicode(parameter_json['full_name'])
         params = _decode_share_secret_parameters(self.hs, ['user', 'full_name', 'email', 'admin'], parameter_json)
         if params['user'].lower() != params['user']:
             raise SynapseError(
