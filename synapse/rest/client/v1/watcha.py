@@ -12,8 +12,6 @@ from hmac import compare_digest
 
 from twisted.internet import defer
 
-from matrix_client.client import MatrixClient
-
 from synapse.util.async import run_on_reactor
 from synapse.api.errors import SynapseError
 from .base import ClientV1RestServlet, client_path_patterns
