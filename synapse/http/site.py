@@ -51,6 +51,10 @@ class SynapseRequest(Request):
         return self.requestHeaders.getRawHeaders("User-Agent", [None])[-1]
 
     def started_processing(self):
+        # insertion for watcha, to reduce log spam
+        if self.method == "OPTIONS":
+            return
+        # end of insertion
         self.site.access_logger.info(
             "%s - %s - Received request: %s %s",
             self.getClientIP(),

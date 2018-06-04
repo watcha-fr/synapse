@@ -354,6 +354,9 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
             else:
                 pass
 
+        # disabled for watcha
+        raise AuthError(403, "Directory is not available")
+
         limit = parse_integer(request, "limit", 0)
         since_token = parse_string(request, "since", None)
 
@@ -376,8 +379,8 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
     def on_POST(self, request):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
 
-        if requester.is_partner:
-            raise AuthError(403, "Partners cannot gain access to the room directory")
+        # disabled for watcha
+        raise AuthError(403, "Directory is not available")
 
         server = parse_string(request, "server", default=None)
         content = parse_json_object_from_request(request)
@@ -500,22 +503,6 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
             as_client_event=as_client_event,
             event_filter=event_filter,
         )
-
-        # watcha: TODO enforce room parameters here, for rooms that may have been created before parameters freezing.
-        #
-        #event_dict = {
-        #    "type": event_type,
-        #    "content": {'join_rule': 'invite'},
-        #    "room_id": room_id,
-        #    "sender": requester.user.to_string(),
-        #}
-
-        # and also
-
-        #if content['history_visibility'] == "world_readable":
-        #    content['history_visibility'] = "shared"
-        #if content['history_visibility'] == "joined":
-        #    content['history_visibility'] = "invited"
 
         defer.returnValue((200, msgs))
 
