@@ -539,7 +539,7 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
             retcol="is_partner",
             desc="isUserPartner",
         )
-        logger.warn("login from user %s. is_partner=%s", user_id, is_partner)
+        logger.info("login from user %s. is_partner=%s", user_id, is_partner)
         defer.returnValue(is_partner)
 
     @defer.inlineCallbacks

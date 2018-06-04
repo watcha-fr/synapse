@@ -42,7 +42,11 @@ def generate_password():
     return password
 
 
-def send_mail(config, recipient, subject, body):
+def send_mail(config, recipient, subject_template, body_template, **parameters):
+    
+    parameters['server'] = config.public_baseurl.rstrip('/')
+    subject = subject_template.format(**parameters)
+    body = body_template.format(**parameters)
     
     message = MIMEText(body, "plain", "utf8")
     message['From'] = config.email_notif_from

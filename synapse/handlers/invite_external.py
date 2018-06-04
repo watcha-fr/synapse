@@ -146,8 +146,8 @@ class InviteExternalHandler(BaseHandler):
     ):
 
         user_id = self.gen_user_id_from_email(invitee)
+        full_user_id = "@" + user_id + ":" + self.hs.get_config().server_name
         user_password = generate_password()
-        server = self.hs.get_config().server_name
 
         try:
             new_user_id, token = yield self.hs.get_handlers().registration_handler.register(
@@ -161,7 +161,6 @@ class InviteExternalHandler(BaseHandler):
             )
             logger.info("invited user is not in the DB. Will send an invitation email.")
 
-            full_user_id = "@" + user_id + ":" + server
             yield self.hs.auth_handler.set_email(full_user_id, invitee)
             
             """
@@ -177,7 +176,6 @@ class InviteExternalHandler(BaseHandler):
             if str(detail) == "400: User ID already taken.":
                 logger.info("invited user is already in the DB. Not modified. Will send a notification by email.")
                 new_user = False
-                # the generated password above will not be sent in the email notification.
             else:
                 logger.info("registration error: " + str(detail))
                 raise SynapseError(
@@ -199,20 +197,20 @@ class InviteExternalHandler(BaseHandler):
             inviter
         )
 
-        # the contents of the invitation email
         if (invitation_info["inviter_display_name"] is not None):
             invitation_name = u''.join((invitation_info["inviter_display_name"], ' (', invitation_info["inviter_id"], ')'))
         else:
             invitation_name = invitation_info["inviter_id"]
 
-        logger.info("will generate message: invitation_name=%s invitee=%s user_id=%s user_pw=<REDACTED> new_user=%s server=%s" % (invitation_name, invitee, user_id, new_user, server));
+        logger.info("will generate message: invitation_name=%s invitee=%s user_id=%s user_pw=<REDACTED> new_user=%s server=%s",
+                    invitation_name, invitee, user_id, new_user, server);
 
         send_mail(self.hs.config, invitee,
-                  EMAIL_SUBJECT_FR.format(server=self.hs.config.public_baseurl),
-                  (NEW_USER_EMAIL_MESSAGE_FR if new_user else EXISTING_USER_EMAIL_MESSAGE_FR).format(
-                      inviter_name=invitation_name,
-                      user_id=user_id,
-                      user_password=user_password,
-                      server=self.hs.config.public_baseurl))
+                  EMAIL_SUBJECT_FR,
+                  (NEW_USER_EMAIL_MESSAGE_FR if new_user else EXISTING_USER_EMAIL_MESSAGE_FR),
+                  inviter_name=invitation_name,
+                  user_id=user_id,
+                  user_password=user_password, # only used if new_user, in fact
+                  server=server)
         
-        defer.returnValue("@" + user_id + ":" + server)
+        defer.returnValue(full_user_id)

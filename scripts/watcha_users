@@ -24,7 +24,7 @@ def _call_with_shared_secret(endpoint, parameters, server_location, shared_secre
     )
 
     for _, parameter_value in parameters:
-        mac.update(parameter_value)
+        mac.update(repr(parameter_value))
         mac.update("\x00")
 
     mac = mac.hexdigest()
@@ -118,7 +118,7 @@ def main():
         print "Config file version ({config_version}) incompatible with this version ({script_version}) of the script. Maybe pull an older version of the script ?".format(config_version=(config.VERSION if hasattr(config, 'VERSION') else 'none found'), script_version=VERSION)
         return
 
-    if not getattr(config, 'NEW_USERS', None) and getattr(config, 'RESET_PASSWORD_FOR_USERS', None):
+    if not getattr(config, 'NEW_USERS', None) and not getattr(config, 'RESET_PASSWORD_FOR_USERS', None):
         print "No user found in %s, please edit file and add users" % user_file
         return
 
@@ -131,7 +131,8 @@ def main():
 
         _call_with_shared_secret('watcha_register',
                                  [('user', user_name),
-                                  ('full_name', full_name),
+                                  # force it to be unicode in all case, to ensure hmac consistency
+                                  ('full_name', unicode(full_name)),
                                   ('email', email),
                                   ('admin', 'admin' if admin else 'notadmin')],
                                  config.CORE, config.REGISTRATION_SHARED_SECRET)
