@@ -86,26 +86,25 @@ class InviteExternalHandler(BaseHandler):
         if member_event:
             inviter_display_name = member_event.content.get("displayname", "")
             inviter_avatar_url = member_event.content.get("avatar_url", "")
-            logger.debug("inviter: display_name=", repr(inviter_display_name))
-            logger.debug("avatar_url=" + repr(inviter_avatar_url))
+            logger.debug("inviter: display_name={0} avatar_url={1}", inviter_display_name, inviter_avatar_url)
 
         room_canonical_alias = ""
         canonical_alias_event = room_state.get((EventTypes.CanonicalAlias, ""))
         if canonical_alias_event:
             room_canonical_alias = canonical_alias_event.content.get("alias", "")
-            logger.debug("room: canonical_alias=" + repr(room_canonical_alias))
+            logger.debug("room: canonical_alias={0}", room_canonical_alias)
 
         room_name = ""
         room_name_event = room_state.get((EventTypes.Name, ""))
         if room_name_event:
             room_name = room_name_event.content.get("name", "")
-            logger.debug("room: name=" + repr(room_name))
+            logger.debug("room: name={0}", room_name)
 
         room_join_rules = ""
         join_rules_event = room_state.get((EventTypes.JoinRules, ""))
         if join_rules_event:
             room_join_rules = join_rules_event.content.get("join_rule", "")
-            logger.debug("room: join_rules=" + repr(room_join_rules))
+            logger.debug("room: join_rules={0}", room_join_rules)
 
         room_avatar_url = ""
         room_avatar_event = room_state.get((EventTypes.RoomAvatar, ""))
@@ -133,7 +132,7 @@ class InviteExternalHandler(BaseHandler):
         local_part = email_split[0]
         domain = email_split[1]
         user_id = local_part + "/" + domain
-        logger.debug("gen_user_id_from_email: email=" + str(email) + " leads to user_id=" + str(user_id))
+        logger.debug("gen_user_id_from_email: email={0} leads to user_id={1}", email, user_id)
         return local_part + "/" + domain
 
     @defer.inlineCallbacks
@@ -146,6 +145,11 @@ class InviteExternalHandler(BaseHandler):
     ):
 
         user_id = self.gen_user_id_from_email(invitee)
+
+        # note about server names:
+        # self.hs.get_config().server_name is of the format SERVER-core.watcha.fr
+        # self.hs.get_config().public_baseurl.rstrip('/') is of the format SERVER.watcha.fr
+
         full_user_id = "@" + user_id + ":" + self.hs.get_config().server_name
         user_password = generate_password()
 
@@ -177,10 +181,10 @@ class InviteExternalHandler(BaseHandler):
                 logger.info("invited user is already in the DB. Not modified. Will send a notification by email.")
                 new_user = False
             else:
-                logger.info("registration error: " + str(detail))
+                logger.info("registration error={0}", detail)
                 raise SynapseError(
                     400,
-                    "Registration error: " + str(detail)
+                    "Registration error: {0}".format(detail)
                 )
 
 
@@ -203,7 +207,7 @@ class InviteExternalHandler(BaseHandler):
             invitation_name = invitation_info["inviter_id"]
 
         logger.info("will generate message: invitation_name=%s invitee=%s user_id=%s user_pw=<REDACTED> new_user=%s server=%s",
-                    invitation_name, invitee, user_id, new_user, server);
+                    invitation_name, invitee, user_id, new_user, self.hs.get_config().server_name);
 
         send_mail(self.hs.config, invitee,
                   EMAIL_SUBJECT_FR,
@@ -211,6 +215,6 @@ class InviteExternalHandler(BaseHandler):
                   inviter_name=invitation_name,
                   user_id=user_id,
                   user_password=user_password, # only used if new_user, in fact
-                  server=server)
+                  server=self.hs.get_config().server_name)
         
         defer.returnValue(full_user_id)
