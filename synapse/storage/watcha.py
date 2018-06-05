@@ -10,11 +10,9 @@ def check_db_customization(db_conn, database_engine):
     # put here the list of db customizations
     # (database_engine will be used later to for postgres)
     _add_column_if_needed(db_conn, "users", "is_partner", "DEFAULT 0")
-    _add_table_partners_invited_by(db_conn)
-    _check_public_rooms_private(db_conn)
-    _check_rooms_invite_only(db_conn)
-    _check_history_visibility(db_conn)
     _add_column_if_needed(db_conn, "users", "email", "TEXT")
+    _add_table_partners_invited_by(db_conn)
+
 
 def _add_column_if_needed(db_conn, table, column, column_details):
     try:
@@ -48,61 +46,3 @@ def _add_table_partners_invited_by(db_conn):
         logger.warn("check_db_customization: table partners_invited_by could not be created")
         db_conn.rollback()
         raise
-
-# check that no room is public
-def _check_public_rooms_private(db_conn):
-    try:
-        cur = db_conn.cursor()
-        cur.execute("SELECT room_id FROM rooms WHERE is_public = 1;")
-
-        # TODO fix incorrect configs with:
-        #cur.execute("UPDATE rooms SET is_public = 0 WHERE is_public = 1;")
-        while True:
-            row = cur.fetchone()
-            if not row:
-                break
-            else:
-                logger.warn("####################################")
-                logger.warn("_check_public_rooms_private: room %s is public", row[0])
-                logger.warn("####################################")
-    except:
-        logger.warn("_check_public_rooms_private: could not check the absence of public rooms")
-        db_conn.rollback()
-        raise
-
-# check that no room is public
-def _check_rooms_invite_only(db_conn):
-    try:
-        cur = db_conn.cursor()
-        cur.execute("UPDATE events SET content = '{\"join_rule\":\"invite\"}' WHERE content = '{\"join_rule\":\"public\"}';")
-        logger.info("_check_rooms_invite_only: ensured that no room can be joined without an invitation")
-        # FIXME !!!!
-        # caching (?) makes this operation not reliable at least in the short term.
-        # people can still join rooms without invitation, even if join_rule = invite.
-    except:
-        logger.warn("_check_rooms_invite_only: could not set rooms to invite only")
-        db_conn.rollback()
-        raise
-
-
-
-# check that history visibility is one the two allowed values
-def _check_history_visibility(db_conn):
-    try:
-        cur = db_conn.cursor()
-        cur.execute("SELECT room_id, history_visibility FROM history_visibility WHERE history_visibility = 'world_readable' OR history_visibility = 'joined';")
-        while True:
-            row = cur.fetchone()
-            if not row:
-                break
-            else:
-                betterval = "shared" if row[1] == "world_readable" else "invited"
-                logger.warn("####################################")
-                logger.warn("_check_history_visibility: room %s has illegal history_visibility: %s. should be %s", row[0], row[1], betterval)
-                logger.warn("####################################")
-    except:
-        logger.warn("_check_history_visibility: could not check the validity of history_visibility of rooms")
-        db_conn.rollback()
-        raise
-
-
