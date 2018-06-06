@@ -34,9 +34,10 @@ Vous pouvez accéder à l’espace de travail à partir d’un navigateur sur :
 
     https://{server}
 
-Vous pouvez aussi installer l'application mobile Android :
+Vous pouvez aussi installer l'application mobile :
 
-    https://play.google.com/store/apps/details?id=im.watcha
+    - iOS : https://itunes.apple.com/us/app/watcha/id1383732254?ls=1&mt=8
+    - Android : https://play.google.com/store/apps/details?id=im.watcha
 
 N’hésitez pas à répondre à cet email si vous avez des difficultés à utiliser Watcha,
 
@@ -58,9 +59,10 @@ Vous pouvez accéder à l’espace de travail à partir d’un navigateur sur :
 
     https://{server}
 
-Vous pouvez aussi installer l'application mobile Android :
+Vous pouvez aussi installer l'application mobile :
 
-    https://play.google.com/store/apps/details?id=im.watcha
+    - iOS : https://itunes.apple.com/us/app/watcha/id1383732254?ls=1&mt=8
+    - Android : https://play.google.com/store/apps/details?id=im.watcha
 
 N’hésitez pas à répondre à cet email si vous avez des difficultés à utiliser Watcha,
 
