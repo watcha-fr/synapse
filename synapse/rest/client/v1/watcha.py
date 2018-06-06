@@ -29,12 +29,7 @@ Vous pouvez accéder à l’espace de travail à partir d’un navigateur sur {s
 Vous pouvez installer aussi un client mobile :
 
 pour Android: https://play.google.com/store/apps/details?id=im.watcha
-Pour iOS: https://itunes.apple.com/us/app/riot-im/id1083446067
-
-Sur l'application mobile, choisissez "Utiliser un serveur personnalisé" et entrez les valeurs:
-
-Serveur d'accueil : {server}
-Serveur d'identité : {server}
+pour iOS: https://itunes.apple.com/us/app/watcha/id1383732254
 
 Si vous avez des difficultés à utiliser Watcha, répondez à cet email et nous vous aiderons
 
@@ -160,14 +155,26 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
         params = _decode_share_secret_parameters(self.hs, ['user'], parameter_json)
         password = generate_password()
         user_id = '@' + params['user'] + ':' + self.hs.get_config().server_name
-        logger.info("Setting password for user %s", params['user'])
-        self.hs.get_set_password_handler().set_password(
+        logger.info("Setting password for user %s", user_id)
+        user = UserID.from_string(user_id)
+
+        user_info = yield self.hs.get_datastore().get_user_by_id(user_id)
+        # do not update password if email is not set
+        if not user_info['email']:
+            logger.warn("email not defined for this user")
+            defer.returnValue((500, { "message": "email not defined for this user" }))
+            return
+
+        yield self.hs.get_set_password_handler().set_password(
             user_id, password, None # no requester
         )
-        user = UserID.from_string(user_id)
-        display_name = yield self.hs.profile_handler.get_displayname(user)
-        user_info = yield self.hs.get_datastore().get_user_by_id(user_id)
-        send_mail(self.hs.config, user_info['email'], 
+
+        try:
+            display_name = yield self.hs.profile_handler.get_displayname(user_user)
+        except:
+            display_name = params['user']
+
+        send_email_error = send_mail(self.hs.config, user_info['email'],
                   PASSWORD_EMAIL_SUBJECT_FR,
                   PASSWORD_EMAIL_MESSAGE_FR,
                   full_name=display_name,
@@ -175,7 +182,10 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
                   user_password=password
                   )
 
-        defer.returnValue((200, {}))
+        if send_email_error is None:
+            defer.returnValue((200, {}))
+        else:
+            defer.returnValue((500, { "message": send_email_error }))
 
 
 class WatchaStats(ClientV1RestServlet):

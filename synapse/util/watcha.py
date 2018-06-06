@@ -41,7 +41,6 @@ def generate_password():
 
     return password
 
-
 def send_mail(config, recipient, subject_template, body_template, **parameters):
     
     parameters['server'] = config.public_baseurl.rstrip('/')
@@ -66,6 +65,7 @@ def send_mail(config, recipient, subject_template, body_template, **parameters):
     #logger.info(msg.as_string())
 
     logger.info("send email through host " + config.email_smtp_host)
+    error = None
     try:
         conn = SMTP(config.email_smtp_host, port=config.email_smtp_port)
         conn.ehlo()
@@ -77,6 +77,9 @@ def send_mail(config, recipient, subject_template, body_template, **parameters):
         logger.info("Mail sent to %s (Subject was: %s)", recipient, subject)
     except Exception, exc:
         logger.error("failed to send mail: %s" % str(exc) )
+        error = str(exc)
     finally:
         conn.quit()
+
+    return error
 
