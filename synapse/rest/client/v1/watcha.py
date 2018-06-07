@@ -200,6 +200,9 @@ class WatchaStats(ClientV1RestServlet):
         ### fetch the number of local and external users.
         user_stats = yield self.store.get_count_users_partners()
 
+        ### fetch the list of rooms, the amount of users and their activity status
+        room_stats = yield self.store.get_room_count_per_type()
+
         ### get the version of the synapse server, if installed with pip.
 
  # this method may block the synapse process for a while, as pip does not immediately return.
@@ -220,7 +223,7 @@ class WatchaStats(ClientV1RestServlet):
             # when grep does not find any line, this error is thrown. it is normal behaviour during development.
             synapse_version = "unavailable"
 
-        defer.returnValue((200, { "users": user_stats, "synapse_version": synapse_version }))
+        defer.returnValue((200, { "users": user_stats, "rooms": room_stats, "synapse_version": synapse_version }))
 
 
 def register_servlets(hs, http_server):

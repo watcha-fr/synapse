@@ -23,6 +23,7 @@ import collections
 import logging
 import ujson as json
 import re
+import time # added for watcha
 
 logger = logging.getLogger(__name__)
 
@@ -248,6 +249,80 @@ class RoomStore(SearchStore):
         return self.runInteraction(
             "get_rooms", f
         )
+
+    # method added by watcha
+    @defer.inlineCallbacks
+    def get_room_count_per_type(self):
+        """List the rooms, with two or less members, and with three or more members.
+        """
+        sql_rooms = """
+            SELECT room_id FROM rooms
+        """
+        rooms = yield self._execute("get_room_count_per_type", None, sql_rooms)
+        logger.info("ROOM STATS: rooms={}".format(rooms))
+
+        sql_members = """
+            SELECT user_id, membership FROM room_memberships WHERE room_id = "{room_id}" ORDER BY event_id ASC;
+        """
+        sql_last_message = """
+            SELECT received_ts FROM events WHERE type = "m.room.message" AND room_id = "{room_id}" ORDER BY received_ts DESC LIMIT 1;
+        """
+        now = int(round(time.time() * 1000))
+
+        one_one_rooms_count = 0
+        big_rooms_count = 0
+        big_rooms_count_active = 0
+
+        ACTIVE_THRESHOLD = 1000 * 3600 * 24 * 7
+
+        # dict containing queries results for a given room
+        result = { "now": now, "active_threshold": ACTIVE_THRESHOLD }
+
+        for room in rooms:
+            room = room[0]
+            # dict containing queries results for a given room
+            room_result = {}
+
+            # determine how many members are in the room
+            membership_events = yield self._execute("get_room_count_per_type", None, sql_members.format(**{ "room_id": room }))
+            memberlist = set()
+            for step in membership_events:
+                user_id = step[0]
+                membership = step[1]
+                #logger.info("ROOM STATS: room_id={room_id} membership={mem} user_id={user_id}".format(**{ "room_id": room, "mem": membership, "user_id": user_id }))
+                if membership == "join" or membership == "invite":
+                    memberlist.add(user_id)
+                elif membership == "leave":
+                    memberlist.discard(user_id)
+            #logger.info("ROOM STATS: memberlist={}", memberlist)
+            #room_result['members'] = len(memberlist)
+            if len(memberlist) >= 3:
+                room_result['three_or_more'] = 1
+                big_rooms_count += 1
+
+                # determine when the last message has been posted in the room
+                last_message_ts = yield self._execute("get_room_count_per_type", None, sql_last_message.format(**{ "room_id": room }))
+                room_result["active"] = 0
+                if last_message_ts is not None and len(last_message_ts) > 0:
+                    last_message_ts = last_message_ts[0][0]
+                    #room_result["last_ts"] = last_message_ts
+                    if now - last_message_ts < ACTIVE_THRESHOLD: # one week
+                        room_result["active"] = 1
+                        big_rooms_count_active += 1
+
+            else:
+                room_result['three_or_more'] = 0
+                one_one_rooms_count += 1
+
+            #logger.info("ROOM STATS: last_message_ts={}", last_message_ts)
+
+            result[room] = room_result
+
+        result["one_one_rooms_count"] = one_one_rooms_count
+        result["big_rooms_count"] = big_rooms_count
+        result["big_rooms_count_active"] = big_rooms_count_active
+
+        defer.returnValue(result)
 
     def _store_room_topic_txn(self, txn, event):
         if hasattr(event, "content") and "topic" in event.content:
