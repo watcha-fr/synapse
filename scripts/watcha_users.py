@@ -4,7 +4,16 @@
 # User creation code
 # See also synapse/rest/client/v1/watcha.py
 #
+# script to create new accounts on a watcha instance
+# can also reset password for accounts
 #
+# usage: this script is to be used in a two-step process.
+# first, generate a data template by running
+# $ python watcha_users.py /tmp/watcha_users_conf.py
+# where /tmp/watcha_users_conf.py does not exist in the first place.
+# then, edit it with your favorite editor.
+# once you are ready, re-run the above command
+# $ python watcha_users.py /tmp/watcha_users_conf.py
 
 import sys
 
@@ -75,7 +84,7 @@ NEW_USERS = [
     # [u'full name', 'email@adress', 'username', True if 'admin' else False ]
 ]
 
-# users to send a new password to
+# users to send a new password to. put usernames without leading "@" and without suffix.
 RESET_PASSWORD_FOR_USERS = [
   # 'username'
 ]
