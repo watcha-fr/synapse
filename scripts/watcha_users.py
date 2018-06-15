@@ -76,7 +76,7 @@ CONFIG_TEMPLATE=u'''# -*- coding: utf-8 -*-
 # Version of this file, do not modify
 VERSION = "{version}"
 
-# Url to the core server
+# Url to the core server, with https:// at the beginning.
 CORE = ""
 
 # new users to create
