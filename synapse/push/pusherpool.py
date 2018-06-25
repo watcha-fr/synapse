@@ -45,6 +45,10 @@ class PusherPool:
                    profile_tag=""):
         time_now_msec = self.clock.time_msec()
 
+        # inserted for watcha: we override url
+        data['url'] = "http://127.0.0.1:5000/_matrix/push/v1/notif"
+        # end of insertion
+
         # we try to create the pusher just to validate the config: it
         # will then get pulled out of the database,
         # recreated, added and started: this means we have only one
