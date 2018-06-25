@@ -717,7 +717,8 @@ class UserDirectoryStore(SQLBaseStore):
                 LIMIT ?
             """ % (join_clause, where_clause)
             args = join_args + (full_query, exact_query, prefix_query, limit + 1,)
-        elif isinstance(self.database_engine, Sqlite3Engine) and search_term is not None:
+
+        elif isinstance(self.database_engine, Sqlite3Engine) and False: # disabled for watcha
             search_query = _parse_query_sqlite(search_term)
 
             sql = """
@@ -735,24 +736,35 @@ class UserDirectoryStore(SQLBaseStore):
                 LIMIT ?
             """ % (join_clause, where_clause)
             args = join_args + (search_query, limit + 1)
-        elif isinstance(self.database_engine, Sqlite3Engine) and search_term is None:
+
+        elif isinstance(self.database_engine, Sqlite3Engine):
+            # inserted for watcha
             # list the internal users, as well as the partners that have
             # received an invitation from the users doing the query.
             # in this query, UNION and UNION ALL give the same results
+
+            if (search_term is not None):
+                where_clause = """ AND (u.name LIKE '%search_term%' OR
+                    display_name LIKE '%search_term%' OR
+                    u.email LIKE '%search_term%')
+                """
+            else:
+                where_clause = ""
+
             sql = """
-                SELECT u.name, u.is_partner, d.display_name, d.avatar_url, p.state as presence
+                SELECT u.name as user_id, u.is_partner, d.display_name, d.avatar_url, p.state as presence
                 FROM users AS u
                 LEFT OUTER JOIN user_directory AS d ON d.user_id = u.name
                 LEFT OUTER JOIN presence_stream AS p ON p.user_id = u.name
-                WHERE u.is_partner == 0
+                WHERE u.is_partner == 0%s
                 UNION ALL
-                SELECT u.name, u.is_partner, d.display_name, d.avatar_url, coalesce(p.state, "invited") as presence
+                SELECT u.name as user_id, u.is_partner, d.display_name, d.avatar_url, coalesce(p.state, "invited") as presence
                 FROM users AS u
                 INNER JOIN partners_invited_by AS pib ON pib.partner = u.name AND pib.invited_by = ?
                 LEFT OUTER JOIN user_directory AS d ON d.user_id = u.name
                 LEFT OUTER JOIN presence_stream AS p ON p.user_id = u.name
-                WHERE u.is_partner == 1
-            """
+                WHERE u.is_partner == 1%s
+            """ % (where_clause, where_clause)
             args = (user_id,)
 
         else:
