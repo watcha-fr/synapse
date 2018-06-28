@@ -744,10 +744,10 @@ class UserDirectoryStore(SQLBaseStore):
             # in this query, UNION and UNION ALL give the same results
 
             if (search_term is not None):
-                where_clause = """ AND (u.name LIKE '%search_term%' OR
-                    display_name LIKE '%search_term%' OR
-                    u.email LIKE '%search_term%')
-                """
+                where_clause = """ AND (u.name LIKE '%%%s%%' OR
+                    display_name LIKE '%%%s%%' OR
+                    u.email LIKE '%%%s%%')
+                """ % (search_term, search_term, search_term)
             else:
                 where_clause = ""
 
@@ -765,6 +765,8 @@ class UserDirectoryStore(SQLBaseStore):
                 LEFT OUTER JOIN presence_stream AS p ON p.user_id = u.name
                 WHERE u.is_partner == 1%s
             """ % (where_clause, where_clause)
+
+            logger.info(sql)
             args = (user_id,)
 
         else:
