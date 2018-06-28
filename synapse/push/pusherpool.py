@@ -45,8 +45,16 @@ class PusherPool:
                    profile_tag=""):
         time_now_msec = self.clock.time_msec()
 
-        # inserted for watcha: we override url
-        data['url'] = "http://127.0.0.1:5000/_matrix/push/v1/notif"
+        # inserted for watcha: we override url for iOS
+        # two options to distinguish iOS and Android push rules
+        # - app_id: for android it is "im.vector.app.android", while for iOS it is "im.watcha.app.voip"
+        # - app_display_name: android: "im.watcha" and iOS "Watcha (iOS)"
+        # below we use the first.
+        if not "android" in app_id:
+            data['url'] = "http://127.0.0.1:5000/_matrix/push/v1/notif"
+        else:
+            data['url'] = "https://matrix.org/_matrix/push/v1/notify"
+        # TODO avoid using matrix.org for android notifications.
         # end of insertion
 
         # we try to create the pusher just to validate the config: it
