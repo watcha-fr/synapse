@@ -51,7 +51,7 @@ class PusherPool:
         # - app_display_name: android: "im.watcha" and iOS "Watcha (iOS)"
         # below we use the first.
         if not "android" in app_id:
-            data['url'] = "http://127.0.0.1:5000/_matrix/push/v1/notif"
+            data['url'] = "http://127.0.0.1:5000/_matrix/push/v1/notify"
         else:
             data['url'] = "https://matrix.org/_matrix/push/v1/notify"
         # TODO avoid using matrix.org for android notifications.
