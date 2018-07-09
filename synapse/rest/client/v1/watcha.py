@@ -22,14 +22,17 @@ from synapse.types import UserID
 
 logger = logging.getLogger(__name__)
 
+#
+# TODO: merge this code with synapse/handlers/invite_external.py
+#
+# In the meantime, changing the URLs to the mobile apps must be done in BOTH places
+#
 HELP = u'''
-
-
 Vous pouvez accéder à l’espace de travail à partir d’un navigateur sur {server}.
-Vous pouvez installer aussi un client mobile :
+Vous pouvez aussi installer l'application mobile :
 
-pour Android: https://play.google.com/store/apps/details?id=im.watcha
-pour iOS: https://itunes.apple.com/us/app/watcha/id1383732254
+    - iOS : https://itunes.apple.com/us/app/watcha/id1383732254
+    - Android : https://play.google.com/store/apps/details?id=im.watcha.app
 
 Si vous avez des difficultés à utiliser Watcha, répondez à cet email et nous vous aiderons
 

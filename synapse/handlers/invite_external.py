@@ -11,10 +11,10 @@ from synapse.util.watcha import generate_password, send_mail
 
 
 #
-# TODO: merge with code in synapse/rest/client/v1/watcha.py
+# TODO: merge this code with synapse/rest/client/v1/watcha.py
 #
-
-
+# In the meantime, changing the URLs to the mobile apps must be done in BOTH places
+#
 logger = logging.getLogger(__name__)
 
 EMAIL_SUBJECT_FR = u'''Accès à l'espace de travail sécurisé {server}'''
