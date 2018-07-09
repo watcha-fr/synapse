@@ -37,7 +37,7 @@ Vous pouvez accéder à l’espace de travail à partir d’un navigateur sur :
 Vous pouvez aussi installer l'application mobile :
 
     - iOS : https://itunes.apple.com/us/app/watcha/id1383732254
-    - Android : https://play.google.com/store/apps/details?id=im.watcha
+    - Android : https://play.google.com/store/apps/details?id=im.watcha.app
 
 N’hésitez pas à répondre à cet email si vous avez des difficultés à utiliser Watcha,
 
@@ -62,13 +62,18 @@ Vous pouvez accéder à l’espace de travail à partir d’un navigateur sur :
 Vous pouvez aussi installer l'application mobile :
 
     - iOS : https://itunes.apple.com/us/app/watcha/id1383732254
-    - Android : https://play.google.com/store/apps/details?id=im.watcha
+    - Android : https://play.google.com/store/apps/details?id=im.watcha.app
 
 N’hésitez pas à répondre à cet email si vous avez des difficultés à utiliser Watcha,
 
 
 L'équipe Watcha.
 '''
+
+"""
+TODO
+add deep linking, if possible, for Android
+"""
 
 class InviteExternalHandler(BaseHandler):
 
@@ -168,7 +173,7 @@ class InviteExternalHandler(BaseHandler):
             logger.info("invited user is not in the DB. Will send an invitation email.")
 
             yield self.hs.auth_handler.set_email(full_user_id, invitee)
-            
+
             """
             # we save the account type
             result = yield self.store.set_partner(
@@ -218,5 +223,5 @@ class InviteExternalHandler(BaseHandler):
                   user_id=user_id,
                   user_password=user_password, # only used if new_user, in fact
                   server=self.hs.get_config().server_name)
-        
+
         defer.returnValue(full_user_id)
