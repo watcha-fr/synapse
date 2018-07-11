@@ -97,16 +97,13 @@ class ProfileHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def get_displayname(self, target_user):
-        logger.info("get_displayname. target_user={0}", target_user.to_string()) # watcha debug
         if self.hs.is_mine(target_user):
-            logger.info("target user is mine") # watcha debug
             displayname = yield self.store.get_profile_displayname(
                 target_user.localpart
             )
 
             defer.returnValue(displayname)
         else:
-            logger.info("target user is not mine") # watcha debug
             try:
                 result = yield self.federation.make_query(
                     destination=target_user.domain,
