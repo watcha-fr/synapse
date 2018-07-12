@@ -164,9 +164,9 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
         user_info = yield self.hs.get_datastore().get_user_by_id(user_id)
         # do not update password if email is not set
         if not user_info['email']:
-            logger.warn("email not defined for this user")
-            defer.returnValue((500, { "message": "email not defined for this user" }))
-            return
+            logger.error("email not defined for this user")
+            raise SynapseError(403,
+                               "email not defined for this user")
 
         yield self.hs.get_set_password_handler().set_password(
             user_id, password, None # no requester
@@ -188,7 +188,8 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
         if send_email_error is None:
             defer.returnValue((200, {}))
         else:
-            defer.returnValue((500, { "message": send_email_error }))
+            raise SynapseError(403,
+                               "Failed to sent email: " + repr(send_email_error))
 
 
 class WatchaStats(ClientV1RestServlet):
