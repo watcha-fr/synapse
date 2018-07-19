@@ -8,7 +8,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 from ._base import BaseHandler
 from synapse.util.watcha import generate_password, send_mail
-
+import base64
 
 #
 # TODO: merge this code with synapse/rest/client/v1/watcha.py
@@ -20,16 +20,23 @@ logger = logging.getLogger(__name__)
 EMAIL_SUBJECT_FR = u'''Accès à l'espace de travail sécurisé {server}'''
 NEW_USER_EMAIL_MESSAGE_FR = u'''Bonjour,
 
-{inviter_name} vous a invité à participer à un espace de travail sécurisé Watcha.
+{inviter_name} vous a invité à participer à l'espace de travail sécurisé Watcha {server}.
 
 Votre nom d’utilisateur est :
 
     {user_id}
 
-et votre mot de passe :
+Cliquez sur ce lien pour activer votre compte :
 
-    {user_password}
+    https://{server}/setup-account.html?t={setupToken}
 
+Nous pouvons vous aider à utiliser Watcha. Si vous rencontrez des difficultés, n'hésitez pas à répondre à cet email !
+
+L'équipe Watcha.
+'''
+
+# those links will be put in the setup-account.html page, alongside the deep link.
+'''
 Vous pouvez accéder à l’espace de travail à partir d’un navigateur sur :
 
     https://{server}
@@ -38,13 +45,10 @@ Vous pouvez aussi installer l'application mobile :
 
     - iOS : https://itunes.apple.com/us/app/watcha/id1383732254
     - Android : https://play.google.com/store/apps/details?id=im.watcha.app
-
-N’hésitez pas à répondre à cet email si vous avez des difficultés à utiliser Watcha,
-
-
-L'équipe Watcha.
 '''
 
+
+# TODO: put deep link here
 EXISTING_USER_EMAIL_MESSAGE_FR = u'''Bonjour,
 
 {inviter_name} vous a invité à participer à un espace de travail sécurisé Watcha.
@@ -53,7 +57,7 @@ Votre nom d’utilisateur est :
 
     {user_id}
 
-et votre mot de passe est celui qui vous avait été adressé à votre première invitation sur cet espace de travail.
+et votre mot de passe est celui que vous avez défini lors de l'activation de votre compte sur cet espace de travail.
 
 Vous pouvez accéder à l’espace de travail à partir d’un navigateur sur :
 
@@ -64,16 +68,11 @@ Vous pouvez aussi installer l'application mobile :
     - iOS : https://itunes.apple.com/us/app/watcha/id1383732254
     - Android : https://play.google.com/store/apps/details?id=im.watcha.app
 
-N’hésitez pas à répondre à cet email si vous avez des difficultés à utiliser Watcha,
-
+Nous pouvons vous aider à utiliser Watcha. Si vous rencontrez des difficultés ou si vous avez perdu votre mot de passe, n'hésitez pas à répondre à cet email !
 
 L'équipe Watcha.
 '''
 
-"""
-TODO
-add deep linking, if possible, for Android
-"""
 
 class InviteExternalHandler(BaseHandler):
 
@@ -216,12 +215,15 @@ class InviteExternalHandler(BaseHandler):
         logger.info("will generate message: invitation_name=%s invitee=%s user_id=%s user_pw=<REDACTED> new_user=%s server=%s",
                     invitation_name, invitee, user_id, new_user, self.hs.get_config().server_name);
 
+        setupToken = base64.b64encode('{"user":"' + user_id + '","pw":"' + user_password + '"}')
+
         send_mail(self.hs.config, invitee,
                   EMAIL_SUBJECT_FR,
                   (NEW_USER_EMAIL_MESSAGE_FR if new_user else EXISTING_USER_EMAIL_MESSAGE_FR),
                   inviter_name=invitation_name,
                   user_id=user_id,
-                  user_password=user_password, # only used if new_user, in fact
+                  setupToken=setupToken, # only used if new_user, in fact
+                  #user_password=user_password, # only used if new_user, in fact
                   server=self.hs.get_config().server_name)
 
         defer.returnValue(full_user_id)

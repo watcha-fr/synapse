@@ -42,11 +42,11 @@ def generate_password():
     return password
 
 def send_mail(config, recipient, subject_template, body_template, **parameters):
-    
+
     parameters['server'] = config.public_baseurl.rstrip('/')
     subject = subject_template.format(**parameters)
     body = body_template.format(**parameters)
-    
+
     message = MIMEText(body, "plain", "utf8")
     message['From'] = config.email_notif_from
     message['To'] = recipient
@@ -58,7 +58,7 @@ def send_mail(config, recipient, subject_template, body_template, **parameters):
     # Semi-relevant online discussions:
     # https://stackoverflow.com/questions/25671608/python-mail-puts-unaccounted-space-in-outlook-subject-line
     # https://bugs.python.org/issue1974
-    message['Subject'] = Header(subject, 'utf-8', 200)    
+    message['Subject'] = Header(subject, 'utf-8', 200)
 
     # if needed to customize the reply-to field
     # message['Reply-To'] = ...
@@ -82,4 +82,3 @@ def send_mail(config, recipient, subject_template, body_template, **parameters):
         conn.quit()
 
     return error
-
