@@ -144,7 +144,6 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
             full_name=display_name,
             user_login=params['user'],
             setupToken=setupToken,
-            #user_password=password
         )
 
         defer.returnValue((200, { "user_id": user_id, }))

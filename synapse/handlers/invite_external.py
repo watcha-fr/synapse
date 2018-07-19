@@ -223,7 +223,6 @@ class InviteExternalHandler(BaseHandler):
                   inviter_name=invitation_name,
                   user_id=user_id,
                   setupToken=setupToken, # only used if new_user, in fact
-                  #user_password=user_password, # only used if new_user, in fact
                   server=self.hs.get_config().server_name)
 
         defer.returnValue(full_user_id)
