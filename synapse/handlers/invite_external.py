@@ -35,18 +35,6 @@ Nous pouvons vous aider à utiliser Watcha. Si vous rencontrez des difficultés,
 L'équipe Watcha.
 '''
 
-# those links will be put in the setup-account.html page, alongside the deep link.
-'''
-Vous pouvez accéder à l’espace de travail à partir d’un navigateur sur :
-
-    https://{server}
-
-Vous pouvez aussi installer l'application mobile :
-
-    - iOS : https://itunes.apple.com/us/app/watcha/id1383732254
-    - Android : https://play.google.com/store/apps/details?id=im.watcha.app
-'''
-
 
 # TODO: put deep link here
 EXISTING_USER_EMAIL_MESSAGE_FR = u'''Bonjour,
