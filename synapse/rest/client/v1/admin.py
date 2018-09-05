@@ -317,9 +317,9 @@ class ListMediaInRoom(ClientV1RestServlet):
 
         defer.returnValue((200, {"local": local_mxcs, "remote": remote_mxcs}))
 
-
+"""Removed for watcha we disable this api since it allow the admin to choose the password for users
 class ResetPasswordRestServlet(ClientV1RestServlet):
-    """Post request to allow an administrator reset password for a user.
+    Post request to allow an administrator reset password for a user.
     This needs user to have administrator access in Synapse.
         Example:
             http://localhost:8008/_matrix/client/api/v1/admin/reset_password/
@@ -330,7 +330,7 @@ class ResetPasswordRestServlet(ClientV1RestServlet):
             }
         Returns:
             200 OK with empty object if success otherwise an error.
-        """
+
     PATTERNS = client_path_patterns("/admin/reset_password/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
@@ -342,9 +342,9 @@ class ResetPasswordRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, target_user_id):
-        """Post request to allow an administrator reset password for a user.
+        Post request to allow an administrator reset password for a user.
         This needs user to have administrator access in Synapse.
-        """
+
         UserID.from_string(target_user_id)
         requester = yield self.auth.get_user_by_req(request)
         is_admin = yield self.auth.is_server_admin(requester.user)
@@ -364,7 +364,7 @@ class ResetPasswordRestServlet(ClientV1RestServlet):
         )
         defer.returnValue((200, {}))
 
-
+"""
 class GetUsersPaginatedRestServlet(ClientV1RestServlet):
     """Get request to get specific number of users from Synapse.
     This needs user to have administrator access in Synapse.
@@ -511,7 +511,9 @@ def register_servlets(hs, http_server):
     DeactivateAccountRestServlet(hs).register(http_server)
     PurgeHistoryRestServlet(hs).register(http_server)
     UsersRestServlet(hs).register(http_server)
+    """removed for watcha
     ResetPasswordRestServlet(hs).register(http_server)
+    """
     GetUsersPaginatedRestServlet(hs).register(http_server)
     SearchUsersRestServlet(hs).register(http_server)
     ShutdownRoomRestServlet(hs).register(http_server)
