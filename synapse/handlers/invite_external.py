@@ -151,6 +151,16 @@ class InviteExternalHandler(BaseHandler):
         invitee
     ):
 
+        logger.info("Inviting %s...", invitee)
+        
+        existing_user_id = yield self.hs.auth_handler.find_user_id_by_email(invitee)
+
+        if existing_user_id:
+            logger.info("Invitee %s already exists, doing nothing", invitee)
+            # TODO: invite user in room (see update_room_membership... line 719 of room.py)
+            # Currently this gives an error.
+            return
+        
         user_id = self.gen_user_id_from_email(invitee)
 
         # note about server names:

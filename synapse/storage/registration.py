@@ -218,6 +218,20 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
             return dict(txn)
 
         return self.runInteraction("get_users_by_id_case_insensitive", f)
+ 
+    def find_user_id_by_email(self, email):
+        """Find user that match email case insensitively.
+        Returns a user_id or None
+        """
+        def f(txn):
+            sql = (
+                "SELECT name FROM users"
+                " WHERE lower(email) = lower(?)"
+            )
+            txn.execute(sql, (email,))
+            return list(txn)
+
+        return self.runInteraction("find_user_id_by_email_case_insensitive", f)
 
     def user_set_password_hash(self, user_id, password_hash):
         """
