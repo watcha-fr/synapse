@@ -152,18 +152,16 @@ class InviteExternalHandler(BaseHandler):
         invitee
     ):
 
-        logger.info("Inviting %s...", invitee)
-
         existing_user_id = yield self.hs.auth_handler.find_user_id_by_email(invitee)
 
         if existing_user_id:
-            existing_user_id = existing_user_id[0][0] # TODO: quite ugly, to improve :)
-            logger.info("Invitee with email %s already exists (id is %s), making him join room %s", invitee, existing_user_id, room_id)
+            logger.info("Invitee with email %s already exists (id is %s), inviting her to room %s",
+                        invitee, existing_user_id, room_id)
             yield self.hs.get_handlers().room_member_handler.update_membership(
                 requester=create_requester(inviter.to_string()),
                 target=UserID.from_string(existing_user_id),
                 room_id=room_id,
-                action="invite", # not Membership.JOIN because it gives "WARNING... 403: Cannot force another user to join."
+                action=Membership.INVITE,
                 txn_id=None,
                 third_party_signed=None,
                 content=None,
@@ -173,12 +171,14 @@ class InviteExternalHandler(BaseHandler):
             return
 
         user_id = self.gen_user_id_from_email(invitee)
+        logger.info("invited user %s is not in the DB. Creating user (id is %s), inviting to room and sending invitation email.",
+                    invitee, user_id)
 
         # note about server names:
-        # self.hs.get_config().server_name is of the format SERVER-core.watcha.fr
-        # self.hs.get_config().public_baseurl.rstrip('/') is of the format SERVER.watcha.fr
+        # self.hs.hostname is self.hs.get_config().server_name - the core's server
+        # self.hs.get_config().public_baseurl.rstrip('/') is the public URL - riot's
 
-        full_user_id = "@" + user_id + ":" + self.hs.get_config().server_name
+        full_user_id = UserID(user_id, self.hs.hostname).to_string()
         user_password = generate_password()
 
         try:
@@ -191,7 +191,6 @@ class InviteExternalHandler(BaseHandler):
                 admin=False,
                 make_partner=True,
             )
-            logger.info("invited user is not in the DB. Will send an invitation email.")
 
             yield self.hs.auth_handler.set_email(full_user_id, invitee)
 
