@@ -218,10 +218,12 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
             return dict(txn)
 
         return self.runInteraction("get_users_by_id_case_insensitive", f)
- 
+
     def find_user_id_by_email(self, email):
         """Find user that match email case insensitively.
-        Returns a user_id or None
+
+        Returns a [(user_id,)] list containing one tuple, or None
+        TODO: make it return something simplier :)
         """
         def f(txn):
             sql = (

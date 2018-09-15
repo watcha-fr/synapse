@@ -8,7 +8,8 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 from ._base import BaseHandler
 from synapse.util.watcha import generate_password, send_mail
-
+from synapse.types import UserID, create_requester
+from synapse.api.constants import Membership
 
 #
 # TODO: merge this code with synapse/rest/client/v1/watcha.py
@@ -152,15 +153,25 @@ class InviteExternalHandler(BaseHandler):
     ):
 
         logger.info("Inviting %s...", invitee)
-        
+
         existing_user_id = yield self.hs.auth_handler.find_user_id_by_email(invitee)
 
         if existing_user_id:
-            logger.info("Invitee %s already exists, doing nothing", invitee)
-            # TODO: invite user in room (see update_room_membership... line 719 of room.py)
-            # Currently this gives an error.
+            existing_user_id = existing_user_id[0][0] # TODO: quite ugly, to improve :)
+            logger.info("Invitee with email %s already exists (id is %s), making him join room %s", invitee, existing_user_id, room_id)
+            yield self.hs.get_handlers().room_member_handler.update_membership(
+                requester=create_requester(inviter.to_string()),
+                target=UserID.from_string(existing_user_id),
+                room_id=room_id,
+                action="invite", # not Membership.JOIN because it gives "WARNING... 403: Cannot force another user to join."
+                txn_id=None,
+                third_party_signed=None,
+                content=None,
+            )
+
+            defer.returnValue(existing_user_id)
             return
-        
+
         user_id = self.gen_user_id_from_email(invitee)
 
         # note about server names:
