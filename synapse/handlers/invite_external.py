@@ -18,43 +18,16 @@ from synapse.api.constants import Membership
 #
 logger = logging.getLogger(__name__)
 
-EMAIL_SUBJECT_FR = u'''Accès à l'espace de travail sécurisé {server}'''
-NEW_USER_EMAIL_MESSAGE_FR = u'''Bonjour,
+EMAIL_SUBJECT_FR = u'''Invitation à un salon de l'espace de travail sécurisé Watcha {server}'''
+EMAIL_MESSAGE_FR = u'''Bonjour,
 
-{inviter_name} vous a invité à participer à un espace de travail sécurisé Watcha.
-
-Votre nom d’utilisateur est :
-
-    {user_id}
-
-et votre mot de passe :
-
-    {user_password}
-
-Vous pouvez accéder à l’espace de travail à partir d’un navigateur sur :
-
-    https://{server}
-
-Vous pouvez aussi installer l'application mobile :
-
-    - iOS : https://itunes.apple.com/us/app/watcha/id1383732254
-    - Android : https://play.google.com/store/apps/details?id=im.watcha.app
-
-N’hésitez pas à répondre à cet email si vous avez des difficultés à utiliser Watcha,
-
-
-L'équipe Watcha.
-'''
-
-EXISTING_USER_EMAIL_MESSAGE_FR = u'''Bonjour,
-
-{inviter_name} vous a invité à participer à un espace de travail sécurisé Watcha.
+{inviter_name} vous a invité à participer au salon "{room}" dans l'espace de travail sécurisé Watcha {server}.
 
 Votre nom d’utilisateur est :
 
     {user_id}
 
-et votre mot de passe est celui qui vous avait été adressé à votre première invitation sur cet espace de travail.
+et votre mot de passe est {password}
 
 Vous pouvez accéder à l’espace de travail à partir d’un navigateur sur :
 
@@ -152,14 +125,16 @@ class InviteExternalHandler(BaseHandler):
         invitee
     ):
 
-        existing_user_id = yield self.hs.auth_handler.find_user_id_by_email(invitee)
+        full_user_id = yield self.hs.auth_handler.find_user_id_by_email(invitee)
 
-        if existing_user_id:
+        if full_user_id:
             logger.info("Invitee with email %s already exists (id is %s), inviting her to room %s",
-                        invitee, existing_user_id, room_id)
+                        invitee, full_user_id, room_id)
+
+            user = UserID.from_string(full_user_id)
             yield self.hs.get_handlers().room_member_handler.update_membership(
                 requester=create_requester(inviter.to_string()),
-                target=UserID.from_string(existing_user_id),
+                target=user,
                 room_id=room_id,
                 action=Membership.INVITE,
                 txn_id=None,
@@ -167,52 +142,54 @@ class InviteExternalHandler(BaseHandler):
                 content=None,
             )
 
-            defer.returnValue(existing_user_id)
-            return
+            user_id = user.localpart
+            new_user = False
+        else:
+            user_id = self.gen_user_id_from_email(invitee)
+            logger.info("invited user %s is not in the DB. Creating user (id is %s), inviting to room and sending invitation email.",
+                        invitee, user_id)
 
-        user_id = self.gen_user_id_from_email(invitee)
-        logger.info("invited user %s is not in the DB. Creating user (id is %s), inviting to room and sending invitation email.",
-                    invitee, user_id)
+            # note about server names:
+            # self.hs.hostname is self.hs.get_config().server_name - the core's server
+            # self.hs.get_config().public_baseurl.rstrip('/') is the public URL - riot's
 
-        # note about server names:
-        # self.hs.hostname is self.hs.get_config().server_name - the core's server
-        # self.hs.get_config().public_baseurl.rstrip('/') is the public URL - riot's
+            full_user_id = UserID(user_id, self.hs.hostname).to_string()
+            user_password = generate_password()
 
-        full_user_id = UserID(user_id, self.hs.hostname).to_string()
-        user_password = generate_password()
+            try:
+                new_user_id, token = yield self.hs.get_handlers().registration_handler.register(
+                    localpart=user_id,
+                    password=user_password,
+                    generate_token=True,
+                    guest_access_token=None,
+                    make_guest=False,
+                    admin=False,
+                    make_partner=True,
+                )
 
-        try:
-            new_user_id, token = yield self.hs.get_handlers().registration_handler.register(
-                localpart=user_id,
-                password=user_password,
-                generate_token=True,
-                guest_access_token=None,
-                make_guest=False,
-                admin=False,
-                make_partner=True,
-            )
+                yield self.hs.auth_handler.set_email(full_user_id, invitee)
 
-            yield self.hs.auth_handler.set_email(full_user_id, invitee)
-
-            """
-            # we save the account type
-            result = yield self.store.set_partner(
+                """
+                # we save the account type
+                result = yield self.store.set_partner(
                 user_id,
                 self.store.EXTERNAL_RESTRICTED_USER
-            )
-            logger.info("set partner account result=" + str(result))
-            """
-            new_user = True
-        except SynapseError as detail:
-            if str(detail) == "400: User ID already taken.":
-                logger.info("invited user is already in the DB. Not modified. Will send a notification by email.")
-                new_user = False
-            else:
-                logger.info("registration error={0}", detail)
-                raise SynapseError(
-                    400,
-                    "Registration error: {0}".format(detail)
                 )
+                logger.info("set partner account result=" + str(result))
+                """
+                new_user = True
+            except SynapseError as detail:
+                # user already exists as external user
+                # (maybe this code is useless since adding a check for email; but leaving it for now)
+                if str(detail) == "400: User ID already taken.":
+                    logger.info("invited user is already in the DB. Not modified. Will send a notification by email.")
+                    new_user = False
+                else:
+                    logger.info("registration error={0}", detail)
+                    raise SynapseError(
+                        400,
+                        "Registration error: {0}".format(detail)
+                    )
 
 
         # log invitation in DB
@@ -233,15 +210,24 @@ class InviteExternalHandler(BaseHandler):
         else:
             invitation_name = invitation_info["inviter_id"]
 
-        logger.info("will generate message: invitation_name=%s invitee=%s user_id=%s user_pw=<REDACTED> new_user=%s server=%s",
-                    invitation_name, invitee, user_id, new_user, self.hs.get_config().server_name);
+        email_parameters = {
+            'inviter_name': invitation_name,
+            'user_id': user_id,
+            'room': invitation_info["room_name"],
+            'server': self.hs.get_config().server_name
+        }
+
+        logger.info("Sending invitation email to %s, new_user=%s, %s",
+                    invitee, new_user, email_parameters);
+
+        if new_user:
+            email_parameters['password'] = ':\n\n    ' + user_password
+        else:
+            email_parameters['password'] = u'celui qui vous avait été adressé à votre première invitation sur cet espace de travail.'
 
         send_mail(self.hs.config, invitee,
                   EMAIL_SUBJECT_FR,
-                  (NEW_USER_EMAIL_MESSAGE_FR if new_user else EXISTING_USER_EMAIL_MESSAGE_FR),
-                  inviter_name=invitation_name,
-                  user_id=user_id,
-                  user_password=user_password, # only used if new_user, in fact
-                  server=self.hs.get_config().server_name)
+                  EMAIL_MESSAGE_FR,
+                  **email_parameters)
 
         defer.returnValue(full_user_id)
