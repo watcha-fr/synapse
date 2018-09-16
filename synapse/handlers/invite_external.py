@@ -213,7 +213,7 @@ class InviteExternalHandler(BaseHandler):
         email_parameters = {
             'inviter_name': invitation_name,
             'user_id': user_id,
-            'room': invitation_info["room_name"],
+            'room': invitation_info["room_name"] if invitation_info["room_name"] else u"(non nommée)",
             'server': self.hs.get_config().server_name
         }
 
