@@ -887,6 +887,7 @@ class AuthHandler(BaseHandler):
 
         defer.returnValue(ret)
 
+    # Added for Watcha...
     @defer.inlineCallbacks
     def find_user_id_by_email(self, email):
         ret = yield self.store.find_user_id_by_email(
@@ -894,6 +895,7 @@ class AuthHandler(BaseHandler):
         )
 
         defer.returnValue(ret)
+    # ... end added for Watcha.
 
 class MacaroonGeneartor(object):
     def __init__(self, hs):

@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 EMAIL_SUBJECT_FR = u'''Invitation à un salon de l'espace de travail sécurisé Watcha {server}'''
 EMAIL_MESSAGE_FR = u'''Bonjour,
 
-{inviter_name} vous a invité à participer au salon "{room}" dans l'espace de travail sécurisé Watcha {server}.
+{inviter_name} vous a invité à participer {room} dans l'espace de travail sécurisé Watcha {server}.
 
 Votre nom d’utilisateur est :
 
@@ -213,7 +213,7 @@ class InviteExternalHandler(BaseHandler):
         email_parameters = {
             'inviter_name': invitation_name,
             'user_id': user_id,
-            'room': invitation_info["room_name"] if invitation_info["room_name"] else u"(non nommée)",
+            'room': (u'au salon "%s"' % invitation_info["room_name"]) if invitation_info["room_name"] else u'à un nouveau salon',
             'server': self.hs.get_config().server_name
         }
 

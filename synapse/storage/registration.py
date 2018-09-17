@@ -219,6 +219,7 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
 
         return self.runInteraction("get_users_by_id_case_insensitive", f)
 
+    # Added for watcha...
     def find_user_id_by_email(self, email):
         """Find user that match email case insensitively.
 
@@ -234,6 +235,7 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
             return rows[0]['name'] if rows else None
 
         return self.runInteraction("find_user_id_by_email_case_insensitive", f)
+    # ... end added for watcha.
 
     def user_set_password_hash(self, user_id, password_hash):
         """
