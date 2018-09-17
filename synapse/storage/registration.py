@@ -226,9 +226,14 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
         Returns a user_id or None
         """
         def f(txn):
+            # there should be only one..
+            # but bad data have caused some accounts to be duplicated, so
+            # take a non-partner one by default
             sql = (
                 "SELECT name FROM users"
                 " WHERE lower(email) = lower(?)"
+                " ORDER BY is_partner ASC"
+                " LIMIT 1"
             )
             txn.execute(sql, (email,))
             rows = self.cursor_to_dict(txn)
