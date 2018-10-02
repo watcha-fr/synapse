@@ -25,6 +25,7 @@ from .admin import AdminHandler
 from .identity import IdentityHandler
 from .search import SearchHandler
 from .invite_external import InviteExternalHandler
+from .watcha_admin_handler import WatchaAdminHandler
 
 
 class Handlers(object):
@@ -58,3 +59,5 @@ class Handlers(object):
         self.search_handler = SearchHandler(hs)
         self.room_context_handler = RoomContextHandler(hs)
         self.invite_external_handler = InviteExternalHandler(hs)
+        self.invite_external_handler = InviteExternalHandler(hs) #added for watcha
+        self.watcha_admin_handler = WatchaAdminHandler(hs) #added for watcha
