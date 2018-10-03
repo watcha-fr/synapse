@@ -108,8 +108,11 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         yield run_on_reactor() # not sure what it is :)
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
+        auth_headers = request.requestHeaders.getRawHeaders("Authorization")
+        query_params = request.args.get("access_token")
+        if query_params:
+            requester = yield self.auth.get_user_by_req(request)
+            is_admin = yield self.auth.is_server_admin(requester.user)
         logger.info("Adding Watcha user...")
 
         parameter_json = parse_json_object_from_request(request)
