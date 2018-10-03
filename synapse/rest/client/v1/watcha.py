@@ -115,15 +115,13 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
                 'server': server,
         }
 
-        body_text = self.email_template_text.render(fields)
-        body_html = self.email_template_html.render(fields)
-
         send_email_error = send_mail(
             self.hs.config,
             params['email'],
             subject=subject,
-            body_text=body_text,
-            body_html=body_html,
+            template_text=self.email_template_text,
+            template_html=self.email_template_html,
+            fields=fields,
         )
 
         if send_email_error is None:
@@ -183,15 +181,13 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
                 'server': server,
         }
 
-        body_text = self.email_template_text.render(fields)
-        body_html = self.email_template_html.render(fields)
-
         send_email_error = send_mail(
             self.hs.config,
             user_info['email'],
             subject=subject,
-            body_text=body_text,
-            body_html=body_html,
+            template_text=self.email_template_text,
+            template_html=self.email_template_html,
+            fields=fields,
         )
 
         if send_email_error is None:
