@@ -19,7 +19,7 @@ from synapse.http.servlet import parse_json_object_from_request
 from synapse.util.watcha import generate_password, send_mail
 from synapse.types import UserID
 import base64
-
+from synapse.types import create_requester
 
 
 logger = logging.getLogger(__name__)
@@ -129,7 +129,8 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
         )
 
         user = UserID.from_string(user_id)
-        self.hs.profile_handler.set_displayname(user, None, params['full_name'], by_admin=True)
+        requester = create_requester(user_id)
+        self.hs.profile_handler.set_displayname(user, requester, params['full_name'], by_admin=True)
 
         yield self.hs.auth_handler.set_email(user_id, params['email'])
 
@@ -169,8 +170,9 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
             raise SynapseError(403,
                                "email not defined for this user")
 
+        requester = create_requester(user_id)
         yield self.hs.get_set_password_handler().set_password(
-            user_id, password, None # no requester
+            user_id, password, requester
         )
 
         try:

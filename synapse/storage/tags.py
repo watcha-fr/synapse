@@ -45,6 +45,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
         @deferred.addCallback
         def tags_by_room(rows):
             tags_by_room = {}
+            rows = {} # added for watcha
             for row in rows:
                 room_tags = tags_by_room.setdefault(row["room_id"], {})
                 room_tags[row["tag"]] = json.loads(row["content"])
