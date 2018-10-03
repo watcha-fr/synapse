@@ -110,6 +110,7 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
         yield run_on_reactor() # not sure what it is :)
         auth_headers = request.requestHeaders.getRawHeaders("Authorization")
         query_params = request.args.get("access_token")
+        is_admin=False;
         if query_params:
             requester = yield self.auth.get_user_by_req(request)
             is_admin = yield self.auth.is_server_admin(requester.user)
