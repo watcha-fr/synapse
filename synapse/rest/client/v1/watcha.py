@@ -118,7 +118,7 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
         if not is_admin:
             params = _decode_share_secret_parameters(self.hs, ['user', 'full_name', 'email', 'admin'], parameter_json)
         else:
-            params=parameter_json;
+            params = parameter_json
         if params['user'].lower() != params['user']:
             raise SynapseError(
                 403, "user name must be lowercase",
