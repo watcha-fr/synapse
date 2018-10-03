@@ -108,12 +108,17 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         yield run_on_reactor() # not sure what it is :)
+        requester = yield self.auth.get_user_by_req(request)
+        is_admin = yield self.auth.is_server_admin(requester.user)
         logger.info("Adding Watcha user...")
 
         parameter_json = parse_json_object_from_request(request)
         # parse_json will not return unicode if it's only ascii... making hmac fail. Force it to be unicode.
         parameter_json['full_name'] = unicode(parameter_json['full_name'])
-        params = _decode_share_secret_parameters(self.hs, ['user', 'full_name', 'email', 'admin'], parameter_json)
+        if not is_admin:
+            params = _decode_share_secret_parameters(self.hs, ['user', 'full_name', 'email', 'admin'], parameter_json)
+        else:
+            params=parameter_json;
         if params['user'].lower() != params['user']:
             raise SynapseError(
                 403, "user name must be lowercase",
