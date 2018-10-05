@@ -46,25 +46,25 @@ class InviteExternalHandler(BaseHandler):
         if member_event:
             inviter_display_name = member_event.content.get("displayname", "")
             inviter_avatar_url = member_event.content.get("avatar_url", "")
-            logger.debug("inviter: display_name={dn} avatar_url={au}".format(dn=inviter_display_name, au=inviter_avatar_url))
+            logger.debug(u"inviter: display_name={dn} avatar_url={au}".format(dn=inviter_display_name, au=inviter_avatar_url))
 
         room_canonical_alias = ""
         canonical_alias_event = room_state.get((EventTypes.CanonicalAlias, ""))
         if canonical_alias_event:
             room_canonical_alias = canonical_alias_event.content.get("alias", "")
-            logger.debug("room: canonical_alias={ca}".format(ca=room_canonical_alias))
+            logger.debug(u"room: canonical_alias={ca}".format(ca=room_canonical_alias))
 
         room_name = ""
         room_name_event = room_state.get((EventTypes.Name, ""))
         if room_name_event:
             room_name = room_name_event.content.get("name", "")
-            logger.debug("room: name={n}".format(n=room_name))
+            logger.debug(u"room: name={n}".format(n=room_name))
 
         room_join_rules = ""
         join_rules_event = room_state.get((EventTypes.JoinRules, ""))
         if join_rules_event:
             room_join_rules = join_rules_event.content.get("join_rule", "")
-            logger.debug("room: join_rules={jr}".format(jr=room_join_rules))
+            logger.debug(u"room: join_rules={jr}".format(jr=room_join_rules))
 
         room_avatar_url = ""
         room_avatar_event = room_state.get((EventTypes.RoomAvatar, ""))
@@ -170,8 +170,8 @@ class InviteExternalHandler(BaseHandler):
                     invitation_name, invitee, user_id, new_user, self.hs.get_config().server_name);
 
         server = self.hs.config.public_baseurl.rstrip('/')
-        setupToken = base64.b64encode('{"user":"' + user_id + '","pw":"' + user_password + '"}')
-        outToken = base64.b64encode('{"user":"{user_id}","server":"{server}"}'.format(user_id=user_id, server=server))
+        setupToken = base64.b64encode('{{"user":"{user_id}","pw":"{user_password}"}}'.format(user_id=user_id, user_password=user_password))
+        outToken = base64.b64encode('{{"user":"{user_id}","server":"{server}"}}'.format(user_id=user_id, server=server))
         subject = u'''Accès à l'espace de travail sécurisé {server}'''.format(server=server)
 
         fields = {
@@ -188,7 +188,7 @@ class InviteExternalHandler(BaseHandler):
             invitee,
             subject=subject,
             template_text=self.email_template_text_new if new_user else self.email_template_text_existing,
-            template_html=self.email_template_html_existing if new_user else self.email_template_html_existing,
+            template_html=self.email_template_html_new if new_user else self.email_template_html_existing,
             fields=fields,
         )
 
