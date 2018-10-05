@@ -11,13 +11,7 @@ from synapse.util.watcha import generate_password, send_mail
 import base64
 import jinja2
 
-#
-# TODO: merge this code with synapse/rest/client/v1/watcha.py
-#
-# In the meantime, changing the URLs to the mobile apps must be done in BOTH places
-#
 logger = logging.getLogger(__name__)
-
 
 class InviteExternalHandler(BaseHandler):
 
@@ -114,7 +108,7 @@ class InviteExternalHandler(BaseHandler):
         user_password = generate_password()
 
         try:
-            new_user_id, token = yield self.hs.get_handlers().registration_handler.register(
+            yield self.hs.get_handlers().registration_handler.register(
                 localpart=user_id,
                 password=user_password,
                 generate_token=True,
@@ -127,14 +121,6 @@ class InviteExternalHandler(BaseHandler):
 
             yield self.hs.auth_handler.set_email(full_user_id, invitee)
 
-            """
-            # we save the account type
-            result = yield self.store.set_partner(
-                user_id,
-                self.store.EXTERNAL_RESTRICTED_USER
-            )
-            logger.info("set partner account result=" + str(result))
-            """
             new_user = True
         except SynapseError as detail:
             if str(detail) == "400: User ID already taken.":
@@ -149,7 +135,7 @@ class InviteExternalHandler(BaseHandler):
 
 
         # log invitation in DB
-        result = yield self.store.insert_partner_invitation(
+        yield self.store.insert_partner_invitation(
             partner_user_id=full_user_id,
             inviter_user_id=inviter,
             inviter_device_id=inviter_device_id,
@@ -192,13 +178,4 @@ class InviteExternalHandler(BaseHandler):
             fields=fields,
         )
 
-        """
-        send_mail(self.hs.config, invitee,
-                  EMAIL_SUBJECT_FR,
-                  (NEW_USER_EMAIL_MESSAGE_FR if new_user else EXISTING_USER_EMAIL_MESSAGE_FR),
-                  inviter_name=invitation_name,
-                  user_id=user_id,
-                  setupToken=setupToken, # only used if new_user, in fact
-                  server=self.hs.get_config().server_name)
-        """
         defer.returnValue(full_user_id)

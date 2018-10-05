@@ -21,16 +21,7 @@ from synapse.types import UserID
 import base64
 import jinja2
 
-
-
 logger = logging.getLogger(__name__)
-
-#
-# TODO: merge this code with synapse/handlers/invite_external.py
-#
-# In the meantime, changing the URLs to the mobile apps must be done in BOTH places
-#
-
 
 def _decode_share_secret_parameters(hs, parameter_names, parameter_json):
     for parameter_name in parameter_names:
