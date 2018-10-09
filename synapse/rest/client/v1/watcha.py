@@ -165,11 +165,21 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         yield run_on_reactor() # not sure what it is :)
+        auth_headers = request.requestHeaders.getRawHeaders("Authorization")
+        is_admin = False
+
+        if auth_headers:
+            requester = yield self.auth.get_user_by_req(request)
+            is_admin = yield self.auth.is_server_admin(requester.user)
 
         parameter_json = parse_json_object_from_request(request)
-        params = _decode_share_secret_parameters(self.hs, ['user'], parameter_json)
+        if not is_admin:
+            params = _decode_share_secret_parameters(self.hs, ['user'], parameter_json)
+            user_id = '@' + params['user'] + ':' + self.hs.get_config().server_name
+        else:
+            params = parameter_json
+            user_id = params['user']
         password = generate_password()
-        user_id = '@' + params['user'] + ':' + self.hs.get_config().server_name
         logger.info("Setting password for user %s", user_id)
         user = UserID.from_string(user_id)
 
