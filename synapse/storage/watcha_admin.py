@@ -40,6 +40,17 @@ class WatchaAdminStore(SQLBaseStore):
             desc="get_rooms",
         )
 
+    def get_watchauser_display_name(self):
+        return self._simple_select_list(
+            table="profiles",
+            keyvalues={},
+            retcols=[
+                "room_id",
+                "creator",
+            ],
+            desc="get_rooms",
+        )
+
     def get_watcharoom_membership(self):
         return self._simple_select_list(
             table="room_memberships",

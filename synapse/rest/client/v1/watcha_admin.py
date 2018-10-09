@@ -104,6 +104,25 @@ class WatchaRoomNameRestServlet(ClientV1RestServlet):
         ret = yield self.handlers.watcha_admin_handler.getRoomName()
         defer.returnValue((200, ret))
 
+    class WatchaDisplayNameRestServlet(ClientV1RestServlet):
+
+        PATTERNS = client_path_patterns("/watchadisplayname")
+        def __init__(self, hs):
+            self.hs = hs
+            self.store = hs.get_datastore()
+            super(WatchaDisplayNameRestServlet, self).__init__(hs)
+            self.auth = hs.get_auth()
+            self.handlers = hs.get_handlers()
+
+        @defer.inlineCallbacks
+        def on_GET(self, request):
+            requester = yield self.auth.get_user_by_req(request)
+            is_admin = yield self.auth.is_server_admin(requester.user)
+            if not is_admin:
+                raise AuthError(403, "You are not a server admin")
+            ret = yield self.handlers.watcha_admin_handler.getRoomName()
+            defer.returnValue((200, ret))
+
 def register_servlets(hs, http_server):
     WatchaUserlistRestServlet(hs).register(http_server)
     WatchaRoomlistRestServlet(hs).register(http_server)

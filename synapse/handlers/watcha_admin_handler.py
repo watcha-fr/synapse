@@ -29,3 +29,8 @@ class WatchaAdminHandler(BaseHandler):
     def getRoomName(self):
         ret = yield self.store.get_watcharoom_name()
         defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def getDisplayName(self):
+        ret = yield self.store.get_watchauser_display_name()
+        defer.returnValue(ret)
