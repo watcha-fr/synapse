@@ -45,8 +45,8 @@ class WatchaAdminStore(SQLBaseStore):
             table="profiles",
             keyvalues={},
             retcols=[
-                "room_id",
-                "creator",
+                "user_id",
+                "displayname",
             ],
             desc="get_rooms",
         )
