@@ -34,3 +34,8 @@ class WatchaAdminHandler(BaseHandler):
     def getDisplayName(self):
         ret = yield self.store.get_watchauser_display_name()
         defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def extendRoomlist(self):
+        ret = yield self.store.get_watcha_extend_room_list()
+        defer.returnValue(ret)
