@@ -77,13 +77,12 @@ class WatchaAdminStore(SQLBaseStore):
                     roomObject['type'] = "discussion"
 
             last_message_ts = yield self._execute("get_room_count_per_type", None, sql_last_message.format(**{ "room_id": room }))
+            roomObject['active'] = 0
             if last_message_ts is not None and len(last_message_ts) > 0:
                 last_message_ts = last_message_ts[0][0]
                 #room_result["last_ts"] = last_message_ts
                 if now - last_message_ts < ACTIVE_THRESHOLD: # one week
                     roomObject['active'] = 1
-            else:
-                roomObject['active'] = 0
             roomArray.append(roomObject)
 
         defer.returnValue(roomArray);
