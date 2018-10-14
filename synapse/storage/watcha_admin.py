@@ -74,7 +74,8 @@ class WatchaAdminStore(SQLBaseStore):
                 roomObject['type'] = "room"
             else:
                 roomObject['type'] = "discussion"
-                last_message_ts = yield self._execute("get_room_count_per_type", None, sql_last_message.format(**{ "room_id": room }))
+
+            last_message_ts = yield self._execute("get_room_count_per_type", None, sql_last_message.format(**{ "room_id": room }))
             if last_message_ts is not None and len(last_message_ts) > 0:
                 last_message_ts = last_message_ts[0][0]
                 #room_result["last_ts"] = last_message_ts
