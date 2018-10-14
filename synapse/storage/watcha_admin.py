@@ -61,6 +61,7 @@ class WatchaAdminStore(SQLBaseStore):
         for room in rooms:
             roomObject={}
             roomObject['room_id']=room[0]
+            roomObject['creator']=room[1]
             roomObject['members']=[]
             membership_events = yield self._execute("get_room_count_per_type", None, sql_members.format(**{ "room_id": room[0] }))
             for step in membership_events:
@@ -70,20 +71,20 @@ class WatchaAdminStore(SQLBaseStore):
                     roomObject['members'].append(user_id)
                 elif membership == "leave":
                     roomObject['members'].remove(user_id)
-            if len(roomObject['members']) >= 3:
-                roomObject['type'] = "room"
-            else:
-                roomObject['type'] = "discussion"
+                if len(roomObject['members']) >= 3:
+                    roomObject['type'] = "room"
+                else:
+                    roomObject['type'] = "discussion"
 
-            last_message_ts = yield self._execute("get_room_count_per_type", None, sql_last_message.format(**{ "room_id": room }))
-            if last_message_ts is not None and len(last_message_ts) > 0:
-                last_message_ts = last_message_ts[0][0]
-                #room_result["last_ts"] = last_message_ts
-                if now - last_message_ts < ACTIVE_THRESHOLD: # one week
-                    roomObject['state'] = 'active'
-            else:
-                roomObject['state'] = 'inactive'
-            roomArray.append(roomObject)
+                last_message_ts = yield self._execute("get_room_count_per_type", None, sql_last_message.format(**{ "room_id": room }))
+                if last_message_ts is not None and len(last_message_ts) > 0:
+                    last_message_ts = last_message_ts[0][0]
+                    #room_result["last_ts"] = last_message_ts
+                    if now - last_message_ts < ACTIVE_THRESHOLD: # one week
+                        roomObject['state'] = 'active'
+                else:
+                    roomObject['state'] = 'inactive'
+                roomArray.append(roomObject)
 
             defer.returnValue(roomArray);
 
