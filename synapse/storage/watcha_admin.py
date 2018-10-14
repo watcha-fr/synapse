@@ -86,7 +86,7 @@ class WatchaAdminStore(SQLBaseStore):
                 roomObject['state'] = 'inactive'
             roomArray.append(roomObject)
 
-            defer.returnValue(roomArray);
+        defer.returnValue(roomArray);
 
 
 
