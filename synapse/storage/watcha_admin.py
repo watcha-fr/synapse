@@ -74,7 +74,7 @@ class WatchaAdminStore(SQLBaseStore):
                 if len(roomObject['members']) >= 3:
                     roomObject['type'] = "room"
                 else:
-                    roomObject['type'] = "discussion"
+                    roomObject['type'] = "One to one"
 
             last_message_ts = yield self._execute("get_room_count_per_type", None, sql_last_message.format(**{ "room_id": room[0] }))
             roomObject['active'] = 0
