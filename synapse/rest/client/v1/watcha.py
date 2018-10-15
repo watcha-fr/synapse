@@ -106,7 +106,7 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
             self.hs.config,
             params['email'],
             subject=subject,
-            template_name='watcha_new_account',
+            template_name='new_account',
             fields=fields,
         )
 
@@ -167,7 +167,7 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
             self.hs.config,
             user_info['email'],
             subject=subject,
-            template_name='watcha_reset_password',
+            template_name='reset_password',
             fields=fields,
         )
 

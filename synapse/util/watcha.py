@@ -5,6 +5,7 @@ import random
 import logging
 import jinja2
 import os
+from os.path import join, dirname, realpath
 
 from smtplib import SMTP
 from email.mime.multipart import MIMEMultipart
@@ -60,13 +61,15 @@ def send_mail(config, recipient, subject, template_name, fields):
     # https://bugs.python.org/issue1974
     msg['Subject'] = Header(subject, 'utf-8', 200)
 
-    template_dir = config.email_template_dir
-    logger.info("Loading email templates from %s", template_dir)
+    # HACK: to avoid issues with setuptools/distutil,
+    # (not easy to get the 'res/templates' folder to be included in the whl file...)
+    # we ship the templates as .py files, and put them in the code tree itself.
+    template_dir = join(dirname(realpath(__file__)), 'watcha_templates')
     jinjaenv = jinja2.Environment(loader=jinja2.FileSystemLoader(template_dir))
 
-    for mimetype, extension in {'html': 'html',
-                                'plain': 'txt'}.items():
-        body = jinjaenv.get_template(template_name + '.' + extension).render(fields)
+    for mimetype, extension in {'plain': 'txt',
+                                'html': 'html'}.items():
+        body = jinjaenv.get_template(template_name + '.' + extension + '.py').render(fields)
         msg.attach(MIMEText(body, mimetype, 'utf-8'))
 
     # if needed to customize the reply-to field

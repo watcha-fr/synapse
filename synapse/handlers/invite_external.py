@@ -162,7 +162,7 @@ class InviteExternalHandler(BaseHandler):
             self.hs.config,
             invitee,
             subject=subject,
-            template_name='watcha_invite_new_account' if new_user else 'watcha_invite_existing_account',
+            template_name='invite_new_account' if new_user else 'invite_existing_account',
             fields=fields,
         )
 
