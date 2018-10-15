@@ -67,9 +67,9 @@ class WatchaAdminStore(SQLBaseStore):
                 user_id = step[0]
                 membership = step[1]
                 if membership == "join" or membership == "invite":
-                    roomObject['members'].append(user_id)
+                    roomObject['members'].add(user_id)
                 elif membership == "leave":
-                    roomObject['members'].remove(user_id)
+                    roomObject['members'].discard(user_id)
                 if len(roomObject['members']) >= 3:
                     roomObject['type'] = "Room"
                 else:
