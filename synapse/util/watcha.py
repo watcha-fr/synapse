@@ -3,6 +3,8 @@
 
 import random
 import logging
+import jinja2
+import os
 
 from smtplib import SMTP
 from email.mime.multipart import MIMEMultipart
@@ -42,8 +44,22 @@ def generate_password():
 
     return password
 
-def send_mail(config, recipient, subject, template_text, template_html, fields):
 
+jinjaenv = None
+
+def send_mail(config, recipient, subject, template_name, fields):
+    global jinjaenv
+    if jinjaenv is None:
+        # load template engine for emails
+        logger.info("will load email templates from {}".format(config.email_template_dir))
+        loader = jinja2.FileSystemLoader(config.email_template_dir)
+        jinjaenv = jinja2.Environment(loader=loader)
+
+    # load templates
+    template_text = jinjaenv.get_template(os.path.basename('{}.txt'.format(template_name)))
+    template_html = jinjaenv.get_template(os.path.basename('{}.html'.format(template_name)))
+
+    # render templates
     body_text = template_text.render(fields)
     body_html = template_html.render(fields)
 

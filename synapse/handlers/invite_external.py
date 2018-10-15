@@ -9,7 +9,6 @@ from synapse.api.errors import SynapseError
 from ._base import BaseHandler
 from synapse.util.watcha import generate_password, send_mail
 import base64
-import jinja2
 
 logger = logging.getLogger(__name__)
 
@@ -17,12 +16,33 @@ class InviteExternalHandler(BaseHandler):
 
     def __init__(self, hs):
         BaseHandler.__init__(self, hs)
-        loader = jinja2.FileSystemLoader(hs.config.email_template_dir)
-        env = jinja2.Environment(loader=loader)
-        self.email_template_text_new = env.get_template('watcha_invite_new_account.txt')
-        self.email_template_html_new = env.get_template('watcha_invite_new_account.html')
-        self.email_template_text_existing = env.get_template('watcha_invite_existing_account.txt')
-        self.email_template_html_existing = env.get_template('watcha_invite_existing_account.html')
+
+        # this is for debug. to delete afterwards.
+        # it shows that jinja2 successfully loads templates when this is called in __init__(),
+        # while it fails when loaded from invite() - see error trace below.
+        """
+        File "synapse/handlers/invite_external.py", line 179, in invite
+
+        File "synapse/util/watcha.py", line 59, in send_mail
+
+        File "/usr/local/lib/python2.7/dist-packages/jinja2/environment.py", line 830, in get_template
+            return self._load_template(name, self.make_globals(globals))
+        File "/usr/local/lib/python2.7/dist-packages/jinja2/environment.py", line 804, in _load_template
+            template = self.loader.load(self, name, globals)
+        File "/usr/local/lib/python2.7/dist-packages/jinja2/loaders.py", line 113, in load
+            source, filename, uptodate = self.get_source(environment, name)
+        File "/usr/local/lib/python2.7/dist-packages/jinja2/loaders.py", line 187, in get_source
+            raise TemplateNotFound(template)
+        jinja2.exceptions.TemplateNotFound: watcha_invite_new_account.txt
+        """
+        send_mail(
+            hs.config,
+            'bibi',
+            subject='trololo',
+            template_name='watcha_invite_new_account',
+            fields={}
+        )
+        # end of debug
 
     # from room_id and user ID, get details about who invites and where.
     # adapted from synapse/handlers/room_member.py
@@ -173,8 +193,7 @@ class InviteExternalHandler(BaseHandler):
             self.hs.config,
             invitee,
             subject=subject,
-            template_text=self.email_template_text_new if new_user else self.email_template_text_existing,
-            template_html=self.email_template_html_new if new_user else self.email_template_html_existing,
+            template_name='watcha_invite_new_account' if new_user else 'watcha_invite_existing_account',
             fields=fields,
         )
 

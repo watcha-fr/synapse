@@ -19,7 +19,6 @@ from synapse.http.servlet import parse_json_object_from_request
 from synapse.util.watcha import generate_password, send_mail
 from synapse.types import UserID
 import base64
-import jinja2
 
 logger = logging.getLogger(__name__)
 
@@ -58,10 +57,7 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         ClientV1RestServlet.__init__(self, hs)
-        loader = jinja2.FileSystemLoader(hs.config.email_template_dir)
-        env = jinja2.Environment(loader=loader)
-        self.email_template_text = env.get_template('watcha_new_account.txt')
-        self.email_template_html = env.get_template('watcha_new_account.html')
+
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -110,8 +106,7 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
             self.hs.config,
             params['email'],
             subject=subject,
-            template_text=self.email_template_text,
-            template_html=self.email_template_html,
+            template_name='watcha_new_account',
             fields=fields,
         )
 
@@ -127,10 +122,6 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         ClientV1RestServlet.__init__(self, hs)
-        loader = jinja2.FileSystemLoader(hs.config.email_template_dir)
-        env = jinja2.Environment(loader=loader)
-        self.email_template_text = env.get_template('watcha_reset_password.txt')
-        self.email_template_html = env.get_template('watcha_reset_password.html')
 
 
     @defer.inlineCallbacks
@@ -176,8 +167,7 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
             self.hs.config,
             user_info['email'],
             subject=subject,
-            template_text=self.email_template_text,
-            template_html=self.email_template_html,
+            template_name='watcha_reset_password',
             fields=fields,
         )
 
