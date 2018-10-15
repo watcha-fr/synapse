@@ -3,9 +3,8 @@
 
 import random
 import logging
-import jinja2
+from jinja2 import Environment, PackageLoader
 import os
-from os.path import join, dirname, realpath
 
 from smtplib import SMTP
 from email.mime.multipart import MIMEMultipart
@@ -61,11 +60,12 @@ def send_mail(config, recipient, subject, template_name, fields):
     # https://bugs.python.org/issue1974
     msg['Subject'] = Header(subject, 'utf-8', 200)
 
-    # HACK: to avoid issues with setuptools/distutil,
+    # To avoid issues with setuptools/distutil,
     # (not easy to get the 'res/templates' folder to be included in the whl file...)
     # we ship the templates as .py files, and put them in the code tree itself.
-    template_dir = join(dirname(realpath(__file__)), 'watcha_templates')
-    jinjaenv = jinja2.Environment(loader=jinja2.FileSystemLoader(template_dir))
+    # This is somewhat a hack, but it is somewhat suggested by the existence
+    # of a "PackagerLoader" in Jinja - they must have had the same issue :)
+    jinjaenv = Environment(loader=PackageLoader('synapse.util', 'watcha_templates'))
 
     for mimetype, extension in {'plain': 'txt',
                                 'html': 'html'}.items():
