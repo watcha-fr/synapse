@@ -72,12 +72,11 @@ class InviteExternalHandler(BaseHandler):
         self,
         email
     ):
-        email_split = email.split("@")
-        local_part = email_split[0]
-        domain = email_split[1]
+        # user_id must be lowercase (and it's OK to consider email as case-insensitive)
+        local_part, domain = email.lower().split("@")
         user_id = local_part + "/" + domain
-        logger.debug("gen_user_id_from_email: email={email} leads to user_id={user_id}".format(email=email, user_id=user_id))
-        return local_part + "/" + domain
+        logger.debug("gen_user_id_from_email: email=%s leads to user_id=%s", email, user_id)
+        return user_id
 
     @defer.inlineCallbacks
     def invite(
