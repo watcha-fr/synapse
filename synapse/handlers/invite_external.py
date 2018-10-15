@@ -14,36 +14,6 @@ logger = logging.getLogger(__name__)
 
 class InviteExternalHandler(BaseHandler):
 
-    def __init__(self, hs):
-        BaseHandler.__init__(self, hs)
-
-        # this is for debug. to delete afterwards.
-        # it shows that jinja2 successfully loads templates when this is called in __init__(),
-        # while it fails when loaded from invite() - see error trace below.
-        """
-        File "synapse/handlers/invite_external.py", line 179, in invite
-
-        File "synapse/util/watcha.py", line 59, in send_mail
-
-        File "/usr/local/lib/python2.7/dist-packages/jinja2/environment.py", line 830, in get_template
-            return self._load_template(name, self.make_globals(globals))
-        File "/usr/local/lib/python2.7/dist-packages/jinja2/environment.py", line 804, in _load_template
-            template = self.loader.load(self, name, globals)
-        File "/usr/local/lib/python2.7/dist-packages/jinja2/loaders.py", line 113, in load
-            source, filename, uptodate = self.get_source(environment, name)
-        File "/usr/local/lib/python2.7/dist-packages/jinja2/loaders.py", line 187, in get_source
-            raise TemplateNotFound(template)
-        jinja2.exceptions.TemplateNotFound: watcha_invite_new_account.txt
-        """
-        send_mail(
-            hs.config,
-            'bibi',
-            subject='trololo',
-            template_name='watcha_invite_new_account',
-            fields={}
-        )
-        # end of debug
-
     # from room_id and user ID, get details about who invites and where.
     # adapted from synapse/handlers/room_member.py
     @defer.inlineCallbacks
@@ -137,17 +107,17 @@ class InviteExternalHandler(BaseHandler):
                 admin=False,
                 make_partner=True,
             )
-            logger.info("invited user is not in the DB. Will send an invitation email.")
+            logger.info("Invited user %s is not in the DB, sending invitation email", user_id)
 
             yield self.hs.auth_handler.set_email(full_user_id, invitee)
 
             new_user = True
         except SynapseError as detail:
             if str(detail) == "400: User ID already taken.":
-                logger.info("invited user is already in the DB. Not modified. Will send a notification by email.")
+                logger.info("Invited user %s is already in the DB, sending email notification", user_id)
                 new_user = False
             else:
-                logger.info("registration error={e}".format(e=detail))
+                logger.exception("registration error when inviting user %s", user_id)
                 raise SynapseError(
                     400,
                     "Registration error: {0}".format(detail)
@@ -172,7 +142,7 @@ class InviteExternalHandler(BaseHandler):
         else:
             invitation_name = invitation_info["inviter_id"]
 
-        logger.info("will generate message: invitation_name=%s invitee=%s user_id=%s user_pw=<REDACTED> new_user=%s server=%s",
+        logger.info("Generating message: invitation_name=%s invitee=%s user_id=%s user_pw=<REDACTED> new_user=%s server=%s",
                     invitation_name, invitee, user_id, new_user, self.hs.get_config().server_name);
 
         server = self.hs.config.public_baseurl.rstrip('/')

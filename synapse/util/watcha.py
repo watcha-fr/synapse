@@ -45,23 +45,7 @@ def generate_password():
     return password
 
 
-jinjaenv = None
-
 def send_mail(config, recipient, subject, template_name, fields):
-    global jinjaenv
-    if jinjaenv is None:
-        # load template engine for emails
-        logger.info("will load email templates from {}".format(config.email_template_dir))
-        loader = jinja2.FileSystemLoader(config.email_template_dir)
-        jinjaenv = jinja2.Environment(loader=loader)
-
-    # load templates
-    template_text = jinjaenv.get_template(os.path.basename('{}.txt'.format(template_name)))
-    template_html = jinjaenv.get_template(os.path.basename('{}.html'.format(template_name)))
-
-    # render templates
-    body_text = template_text.render(fields)
-    body_html = template_html.render(fields)
 
     msg = MIMEMultipart('alternative')
     msg['From'] = config.email_notif_from
@@ -76,14 +60,20 @@ def send_mail(config, recipient, subject, template_name, fields):
     # https://bugs.python.org/issue1974
     msg['Subject'] = Header(subject, 'utf-8', 200)
 
-    msg.attach(MIMEText(body_text, 'plain', 'utf-8'))
-    msg.attach(MIMEText(body_html, 'html', 'utf-8'))
+    template_dir = config.email_template_dir
+    logger.info("Loading email templates from %s", template_dir)
+    jinjaenv = jinja2.Environment(loader=jinja2.FileSystemLoader(template_dir))
+
+    for mimetype, extension in {'html': 'html',
+                                'plain': 'txt'}.items():
+        body = jinjaenv.get_template(template_name + '.' + extension).render(fields)
+        msg.attach(MIMEText(body, mimetype, 'utf-8'))
 
     # if needed to customize the reply-to field
     # msg['Reply-To'] = ...
     #logger.info(msg.as_string())
 
-    logger.info("send email through host " + config.email_smtp_host)
+    logger.info("Sending email through host %s...", config.email_smtp_host)
     error = None
     try:
         conn = SMTP(config.email_smtp_host, port=config.email_smtp_port)
@@ -93,9 +83,9 @@ def send_mail(config, recipient, subject, template_name, fields):
         conn.set_debuglevel(False)
         conn.login(config.email_smtp_user, config.email_smtp_pass)
         conn.sendmail(config.email_notif_from, [recipient], msg.as_string())
-        logger.info("Mail sent to %s (Subject was: %s)", recipient, subject)
+        logger.info("...Mail sent to %s (Subject was: %s)", recipient, subject)
     except Exception, exc:
-        logger.error("failed to send mail: %s" % str(exc) )
+        logger.exception("...Failed to send mail")
         error = str(exc)
     finally:
         conn.quit()
