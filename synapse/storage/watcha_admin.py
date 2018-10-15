@@ -8,7 +8,6 @@ from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id, get_localpart_from_id
 import time
 
-import re
 import logging
 
 logger = logging.getLogger(__name__)
@@ -62,7 +61,7 @@ class WatchaAdminStore(SQLBaseStore):
             roomObject={}
             roomObject['room_id']=room[0]
             roomObject['creator']=room[1]
-            roomObject['members']=[]
+            roomObject['members']=set()
             membership_events = yield self._execute("get_room_count_per_type", None, sql_members.format(**{ "room_id": room[0] }))
             for step in membership_events:
                 user_id = step[0]
@@ -72,7 +71,7 @@ class WatchaAdminStore(SQLBaseStore):
                 elif membership == "leave":
                     roomObject['members'].remove(user_id)
                 if len(roomObject['members']) >= 3:
-                    roomObject['type'] = "room"
+                    roomObject['type'] = "Room"
                 else:
                     roomObject['type'] = "One to one"
 
