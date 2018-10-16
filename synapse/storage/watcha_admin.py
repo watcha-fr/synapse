@@ -116,6 +116,6 @@ class WatchaAdminStore(SQLBaseStore):
         return self._simple_update(
             table="users",
             keyvalues={'user_id':userId},
-            updatevalues={'email':email}
+            updatevalues={'email':email},
             desc='updateMail';
         )
