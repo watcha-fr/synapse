@@ -117,4 +117,5 @@ class WatchaAdminStore(SQLBaseStore):
             table="users",
             keyvalues={'user_id':userId},
             updatevalues={'email':email}
+            desc='updateMail';
         )
