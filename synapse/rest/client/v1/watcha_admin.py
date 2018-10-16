@@ -146,7 +146,7 @@ class WatchaUpdateMailRestServlet(ClientV1RestServlet):
     def __init__(self, hs):
         self.hs = hs
         self.store = hs.get_datastore()
-        super(WatchaExtendRoomlistRestServlet, self).__init__(hs)
+        super(WatchaUpdateMailRestServlet, self).__init__(hs)
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
@@ -161,7 +161,7 @@ class WatchaUpdateMailRestServlet(ClientV1RestServlet):
         new_email = params['new_email']
         if not new_email:
             raise SynapseError(400, "Missing 'new_password' arg")
-        ret = yield self.handlers.watcha_admin_handler.watchaUpdateMail(target_user_id,new_email)
+        ret = yield self.handlers.watcha_admin_handler.watchaUpdateMail(target_user_id, new_email)
         defer.returnValue((200, ret))
 
 def register_servlets(hs, http_server):
