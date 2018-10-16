@@ -111,3 +111,10 @@ class WatchaAdminStore(SQLBaseStore):
             ],
             desc="get_rooms",
         )
+
+    def watcha_update_mail(self, userId, email):
+        return self._simple_update(
+            table="users",
+            keyvalues={'user_id':userId},
+            updatevalues={'email':email}
+        )

@@ -141,7 +141,31 @@ class WatchaExtendRoomlistRestServlet(ClientV1RestServlet):
         ret = yield self.handlers.watcha_admin_handler.extendRoomlist()
         defer.returnValue((200, ret))
 
+class WatchaUpdateMailRestServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/watchaupdatemail/(?P<target_user_id>[^/]*)")
+    def __init__(self, hs):
+        self.hs = hs
+        self.store = hs.get_datastore()
+        super(WatchaExtendRoomlistRestServlet, self).__init__(hs)
+        self.auth = hs.get_auth()
+        self.handlers = hs.get_handlers()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request, target_user_id):
+        UserID.from_string(target_user_id)
+        requester = yield self.auth.get_user_by_req(request)
+        is_admin = yield self.auth.is_server_admin(requester.user)
+        if not is_admin:
+            raise AuthError(403, "You are not a server admin")
+        params = parse_json_object_from_request(request)
+        new_email = params['new_email']
+        if not new_email:
+            raise SynapseError(400, "Missing 'new_password' arg")
+        ret = yield self.handlers.watcha_admin_handler.watchaUpdateMail(target_user_id,new_email)
+        defer.returnValue((200, ret))
+
 def register_servlets(hs, http_server):
+    WatchaUpdateMailRestServlet(hs).register(http_server)
     WatchaUserlistRestServlet(hs).register(http_server)
     WatchaRoomlistRestServlet(hs).register(http_server)
     WatchaExtendRoomlistRestServlet(hs).register(http_server)

@@ -39,3 +39,8 @@ class WatchaAdminHandler(BaseHandler):
     def extendRoomlist(self):
         ret = yield self.store.get_watcha_extend_room_list()
         defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def watchaUpdateMail(self, userId, email):
+        ret = yield self.store.watcha_update_mail(userId, email)
+        defer.returnValue(ret)
