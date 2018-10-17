@@ -184,6 +184,7 @@ class WatchaUpdateToMember(ClientV1RestServlet):
         defer.returnValue((200, {}))
 
 def register_servlets(hs, http_server):
+    WatchaUpdateToMember(hs).register(http_server)
     WatchaUpdateMailRestServlet(hs).register(http_server)
     WatchaUserlistRestServlet(hs).register(http_server)
     WatchaRoomlistRestServlet(hs).register(http_server)
