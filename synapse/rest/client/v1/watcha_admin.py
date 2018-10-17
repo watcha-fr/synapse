@@ -180,7 +180,7 @@ class WatchaUpdateToMember(ClientV1RestServlet):
         is_admin = yield self.auth.is_server_admin(requester.user)
         if not is_admin:
             raise AuthError(403, "You are not a server admin")
-        ret = yield self.handlers.watcha_admin_handler.watchaUpdateToMember(target_user_id, new_email)
+        ret = yield self.handlers.watcha_admin_handler.watchaUpdateToMember(target_user_id)
         defer.returnValue((200, {}))
 
 def register_servlets(hs, http_server):

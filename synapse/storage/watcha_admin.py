@@ -120,7 +120,7 @@ class WatchaAdminStore(SQLBaseStore):
             desc='updateMail',
         )
 
-    def watcha_update_to_member(self, userId, email):
+    def watcha_update_to_member(self, userId):
         return self._simple_update(
             table="users",
             keyvalues={'name':userId},
