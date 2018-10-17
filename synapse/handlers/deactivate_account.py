@@ -50,3 +50,5 @@ class DeactivateAccountHandler(BaseHandler):
 
         yield self.store.user_delete_threepids(user_id)
         yield self.store.user_set_password_hash(user_id, None)
+        #added for watcha
+        yield (self.handlers.watcha_admin_handler.deactivate_account(userId)

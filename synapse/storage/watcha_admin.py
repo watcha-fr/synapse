@@ -127,3 +127,11 @@ class WatchaAdminStore(SQLBaseStore):
             updatevalues={'is_partner':0},
             desc='WatchaUpdateToMember',
         )
+
+    def watcha_update_to_member(self, userId):
+    return self._simple_update(
+        table="users",
+        keyvalues={'name':userId},
+        updatevalues={'is_deactivate':1},
+        desc='watchaDeactivateAccount',
+    )

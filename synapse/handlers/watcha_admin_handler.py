@@ -49,3 +49,8 @@ class WatchaAdminHandler(BaseHandler):
     def watchaUpdateToMember(self, userId):
         ret = yield self.store.watcha_update_to_member(userId)
         defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def watchaDeactivateAccount(self, userId):
+        ret = yield self.store.watcha_deactivate_account(userId)
+        defer.returnValue(ret)
