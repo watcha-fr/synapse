@@ -23,7 +23,8 @@ class WatchaAdminStore(SQLBaseStore):
                 "is_partner",
                 "admin",
                 "email",
-                "creation_ts"
+                "creation_ts",
+                "is_deactivate"
 
             ],
             desc="get_watchausers",
