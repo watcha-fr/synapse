@@ -17,7 +17,6 @@ from twisted.internet import defer
 from ._base import BaseHandler
 
 import logging
-from
 
 logger = logging.getLogger(__name__)
 
