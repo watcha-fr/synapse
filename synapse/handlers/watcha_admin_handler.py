@@ -43,4 +43,9 @@ class WatchaAdminHandler(BaseHandler):
     @defer.inlineCallbacks
     def watchaUpdateMail(self, userId, email):
         ret = yield self.store.watcha_update_mail(userId, email)
+        defer.returnValue(ret)    @defer.inlineCallbacks
+        
+    @defer.inlineCallbacks
+    def watchaUpdateToMember(self, userId, email):
+        ret = yield self.store.watcha_update_to_member(userId)
         defer.returnValue(ret)
