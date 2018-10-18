@@ -48,9 +48,9 @@ def generate_password():
 
 def send_mail(config, recipient, subject, template_name, fields):
 
-    msg = MIMEMultipart('alternative')
-    msg['From'] = config.email_notif_from
-    msg['To'] = recipient
+    message = MIMEMultipart('alternative')
+    message['From'] = config.email_notif_from
+    message['To'] = recipient
 
     # Set the parameter maxlinelen https://docs.python.org/2.7/library/email.header.html
     # setting a high-enough value helps avoid glitches in the subject line (space added every 40-50 characters),
@@ -59,16 +59,16 @@ def send_mail(config, recipient, subject, template_name, fields):
     # Semi-relevant online discussions:
     # https://stackoverflow.com/questions/25671608/python-mail-puts-unaccounted-space-in-outlook-subject-line
     # https://bugs.python.org/issue1974
-    msg['Subject'] = Header(subject, 'utf-8', 200)
+    message['Subject'] = Header(subject, 'utf-8', 200)
 
     for mimetype, extension in {'plain': 'txt',
                                 'html': 'html'}.items():
         body = Template(templates[template_name + '.' + extension]).render(fields)
-        msg.attach(MIMEText(body, mimetype, 'utf-8'))
+        message.attach(MIMEText(body, mimetype, 'utf-8'))
 
     # if needed to customize the reply-to field
-    # msg['Reply-To'] = ...
-    #logger.info(msg.as_string())
+    # message['Reply-To'] = ...
+    #logger.info(message.as_string())
 
     logger.info("Sending email through host %s...", config.email_smtp_host)
     error = None
@@ -79,7 +79,7 @@ def send_mail(config, recipient, subject, template_name, fields):
         conn.ehlo()
         conn.set_debuglevel(False)
         conn.login(config.email_smtp_user, config.email_smtp_pass)
-        conn.sendmail(config.email_notif_from, [recipient], msg.as_string())
+        conn.sendmail(config.email_notif_from, [recipient], message.as_string())
         logger.info("...Mail sent to %s (Subject was: %s)", recipient, subject)
     except Exception, exc:
         logger.exception("...Failed to send mail")
