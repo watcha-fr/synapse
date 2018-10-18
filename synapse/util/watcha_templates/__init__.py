@@ -1,7 +1,5 @@
 import logging
 
-from jinja2 import Template
-
 logger = logging.getLogger(__name__)
 
 # To avoid issues with setuptools/distutil,
@@ -21,10 +19,10 @@ files = [
 	'invite_existing_account.html',
 ]
 
-TEMPLATES = {}
+templates = {}
 
 for file in files:
 	f = open('synapse/util/watcha_templates/' + file + '.py', 'r')
-	TEMPLATES[file] = Template(f.read().decode('utf8'))
+	templates[file] = f.read().decode('utf8')
 	logger.info('load template %s', file)
 	f.close()
