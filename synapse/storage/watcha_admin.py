@@ -88,7 +88,6 @@ class WatchaAdminStore(SQLBaseStore):
         defer.returnValue(roomArray);
 
 
-
     def get_watcharoom_membership(self):
         return self._simple_select_list(
             table="room_memberships",
