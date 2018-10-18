@@ -89,7 +89,6 @@ class WatchaAdminStore(SQLBaseStore):
 
 
 
-
     def get_watcharoom_membership(self):
         return self._simple_select_list(
             table="room_memberships",
