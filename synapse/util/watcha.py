@@ -3,14 +3,13 @@
 
 import random
 import logging
-from jinja2 import Template
 import os
 
 from smtplib import SMTP
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.header import Header
-from synapse.util.watcha_templates import templates
+from synapse.util.watcha_templates import TEMPLATES
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +62,7 @@ def send_mail(config, recipient, subject, template_name, fields):
 
     for mimetype, extension in {'plain': 'txt',
                                 'html': 'html'}.items():
-        body = Template(templates[template_name + '.' + extension]).render(fields)
+        body = TEMPLATES[template_name + '.' + extension].render(fields)
         message.attach(MIMEText(body, mimetype, 'utf-8'))
 
     # if needed to customize the reply-to field
