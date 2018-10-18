@@ -165,7 +165,7 @@ class WatchaUpdateMailRestServlet(ClientV1RestServlet):
         defer.returnValue((200, {}))
 
 class WatchaUpdateToMember(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/watchaupdatomember/(?P<target_user_id>[^/]*)")
+    PATTERNS = client_path_patterns("/watchaupdatepartnertomember/(?P<target_user_id>[^/]*)")
     def __init__(self, hs):
         super(WatchaUpdateToMember, self).__init__(hs)
         self.hs = hs
