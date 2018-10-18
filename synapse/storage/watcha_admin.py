@@ -83,7 +83,7 @@ class WatchaAdminStore(SQLBaseStore):
             if last_message_ts is not None and len(last_message_ts) > 0:
                 last_message_ts = last_message_ts[0][0]
                 #room_result["last_ts"] = last_message_ts
-                if now - last_message_ts < ACTIVE_THRESHOLD: # one week
+                if now - last_message_ts < ACTIVE_THRESHOLD:
                     roomObject['active'] = 1
             roomArray.append(roomObject)
 
