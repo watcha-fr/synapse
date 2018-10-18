@@ -30,7 +30,7 @@ class InviteExternalHandler(BaseHandler):
         if member_event:
             inviter_display_name = member_event.content.get("displayname", "")
             inviter_avatar_url = member_event.content.get("avatar_url", "")
-            logger.debug(u"inviter: display_name={dn} avatar_url={au}".format(dn=inviter_display_name, au=inviter_avatar_url))
+            logger.debug(u"inviter: display_name={0} avatar_url={1}", inviter_display_name, inviter_avatar_url)
 
         room_canonical_alias = ""
         canonical_alias_event = room_state.get((EventTypes.CanonicalAlias, ""))
