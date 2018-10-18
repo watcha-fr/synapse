@@ -14,9 +14,6 @@ logger = logging.getLogger(__name__)
 
 class InviteExternalHandler(BaseHandler):
 
-    def __init__(self, hs):
-        BaseHandler.__init__(self, hs)
-
     # from room_id and user ID, get details about who invites and where.
     # adapted from synapse/handlers/room_member.py
     @defer.inlineCallbacks
