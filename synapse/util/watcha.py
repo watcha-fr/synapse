@@ -3,15 +3,20 @@
 
 import random
 import logging
-from jinja2 import Environment, PackageLoader
 import os
+from os.path import join, dirname, abspath
 
+from jinja2 import Environment, FileSystemLoader
 from smtplib import SMTP
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.header import Header
 
 logger = logging.getLogger(__name__)
+
+# must be defined at package loading time,
+# because synctl start's demonizer is changing the abspath...
+TEMPLATE_DIR = join(dirname(abspath(__file__)), 'watcha_templates')
 
 def generate_password():
     '''Generate 'good enough' password
@@ -60,16 +65,15 @@ def send_mail(config, recipient, subject, template_name, fields):
     # https://bugs.python.org/issue1974
     message['Subject'] = Header(subject, 'utf-8', 200)
 
-    # To avoid issues with setuptools/distutil,
+    # HACK: to avoid issues with setuptools/distutil,
     # (not easy to get the 'res/templates' folder to be included in the whl file...)
     # we ship the templates as .py files, and put them in the code tree itself.
-    # This is somewhat a hack, but it is somewhat suggested by the existence
-    # of a "PackagerLoader" in Jinja - they must have had the same issue :)
-    jinjaenv = Environment(loader=PackageLoader('synapse.util', 'watcha_templates'))
+    jinjaenv = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
 
     for mimetype, extension in {'plain': 'txt',
                                 'html': 'html'}.items():
-        body = jinjaenv.get_template(template_name + '.' + extension + '.py').render(fields)
+        template_file_name = template_name + '.' + extension + '.py'
+        body = jinjaenv.get_template(template_file_name).render(fields)
         message.attach(MIMEText(body, mimetype, 'utf-8'))
 
     # if needed to customize the reply-to field
