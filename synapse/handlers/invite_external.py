@@ -10,57 +10,7 @@ from ._base import BaseHandler
 from synapse.util.watcha import generate_password, send_mail
 import base64
 
-#
-# TODO: merge this code with synapse/rest/client/v1/watcha.py
-#
-# In the meantime, changing the URLs to the mobile apps must be done in BOTH places
-#
 logger = logging.getLogger(__name__)
-
-EMAIL_SUBJECT_FR = u'''Accès à l'espace de travail sécurisé {server}'''
-NEW_USER_EMAIL_MESSAGE_FR = u'''Bonjour,
-
-{inviter_name} vous a invité à participer à l'espace de travail sécurisé Watcha {server}.
-
-Votre nom d’utilisateur est :
-
-    {user_id}
-
-Cliquez sur ce lien pour activer votre compte :
-
-    https://{server}/setup-account.html?t={setupToken}
-
-Nous pouvons vous aider à utiliser Watcha. Si vous rencontrez des difficultés, n'hésitez pas à répondre à cet email !
-
-L'équipe Watcha.
-'''
-
-
-# TODO: put deep link here
-EXISTING_USER_EMAIL_MESSAGE_FR = u'''Bonjour,
-
-{inviter_name} vous a invité à participer à un espace de travail sécurisé Watcha.
-
-Votre nom d’utilisateur est :
-
-    {user_id}
-
-et votre mot de passe est celui que vous avez défini lors de l'activation de votre compte sur cet espace de travail.
-
-Vous pouvez accéder à l’espace de travail à partir d’un navigateur sur :
-
-    https://{server}
-
-Vous pouvez aussi installer l'application mobile :
-
-    - iOS : https://itunes.apple.com/us/app/watcha/id1383732254
-    - Android : https://play.google.com/store/apps/details?id=im.watcha.app
-
-Nous pouvons vous aider à utiliser Watcha. Si vous rencontrez des difficultés ou si vous avez perdu votre mot de passe, n'hésitez pas à répondre à cet email !
-
-L'équipe Watcha.
-'''
-
 
 class InviteExternalHandler(BaseHandler):
 
@@ -80,25 +30,25 @@ class InviteExternalHandler(BaseHandler):
         if member_event:
             inviter_display_name = member_event.content.get("displayname", "")
             inviter_avatar_url = member_event.content.get("avatar_url", "")
-            logger.debug("inviter: display_name={0} avatar_url={1}", inviter_display_name, inviter_avatar_url)
+            logger.debug(u"inviter: display_name=%s avatar_url=%s", inviter_display_name, inviter_avatar_url)
 
         room_canonical_alias = ""
         canonical_alias_event = room_state.get((EventTypes.CanonicalAlias, ""))
         if canonical_alias_event:
             room_canonical_alias = canonical_alias_event.content.get("alias", "")
-            logger.debug("room: canonical_alias={0}", room_canonical_alias)
+            logger.debug(u"room: canonical_alias=%s", room_canonical_alias)
 
         room_name = ""
         room_name_event = room_state.get((EventTypes.Name, ""))
         if room_name_event:
             room_name = room_name_event.content.get("name", "")
-            logger.debug("room: name={0}", room_name)
+            logger.debug(u"room: name=%s", room_name)
 
         room_join_rules = ""
         join_rules_event = room_state.get((EventTypes.JoinRules, ""))
         if join_rules_event:
             room_join_rules = join_rules_event.content.get("join_rule", "")
-            logger.debug("room: join_rules={0}", room_join_rules)
+            logger.debug(u"room: join_rules=%s", room_join_rules)
 
         room_avatar_url = ""
         room_avatar_event = room_state.get((EventTypes.RoomAvatar, ""))
@@ -122,12 +72,11 @@ class InviteExternalHandler(BaseHandler):
         self,
         email
     ):
-        email_split = email.split("@")
-        local_part = email_split[0]
-        domain = email_split[1]
+        # user_id must be lowercase (and it's OK to consider email as case-insensitive)
+        local_part, domain = email.lower().split("@")
         user_id = local_part + "/" + domain
-        logger.debug("gen_user_id_from_email: email={0} leads to user_id={1}", email, user_id)
-        return local_part + "/" + domain
+        logger.debug("gen_user_id_from_email: email=%s leads to user_id=%s", email, user_id)
+        return user_id
 
     @defer.inlineCallbacks
     def invite(
@@ -148,7 +97,7 @@ class InviteExternalHandler(BaseHandler):
         user_password = generate_password()
 
         try:
-            new_user_id, token = yield self.hs.get_handlers().registration_handler.register(
+            yield self.hs.get_handlers().registration_handler.register(
                 localpart=user_id,
                 password=user_password,
                 generate_token=True,
@@ -157,25 +106,17 @@ class InviteExternalHandler(BaseHandler):
                 admin=False,
                 make_partner=True,
             )
-            logger.info("invited user is not in the DB. Will send an invitation email.")
+            logger.info("Invited user %s is not in the DB, sending invitation email", user_id)
 
             yield self.hs.auth_handler.set_email(full_user_id, invitee)
 
-            """
-            # we save the account type
-            result = yield self.store.set_partner(
-                user_id,
-                self.store.EXTERNAL_RESTRICTED_USER
-            )
-            logger.info("set partner account result=" + str(result))
-            """
             new_user = True
         except SynapseError as detail:
             if str(detail) == "400: User ID already taken.":
-                logger.info("invited user is already in the DB. Not modified. Will send a notification by email.")
+                logger.info("Invited user %s is already in the DB, sending email notification", user_id)
                 new_user = False
             else:
-                logger.info("registration error={0}", detail)
+                logger.exception("registration error when inviting user %s", user_id)
                 raise SynapseError(
                     400,
                     "Registration error: {0}".format(detail)
@@ -183,7 +124,7 @@ class InviteExternalHandler(BaseHandler):
 
 
         # log invitation in DB
-        result = yield self.store.insert_partner_invitation(
+        yield self.store.insert_partner_invitation(
             partner_user_id=full_user_id,
             inviter_user_id=inviter,
             inviter_device_id=inviter_device_id,
@@ -200,17 +141,29 @@ class InviteExternalHandler(BaseHandler):
         else:
             invitation_name = invitation_info["inviter_id"]
 
-        logger.info("will generate message: invitation_name=%s invitee=%s user_id=%s user_pw=<REDACTED> new_user=%s server=%s",
+        logger.info("Generating message: invitation_name=%s invitee=%s user_id=%s user_pw=<REDACTED> new_user=%s server=%s",
                     invitation_name, invitee, user_id, new_user, self.hs.get_config().server_name);
 
-        setupToken = base64.b64encode('{"user":"' + user_id + '","pw":"' + user_password + '"}')
+        server = self.hs.config.public_baseurl.rstrip('/')
+        setupToken = base64.b64encode('{{"user":"{user_id}","pw":"{user_password}"}}'.format(user_id=user_id, user_password=user_password))
+        outToken = base64.b64encode('{{"user":"{user_id}"}}'.format(user_id=user_id))
+        subject = u'''Accès à l'espace de travail sécurisé {server}'''.format(server=server)
 
-        send_mail(self.hs.config, invitee,
-                  EMAIL_SUBJECT_FR,
-                  (NEW_USER_EMAIL_MESSAGE_FR if new_user else EXISTING_USER_EMAIL_MESSAGE_FR),
-                  inviter_name=invitation_name,
-                  user_id=user_id,
-                  setupToken=setupToken, # only used if new_user, in fact
-                  server=self.hs.get_config().server_name)
+        fields = {
+                'title': subject,
+                'inviter_name': invitation_name,
+                'user_login': user_id,
+                'setupToken': setupToken, # only used if new_user, in fact
+                'outToken': outToken, # only used if existing user, in fact
+                'server': server,
+        }
+
+        send_mail(
+            self.hs.config,
+            invitee,
+            subject=subject,
+            template_name='invite_new_account' if new_user else 'invite_existing_account',
+            fields=fields,
+        )
 
         defer.returnValue(full_user_id)
