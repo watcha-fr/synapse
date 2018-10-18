@@ -8,7 +8,7 @@ Votre nom d’utilisateur est :
 Votre mot de passe est celui que vous avez défini lors de l'activation de votre compte sur cet espace de travail.
 
 Pour accéder à votre compte, cliquez ici:
-	https://watcha.fr/mobile.php?t={{ outToken }}
+	https://{{ server }}/#/login?t={{ outToken }}
 
 Nous pouvons vous aider à utiliser Watcha. Si vous rencontrez des difficultés, n'hésitez pas à répondre à cet email !
 

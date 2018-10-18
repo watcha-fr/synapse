@@ -146,7 +146,7 @@ class InviteExternalHandler(BaseHandler):
 
         server = self.hs.config.public_baseurl.rstrip('/')
         setupToken = base64.b64encode('{{"user":"{user_id}","pw":"{user_password}"}}'.format(user_id=user_id, user_password=user_password))
-        outToken = base64.b64encode('{{"user":"{user_id}","server":"{server}"}}'.format(user_id=user_id, server=server))
+        outToken = base64.b64encode('{{"user":"{user_id}"}}'.format(user_id=user_id))
         subject = u'''Accès à l'espace de travail sécurisé {server}'''.format(server=server)
 
         fields = {
