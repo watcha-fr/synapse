@@ -11,7 +11,7 @@ def check_db_customization(db_conn, database_engine):
     # (database_engine will be used later to for postgres)
     _add_column_if_needed(db_conn, "users", "is_partner", "DEFAULT 0")
     _add_column_if_needed(db_conn, "users", "email", "TEXT")
-    _add_column_if_needed(db_conn, "users", "is_deactivate", "DEFAULT 0")
+    _add_column_if_needed(db_conn, "users", "is_deactivated", "DEFAULT 0")
     _add_table_partners_invited_by(db_conn)
 
 

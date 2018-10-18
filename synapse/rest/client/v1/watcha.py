@@ -101,7 +101,13 @@ def _decode_share_secret_parameters(hs, parameter_names, parameter_json):
                 403, "HMAC incorrect",
             )
     return parameters
-
+"""
+allow to register new users to watcha server the caller must be ever an admin
+of the server or know the shared secret of the server.
+If the registration is done by shared secret we use the method _decode_share_secret_parameters to check if
+the shared secret is valid else we hanlde the parameters as they are
+If the requester is not an admin we require the shared secret parameters if there is none we raise error
+"""
 class WatchaRegisterRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/watcha_register")
 

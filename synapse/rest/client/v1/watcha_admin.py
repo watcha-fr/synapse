@@ -31,9 +31,9 @@ class WatchaUserlistRestServlet(ClientV1RestServlet):
 
     PATTERNS = client_path_patterns("/watchauserlist")
     def __init__(self, hs):
+        super(WatchaUserlistRestServlet, self).__init__(hs)
         self.hs = hs
         self.store = hs.get_datastore()
-        super(WatchaUserlistRestServlet, self).__init__(hs)
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
@@ -51,9 +51,9 @@ class WatchaRoomlistRestServlet(ClientV1RestServlet):
 
     PATTERNS = client_path_patterns("/watcharoomlist")
     def __init__(self, hs):
+        super(WatchaRoomlistRestServlet, self).__init__(hs)
         self.hs = hs
         self.store = hs.get_datastore()
-        super(WatchaRoomlistRestServlet, self).__init__(hs)
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
@@ -70,9 +70,9 @@ class WatchaRoomMembershipRestServlet(ClientV1RestServlet):
 
     PATTERNS = client_path_patterns("/watcharoommembershib")
     def __init__(self, hs):
+        super(WatchaRoomMembershipRestServlet, self).__init__(hs)
         self.hs = hs
         self.store = hs.get_datastore()
-        super(WatchaRoomMembershipRestServlet, self).__init__(hs)
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
@@ -108,9 +108,9 @@ class WatchaDisplayNameRestServlet(ClientV1RestServlet):
 
     PATTERNS = client_path_patterns("/watchadisplayname")
     def __init__(self, hs):
+        super(WatchaDisplayNameRestServlet, self).__init__(hs)
         self.hs = hs
         self.store = hs.get_datastore()
-        super(WatchaDisplayNameRestServlet, self).__init__(hs)
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
@@ -126,9 +126,9 @@ class WatchaDisplayNameRestServlet(ClientV1RestServlet):
 class WatchaExtendRoomlistRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/watchaextendroomlist")
     def __init__(self, hs):
+        super(WatchaExtendRoomlistRestServlet, self).__init__(hs)
         self.hs = hs
         self.store = hs.get_datastore()
-        super(WatchaExtendRoomlistRestServlet, self).__init__(hs)
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
@@ -144,9 +144,9 @@ class WatchaExtendRoomlistRestServlet(ClientV1RestServlet):
 class WatchaUpdateMailRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/watchaupdatemail/(?P<target_user_id>[^/]*)")
     def __init__(self, hs):
+        super(WatchaUpdateMailRestServlet, self).__init__(hs)
         self.hs = hs
         self.store = hs.get_datastore()
-        super(WatchaUpdateMailRestServlet, self).__init__(hs)
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
@@ -167,14 +167,14 @@ class WatchaUpdateMailRestServlet(ClientV1RestServlet):
 class WatchaUpdateToMember(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/watchaupdatomember/(?P<target_user_id>[^/]*)")
     def __init__(self, hs):
+        super(WatchaUpdateToMember, self).__init__(hs)
         self.hs = hs
         self.store = hs.get_datastore()
-        super(WatchaUpdateToMember, self).__init__(hs)
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
     @defer.inlineCallbacks
-    def on_POST(self, request, target_user_id):
+    def on_PUT(self, request, target_user_id):
         UserID.from_string(target_user_id)
         requester = yield self.auth.get_user_by_req(request)
         is_admin = yield self.auth.is_server_admin(requester.user)
