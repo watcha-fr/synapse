@@ -18,61 +18,9 @@ from .base import ClientV1RestServlet, client_path_patterns
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.util.watcha import generate_password, send_mail
 from synapse.types import UserID
-
+import base64
 
 logger = logging.getLogger(__name__)
-
-#
-# TODO: merge this code with synapse/handlers/invite_external.py
-#
-# In the meantime, changing the URLs to the mobile apps must be done in BOTH places
-#
-HELP = u'''
-Vous pouvez accéder à l’espace de travail à partir d’un navigateur sur {server}.
-Vous pouvez aussi installer l'application mobile :
-
-    - iOS : https://itunes.apple.com/us/app/watcha/id1383732254
-    - Android : https://play.google.com/store/apps/details?id=im.watcha.app
-
-Si vous avez des difficultés à utiliser Watcha, répondez à cet email et nous vous aiderons
-
-Cordialement,
-
-L'équipe Watcha.
-'''
-
-CONFIRMATION_EMAIL_SUBJECT_FR = u'''Accès à l'espace de travail sécurisé Watcha {server}'''
-CONFIRMATION_EMAIL_MESSAGE_FR = u'''Bonjour {full_name},
-
-
-
-Vous avez été invité à participer à l’espace de travail sécurisé Watcha {server} 
-Pour y accéder, votre nom d’utilisateur est :
-
-{user_login}
-
-et votre mot de passe est :
-
-{user_password}
-
-
-''' + HELP
-
-PASSWORD_EMAIL_SUBJECT_FR = u'''Nouveau mot de passe pour l'espace de travail sécurisé Watcha {server}'''
-PASSWORD_EMAIL_MESSAGE_FR = u'''Bonjour {full_name},
-
-Votre mot de passe pour accéder à l’espace de travail sécurisé {server} a été changé.
-
-Votre nom d’utilisateur est toujours :
-
-{user_login}
-
-et votre mot de passe est maintenant :
-
-{user_password}
-
-''' + HELP
-
 
 def _decode_share_secret_parameters(hs, parameter_names, parameter_json):
     for parameter_name in parameter_names:
@@ -97,7 +45,7 @@ def _decode_share_secret_parameters(hs, parameter_names, parameter_json):
     )
     for parameter_name in parameter_names:
         want_mac.update(repr(parameters[parameter_name]))
-        want_mac.update("\x00")        
+        want_mac.update("\x00")
     if not compare_digest(want_mac.hexdigest(), got_mac):
             raise SynapseError(
                 403, "HMAC incorrect",
@@ -107,11 +55,15 @@ def _decode_share_secret_parameters(hs, parameter_names, parameter_json):
 class WatchaRegisterRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/watcha_register")
 
+    def __init__(self, hs):
+        ClientV1RestServlet.__init__(self, hs)
+
+
     @defer.inlineCallbacks
     def on_POST(self, request):
         yield run_on_reactor() # not sure what it is :)
         logger.info("Adding Watcha user...")
-        
+
         parameter_json = parse_json_object_from_request(request)
         # parse_json will not return unicode if it's only ascii... making hmac fail. Force it to be unicode.
         parameter_json['full_name'] = unicode(parameter_json['full_name'])
@@ -120,7 +72,7 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
             raise SynapseError(
                 403, "user name must be lowercase",
             )
-            
+
         password = generate_password()
         handler = self.hs.get_handlers().registration_handler
         admin = (params['admin'] == 'admin')
@@ -129,31 +81,53 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
             password=password,
             admin=admin,
         )
-        
+
         user = UserID.from_string(user_id)
         self.hs.profile_handler.set_displayname(user, None, params['full_name'], by_admin=True)
-        
+
         yield self.hs.auth_handler.set_email(user_id, params['email'])
 
         display_name = yield self.hs.profile_handler.get_displayname(user)
 
-        send_mail(self.hs.config, params['email'], 
-                  CONFIRMATION_EMAIL_SUBJECT_FR,
-                  CONFIRMATION_EMAIL_MESSAGE_FR,
-                  full_name=display_name,
-                  user_login=params['user'],
-                  user_password=password)
-        
-        defer.returnValue((200, { "user_id": user_id, }))
-            
-    
+        setupToken = base64.b64encode('{"user":"' + user_id + '","pw":"' + password + '"}')
+
+        server = self.hs.config.public_baseurl.rstrip('/')
+        subject = u'''Accès à l'espace de travail sécurisé Watcha {server}'''.format(server=server)
+
+        fields = {
+                'title': subject,
+                'full_name': display_name,
+                'user_login': params['user'],
+                'setupToken': setupToken,
+                'server': server,
+        }
+
+        send_email_error = send_mail(
+            self.hs.config,
+            params['email'],
+            subject=subject,
+            template_name='new_account',
+            fields=fields,
+        )
+
+        if send_email_error is None:
+            defer.returnValue((200, { "user_id": user_id }))
+        else:
+            raise SynapseError(403,
+                               "Failed to sent email: " + repr(send_email_error))
+
+
 class WatchaResetPasswordRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/watcha_reset_password")
+
+    def __init__(self, hs):
+        ClientV1RestServlet.__init__(self, hs)
+
 
     @defer.inlineCallbacks
     def on_POST(self, request):
         yield run_on_reactor() # not sure what it is :)
-        
+
         parameter_json = parse_json_object_from_request(request)
         params = _decode_share_secret_parameters(self.hs, ['user'], parameter_json)
         password = generate_password()
@@ -172,17 +146,30 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
         )
 
         try:
-            display_name = yield self.hs.profile_handler.get_displayname(user_user)
+            display_name = yield self.hs.profile_handler.get_displayname(user)
         except:
             display_name = params['user']
 
-        send_email_error = send_mail(self.hs.config, user_info['email'],
-                  PASSWORD_EMAIL_SUBJECT_FR,
-                  PASSWORD_EMAIL_MESSAGE_FR,
-                  full_name=display_name,
-                  user_login=params['user'],
-                  user_password=password
-                  )
+        setupToken = base64.b64encode('{"user":"' + user_id + '","pw":"' + password + '"}')
+
+        server = self.hs.config.public_baseurl.rstrip('/')
+        subject = u'''Nouveau mot de passe pour l'espace de travail sécurisé Watcha {server}'''.format(server=server)
+
+        fields = {
+                'title': subject,
+                'full_name': display_name,
+                'user_login': params['user'],
+                'setupToken': setupToken,
+                'server': server,
+        }
+
+        send_email_error = send_mail(
+            self.hs.config,
+            user_info['email'],
+            subject=subject,
+            template_name='reset_password',
+            fields=fields,
+        )
 
         if send_email_error is None:
             defer.returnValue((200, {}))

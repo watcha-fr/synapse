@@ -3,10 +3,13 @@
 
 import random
 import logging
+import os
 
 from smtplib import SMTP
+from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.header import Header
+from synapse.util.watcha_templates import TEMPLATES
 
 logger = logging.getLogger(__name__)
 
@@ -41,13 +44,10 @@ def generate_password():
 
     return password
 
-def send_mail(config, recipient, subject_template, body_template, **parameters):
-    
-    parameters['server'] = config.public_baseurl.rstrip('/')
-    subject = subject_template.format(**parameters)
-    body = body_template.format(**parameters)
-    
-    message = MIMEText(body, "plain", "utf8")
+
+def send_mail(config, recipient, subject, template_name, fields):
+
+    message = MIMEMultipart('alternative')
     message['From'] = config.email_notif_from
     message['To'] = recipient
 
@@ -58,13 +58,18 @@ def send_mail(config, recipient, subject_template, body_template, **parameters):
     # Semi-relevant online discussions:
     # https://stackoverflow.com/questions/25671608/python-mail-puts-unaccounted-space-in-outlook-subject-line
     # https://bugs.python.org/issue1974
-    message['Subject'] = Header(subject, 'utf-8', 200)    
+    message['Subject'] = Header(subject, 'utf-8', 200)
+
+    for mimetype, extension in {'plain': 'txt',
+                                'html': 'html'}.items():
+        body = TEMPLATES[template_name + '.' + extension].render(fields)
+        message.attach(MIMEText(body, mimetype, 'utf-8'))
 
     # if needed to customize the reply-to field
     # message['Reply-To'] = ...
-    #logger.info(msg.as_string())
+    #logger.info(message.as_string())
 
-    logger.info("send email through host " + config.email_smtp_host)
+    logger.info("Sending email through host %s...", config.email_smtp_host)
     error = None
     try:
         conn = SMTP(config.email_smtp_host, port=config.email_smtp_port)
@@ -74,12 +79,11 @@ def send_mail(config, recipient, subject_template, body_template, **parameters):
         conn.set_debuglevel(False)
         conn.login(config.email_smtp_user, config.email_smtp_pass)
         conn.sendmail(config.email_notif_from, [recipient], message.as_string())
-        logger.info("Mail sent to %s (Subject was: %s)", recipient, subject)
+        logger.info("...Mail sent to %s (Subject was: %s)", recipient, subject)
     except Exception, exc:
-        logger.error("failed to send mail: %s" % str(exc) )
+        logger.exception("...Failed to send mail")
         error = str(exc)
     finally:
         conn.quit()
 
     return error
-
