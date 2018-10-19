@@ -8,6 +8,9 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 from ._base import BaseHandler
 from synapse.util.watcha import generate_password, send_mail
+from synapse.types import UserID, create_requester
+from synapse.api.constants import Membership
+
 import base64
 
 logger = logging.getLogger(__name__)
@@ -87,40 +90,81 @@ class InviteExternalHandler(BaseHandler):
         invitee
     ):
 
-        user_id = self.gen_user_id_from_email(invitee)
+        full_user_id = yield self.hs.auth_handler.find_user_id_by_email(invitee)
 
-        # note about server names:
-        # self.hs.get_config().server_name is of the format SERVER-core.watcha.fr
-        # self.hs.get_config().public_baseurl.rstrip('/') is of the format SERVER.watcha.fr
+        # the user already exists. it is an internal user or an external user.
+        if full_user_id:
+            logger.info("Invitee with email %s already exists (id is %s), inviting her to room %s",
+                        invitee, full_user_id, room_id)
 
-        full_user_id = "@" + user_id + ":" + self.hs.get_config().server_name
-        user_password = generate_password()
-
-        try:
-            yield self.hs.get_handlers().registration_handler.register(
-                localpart=user_id,
-                password=user_password,
-                generate_token=True,
-                guest_access_token=None,
-                make_guest=False,
-                admin=False,
-                make_partner=True,
+            user = UserID.from_string(full_user_id)
+            yield self.hs.get_handlers().room_member_handler.update_membership(
+                requester=create_requester(inviter.to_string()),
+                target=user,
+                room_id=room_id,
+                action=Membership.INVITE,
+                txn_id=None,
+                third_party_signed=None,
+                content=None,
             )
-            logger.info("Invited user %s is not in the DB, sending invitation email", user_id)
 
-            yield self.hs.auth_handler.set_email(full_user_id, invitee)
+            user_id = user.localpart
+            new_user = False
 
-            new_user = True
-        except SynapseError as detail:
-            if str(detail) == "400: User ID already taken.":
-                logger.info("Invited user %s is already in the DB, sending email notification", user_id)
-                new_user = False
-            else:
-                logger.exception("registration error when inviting user %s", user_id)
-                raise SynapseError(
-                    400,
-                    "Registration error: {0}".format(detail)
+            # only send email if that user is external.
+            # this restriction can be removed once internal users will also receive notifications from invitations by user ID.
+            is_partner = yield self.hs.auth_handler.is_partner(full_user_id)
+            if not is_partner:
+                logger.info("Invitee is an internal user. Do not send a notification email.")
+                defer.returnValue(full_user_id)
+
+        # the user does not exist. we create an account
+        else:
+            user_id = self.gen_user_id_from_email(invitee)
+            logger.info("invited user %s is not in the DB. Creating user (id is %s), inviting to room and sending invitation email.",
+                        invitee, user_id)
+
+            # note about server names:
+            # self.hs.hostname is self.hs.get_config().server_name - the core's server
+            # self.hs.get_config().public_baseurl.rstrip('/') is the public URL - riot's
+
+            full_user_id = UserID(user_id, self.hs.hostname).to_string()
+            user_password = generate_password()
+
+            try:
+                yield self.hs.get_handlers().registration_handler.register(
+                    localpart=user_id,
+                    password=user_password,
+                    generate_token=True,
+                    guest_access_token=None,
+                    make_guest=False,
+                    admin=False,
+                    make_partner=True,
                 )
+
+                yield self.hs.auth_handler.set_email(full_user_id, invitee)
+
+                """
+                # we save the account type
+                result = yield self.store.set_partner(
+                user_id,
+                self.store.EXTERNAL_RESTRICTED_USER
+                )
+                logger.info("set partner account result=" + str(result))
+                """
+                new_user = True
+            except SynapseError as detail:
+                # user already exists as external user
+                # (maybe this code is useless since adding a check for email; but leaving it for now)
+                if str(detail) == "400: User ID already taken.":
+                    logger.info("invited user is already in the DB. Not modified. Will send a notification by email.")
+                    new_user = False
+                else:
+                    logger.info("registration error=%s", detail)
+                    raise SynapseError(
+                        400,
+                        "Registration error: {0}".format(detail)
+                    )
 
 
         # log invitation in DB
@@ -145,24 +189,29 @@ class InviteExternalHandler(BaseHandler):
                     invitation_name, invitee, user_id, new_user, self.hs.get_config().server_name);
 
         server = self.hs.config.public_baseurl.rstrip('/')
-        setupToken = base64.b64encode('{{"user":"{user_id}","pw":"{user_password}"}}'.format(user_id=user_id, user_password=user_password))
-        outToken = base64.b64encode('{{"user":"{user_id}"}}'.format(user_id=user_id))
         subject = u'''Accès à l'espace de travail sécurisé {server}'''.format(server=server)
 
         fields = {
-                'title': subject,
-                'inviter_name': invitation_name,
-                'user_login': user_id,
-                'setupToken': setupToken, # only used if new_user, in fact
-                'outToken': outToken, # only used if existing user, in fact
-                'server': server,
+            'title': subject,
+            'inviter_name': invitation_name,
+            'user_login': user_id,
+            'server': server,
         }
+
+        if (new_user):
+            setupToken = base64.b64encode('{{"user":"{user_id}","pw":"{user_password}"}}'.format(user_id=user_id, user_password=user_password))
+            fields['setupToken'] = setupToken
+            template_name = 'invite_new_account'
+        else:
+            outToken = base64.b64encode('{{"user":"{user_id}"}}'.format(user_id=user_id))
+            fields['outToken'] = outToken
+            template_name = 'invite_existing_account'
 
         send_mail(
             self.hs.config,
             invitee,
             subject=subject,
-            template_name='invite_new_account' if new_user else 'invite_existing_account',
+            template_name=template_name,
             fields=fields,
         )
 
