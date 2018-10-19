@@ -8,6 +8,8 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 from ._base import BaseHandler
 from synapse.util.watcha import generate_password, send_mail
+from synapse.types import UserID, create_requester
+from synapse.api.constants import Membership
 
 import base64
 
@@ -90,6 +92,7 @@ class InviteExternalHandler(BaseHandler):
 
         full_user_id = yield self.hs.auth_handler.find_user_id_by_email(invitee)
 
+        # the user already exists. it is an internal user or an external user.
         if full_user_id:
             logger.info("Invitee with email %s already exists (id is %s), inviting her to room %s",
                         invitee, full_user_id, room_id)
@@ -107,6 +110,15 @@ class InviteExternalHandler(BaseHandler):
 
             user_id = user.localpart
             new_user = False
+
+            # only send email if that user is external.
+            # this restriction can be removed once internal users will also receive notifications from invitations by user ID.
+            is_partner = yield self.hs.auth_handler.is_partner(full_user_id)
+            if not is_partner:
+                logger.info("Invitee is an internal user. Do not send a notification email.")
+                defer.returnValue(full_user_id)
+
+        # the user does not exist. we create an account
         else:
             user_id = self.gen_user_id_from_email(invitee)
             logger.info("invited user %s is not in the DB. Creating user (id is %s), inviting to room and sending invitation email.",
@@ -120,7 +132,7 @@ class InviteExternalHandler(BaseHandler):
             user_password = generate_password()
 
             try:
-                new_user_id, token = yield self.hs.get_handlers().registration_handler.register(
+                yield self.hs.get_handlers().registration_handler.register(
                     localpart=user_id,
                     password=user_password,
                     generate_token=True,
@@ -148,7 +160,7 @@ class InviteExternalHandler(BaseHandler):
                     logger.info("invited user is already in the DB. Not modified. Will send a notification by email.")
                     new_user = False
                 else:
-                    logger.info("registration error={0}", detail)
+                    logger.info("registration error=%s", detail)
                     raise SynapseError(
                         400,
                         "Registration error: {0}".format(detail)
@@ -172,29 +184,34 @@ class InviteExternalHandler(BaseHandler):
             invitation_name = u''.join((invitation_info["inviter_display_name"], ' (', invitation_info["inviter_id"], ')'))
         else:
             invitation_name = invitation_info["inviter_id"]
-        
+
         logger.info("Generating message: invitation_name=%s invitee=%s user_id=%s user_pw=<REDACTED> new_user=%s server=%s",
                     invitation_name, invitee, user_id, new_user, self.hs.get_config().server_name);
 
         server = self.hs.config.public_baseurl.rstrip('/')
-        setupToken = base64.b64encode('{{"user":"{user_id}","pw":"{user_password}"}}'.format(user_id=user_id, user_password=user_password))
-        outToken = base64.b64encode('{{"user":"{user_id}"}}'.format(user_id=user_id))
         subject = u'''Accès à l'espace de travail sécurisé {server}'''.format(server=server)
 
         fields = {
-                'title': subject,
-                'inviter_name': invitation_name,
-                'user_login': user_id,
-                'setupToken': setupToken, # only used if new_user, in fact
-                'outToken': outToken, # only used if existing user, in fact
-                'server': server,
+            'title': subject,
+            'inviter_name': invitation_name,
+            'user_login': user_id,
+            'server': server,
         }
+
+        if (new_user):
+            setupToken = base64.b64encode('{{"user":"{user_id}","pw":"{user_password}"}}'.format(user_id=user_id, user_password=user_password))
+            fields['setupToken'] = setupToken
+            template_name = 'invite_new_account'
+        else:
+            outToken = base64.b64encode('{{"user":"{user_id}"}}'.format(user_id=user_id))
+            fields['outToken'] = outToken
+            template_name = 'invite_existing_account'
 
         send_mail(
             self.hs.config,
             invitee,
             subject=subject,
-            template_name='invite_new_account' if new_user else 'invite_existing_account',
+            template_name=template_name,
             fields=fields,
         )
 
