@@ -43,50 +43,7 @@ class WatchaAdminStore(SQLBaseStore):
                     userObject['displayname'] = name[1]
             userListTupple.append(userObject)
 
-        defer.returnValue(userListTupple);
-
-    @defer.inlineCallbacks
-    def get_watchauser_list(self):
-        sql_user_list = """
-            SELECT "name", "is_guest", "is_partner", "admin", "email", "creation_ts", "is_deactivated" FROM users;
-        """
-        sql_user_displayname = """
-            SELECT "user_id", "displayname" FROM profiles;
-        """
-
-        userList =  yield self._execute("get_watcha_user_list", None, sql_user_list)
-        userNameList = yield self._execute("get_user_name", None, sql_user_displayname)
-        userListTupple=[]
-        userNameTuple=[]
-        userObject = {}
-        for user in userList:
-            userObject = {}
-            userObject['name'] = user[0]
-            userObject['is_guest'] = user[1]
-            userObject['is_partner'] = user[2]
-            userObject['admin'] = user[3]
-            userObject['email'] = user[4]
-            userObject['creation_ts'] = user[5]
-            userObject['is_deactivated'] = user[6]
-            userObject['displayname'] = ''
-            for name in userNameList:
-                if userObject['name'].replace('@','').split(':')[0] == name[0]:
-                    userObject['displayname'] = name[1]
-            userListTupple.append(userObject)
-
-        defer.returnValue(userListTupple);
-
-
-    def get_watchauser_display_name(self):
-        return self._simple_select_list(
-            table = "profiles",
-            keyvalues = {},
-            retcols = [
-                "user_id",
-                "displayname",
-            ],
-            desc = "get_rooms",
-        )
+        defer.returnValue(userListTupple)
 
     @defer.inlineCallbacks
     def get_watcha_extend_room_list(self):

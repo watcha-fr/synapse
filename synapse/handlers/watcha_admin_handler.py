@@ -12,27 +12,27 @@ class WatchaAdminHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def getUserList(self):
-        ret = yield self.store.get_watchauser_list()
+        ret = yield self.store.get_watcha_user_list()
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
     def getRoomList(self):
-        ret = yield self.store.get_watcharoom_list()
+        ret = yield self.store.get_watcha_room_list()
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
     def getRoomMembership(self):
-        ret = yield self.store.get_watcharoom_membership()
+        ret = yield self.store.get_watcha_room_membership()
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
     def getRoomName(self):
-        ret = yield self.store.get_watcharoom_name()
+        ret = yield self.store.get_watcha_room_name()
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
     def getDisplayName(self):
-        ret = yield self.store.get_watchauser_display_name()
+        ret = yield self.store.get_watcha_user_display_name()
         defer.returnValue(ret)
 
     @defer.inlineCallbacks

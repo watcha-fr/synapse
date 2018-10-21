@@ -68,7 +68,7 @@ class WatchaRoomlistRestServlet(ClientV1RestServlet):
 
 class WatchaRoomMembershipRestServlet(ClientV1RestServlet):
 
-    PATTERNS = client_path_patterns("/watcha_room_membershib")
+    PATTERNS = client_path_patterns("/watcha_room_membership")
     def __init__(self, hs):
         super(WatchaRoomMembershipRestServlet, self).__init__(hs)
         self.hs = hs
