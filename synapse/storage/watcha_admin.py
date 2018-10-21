@@ -7,6 +7,7 @@ from synapse.api.constants import EventTypes, JoinRules
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id, get_localpart_from_id
 import time
+import psutil
 
 import logging
 
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 class WatchaAdminStore(SQLBaseStore):
 
     @defer.inlineCallbacks
-    def get_watcha_user_list(self):
+    def watcha_user_list(self):
         sql_user_list = """
             SELECT "name", "is_guest", "is_partner", "admin", "email", "creation_ts", "is_deactivated" FROM users;
         """
@@ -46,7 +47,7 @@ class WatchaAdminStore(SQLBaseStore):
         defer.returnValue(userListTupple)
 
     @defer.inlineCallbacks
-    def get_watcha_extend_room_list(self):
+    def watcha_extend_room_list(self):
         """ List the rooms their state and their users """
         sql_rooms = """ SELECT room_id, creator FROM rooms """
         sql_members = """
@@ -99,7 +100,7 @@ class WatchaAdminStore(SQLBaseStore):
 
 
 
-    def get_watcharoom_membership(self):
+    def watcharoom_membership(self):
         return self._simple_select_list(
             table = "room_memberships",
             keyvalues = {},
@@ -111,7 +112,26 @@ class WatchaAdminStore(SQLBaseStore):
             desc = "get_rooms",
         )
 
-    def get_watcharoom_name(self):
+    def watcha_server_state(self):
+        serverState = {}
+        cpu = {}
+        memory = {}
+        cpuUtilization = psutil.cpu_percent(interval=1)
+        cpuUtilizationPerCpu = psutil.cpu_percent(interval=1, percpu=True)
+        mem = psutil.virtual_memory()
+        swap = psutil.swap_memory()
+        diskUsage = psutil.disk_usage('/')
+        cpu['average'] = cpuUtilization
+        cpu['detailed'] = cpuUtilizationPerCpu
+        memory['memory'] = mem._asdict()
+        memory['swap'] = swap._asdict()
+        serverState['cpu'] = cpu
+        serverState['memory'] = memory
+        serverState ['disk'] = diskUsage._asdict()
+        return serverState
+
+
+    def watcharoom_name(self):
         return self._simple_select_list(
             table = "room_names",
             keyvalues = {},
