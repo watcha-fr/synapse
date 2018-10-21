@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 class WatchaUserlistRestServlet(ClientV1RestServlet):
 
-    PATTERNS = client_path_patterns("/watchauserlist")
+    PATTERNS = client_path_patterns("/watcha_user_list")
     def __init__(self, hs):
         super(WatchaUserlistRestServlet, self).__init__(hs)
         self.hs = hs
@@ -49,7 +49,7 @@ class WatchaUserlistRestServlet(ClientV1RestServlet):
 
 class WatchaRoomlistRestServlet(ClientV1RestServlet):
 
-    PATTERNS = client_path_patterns("/watcharoomlist")
+    PATTERNS = client_path_patterns("/watcha_room_list")
     def __init__(self, hs):
         super(WatchaRoomlistRestServlet, self).__init__(hs)
         self.hs = hs
@@ -68,7 +68,7 @@ class WatchaRoomlistRestServlet(ClientV1RestServlet):
 
 class WatchaRoomMembershipRestServlet(ClientV1RestServlet):
 
-    PATTERNS = client_path_patterns("/watcharoommembershib")
+    PATTERNS = client_path_patterns("/watcha_room_membershib")
     def __init__(self, hs):
         super(WatchaRoomMembershipRestServlet, self).__init__(hs)
         self.hs = hs
@@ -87,7 +87,7 @@ class WatchaRoomMembershipRestServlet(ClientV1RestServlet):
 
 class WatchaRoomNameRestServlet(ClientV1RestServlet):
 
-    PATTERNS = client_path_patterns("/watcharoomname")
+    PATTERNS = client_path_patterns("/watcha_room_name")
     def __init__(self, hs):
         self.hs = hs
         self.store = hs.get_datastore()
@@ -106,7 +106,7 @@ class WatchaRoomNameRestServlet(ClientV1RestServlet):
 
 class WatchaDisplayNameRestServlet(ClientV1RestServlet):
 
-    PATTERNS = client_path_patterns("/watchadisplayname")
+    PATTERNS = client_path_patterns("/watcha_display_name")
     def __init__(self, hs):
         super(WatchaDisplayNameRestServlet, self).__init__(hs)
         self.hs = hs
@@ -124,7 +124,7 @@ class WatchaDisplayNameRestServlet(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 class WatchaExtendRoomlistRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/watchaextendroomlist")
+    PATTERNS = client_path_patterns("/watcha_extend_room_list")
     def __init__(self, hs):
         super(WatchaExtendRoomlistRestServlet, self).__init__(hs)
         self.hs = hs
@@ -142,7 +142,7 @@ class WatchaExtendRoomlistRestServlet(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 class WatchaUpdateMailRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/watchaupdatemail/(?P<target_user_id>[^/]*)")
+    PATTERNS = client_path_patterns("/watcha_update_email/(?P<target_user_id>[^/]*)")
     def __init__(self, hs):
         super(WatchaUpdateMailRestServlet, self).__init__(hs)
         self.hs = hs
@@ -165,7 +165,7 @@ class WatchaUpdateMailRestServlet(ClientV1RestServlet):
         defer.returnValue((200, {}))
 
 class WatchaUpdateToMember(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/watchaupdatepartnertomember/(?P<target_user_id>[^/]*)")
+    PATTERNS = client_path_patterns("/watcha_update_partner_to_member/(?P<target_user_id>[^/]*)")
     def __init__(self, hs):
         super(WatchaUpdateToMember, self).__init__(hs)
         self.hs = hs
