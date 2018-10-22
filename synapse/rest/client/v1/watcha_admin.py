@@ -185,7 +185,7 @@ class WatchaUpdateToMember(ClientV1RestServlet):
 
 class WatchaServerState(ClientV1RestServlet):
 
-    PATTERNS = client_path_patterns("/watcha_get_server_state")
+    PATTERNS = client_path_patterns("/watcha_server_state")
     def __init__(self, hs):
         super(WatchaServerState, self).__init__(hs)
         self.hs = hs
