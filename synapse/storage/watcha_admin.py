@@ -8,6 +8,8 @@ from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id, get_localpart_from_id
 import time
 import psutil
+import subprocess
+import os
 
 import logging
 
@@ -165,3 +167,9 @@ class WatchaAdminStore(SQLBaseStore):
             updatevalues = {'is_deactivate':1},
             desc = 'watchaDeactivateAccount',
     )
+
+    def watcha_log(self):
+        f=open("/home/morisse/Work/synapse-admin/synapse/homeserver.log", "r")
+        if f.mode == 'r':
+            contents =f.read()
+        return contents

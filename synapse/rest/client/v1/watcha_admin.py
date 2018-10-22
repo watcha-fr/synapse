@@ -199,7 +199,26 @@ class WatchaServerState(ClientV1RestServlet):
         is_admin = yield self.auth.is_server_admin(requester.user)
         if not is_admin:
             raise AuthError(403, "You are not a server admin")
-        ret = yield self.handlers.watcha_admin_handler.WatchaServerState()
+        ret = yield self.handlers.watcha_admin_handler.watchaServerState()
+        defer.returnValue((200, ret))
+
+class WatchaLog(ClientV1RestServlet):
+
+    PATTERNS = client_path_patterns("/watcha_log")
+    def __init__(self, hs):
+        super(WatchaLog, self).__init__(hs)
+        self.hs = hs
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.handlers = hs.get_handlers()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        requester = yield self.auth.get_user_by_req(request)
+        is_admin = yield self.auth.is_server_admin(requester.user)
+        if not is_admin:
+            raise AuthError(403, "You are not a server admin")
+        ret = yield self.handlers.watcha_admin_handler.watchaLog()
         defer.returnValue((200, ret))
 
 def register_servlets(hs, http_server):
@@ -212,3 +231,4 @@ def register_servlets(hs, http_server):
     WatchaRoomMembershipRestServlet(hs).register(http_server)
     WatchaRoomNameRestServlet(hs).register(http_server)
     WatchaDisplayNameRestServlet(hs).register(http_server)
+    WatchaLog(hs).register(http_server)
