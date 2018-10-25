@@ -33,6 +33,7 @@ class WatchaAdminStore(SQLBaseStore):
         userNameList = yield self._execute("get_user_name", None, sql_user_displayname)
         userIpList = yield self._execute("get_user_name", None, sql_user_ip)
         userObject = {}
+        userListTupple = []
         for user in userList:
             userObject = {}
             userObject['name'] = user[0]
