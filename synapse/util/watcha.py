@@ -3,12 +3,20 @@
 
 import random
 import logging
+import os
+from os.path import join, dirname, abspath
 
+from jinja2 import Environment, FileSystemLoader
 from smtplib import SMTP
+from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.header import Header
 
 logger = logging.getLogger(__name__)
+
+# must be defined at package loading time,
+# because synctl start's demonizer is changing the abspath...
+TEMPLATE_DIR = join(dirname(abspath(__file__)), 'watcha_templates')
 
 def generate_password():
     '''Generate 'good enough' password
@@ -41,13 +49,10 @@ def generate_password():
 
     return password
 
-def send_mail(config, recipient, subject_template, body_template, **parameters):
 
-    parameters['server'] = config.public_baseurl.rstrip('/')
-    subject = subject_template.format(**parameters)
-    body = body_template.format(**parameters)
+def send_mail(config, recipient, subject, template_name, fields):
 
-    message = MIMEText(body, "plain", "utf8")
+    message = MIMEMultipart('alternative')
     message['From'] = config.email_notif_from
     message['To'] = recipient
 
@@ -60,11 +65,22 @@ def send_mail(config, recipient, subject_template, body_template, **parameters):
     # https://bugs.python.org/issue1974
     message['Subject'] = Header(subject, 'utf-8', 200)
 
+    # HACK: to avoid issues with setuptools/distutil,
+    # (not easy to get the 'res/templates' folder to be included in the whl file...)
+    # we ship the templates as .py files, and put them in the code tree itself.
+    jinjaenv = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
+
+    for mimetype, extension in {'plain': 'txt',
+                                'html': 'html'}.items():
+        template_file_name = template_name + '.' + extension + '.py'
+        body = jinjaenv.get_template(template_file_name).render(fields)
+        message.attach(MIMEText(body, mimetype, 'utf-8'))
+
     # if needed to customize the reply-to field
     # message['Reply-To'] = ...
-    #logger.info(msg.as_string())
+    #logger.info(message.as_string())
 
-    logger.info("send email through host " + config.email_smtp_host)
+    logger.info("Sending email through host %s...", config.email_smtp_host)
     error = None
     try:
         conn = SMTP(config.email_smtp_host, port=config.email_smtp_port)
@@ -74,9 +90,9 @@ def send_mail(config, recipient, subject_template, body_template, **parameters):
         conn.set_debuglevel(False)
         conn.login(config.email_smtp_user, config.email_smtp_pass)
         conn.sendmail(config.email_notif_from, [recipient], message.as_string())
-        logger.info("Mail sent to %s (Subject was: %s)", recipient, subject)
+        logger.info("...Mail sent to %s (Subject was: %s)", recipient, subject)
     except Exception, exc:
-        logger.error("failed to send mail: %s" % str(exc) )
+        logger.exception("...Failed to send mail")
         error = str(exc)
     finally:
         conn.quit()
