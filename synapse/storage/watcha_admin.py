@@ -102,7 +102,7 @@ class WatchaAdminStore(SQLBaseStore):
 
 
 
-    def watcharoom_membership(self):
+    def watcha_room_membership(self):
         return self._simple_select_list(
             table = "room_memberships",
             keyvalues = {},
