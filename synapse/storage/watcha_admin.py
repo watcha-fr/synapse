@@ -42,7 +42,7 @@ class WatchaAdminStore(SQLBaseStore):
             userObject['admin'] = user[3]
             userObject['email'] = user[4]
             userObject['creation_ts'] = user[5]
-            userObject['is_deactivated'] = user[6]
+            userObject['is_active'] = user[6]
             userObject['displayname'] = ''
             userObject['last_seen'] = ''
             userObject['ip'] = set()
@@ -175,7 +175,7 @@ class WatchaAdminStore(SQLBaseStore):
         return self._simple_update(
             table = "users",
             keyvalues = {'name':userId},
-            updatevalues = {'is_deactivate':1},
+            updatevalues = {'is_active':0},
             desc = 'watchaDeactivateAccount',
     )
 
