@@ -22,7 +22,7 @@ class WatchaAdminHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def getRoomMembership(self):
-        ret = yield self.store.watcharoom_membership()
+        ret = yield self.store.watcha_room_membership()
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
