@@ -26,7 +26,7 @@ class WatchaAdminStore(SQLBaseStore):
             SELECT "user_id", "displayname" FROM profiles;
         """
         sql_user_ip = """
-            SELECT "user_id", "ip", "last_seen" FROM user_ips ORDER BY last_seen DESC;
+            SELECT "user_id", "ip", "last_seen" FROM user_ips ORDER BY last_seen ASC;
         """
 
         userList =  yield self._execute("get_watcha_user_list", None, sql_user_list)
