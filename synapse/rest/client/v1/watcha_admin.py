@@ -151,7 +151,7 @@ class WatchaUpdateMailRestServlet(ClientV1RestServlet):
         self.handlers = hs.get_handlers()
 
     @defer.inlineCallbacks
-    def on_POST(self, request, target_user_id):
+    def on_PUT(self, request, target_user_id):
         UserID.from_string(target_user_id)
         requester = yield self.auth.get_user_by_req(request)
         is_admin = yield self.auth.is_server_admin(requester.user)
