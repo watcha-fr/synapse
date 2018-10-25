@@ -101,14 +101,13 @@ def _decode_share_secret_parameters(hs, parameter_names, parameter_json):
                 403, "HMAC incorrect",
             )
     return parameters
-"""
-allow to register new users to watcha server the caller must be ever an admin
-of the server or know the shared secret of the server.
-If the registration is done by shared secret we use the method _decode_share_secret_parameters to check if
-the shared secret is valid else we hanlde the parameters as they are
-If the requester is not an admin we require the shared secret parameters if there is none we raise error
-"""
+
+
 class WatchaRegisterRestServlet(ClientV1RestServlet):
+    """
+    Registration of users.
+    Requester must either be logged in as an admin, or supply a valid HMAC (generated from the registration_shared_secret)
+    """
     PATTERNS = client_path_patterns("/watcha_register")
 
     @defer.inlineCallbacks
@@ -126,9 +125,11 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
         # parse_json will not return unicode if it's only ascii... making hmac fail. Force it to be unicode.
         parameter_json['full_name'] = unicode(parameter_json['full_name'])
         if not is_admin:
+            # auth by checking that the HMAC is valid. this raises an error otherwise.
             params = _decode_share_secret_parameters(self.hs, ['user', 'full_name', 'email', 'admin'], parameter_json)
         else:
             params = parameter_json
+
         if params['user'].lower() != params['user']:
             raise SynapseError(
                 403, "user name must be lowercase",
@@ -201,7 +202,7 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
         )
 
         try:
-            display_name = yield self.hs.profile_handler.get_displayname(user_user)
+            display_name = yield self.hs.profile_handler.get_displayname(user)
         except:
             display_name = params['user']
 

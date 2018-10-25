@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from twisted.internet import defer
 
 from ._base import SQLBaseStore
@@ -19,39 +21,38 @@ class WatchaAdminStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def watcha_user_list(self):
-        sql_user_list = """
-            SELECT "name", "is_guest", "is_partner", "admin", "email", "creation_ts", "is_deactivated" FROM users;
-        """
+        fields = ["name", "is_guest", "is_partner", "admin", "email", "creation_ts", "is_active"]
+        sql_user_list = 'SELECT ' + ', '.join(fields) + ' FROM users;'
         sql_user_displayname = """
             SELECT "user_id", "displayname" FROM profiles;
         """
 
         userList =  yield self._execute("get_watcha_user_list", None, sql_user_list)
         userNameList = yield self._execute("get_user_name", None, sql_user_displayname)
-        userListTupple=[]
-        userNameTuple=[]
+        userListTuple = []
         userObject = {}
         for user in userList:
             userObject = {}
-            userObject['name'] = user[0]
-            userObject['is_guest'] = user[1]
-            userObject['is_partner'] = user[2]
-            userObject['admin'] = user[3]
-            userObject['email'] = user[4]
-            userObject['creation_ts'] = user[5]
-            userObject['is_deactivated'] = user[6]
+            for i in range(0, len(fields)):
+                userObject[fields[i]] = user[i]
+
+            # TODO: avoid a N^2 loop where it is not needed
+            # idea: grap display_name from user_directory table, with a SQL JOIN
             userObject['displayname'] = ''
             for name in userNameList:
                 if userObject['name'].replace('@','').split(':')[0] == name[0]:
                     userObject['displayname'] = name[1]
-            userListTupple.append(userObject)
+                    break
+            userListTuple.append(userObject)
 
-        defer.returnValue(userListTupple)
+        defer.returnValue(userListTuple)
 
     @defer.inlineCallbacks
     def watcha_extend_room_list(self):
         """ List the rooms their state and their users """
-        sql_rooms = """ SELECT room_id, creator FROM rooms """
+        sql_rooms = """
+            SELECT room_id, creator FROM rooms
+        """
         sql_members = """
             SELECT user_id, membership FROM room_memberships WHERE room_id = "{room_id}" ORDER BY event_id ASC;
         """
@@ -62,8 +63,7 @@ class WatchaAdminStore(SQLBaseStore):
             SELECT room_id, name FROM room_names;
         """
         now = int(round(time.time() * 1000))
-        ACTIVE_THRESHOLD = 1000 * 3600 * 24 * 7
-        result = { "now": now, "active_threshold": ACTIVE_THRESHOLD }
+        ACTIVE_THRESHOLD = 1000 * 3600 * 24 * 7 # one week
         rooms = yield self._execute("get_room_count_per_type", None, sql_rooms)
         room_name = yield self._execute("get_room_name", None, sql_room_name)
         roomArray = []
@@ -98,9 +98,7 @@ class WatchaAdminStore(SQLBaseStore):
                     roomObject['active'] = 1
             roomArray.append(roomObject)
 
-        defer.returnValue(roomArray);
-
-
+        defer.returnValue(roomArray)
 
 
     def watcha_room_membership(self):
@@ -165,12 +163,6 @@ class WatchaAdminStore(SQLBaseStore):
         return self._simple_update(
             table = "users",
             keyvalues = {'name':userId},
-            updatevalues = {'is_deactivate':1},
+            updatevalues = {'is_active':0},
             desc = 'watchaDeactivateAccount',
     )
-
-    def watcha_log(self):
-        f=open("/home/morisse/Work/synapse-admin/synapse/homeserver.log", "r")
-        if f.mode == 'r':
-            contents =f.read()
-        return contents
