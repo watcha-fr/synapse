@@ -93,7 +93,8 @@ class WatchaAdminStore(SQLBaseStore):
             roomObject['active'] = 0
             if last_message_ts is not None and len(last_message_ts) > 0:
                 last_message_ts = last_message_ts[0][0]
-                if now - last_message_ts < ACTIVE_THRESHOLD: # one week
+                #room_result["last_ts"] = last_message_ts
+                if now - last_message_ts < ACTIVE_THRESHOLD:
                     roomObject['active'] = 1
             roomArray.append(roomObject)
 
@@ -102,7 +103,7 @@ class WatchaAdminStore(SQLBaseStore):
 
 
 
-    def watcharoom_membership(self):
+    def watcha_room_membership(self):
         return self._simple_select_list(
             table = "room_memberships",
             keyvalues = {},
