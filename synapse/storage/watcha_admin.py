@@ -25,11 +25,13 @@ class WatchaAdminStore(SQLBaseStore):
         sql_user_displayname = """
             SELECT "user_id", "displayname" FROM profiles;
         """
+        sql_user_ip = """
+            SELECT "user_id", "ip", "last_seen" FROM user_ips ORDER BY last_seen DESC;
+        """
 
         userList =  yield self._execute("get_watcha_user_list", None, sql_user_list)
         userNameList = yield self._execute("get_user_name", None, sql_user_displayname)
-        userListTupple=[]
-        userNameTuple=[]
+        userIpList = yield self._execute("get_user_name", None, sql_user_ip)
         userObject = {}
         for user in userList:
             userObject = {}
@@ -41,10 +43,18 @@ class WatchaAdminStore(SQLBaseStore):
             userObject['creation_ts'] = user[5]
             userObject['is_deactivated'] = user[6]
             userObject['displayname'] = ''
+            userObject['last_seen'] = ''
+            userObject['ip'] = set()
             for name in userNameList:
                 if userObject['name'].replace('@','').split(':')[0] == name[0]:
                     userObject['displayname'] = name[1]
             userListTupple.append(userObject)
+
+            for user in userIpList:
+                if userObject['name'] == user[0]:
+                    userObject['ip'].add(user[1])
+                    userObject['last_seen'] = user[2]
+
 
         defer.returnValue(userListTupple)
 
