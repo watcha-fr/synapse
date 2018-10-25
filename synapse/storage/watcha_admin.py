@@ -20,7 +20,7 @@ class WatchaAdminStore(SQLBaseStore):
     @defer.inlineCallbacks
     def watcha_user_list(self):
         sql_user_list = """
-            SELECT "name", "is_guest", "is_partner", "admin", "email", "creation_ts", "is_deactivated" FROM users;
+            SELECT "name", "is_guest", "is_partner", "admin", "email", "creation_ts", "is_active" FROM users;
         """
         sql_user_displayname = """
             SELECT "user_id", "displayname" FROM profiles;
