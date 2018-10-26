@@ -202,7 +202,7 @@ class WatchaAdminStore(SQLBaseStore):
                 synapse_version = output
             else:
                 (synapse_version, err) = output.communicate()
-            except subprocess.CalledProcessError as e:
+        except subprocess.CalledProcessError as e:
             synapse_version = "unavailable"
 
         ret=[user_stats,room_stats,user_admin,synapse_version]
