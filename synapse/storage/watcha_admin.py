@@ -207,6 +207,6 @@ class WatchaAdminStore(SQLBaseStore):
         except subprocess.CalledProcessError as e:
             synapse_version = "unavailable"
 
-        ret=[user_stats,room_stats,user_admin,synapse_version]
+        ret={'users':user_stats,'rooms':room_stats,'admins':user_admin,'version':synapse_version}
 
         defer.returnValue(ret)
