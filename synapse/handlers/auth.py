@@ -871,6 +871,7 @@ class AuthHandler(BaseHandler):
         else:
             return defer.succeed(False)
 
+    #insertion for watcha
     @defer.inlineCallbacks
     def is_partner(self, user_id):
         ret = yield self.store.is_user_partner(
@@ -886,6 +887,7 @@ class AuthHandler(BaseHandler):
         )
 
         defer.returnValue(ret)
+    #end of insertion
 
     # Added for Watcha...
     @defer.inlineCallbacks

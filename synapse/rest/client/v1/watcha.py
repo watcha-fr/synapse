@@ -19,6 +19,8 @@ from synapse.http.servlet import parse_json_object_from_request
 from synapse.util.watcha import generate_password, send_mail
 from synapse.types import UserID
 import base64
+from synapse.types import create_requester
+
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +54,12 @@ def _decode_share_secret_parameters(hs, parameter_names, parameter_json):
             )
     return parameters
 
+
 class WatchaRegisterRestServlet(ClientV1RestServlet):
+    """
+    Registration of users.
+    Requester must either be logged in as an admin, or supply a valid HMAC (generated from the registration_shared_secret)
+    """
     PATTERNS = client_path_patterns("/watcha_register")
 
     def __init__(self, hs):
@@ -62,12 +69,23 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         yield run_on_reactor() # not sure what it is :)
+        auth_headers = request.requestHeaders.getRawHeaders("Authorization")
+        is_admin = False
+
+        if auth_headers:
+            requester = yield self.auth.get_user_by_req(request)
+            is_admin = yield self.auth.is_server_admin(requester.user)
         logger.info("Adding Watcha user...")
 
         parameter_json = parse_json_object_from_request(request)
         # parse_json will not return unicode if it's only ascii... making hmac fail. Force it to be unicode.
         parameter_json['full_name'] = unicode(parameter_json['full_name'])
-        params = _decode_share_secret_parameters(self.hs, ['user', 'full_name', 'email', 'admin'], parameter_json)
+        if not is_admin:
+            # auth by checking that the HMAC is valid. this raises an error otherwise.
+            params = _decode_share_secret_parameters(self.hs, ['user', 'full_name', 'email', 'admin'], parameter_json)
+        else:
+            params = parameter_json
+
         if params['user'].lower() != params['user']:
             raise SynapseError(
                 403, "user name must be lowercase",
@@ -83,7 +101,8 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
         )
 
         user = UserID.from_string(user_id)
-        self.hs.profile_handler.set_displayname(user, None, params['full_name'], by_admin=True)
+        requester = create_requester(user_id)
+        self.hs.profile_handler.set_displayname(user, requester, params['full_name'], by_admin=True)
 
         yield self.hs.auth_handler.set_email(user_id, params['email'])
 
@@ -127,11 +146,21 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         yield run_on_reactor() # not sure what it is :)
+        auth_headers = request.requestHeaders.getRawHeaders("Authorization")
+        is_admin = False
+
+        if auth_headers:
+            requester = yield self.auth.get_user_by_req(request)
+            is_admin = yield self.auth.is_server_admin(requester.user)
 
         parameter_json = parse_json_object_from_request(request)
-        params = _decode_share_secret_parameters(self.hs, ['user'], parameter_json)
+        if not is_admin:
+            params = _decode_share_secret_parameters(self.hs, ['user'], parameter_json)
+            user_id = '@' + params['user'] + ':' + self.hs.get_config().server_name
+        else:
+            params = parameter_json
+            user_id = params['user']
         password = generate_password()
-        user_id = '@' + params['user'] + ':' + self.hs.get_config().server_name
         logger.info("Setting password for user %s", user_id)
         user = UserID.from_string(user_id)
 
@@ -141,8 +170,9 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
             raise SynapseError(403,
                                "email not defined for this user")
 
+        requester = create_requester(user_id)
         yield self.hs.get_set_password_handler().set_password(
-            user_id, password, None # no requester
+            user_id, password, requester
         )
 
         try:
