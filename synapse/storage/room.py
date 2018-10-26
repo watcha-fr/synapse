@@ -259,7 +259,6 @@ class RoomStore(SearchStore):
             SELECT room_id FROM rooms
         """
         rooms = yield self._execute("get_room_count_per_type", None, sql_rooms)
-        logger.info("ROOM STATS: rooms={}".format(rooms))
 
         sql_members = """
             SELECT user_id, membership FROM room_memberships WHERE room_id = "{room_id}" ORDER BY event_id ASC;

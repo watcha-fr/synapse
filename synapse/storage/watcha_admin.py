@@ -184,3 +184,15 @@ class WatchaAdminStore(SQLBaseStore):
         if f.mode == 'r':
             contents =f.read()
         return contents
+
+    def get_user_admin:
+        sql_user_admin = """ SELECT name FROM users WHERE admin=1"""
+        admins=yield self._execute("get_user_admin", None, sql_user_admin)
+        return admins
+
+    def watcha_admin_stats(self):
+        user_stats = yield self.get_count_users_partners()
+        room_stats = yield self.get_room_count_per_type()
+        user_admin = yield self.get_user_admin()
+
+        return contents
