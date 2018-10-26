@@ -185,11 +185,13 @@ class WatchaAdminStore(SQLBaseStore):
             contents =f.read()
         return contents
 
+    @defer.inlineCallbacks
     def get_user_admin(self):
         sql_user_admin = """ SELECT name FROM users WHERE admin=1"""
         admins=yield self._execute("get_user_admin", None, sql_user_admin)
-        return admins
+        defer.returnValue(admins)
 
+    @defer.inlineCallbacks
     def watcha_admin_stats(self):
         user_stats = yield self.get_count_users_partners()
         room_stats = yield self.get_room_count_per_type()
@@ -207,4 +209,4 @@ class WatchaAdminStore(SQLBaseStore):
 
         ret=[user_stats,room_stats,user_admin,synapse_version]
 
-        return ret
+        defer.returnValue(ret)
