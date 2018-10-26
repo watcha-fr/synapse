@@ -194,5 +194,16 @@ class WatchaAdminStore(SQLBaseStore):
         user_stats = yield self.get_count_users_partners()
         room_stats = yield self.get_room_count_per_type()
         user_admin = yield self.get_user_admin()
+        try:
+            proc = subprocess.Popen(['pip', 'freeze'], stdout=subprocess.PIPE)
+            output = subprocess.check_output(('grep', 'matrix-synapse==='), stdin=proc.stdout)
+            proc.wait()
+            if type(output) is str:
+                synapse_version = output
+            else:
+                (synapse_version, err) = output.communicate()
+            except subprocess.CalledProcessError as e:
+            synapse_version = "unavailable"
+        ret=[user_stats,room_stats,user_admin,synapse_version]
 
-        return contents
+        return ret
