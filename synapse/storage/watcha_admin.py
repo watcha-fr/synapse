@@ -185,7 +185,7 @@ class WatchaAdminStore(SQLBaseStore):
             contents =f.read()
         return contents
 
-    def get_user_admin:
+    def get_user_admin(self):
         sql_user_admin = """ SELECT name FROM users WHERE admin=1"""
         admins=yield self._execute("get_user_admin", None, sql_user_admin)
         return admins
@@ -204,6 +204,7 @@ class WatchaAdminStore(SQLBaseStore):
                 (synapse_version, err) = output.communicate()
             except subprocess.CalledProcessError as e:
             synapse_version = "unavailable"
+
         ret=[user_stats,room_stats,user_admin,synapse_version]
 
         return ret
