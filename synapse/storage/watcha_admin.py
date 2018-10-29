@@ -37,7 +37,7 @@ class WatchaAdminStore(SQLBaseStore):
     def watcha_extend_room_list(self):
         """ List the rooms their state and their users """
         sql_rooms = """
-            SELECT room_id, creator FROM rooms
+            SELECT rooms.room_id, creator, name FROM rooms JOIN room_names on rooms.room_id = room_names.room_id
         """
         sql_members = """
             SELECT user_id, membership FROM room_memberships WHERE room_id = "{room_id}" ORDER BY event_id ASC;
@@ -45,18 +45,16 @@ class WatchaAdminStore(SQLBaseStore):
         sql_last_message = """
             SELECT received_ts FROM events WHERE type = "m.room.message" AND room_id = "{room_id}" ORDER BY received_ts DESC LIMIT 1;
         """
-        sql_room_name = """
-            SELECT room_id, name FROM room_names;
-        """
+
         now = int(round(time.time() * 1000))
         ACTIVE_THRESHOLD = 1000 * 3600 * 24 * 7 # one week
         rooms = yield self._execute("get_room_count_per_type", None, sql_rooms)
-        room_name = yield self._execute("get_room_name", None, sql_room_name)
         roomArray = []
         for room in rooms:
             roomObject = {}
             roomObject['room_id'] = room[0]
             roomObject['creator'] = room[1]
+            roomObject['name'] = room[2]
             roomObject['members'] = set()
             membership_events = yield self._execute("get_room_count_per_type", None, sql_members.format(**{ "room_id": room[0] }))
             for step in membership_events:
@@ -70,11 +68,6 @@ class WatchaAdminStore(SQLBaseStore):
                     roomObject['type'] = "Room"
                 else:
                     roomObject['type'] = "One to one"
-
-            for name in room_name:
-                if name[0] == room[0]:
-                    roomObject['name'] = name[1]
-
             last_message_ts = yield self._execute("get_room_count_per_type", None, sql_last_message.format(**{ "room_id": room[0] }))
             roomObject['active'] = 0
             if last_message_ts is not None and len(last_message_ts) > 0:
