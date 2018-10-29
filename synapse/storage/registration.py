@@ -219,6 +219,29 @@ class RegistrationStore(background_updates.BackgroundUpdateStore):
 
         return self.runInteraction("get_users_by_id_case_insensitive", f)
 
+    # Added for watcha...
+    def find_user_id_by_email(self, email):
+        """Find user that match email case insensitively.
+
+        Returns a user_id or None
+        """
+        def f(txn):
+            # there should be only one..
+            # but bad data have caused some accounts to be duplicated, so
+            # take a non-partner one by default
+            sql = (
+                "SELECT name FROM users"
+                " WHERE lower(email) = lower(?)"
+                " ORDER BY is_partner ASC"
+                " LIMIT 1"
+            )
+            txn.execute(sql, (email,))
+            rows = self.cursor_to_dict(txn)
+            return rows[0]['name'] if rows else None
+
+        return self.runInteraction("find_user_id_by_email_case_insensitive", f)
+    # ... end added for watcha.
+
     def user_set_password_hash(self, user_id, password_hash):
         """
         NB. This does *not* evict any cache because the one use for this
