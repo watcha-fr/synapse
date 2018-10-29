@@ -34,7 +34,7 @@ class WatchaAdminStore(SQLBaseStore):
         userNameList = yield self._execute("get_user_name", None, sql_user_displayname)
         userIpList = yield self._execute("get_user_name", None, sql_user_ip)
         userObject = {}
-        userListTupple = []
+        userListTuple = []
         for user in userList:
             userObject = {}
             for i in range(0, len(fields)):
@@ -57,7 +57,7 @@ class WatchaAdminStore(SQLBaseStore):
                     userObject['last_seen'] = user[2]
 
 
-        defer.returnValue(userListTupple)
+        defer.returnValue(userListTuple)
 
     @defer.inlineCallbacks
     def watcha_extend_room_list(self):
