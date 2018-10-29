@@ -21,42 +21,16 @@ class WatchaAdminStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def watcha_user_list(self):
-        fields = ["name", "is_guest", "is_partner", "admin", "email", "creation_ts", "is_active"]
-        sql_user_list = 'SELECT ' + ', '.join(fields) + ' FROM users;'
-        sql_user_displayname = """
-            SELECT "user_id", "displayname" FROM profiles;
-        """
-        sql_user_ip = """
-            SELECT "user_id", "ip", "last_seen" FROM user_ips ORDER BY last_seen ASC;
-        """
-
+        fields = ["name", "is_guest", "is_partner", "admin", "email", "creation_ts", "is_active" ,"displayname", "MAX(last_seen)"]
+        sql_user_list = 'SELECT ' + ', '.join(fields) + ' FROM users LEFT JOIN user_ips ON users.name = user_ips.user_id LEFT JOIN profiles ON users.name LIKE "@"||profiles.user_id||":%"GROUP BY users.name ;'
         userList =  yield self._execute("get_watcha_user_list", None, sql_user_list)
-        userNameList = yield self._execute("get_user_name", None, sql_user_displayname)
-        userIpList = yield self._execute("get_user_name", None, sql_user_ip)
         userObject = {}
         userListTuple = []
         for user in userList:
             userObject = {}
             for i in range(0, len(fields)):
                 userObject[fields[i]] = user[i]
-
-            # TODO: avoid a N^2 loop where it is not needed
-            # idea: grap display_name from user_directory table, with a SQL JOIN
-            userObject['displayname'] = ''
-            userObject['last_seen'] = ''
-            userObject['ip'] = set()
-            for name in userNameList:
-                if userObject['name'].replace('@','').split(':')[0] == name[0]:
-                    userObject['displayname'] = name[1]
-                    break
             userListTuple.append(userObject)
-
-            for user in userIpList:
-                if userObject['name'] == user[0]:
-                    userObject['ip'].add(user[1])
-                    userObject['last_seen'] = user[2]
-
-
         defer.returnValue(userListTuple)
 
     @defer.inlineCallbacks
