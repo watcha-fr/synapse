@@ -11,42 +11,42 @@ class WatchaAdminHandler(BaseHandler):
         super(WatchaAdminHandler, self).__init__(hs)
 
     @defer.inlineCallbacks
-    def getUserList(self):
+    def watcha_user_list(self):
         ret = yield self.store.watcha_user_list()
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def getRoomList(self):
+    def watcha_room_list(self):
         ret = yield self.store.watcharoom_list()
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def getRoomMembership(self):
+    def watcha_room_membership(self):
         ret = yield self.store.watcha_room_membership()
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def getRoomName(self):
+    def watcha_room_name(self):
         ret = yield self.store.watcharoom_name()
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def getDisplayName(self):
+    def watcha_display_name(self):
         ret = yield self.store.watchauser_display_name()
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def extendRoomlist(self):
+    def watcha_extend_room_list(self):
         ret = yield self.store.watcha_extend_room_list()
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def watchaUpdateMail(self, userId, email):
+    def watcha_update_mail(self, userId, email):
         ret = yield self.store.watcha_update_mail(userId, email)
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def watchaUpdateToMember(self, userId):
+    def watcha_update_to_member(self, userId):
         ret = yield self.store.watcha_update_to_member(userId)
         defer.returnValue(ret)
 
@@ -56,16 +56,21 @@ class WatchaAdminHandler(BaseHandler):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def watchaServerState(self):
+    def watcha_server_state(self):
         ret = yield self.store.watcha_server_state()
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def watchaLog(self):
+    def watcha_log(self):
         ret = yield self.store.watcha_log()
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def WatchaAdminStats(self):
+    def watcha_admin_stat(self):
         ret = yield self.store.watcha_admin_stats()
+        defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def watcha_user_ip(self, userId):
+        ret = yield self.store.watcha_user_ip(userId)
         defer.returnValue(ret)

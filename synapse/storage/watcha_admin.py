@@ -34,6 +34,13 @@ class WatchaAdminStore(SQLBaseStore):
         defer.returnValue(userListTuple)
 
     @defer.inlineCallbacks
+    def watcha_user_ip(self, userId):
+        sql_user_ip="SELECT ip, user_agent, last_seen FROM user_ips where user_id="+"'"+userId+"'"
+        user_ip = yield self._execute("watcha_user_ip",None, sql_user_ip)
+        defer.returnValue(user_ip)
+
+
+    @defer.inlineCallbacks
     def watcha_extend_room_list(self):
         """ List the rooms their state and their users """
         sql_rooms = """
