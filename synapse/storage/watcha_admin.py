@@ -35,7 +35,7 @@ class WatchaAdminStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def watcha_user_ip(self, userId):
-        sql_user_ip="SELECT ip, user_agent, last_seen FROM user_ips where user_id="+"'"+userId+"'"
+        sql_user_ip="SELECT ip, user_agent, last_seen FROM user_ips where user_id="+"'"+userId+"'"+"ORDER BY last_seen DESC"
         user_ip = yield self._execute("watcha_user_ip",None, sql_user_ip)
         defer.returnValue(user_ip)
 
