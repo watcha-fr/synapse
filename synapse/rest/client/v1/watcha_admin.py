@@ -200,6 +200,25 @@ class WatchaUserIp(ClientV1RestServlet):
         ret = yield self.handlers.watcha_admin_handler.watcha_user_ip(target_user_id)
         defer.returnValue((200, ret))
 
+class WatchaReactivateAccount(ClientV1RestServlet):
+
+    PATTERNS = client_path_patterns("/watcha_reacticate_account/(?P<target_user_id>[^/]*)")
+    def __init__(self, hs):
+        super(WatchaReactivateAccount, self).__init__(hs)
+        self.hs = hs
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.handlers = hs.get_handlers()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request, target_user_id):
+        requester = yield self.auth.get_user_by_req(request)
+        is_admin = yield self.auth.is_server_admin(requester.user)
+        if not is_admin:
+            raise AuthError(403, "You are not a server admin")
+        ret = yield self.handlers.watcha_admin_handler.watcha_reactivate_account(target_user_id)
+        defer.returnValue((200, ret))
+
 def register_servlets(hs, http_server):
     WatchaUpdateToMember(hs).register(http_server)
     WatchaUserIp(hs).register(http_server)

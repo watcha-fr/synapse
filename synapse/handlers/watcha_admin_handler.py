@@ -74,3 +74,8 @@ class WatchaAdminHandler(BaseHandler):
     def watcha_user_ip(self, userId):
         ret = yield self.store.watcha_user_ip(userId)
         defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def watcha_reacticate_account(self, userId):
+        ret = yield self.store.watcha_reacticate_account(userId)
+        defer.returnValue(ret)

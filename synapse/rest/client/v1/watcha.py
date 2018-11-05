@@ -141,6 +141,7 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         ClientV1RestServlet.__init__(self, hs)
+        self.handlers =hs.get_handlers()
 
 
     @defer.inlineCallbacks
@@ -148,7 +149,6 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
         yield run_on_reactor() # not sure what it is :)
         auth_headers = request.requestHeaders.getRawHeaders("Authorization")
         is_admin = False
-
         if auth_headers:
             requester = yield self.auth.get_user_by_req(request)
             is_admin = yield self.auth.is_server_admin(requester.user)
@@ -174,6 +174,8 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
         yield self.hs.get_set_password_handler().set_password(
             user_id, password, requester
         )
+        if hasattr(params,"reactivate"):
+            yield self.handlers.watcha_admin_handler.watcha_reactivate_account(user_id)
 
         try:
             display_name = yield self.hs.profile_handler.get_displayname(user)
