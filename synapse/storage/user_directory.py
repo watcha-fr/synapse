@@ -752,18 +752,18 @@ class UserDirectoryStore(SQLBaseStore):
                 where_clause = ""
 
             sql = """
-                SELECT u.name as user_id, u.is_partner, d.display_name, d.avatar_url, p.state as presence
+                SELECT u.name as user_id, u.is_active, u.is_partner, d.display_name, d.avatar_url, p.state as presence
                 FROM users AS u
                 LEFT OUTER JOIN user_directory AS d ON d.user_id = u.name
                 LEFT OUTER JOIN presence_stream AS p ON p.user_id = u.name
-                WHERE u.is_partner == 0%s
+                WHERE u.is_partner = 0 AND u.is_active = 1%s
                 UNION ALL
-                SELECT u.name as user_id, u.is_partner, d.display_name, d.avatar_url, coalesce(p.state, "invited") as presence
+                SELECT u.name as user_id, u.is_active, u.is_partner, d.display_name, d.avatar_url, coalesce(p.state, "invited") as presence
                 FROM users AS u
                 INNER JOIN partners_invited_by AS pib ON pib.partner = u.name AND pib.invited_by = ?
                 LEFT OUTER JOIN user_directory AS d ON d.user_id = u.name
                 LEFT OUTER JOIN presence_stream AS p ON p.user_id = u.name
-                WHERE u.is_partner == 1%s
+                WHERE u.is_partner = 1 AND u.is_active = 1%s
             """ % (where_clause, where_clause)
 
             logger.info(sql)
