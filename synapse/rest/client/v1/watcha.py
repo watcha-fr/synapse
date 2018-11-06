@@ -174,7 +174,7 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
         yield self.hs.get_set_password_handler().set_password(
             user_id, password, requester
         )
-        if hasattr(params,"reactivate"):
+        if 'reactivate' in params:
             yield self.handlers.watcha_admin_handler.watcha_reactivate_account(user_id)
 
         try:
