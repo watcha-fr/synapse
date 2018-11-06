@@ -152,6 +152,7 @@ class WatchaAdminStore(SQLBaseStore):
             updatevalues = {'is_active':0},
             desc = 'watchaDeactivateAccount',
     )
+    
     def watcha_reactivate_account(self, userId):
         return self._simple_update(
             table = "users",

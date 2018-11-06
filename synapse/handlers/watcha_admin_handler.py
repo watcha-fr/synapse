@@ -76,6 +76,6 @@ class WatchaAdminHandler(BaseHandler):
         defer.returnValue(ret)
 
     @defer.inlineCallbacks
-    def watcha_reacticate_account(self, userId):
-        ret = yield self.store.watcha_reacticate_account(userId)
+    def watcha_reactivate_account(self, userId):
+        ret = yield self.store.watcha_reactivate_account(userId)
         defer.returnValue(ret)
