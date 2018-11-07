@@ -152,7 +152,7 @@ class WatchaAdminStore(SQLBaseStore):
             updatevalues = {'is_active':0},
             desc = 'watchaDeactivateAccount',
     )
-    
+
     def watcha_reactivate_account(self, userId):
         return self._simple_update(
             table = "users",
@@ -160,12 +160,6 @@ class WatchaAdminStore(SQLBaseStore):
             updatevalues = {'is_active':1},
             desc = 'watchaReactivateAccount',
     )
-
-    def watcha_log(self):
-        f=open("/home/morisse/Work/synapse-admin/synapse/homeserver.log", "r")
-        if f.mode == 'r':
-            contents =f.read()
-        return contents
 
     @defer.inlineCallbacks
     def get_user_admin(self):
