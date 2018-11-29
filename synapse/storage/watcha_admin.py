@@ -44,7 +44,7 @@ class WatchaAdminStore(SQLBaseStore):
     def watcha_extend_room_list(self):
         """ List the rooms their state and their users """
         sql_rooms = """
-            SELECT rooms.room_id, creator, name FROM rooms JOIN room_names on rooms.room_id = room_names.room_id
+            SELECT rooms.room_id, creator, name FROM rooms LEFT JOIN room_names on rooms.room_id = room_names.room_id
         """
         sql_members = """
             SELECT user_id, membership FROM room_memberships WHERE room_id = "{room_id}" ORDER BY event_id ASC;
