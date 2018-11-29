@@ -12,6 +12,7 @@ import time
 import psutil
 import subprocess
 import os
+from collections import defaultdict
 
 import logging
 
@@ -35,56 +36,57 @@ class WatchaAdminStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def watcha_user_ip(self, userId):
-        sql_user_ip="SELECT ip, user_agent, last_seen FROM user_ips where user_id="+"'"+userId+"'"+"ORDER BY last_seen DESC"
-        user_ip = yield self._execute("watcha_user_ip",None, sql_user_ip)
+        SQL_USER_IP = "SELECT ip, user_agent, last_seen FROM user_ips where user_id="+"'"+userId+"'"+"ORDER BY last_seen DESC"
+        user_ip = yield self._execute("watcha_user_ip",None, SQL_USER_IP)
         defer.returnValue(user_ip)
-
 
     @defer.inlineCallbacks
     def watcha_extend_room_list(self):
         """ List the rooms their state and their users """
-        sql_rooms = """
-            SELECT rooms.room_id, creator, name FROM rooms LEFT JOIN room_names on rooms.room_id = room_names.room_id
-        """
-        sql_members = """
-            SELECT user_id, membership FROM room_memberships WHERE room_id = "{room_id}" ORDER BY event_id ASC;
-        """
-        sql_last_message = """
-            SELECT received_ts FROM events WHERE type = "m.room.message" AND room_id = "{room_id}" ORDER BY received_ts DESC LIMIT 1;
+
+        ROOMS_SQL = """
+        SELECT rooms.room_id, rooms.creator, room_names.name, last_events.last_received_ts FROM rooms 
+        LEFT JOIN (SELECT max(event_id) event_id, room_id from room_names group by room_id) last_room_names 
+              ON rooms.room_id = last_room_names.room_id 
+        LEFT JOIN room_names on room_names.event_id = last_room_names.event_id 
+        LEFT JOIN (SELECT max(received_ts) last_received_ts, room_id FROM events 
+                   GROUP BY room_id HAVING type = "m.room.message") last_events 
+              ON last_events.room_id = rooms.room_id
+        ORDER BY rooms.room_id ASC;
         """
 
+        MEMBERS_SQL = """
+        SELECT room_id, user_id, membership FROM room_memberships ORDER BY room_id, event_id ASC
+        """
+
+        rooms = yield self._execute("get_room_count_per_type", None, ROOMS_SQL)        
+        room_memberships = yield self._execute("get_room_count_per_type", None, MEMBERS_SQL)
+        
+        membership_by_room = defaultdict(list)
+        for room_id, user_id, membership in room_memberships:
+            membership_by_room[room_id].append((user_id, membership))
+
+        members_by_room = {
+            room_id: list(set(user_id for user_id, membership in members if membership in ["join", "invite"])
+                          -
+                          set(user_id for user_id, membership in members if membership == "leave"))
+            for room_id, members in membership_by_room.items()
+        }
+        
         now = int(round(time.time() * 1000))
         ACTIVE_THRESHOLD = 1000 * 3600 * 24 * 7 # one week
-        rooms = yield self._execute("get_room_count_per_type", None, sql_rooms)
-        roomArray = []
-        for room in rooms:
-            roomObject = {}
-            roomObject['room_id'] = room[0]
-            roomObject['creator'] = room[1]
-            roomObject['name'] = room[2]
-            roomObject['members'] = set()
-            membership_events = yield self._execute("get_room_count_per_type", None, sql_members.format(**{ "room_id": room[0] }))
-            for step in membership_events:
-                user_id = step[0]
-                membership = step[1]
-                if membership == "join" or membership == "invite":
-                    roomObject['members'].add(user_id)
-                elif membership == "leave":
-                    roomObject['members'].discard(user_id)
-                if len(roomObject['members']) >= 3:
-                    roomObject['type'] = "Room"
-                else:
-                    roomObject['type'] = "One to one"
-            last_message_ts = yield self._execute("get_room_count_per_type", None, sql_last_message.format(**{ "room_id": room[0] }))
-            roomObject['active'] = 0
-            if last_message_ts is not None and len(last_message_ts) > 0:
-                last_message_ts = last_message_ts[0][0]
-                #room_result["last_ts"] = last_message_ts
-                if now - last_message_ts < ACTIVE_THRESHOLD:
-                    roomObject['active'] = 1
-            roomArray.append(roomObject)
 
-        defer.returnValue(roomArray)
+        defer.returnValue(
+            [ {
+                'room_id': room_id,
+                'creator': creator,
+                'name': name,
+                'members': members_by_room[room_id],
+                'type': "Room" if (len(members_by_room[room_id]) >= 3) else "One to one",
+                'active': 1 if last_received_ts and (now - last_received_ts < ACTIVE_THRESHOLD) else 0
+            }
+              for room_id, creator, name, last_received_ts in rooms
+            ])
 
 
     def watcha_room_membership(self):
