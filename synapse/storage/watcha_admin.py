@@ -22,17 +22,17 @@ class WatchaAdminStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def watcha_user_list(self):
-        fields = ["name", "is_guest", "is_partner", "admin", "email", "creation_ts", "is_active" ,"displayname", "MAX(last_seen)"]
-        sql_user_list = 'SELECT ' + ', '.join(fields) + ' FROM users LEFT JOIN user_ips ON users.name = user_ips.user_id LEFT JOIN profiles ON users.name LIKE "@"||profiles.user_id||":%"GROUP BY users.name ;'
-        userList =  yield self._execute("get_watcha_user_list", None, sql_user_list)
-        userObject = {}
-        userListTuple = []
-        for user in userList:
-            userObject = {}
-            for i in range(0, len(fields)):
-                userObject[fields[i]] = user[i]
-            userListTuple.append(userObject)
-        defer.returnValue(userListTuple)
+        FIELDS = ["name", "is_guest", "is_partner", "admin", "email",
+                  "creation_ts", "is_active" , "displayname", "last_seen"]
+        COLUMNS = FIELDS[:-1] + ["MAX(last_seen)"]
+        SQL_USER_LIST = 'SELECT ' + ', '.join(COLUMNS) + ''' FROM users 
+        LEFT JOIN user_ips ON users.name = user_ips.user_id
+        LEFT JOIN profiles ON users.name LIKE "@"||profiles.user_id||":%" 
+        GROUP BY users.name'''
+        
+        users = yield self._execute("get_watcha_user_list", None, SQL_USER_LIST)
+        
+        defer.returnValue([dict(zip(FIELDS, user)) for user in users])
 
     @defer.inlineCallbacks
     def watcha_user_ip(self, userId):
