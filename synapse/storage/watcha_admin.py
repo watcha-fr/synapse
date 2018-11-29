@@ -76,8 +76,8 @@ class WatchaAdminStore(SQLBaseStore):
         now = int(round(time.time() * 1000))
         ACTIVE_THRESHOLD = 1000 * 3600 * 24 * 7 # one week
 
-        defer.returnValue(
-            [ {
+        defer.returnValue([
+            {
                 'room_id': room_id,
                 'creator': creator,
                 'name': name,
@@ -85,8 +85,9 @@ class WatchaAdminStore(SQLBaseStore):
                 'type': "Room" if (len(members_by_room[room_id]) >= 3) else "One to one",
                 'active': 1 if last_received_ts and (now - last_received_ts < ACTIVE_THRESHOLD) else 0
             }
-              for room_id, creator, name, last_received_ts in rooms
-            ])
+            for room_id, creator, name, last_received_ts in rooms
+            if room_id in members_by_room # don't show empty room (and avoid a possible exception)
+        ])
 
 
     def watcha_room_membership(self):
