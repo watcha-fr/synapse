@@ -19,11 +19,19 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def _caller_name():
+    '''returns the name of the function calling the one calling this one'''
+    try:
+        return inspect.stack()[2][3]
+    except IndexError:
+        # seems to happen (related to iPython install ?)
+        return "<unknown function>"
+
 class WatchaAdminStore(SQLBaseStore):
 
     def _execute_sql(self, sql, *args):
         return self._execute(
-            inspect.stack()[1][3],  # name of the caller function
+            _caller_name(),
             None, sql, *args)
     
     @defer.inlineCallbacks
@@ -182,7 +190,7 @@ class WatchaAdminStore(SQLBaseStore):
             table = "users",
             keyvalues = { 'name': user_id },
             updatevalues=updatevalues,
-            desc=inspect.stack()[1][3], # name of the caller function
+            desc=_caller_name(),
         )
     
     def watcha_update_mail(self, user_id, email):
