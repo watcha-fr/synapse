@@ -21,12 +21,11 @@ logger = logging.getLogger(__name__)
 
 class WatchaAdminStore(SQLBaseStore):
 
-    @defer.inlineCallbacks
     def _execute_sql(self, sql, *args):
-        yield self._execute(
-            inspect.stack()[1][3], # name of the caller function
+        return self._execute(
+            inspect.stack()[1][3],  # name of the caller function
             None, sql, *args)
-
+    
     @defer.inlineCallbacks
     def get_room_count_per_type(self):
         """List the rooms, with two or less members, and with three or more members.
