@@ -176,7 +176,7 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
         except:
             display_name = params['user']
 
-        send_email_error = send_mail(self.hs.config, user_info['email'],
+        send_mail(self.hs.config, user_info['email'],
                   PASSWORD_EMAIL_SUBJECT_FR,
                   PASSWORD_EMAIL_MESSAGE_FR,
                   full_name=display_name,
@@ -184,12 +184,7 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
                   user_password=password
                   )
 
-        if send_email_error is None:
-            defer.returnValue((200, {}))
-        else:
-            raise SynapseError(403,
-                               "Failed to sent email: " + repr(send_email_error))
-
+        defer.returnValue((200, {}))
 
 class WatchaStats(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/stats")

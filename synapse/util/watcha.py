@@ -64,22 +64,26 @@ def send_mail(config, recipient, subject_template, body_template, **parameters):
     # message['Reply-To'] = ...
     #logger.info(msg.as_string())
 
-    logger.info("send email through host " + config.email_smtp_host)
-    error = None
+    logger.info("Sending email through host %s...", config.email_smtp_host)
+    connection = None
     try:
-        conn = SMTP(config.email_smtp_host, port=config.email_smtp_port)
-        conn.ehlo()
-        conn.starttls()  # enable TLS
-        conn.ehlo()
-        conn.set_debuglevel(False)
-        conn.login(config.email_smtp_user, config.email_smtp_pass)
-        conn.sendmail(config.email_notif_from, [recipient], message.as_string())
-        logger.info("Mail sent to %s (Subject was: %s)", recipient, subject)
+        connection = SMTP(config.email_smtp_host,
+                          port=config.email_smtp_port,
+                          timeout=10) # putting a short timeout to avoid client erroring before server
+        connection.ehlo()
+        connection.starttls()  # enable TLS
+        connection.ehlo()
+        connection.set_debuglevel(False)
+        connection.login(config.email_smtp_user, config.email_smtp_pass)
+        connection.sendmail(config.email_notif_from, [recipient], message.as_string())
+        logger.info("...email sent to %s (subject was: %s)", recipient, subject)
     except Exception, exc:
-        logger.error("failed to send mail: %s" % str(exc) )
         error = str(exc)
+        logger.error("...failed to send email: %s", error )
+        raise SynapseError(
+            403, "Failed to send email: " + repr(error),
+        )
     finally:
-        conn.quit()
-
-    return error
+        if connection:
+            connection.quit()
 
