@@ -8,6 +8,8 @@ from smtplib import SMTP
 from email.mime.text import MIMEText
 from email.header import Header
 
+from synapse.api.errors import SynapseError
+
 logger = logging.getLogger(__name__)
 
 def generate_password():
@@ -42,6 +44,7 @@ def generate_password():
     return password
 
 def send_mail(config, recipient, subject_template, body_template, **parameters):
+    # (Only for use in APIs, as it raises a SynapseError on error)
     
     parameters['server'] = config.public_baseurl.rstrip('/')
     subject = subject_template.format(**parameters)
