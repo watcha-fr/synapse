@@ -176,19 +176,19 @@ class WatchaAdminStore(SQLBaseStore):
 
     def watcha_room_name(self):
         return self._simple_select_list(
-            table = "room_names",
-            keyvalues = {},
-            retcols = [
+            table="room_names",
+            keyvalues={},
+            retcols=[
                 "name",
                 "room_id",
             ],
-            desc = "get_rooms",
+            desc="get_rooms",
         )
 
-    def _update_user(user_id, **updatevalues):
+    def _update_user(self, user_id, **updatevalues):
         return self._simple_update(
-            table = "users",
-            keyvalues = { 'name': user_id },
+            table="users",
+            keyvalues={ 'name': user_id },
             updatevalues=updatevalues,
             desc=_caller_name(),
         )
