@@ -33,7 +33,7 @@ class WatchaAdminStore(SQLBaseStore):
         return self._execute(
             _caller_name(),
             None, sql, *args)
-    
+
     @defer.inlineCallbacks
     def get_room_count_per_type(self):
         """List the rooms, with two or less members, and with three or more members.
@@ -43,29 +43,30 @@ class WatchaAdminStore(SQLBaseStore):
         ACTIVE_THRESHOLD = 1000 * 3600 * 24 * 7
 
         rooms = yield self._execute_sql("""
-        SELECT rooms.room_id, last_events.last_received_ts FROM rooms 
-        LEFT JOIN (SELECT max(received_ts) last_received_ts, room_id FROM events 
-                   GROUP BY room_id HAVING type = "m.room.message") last_events 
+        SELECT rooms.room_id, last_events.last_received_ts FROM rooms
+        LEFT JOIN (SELECT max(received_ts) last_received_ts, room_id FROM events
+                   GROUP BY room_id HAVING type = "m.room.message") last_events
               ON last_events.room_id = rooms.room_id
         ORDER BY rooms.room_id ASC;
         """)
-        
+
         members_by_room = yield self.members_by_room()
-        
-        result = {
+
+        room_details = {
             room_id: { 'three_or_more': 1 if len(members_by_room[room_id]) > 3 else 0,
-                       'active': 1 if (now - last_message_ts < ACTIVE_THRESHOLD) else 0
+                       'active': 1 if last_message_ts and (now - last_message_ts < ACTIVE_THRESHOLD) else 0
             }
             for room_id, last_message_ts in rooms
             if room_id in members_by_room # don't show empty room (and avoid a possible exception)
         }
-         
-        result.update(
+
+        result = (
             {'now': now,
              'active_threshold': ACTIVE_THRESHOLD,
-             "one_one_rooms_count": len(_ for _, counts in results.items() if counts['three_or_more']),
-             "big_rooms_count": len(_ for _, counts in results.items() if not counts['three_or_more']),
-             "big_rooms_count_active": len(_ for _, counts in results.items() if counts['active']),
+             "one_one_rooms_count": len([_ for _, counts in room_details.items() if counts['three_or_more']]),
+             "big_rooms_count": len([_ for _, counts in room_details.items() if not counts['three_or_more']]),
+             "big_rooms_count_active": len([_ for _, counts in room_details.items() if counts['active']]),
+             "room_details": room_details
             })
 
         defer.returnValue(result)
@@ -75,13 +76,13 @@ class WatchaAdminStore(SQLBaseStore):
         FIELDS = ["name", "is_guest", "is_partner", "admin", "email",
                   "creation_ts", "is_active" , "displayname", "last_seen"]
         COLUMNS = FIELDS[:-1] + ["MAX(last_seen)"]
-        SQL_USER_LIST = 'SELECT ' + ', '.join(COLUMNS) + ''' FROM users 
+        SQL_USER_LIST = 'SELECT ' + ', '.join(COLUMNS) + ''' FROM users
         LEFT JOIN user_ips ON users.name = user_ips.user_id
-        LEFT JOIN profiles ON users.name LIKE "@"||profiles.user_id||":%" 
+        LEFT JOIN profiles ON users.name LIKE "@"||profiles.user_id||":%"
         GROUP BY users.name'''
-        
+
         users = yield self._execute_sql(SQL_USER_LIST)
-        
+
         defer.returnValue([dict(zip(FIELDS, user)) for user in users])
 
     @defer.inlineCallbacks
@@ -92,7 +93,7 @@ class WatchaAdminStore(SQLBaseStore):
         WHERE user_id = ?
         ORDER BY last_seen DESC
         """, user_id)
-        
+
         defer.returnValue(user_ip)
 
     @defer.inlineCallbacks
@@ -101,7 +102,7 @@ class WatchaAdminStore(SQLBaseStore):
         room_memberships = yield self._execute_sql("""
         SELECT room_id, user_id, membership FROM room_memberships ORDER BY room_id, event_id ASC
         """)
-        
+
         membership_by_room = defaultdict(list)
         for room_id, user_id, membership in room_memberships:
             membership_by_room[room_id].append((user_id, membership))
@@ -112,26 +113,26 @@ class WatchaAdminStore(SQLBaseStore):
                           set(user_id for user_id, membership in members if membership == "leave"))
             for room_id, members in membership_by_room.items()
         })
-        
-        
+
+
     @defer.inlineCallbacks
     def watcha_extend_room_list(self):
         """ List the rooms their state and their users """
 
-        
+
         rooms = yield self._execute_sql("""
-        SELECT rooms.room_id, rooms.creator, room_names.name, last_events.last_received_ts FROM rooms 
-        LEFT JOIN (SELECT max(event_id) event_id, room_id from room_names group by room_id) last_room_names 
-              ON rooms.room_id = last_room_names.room_id 
-        LEFT JOIN room_names on room_names.event_id = last_room_names.event_id 
-        LEFT JOIN (SELECT max(received_ts) last_received_ts, room_id FROM events 
-                   GROUP BY room_id HAVING type = "m.room.message") last_events 
+        SELECT rooms.room_id, rooms.creator, room_names.name, last_events.last_received_ts FROM rooms
+        LEFT JOIN (SELECT max(event_id) event_id, room_id from room_names group by room_id) last_room_names
+              ON rooms.room_id = last_room_names.room_id
+        LEFT JOIN room_names on room_names.event_id = last_room_names.event_id
+        LEFT JOIN (SELECT max(received_ts) last_received_ts, room_id FROM events
+                   GROUP BY room_id HAVING type = "m.room.message") last_events
               ON last_events.room_id = rooms.room_id
         ORDER BY rooms.room_id ASC;
         """)
 
         members_by_room = yield self.members_by_room()
-        
+
         now = int(round(time.time() * 1000))
         ACTIVE_THRESHOLD = 1000 * 3600 * 24 * 7 # one week
 
@@ -192,7 +193,7 @@ class WatchaAdminStore(SQLBaseStore):
             updatevalues=updatevalues,
             desc=_caller_name(),
         )
-    
+
     def watcha_update_mail(self, user_id, email):
         return self._update_user(user_id, email=email)
 
@@ -202,7 +203,7 @@ class WatchaAdminStore(SQLBaseStore):
     def watcha_deactivate_account(self, user_id):
         return self._update_user(user_id, is_active=0)
 
-    
+
     def watcha_reactivate_account(self, user_id):
         return self._update_user(user_id, is_active=1)
 
@@ -223,7 +224,7 @@ class WatchaAdminStore(SQLBaseStore):
             if type(output) is str:
                 synapse_version = output
             else:
-                (synapse_version, err) = output.communicate()                
+                (synapse_version, err) = output.communicate()
         except subprocess.CalledProcessError as e:
             synapse_version = "unavailable"
 
