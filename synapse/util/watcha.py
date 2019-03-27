@@ -80,8 +80,8 @@ def send_mail(config, recipient, subject, template_name, fields):
     # message['Reply-To'] = ...
     #logger.info(message.as_string())
 
-    logger.info("Sending email through host %s...", config.email_smtp_host)
-    error = None
+    logger.info("Sending email to %s through host %s...", recipient, config.email_smtp_host)
+    error, conn = None, None
     try:
         conn = SMTP(config.email_smtp_host, port=config.email_smtp_port)
         conn.ehlo()
@@ -95,6 +95,7 @@ def send_mail(config, recipient, subject, template_name, fields):
         logger.exception("...Failed to send mail")
         error = str(exc)
     finally:
-        conn.quit()
+        if conn:
+            conn.quit()
 
     return error

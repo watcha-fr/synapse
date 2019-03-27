@@ -68,27 +68,29 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        yield run_on_reactor() # not sure what it is :)
+        yield run_on_reactor()        
         auth_headers = request.requestHeaders.getRawHeaders("Authorization")
-        is_admin = False
+        parameter_json = parse_json_object_from_request(request)
+
+        logger.info("Adding Watcha user...")
 
         if auth_headers:
             requester = yield self.auth.get_user_by_req(request)
             is_admin = yield self.auth.is_server_admin(requester.user)
-        logger.info("Adding Watcha user...")
-
-        parameter_json = parse_json_object_from_request(request)
-        # parse_json will not return unicode if it's only ascii... making hmac fail. Force it to be unicode.
-        parameter_json['full_name'] = unicode(parameter_json['full_name'])
-        if not is_admin:
+            if not is_admin:
+                raise SynapseError(
+                    403, "You must be admin to register a user, or provide a shared secret",
+                )
+            params = parameter_json
+        else:
+            # parse_json will not return unicode if it's only ascii... making hmac fail. Force it to be unicode.
+            parameter_json['full_name'] = unicode(parameter_json['full_name'])
             # auth by checking that the HMAC is valid. this raises an error otherwise.
             params = _decode_share_secret_parameters(self.hs, ['user', 'full_name', 'email', 'admin'], parameter_json)
-        else:
-            params = parameter_json
 
         if params['user'].lower() != params['user']:
             raise SynapseError(
-                403, "user name must be lowercase",
+                500, "user name must be lowercase",
             )
 
         password = generate_password()
@@ -116,7 +118,7 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
         fields = {
                 'title': subject,
                 'full_name': display_name,
-                'user_login': params['user'],
+                'user_login': user.localpart,
                 'setupToken': setupToken,
                 'server': server,
         }
@@ -141,25 +143,27 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         ClientV1RestServlet.__init__(self, hs)
+        self.handlers =hs.get_handlers()
 
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        yield run_on_reactor() # not sure what it is :)
+        yield run_on_reactor()
         auth_headers = request.requestHeaders.getRawHeaders("Authorization")
-        is_admin = False
-
+        parameter_json = parse_json_object_from_request(request)
         if auth_headers:
             requester = yield self.auth.get_user_by_req(request)
             is_admin = yield self.auth.is_server_admin(requester.user)
-
-        parameter_json = parse_json_object_from_request(request)
-        if not is_admin:
+            if not is_admin:
+                raise SynapseError(
+                    403, "You must be admin to reset passwords, or provide a shared secret",
+                )
+            user_id = parameter_json['user'] # We expect the "@" and the ":localhost" part here !
+        else:
+            # auth by checking that the HMAC is valid. this raises an error otherwise.
             params = _decode_share_secret_parameters(self.hs, ['user'], parameter_json)
             user_id = '@' + params['user'] + ':' + self.hs.get_config().server_name
-        else:
-            params = parameter_json
-            user_id = params['user']
+            
         password = generate_password()
         logger.info("Setting password for user %s", user_id)
         user = UserID.from_string(user_id)
@@ -174,11 +178,12 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
         yield self.hs.get_set_password_handler().set_password(
             user_id, password, requester
         )
-
+        yield self.handlers.watcha_admin_handler.watcha_reactivate_account(user_id)
+        
         try:
             display_name = yield self.hs.profile_handler.get_displayname(user)
         except:
-            display_name = params['user']
+            display_name = user.localpart
 
         setupToken = base64.b64encode('{"user":"' + user_id + '","pw":"' + password + '"}')
 
@@ -188,7 +193,7 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
         fields = {
                 'title': subject,
                 'full_name': display_name,
-                'user_login': params['user'],
+                'user_login': user.localpart,
                 'setupToken': setupToken,
                 'server': server,
         }
