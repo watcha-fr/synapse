@@ -123,7 +123,7 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
                 'server': server,
         }
 
-        send_email_error = send_mail(
+        send_mail(
             self.hs.config,
             params['email'],
             subject=subject,
@@ -131,11 +131,7 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
             fields=fields,
         )
 
-        if send_email_error is None:
-            defer.returnValue((200, { "user_id": user_id }))
-        else:
-            raise SynapseError(403,
-                               "Failed to sent email: " + repr(send_email_error))
+        defer.returnValue((200, { "user_id": user_id }))
 
 
 class WatchaResetPasswordRestServlet(ClientV1RestServlet):
@@ -198,7 +194,7 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
                 'server': server,
         }
 
-        send_email_error = send_mail(
+        send_mail(
             self.hs.config,
             user_info['email'],
             subject=subject,
@@ -206,12 +202,7 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
             fields=fields,
         )
 
-        if send_email_error is None:
-            defer.returnValue((200, {}))
-        else:
-            raise SynapseError(403,
-                               "Failed to sent email: " + repr(send_email_error))
-
+        defer.returnValue((200, {}))
 
 class WatchaStats(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/stats")
