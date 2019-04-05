@@ -115,13 +115,50 @@
 									<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0;">
 										<td class="content-block" style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; vertical-align: top; margin: 0; padding: 0 0 20px;"
 										 valign="top">
-											Pour y accéder, votre nom d’utilisateur est :
+											Vos identifiants sont :
 										</td>
 									</tr>
 									<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0;">
+										<td class="content-block" style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; font-weight: bold; vertical-align: top; margin: 0; padding: 0 0 20px;"
+										 valign="top">
+											Utilisateur :
+										</td>
+									</tr>
+									<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0 border-width:1px;">
 										<td class="content-block" style="font-family: 'Courier New', Courier, monospace; box-sizing: border-box; font-size: 14px; vertical-align: top; margin: 0; padding: 0 0 20px 20px;"
 										 valign="top">
+											<div style="width:200px; padding:9px; border:1px solid black;">
 											{{ user_login }}
+											</div>
+										</td>
+									</tr>
+									<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0;">
+										<td class="content-block" style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-weight: bold; font-size: 14px; vertical-align: top; margin: 0; padding: 0 0 20px;"
+										 valign="top">
+											Mot de passe :
+										</td>
+									</tr>
+
+									<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0 border-width:1px;">
+										<td class="content-block" style="font-family: 'Courier New', Courier, monospace; box-sizing: border-box; font-size: 14px;  vertical-align: top; margin: 0; padding: 0 0 20px 20px;"
+										 valign="top">
+											<div style="width:200px; padding:9px; border:1px solid black;">
+											À définir 	
+											</div>
+										</td>
+									</tr>
+									<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0;">
+										<td class="content-block" style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-weight: bold; font-size: 14px; vertical-align: top; margin: 0; padding: 0 0 20px;"
+										 valign="top">
+										Serveur :
+										</td>
+									</tr>
+									<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0 border-width:1px;">
+										<td class="content-block" style="font-family: 'Courier New', Courier, monospace; box-sizing: border-box; font-size: 14px; vertical-align: top; margin: 0; padding: 0 0 20px 20px;"
+										 valign="top">
+											<div style="width:200px; padding:9px; border:1px solid black;">
+											{{ server }}
+											</div>
 										</td>
 									</tr>
 									<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0;">
@@ -132,10 +169,12 @@
 											</a>
 										</td>
 									</tr>
+									</br>
 									<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0;">
 										<td class="content-block" style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; vertical-align: top; margin: 0; padding: 0 0 20px;"
 										 valign="top">
-											Nous pouvons vous aider à utiliser Watcha. Si vous rencontrez des difficultés, n'hésitez pas à répondre à cet email !
+											
+										N'hésitez pas à nous contacter en répondant cet email.  
 										</td>
 									</tr>
 									<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0;">
