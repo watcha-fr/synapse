@@ -6,8 +6,7 @@ Pour y accéder, votre nom d’utilisateur est :
 	{{ user_login }}
 
 Pour activer votre compte, cliquez ce lien:
-	https://{{ server }}/setup-account.html?t={{ setupToken }}
-
+    https://{{ server }}/#login/t={{ setupToken }}
 Nous pouvons vous aider à utiliser Watcha. Si vous rencontrez des difficultés, n'hésitez pas à répondre à cet email !
 
 L'équipe Watcha.
