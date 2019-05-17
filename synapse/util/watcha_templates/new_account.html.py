@@ -112,10 +112,22 @@
 											Vous êtes invité à participer à l’espace de travail sécurisé Watcha {{ server }}.
 										</td>
 									</tr>
+<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0; text-align:center;">
+										<td class="content-block" itemprop="handler" itemscope itemtype="http://schema.org/HttpActionHandler" style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif;align:center; box-sizing: border-box; font-size: 14px; vertical-align: top; margin: 0; padding: 0 0 20px;"
+										 valign="top">
+											<a href="https://{{ server }}/#login/t={{ setupToken }}" class="btn-primary" itemprop="url" style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; color: #FFF; text-decoration: none; line-height: 2em; font-weight: bold; text-align: center; cursor: pointer; display: inline-block; border-radius: 5px; background-color: #348eda; margin: 0; border-color: #348eda; border-style: solid; border-width: 10px 20px;">
+
+                                                                                Connectez vous à Watcha
+											</a>
+										</td>
+									</tr>
+
+										</td>
+									</tr>
 									<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0;">
 										<td class="content-block" style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; vertical-align: top; margin: 0; padding: 0 0 20px;"
 										 valign="top">
-											Vos identifiants sont :
+                                                                                 Pour vous reconnecter dans le futur, conservez cet email et utilisez le bouton de connection ci-dessus, ou notez vos identifiants de connection :
 										</td>
 									</tr>
 									<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0;">
@@ -127,27 +139,13 @@
 									<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0 border-width:1px;">
 										<td class="content-block" style="font-family: 'Courier New', Courier, monospace; box-sizing: border-box; font-size: 14px; vertical-align: top; margin: 0; padding: 0 0 20px 20px;"
 										 valign="top">
-											<div style="width:200px; padding:9px; border:1px solid black;">
+											<div style="width:200px; padding:9px;">
 											{{ user_login }}
 											</div>
 										</td>
 									</tr>
-									<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0;">
-										<td class="content-block" style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-weight: bold; font-size: 14px; vertical-align: top; margin: 0; padding: 0 0 20px;"
-										 valign="top">
-											Mot de passe :
-										</td>
-									</tr>
-
-									<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0 border-width:1px;">
-										<td class="content-block" style="font-family: 'Courier New', Courier, monospace; box-sizing: border-box; font-size: 14px;  vertical-align: top; margin: 0; padding: 0 0 20px 20px;"
-										 valign="top">
-											<div style="width:200px; padding:9px; border:1px solid black;">
-											À définir 	
-											</div>
-										</td>
-									</tr>
-									<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0;">
+									
+																		<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0;">
 										<td class="content-block" style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-weight: bold; font-size: 14px; vertical-align: top; margin: 0; padding: 0 0 20px;"
 										 valign="top">
 										Serveur :
@@ -156,20 +154,12 @@
 									<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0 border-width:1px;">
 										<td class="content-block" style="font-family: 'Courier New', Courier, monospace; box-sizing: border-box; font-size: 14px; vertical-align: top; margin: 0; padding: 0 0 20px 20px;"
 										 valign="top">
-											<div style="width:200px; padding:9px; border:1px solid black;">
+											<div style="width:200px; padding:9px; ">
 											{{ server }}
 											</div>
 										</td>
 									</tr>
-									<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0;">
-										<td class="content-block" itemprop="handler" itemscope itemtype="http://schema.org/HttpActionHandler" style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; vertical-align: top; margin: 0; padding: 0 0 20px;"
-										 valign="top">
-											<a href="https://{{ server }}/#login/t={{ setupToken }}" class="btn-primary" itemprop="url" style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; color: #FFF; text-decoration: none; line-height: 2em; font-weight: bold; text-align: center; cursor: pointer; display: inline-block; border-radius: 5px; background-color: #348eda; margin: 0; border-color: #348eda; border-style: solid; border-width: 10px 20px;">
-												Pour activer votre compte, cliquez ici
-											</a>
-										</td>
-									</tr>
-									</br>
+																		</br>
 									<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0;">
 										<td class="content-block" style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; vertical-align: top; margin: 0; padding: 0 0 20px;"
 										 valign="top">
