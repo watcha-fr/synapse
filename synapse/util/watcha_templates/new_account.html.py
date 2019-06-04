@@ -109,7 +109,7 @@
 									<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0;">
 										<td class="content-block" style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; vertical-align: top; margin: 0; padding: 0 0 20px;"
 										 valign="top">
-											Vous êtes invité à participer à l’espace de travail sécurisé Watcha {{ server }}.
+											Vous êtes invité à participer à l’espace de travail sécurisé Watcha.
 										</td>
 									</tr>
 <tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0; text-align:center;">
