@@ -113,7 +113,7 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
         setupToken = base64.b64encode('{"user":"' + user_id + '","pw":"' + password + '"}')
 
         server = self.hs.config.public_baseurl.rstrip('/')
-        subject = u'''Accès à l'espace de travail sécurisé Watcha {server}'''.format(server=server)
+        subject = u'''Invitation à l'espace de travail sécurisé Watcha {server}'''.format(server=server)
 
         fields = {
                 'title': subject,

@@ -189,7 +189,7 @@ class InviteExternalHandler(BaseHandler):
                     invitation_name, invitee, user_id, new_user, self.hs.get_config().server_name);
 
         server = self.hs.config.public_baseurl.rstrip('/')
-        subject = u'''Accès à l'espace de travail sécurisé {server}'''.format(server=server)
+        subject = u'''Invitation à l'espace de travail sécurisé {server}'''.format(server=server)
 
         fields = {
             'title': subject,
