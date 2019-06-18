@@ -148,20 +148,6 @@ class WatchaServerState(ClientV1RestServlet):
         ret = yield self.handlers.watcha_admin_handler.watcha_server_state()
         defer.returnValue((200, ret))
 
-class WatchaLog(ClientV1RestServlet):
-
-    PATTERNS = client_path_patterns("/watcha_log")
-    def __init__(self, hs):
-        super(WatchaLog, self).__init__(hs)
-        self.auth = hs.get_auth()
-        self.handlers = hs.get_handlers()
-
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        yield check_admin(self.auth, request)
-        ret = yield self.handlers.watcha_admin_handler.watcha_log()
-        defer.returnValue((200, ret))
-
 class WatchaAdminStats(ClientV1RestServlet):
 
     PATTERNS = client_path_patterns("/watcha_admin_stats")
@@ -212,4 +198,3 @@ def register_servlets(hs, http_server):
     WatchaRoomMembershipRestServlet(hs).register(http_server)
     WatchaRoomNameRestServlet(hs).register(http_server)
     WatchaDisplayNameRestServlet(hs).register(http_server)
-    WatchaLog(hs).register(http_server)

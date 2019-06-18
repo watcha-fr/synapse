@@ -65,11 +65,6 @@ class WatchaAdminHandler(BaseHandler):
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def watcha_log(self):
-        result = yield self.store.watcha_log()
-        defer.returnValue(result)
-
-    @defer.inlineCallbacks
     def watcha_admin_stat(self):
         result = yield self.store.watcha_admin_stats()
         defer.returnValue(result)
