@@ -5,7 +5,6 @@ import sys
 import hmac
 from hashlib import sha1
 
-import subprocess
 import logging
 # requires python 2.7.7 or later
 from hmac import compare_digest
@@ -68,7 +67,7 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        yield run_on_reactor()        
+        yield run_on_reactor()
         auth_headers = request.requestHeaders.getRawHeaders("Authorization")
         parameter_json = parse_json_object_from_request(request)
 
@@ -159,7 +158,7 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
             # auth by checking that the HMAC is valid. this raises an error otherwise.
             params = _decode_share_secret_parameters(self.hs, ['user'], parameter_json)
             user_id = '@' + params['user'] + ':' + self.hs.get_config().server_name
-            
+
         password = generate_password()
         logger.info("Setting password for user %s", user_id)
         user = UserID.from_string(user_id)
@@ -175,7 +174,7 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
             user_id, password, requester
         )
         yield self.handlers.watcha_admin_handler.watcha_reactivate_account(user_id)
-        
+
         try:
             display_name = yield self.hs.profile_handler.get_displayname(user)
         except:
@@ -204,45 +203,6 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
 
         defer.returnValue((200, {}))
 
-class WatchaStats(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/stats")
-
-    def __init__(self, hs):
-        super(WatchaStats, self).__init__(hs)
-        self.store = hs.get_datastore()
-
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        ### fetch the number of local and external users.
-        user_stats = yield self.store.get_count_users_partners()
-
-        ### fetch the list of rooms, the amount of users and their activity status
-        room_stats = yield self.store.get_room_count_per_type()
-
-        ### get the version of the synapse server, if installed with pip.
-
- # this method may block the synapse process for a while, as pip does not immediately return.
-        #synapse_version = system('pip freeze | grep "matrix-synapse==="')
-
-        try:
-            proc = subprocess.Popen(['pip', 'freeze'], stdout=subprocess.PIPE)
-            output = subprocess.check_output(('grep', 'matrix-synapse==='), stdin=proc.stdout)
-            proc.wait()
-            # output seems not always to be of the same type. str or object.
-            #(synapse_version, err) = output.communicate()
-            if type(output) is str:
-                synapse_version = output
-            else:
-                (synapse_version, err) = output.communicate()
-
-        except subprocess.CalledProcessError as e:
-            # when grep does not find any line, this error is thrown. it is normal behaviour during development.
-            synapse_version = "unavailable"
-
-        defer.returnValue((200, { "users": user_stats, "rooms": room_stats, "synapse_version": synapse_version }))
-
-
 def register_servlets(hs, http_server):
-    WatchaStats(hs).register(http_server)
     WatchaResetPasswordRestServlet(hs).register(http_server)
     WatchaRegisterRestServlet(hs).register(http_server)

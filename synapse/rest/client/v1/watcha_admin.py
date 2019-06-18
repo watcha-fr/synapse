@@ -160,6 +160,8 @@ class WatchaAdminStats(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
+        # TODO: also give access using shared secret
+        # (see synapse/rest/client/v1/watcha.py for examples)
         requester = yield self.auth.get_user_by_req(request)
         is_admin = yield self.auth.is_server_admin(requester.user)
         if not is_admin:

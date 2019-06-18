@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 
+import time
+import psutil
+from collections import defaultdict
+import inspect
+
 from twisted.internet import defer
 
 from ._base import SQLBaseStore
@@ -8,16 +13,6 @@ from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id, get_localpart_from_id
-import time
-import psutil
-import subprocess
-import os
-from collections import defaultdict
-import inspect
-
-import logging
-
-logger = logging.getLogger(__name__)
 
 def _caller_name():
     '''returns the name of the function calling the one calling this one'''
@@ -217,21 +212,10 @@ class WatchaAdminStore(SQLBaseStore):
         user_stats = yield self.get_count_users_partners()
         room_stats = yield self.get_room_count_per_type()
         user_admin = yield self.get_user_admin()
-        try:
-            proc = subprocess.Popen(['pip', 'freeze'], stdout=subprocess.PIPE)
-            output = subprocess.check_output(('grep', 'matrix-synapse==='), stdin=proc.stdout)
-            proc.wait()
-            if type(output) is str:
-                synapse_version = output
-            else:
-                (synapse_version, err) = output.communicate()
-        except subprocess.CalledProcessError as e:
-            synapse_version = "unavailable"
 
         result = { 'users': user_stats,
                    'rooms': room_stats,
                    'admins': user_admin,
-                   'version':synapse_version
         }
 
         defer.returnValue(result)
