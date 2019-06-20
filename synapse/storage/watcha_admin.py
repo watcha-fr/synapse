@@ -208,25 +208,36 @@ class WatchaAdminStore(SQLBaseStore):
         defer.returnValue(admins)
 
     @defer.inlineCallbacks
-    def watcha_admin_stats(self):
+    def _get_range_count(self, where_clause, time_range):
+        value = yield self._execute_sql('SELECT count(*) FROM events WHERE ' +
+                                        where_clause +
+                                        ' AND received_ts BETWEEN %d AND %d' %
+                                        (int(time_range[1])*1000, int(time_range[2])*1000))
+        defer.returnValue(value[0][0])
+
+    @defer.inlineCallbacks
+    def watcha_admin_stats(self, ranges=None):
+        # ranges must be a list of arrays with three elements: label, start seconds since epoch, end seconds since epoch
         user_stats = yield self.get_count_users_partners()
         room_stats = yield self.get_room_count_per_type()
         user_admin = yield self.get_user_admin()
-
-        # TODO: add more stats that can be used in the UI, for commercial support (and ultimately for billing !),
-        # for: last 24 hours, last week, last month, 3 month, a year, since installation
-        # - number of user who connected ?
-        # - number of messages:
-        # select count(*) from events where type = 'm.room.message'and received_ts between 1554076800000 and 1    556582400000;
-        # - number of files
-        # select count(*) from events where type='m.room.message' and received_ts between 1553990400000 and 1559260800000 and content not like '%m.text%'
-        # - room creation:
-        # select count(*) from events where type='m.room.create' and received_ts between 1548979200000 and  1551312000
-        # (see https://docs.google.com/spreadsheets/d/19ejULn_tY7vwj0ZyNkb52jPFyPpW3f1a1kf8_T66BBo/edit#gid=0 for an example)
 
         result = { 'users': user_stats,
                    'rooms': room_stats,
                    'admins': user_admin,
         }
+
+        if ranges:
+            result['stats'] = []
+            for index, time_range in enumerate(ranges):
+                message_count = yield self._get_range_count("type = 'm.room.message'", time_range)
+                file_count = yield self._get_range_count("type='m.room.message' AND content NOT LIKE '%m.text%'", time_range)
+                create_room_count = yield self._get_range_count("type = 'm.room.create'", time_range)
+                result['stats'].append({
+                    'label': time_range[0],
+                    'message_count': message_count,
+                    'file_count': file_count,
+                    'create_room_count': create_room_count,
+                })
 
         defer.returnValue(result)

@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 def _decode_share_secret_parameters(hs, parameter_names, parameter_json):
     for parameter_name in parameter_names:
-        if not isinstance(parameter_json.get(parameter_name, None), basestring):
+        if parameter_name not in parameter_json:
             raise SynapseError(400, "Expected %s." % parameter_name)
 
     if not hs.config.registration_shared_secret:
@@ -202,19 +202,22 @@ class WatchaAdminStats(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        auth_headers = request.requestHeaders.getRawHeaders("Authorization")
-        if auth_headers:
-            requester = yield self.auth.get_user_by_req(request)
-            is_admin = yield self.auth.is_server_admin(requester.user)
-            if not is_admin:
-                raise AuthError(403, "You are not a server admin")
-        else:
-            # auth by checking that the HMAC is valid. this raises an error otherwise.
-            parameter_json = parse_json_object_from_request(request)
-            _decode_share_secret_parameters(self.hs, ['token'], parameter_json)
+        requester = yield self.auth.get_user_by_req(request)
+        is_admin = yield self.auth.is_server_admin(requester.user)
+        if not is_admin:
+            raise AuthError(403, "You are not a server admin")
 
         ret = yield self.handlers.watcha_admin_handler.watcha_admin_stat()
         defer.returnValue((200, ret))
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        parameter_json = parse_json_object_from_request(request)
+        # auth by checking that the HMAC is valid. this raises an error otherwise.
+        params = _decode_share_secret_parameters(self.hs, ['ranges'], parameter_json)
+        ret = yield self.handlers.watcha_admin_handler.watcha_admin_stat(params['ranges'] or None)
+        defer.returnValue((200, ret))
+
 
 class WatchaUserIp(ClientV1RestServlet):
 
