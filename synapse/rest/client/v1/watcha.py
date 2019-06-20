@@ -24,12 +24,12 @@ from synapse.api.constants import Membership
 
 logger = logging.getLogger(__name__)
 
-def _decode_share_secret_parameters(hs, parameter_names, parameter_json):
+def _decode_share_secret_parameters(config, parameter_names, parameter_json):
     for parameter_name in parameter_names:
         if parameter_name not in parameter_json:
             raise SynapseError(400, "Expected %s." % parameter_name)
 
-    if not hs.config.registration_shared_secret:
+    if not config.registration_shared_secret:
         raise SynapseError(400, "Shared secret registration is not enabled")
 
     parameters = { parameter_name: parameter_json[parameter_name]
@@ -39,29 +39,51 @@ def _decode_share_secret_parameters(hs, parameter_names, parameter_json):
     if any("\x00" in parameters[parameter_name] for parameter_name in parameter_names):
         raise SynapseError(400, "Invalid message")
 
+    # FIXME: hack for create_user: parse_json will not return unicode if it's only ascii... making hmac fail.
+    # So force it to be unicode.
+    if 'full_name' in parameters:
+        parameters['full_name'] = unicode(parameters['full_name'])
+
     got_mac = str(parameter_json["mac"])
 
     want_mac = hmac.new(
-        key=hs.config.registration_shared_secret,
+        key=config.registration_shared_secret,
         digestmod=sha1,
     )
     for parameter_name in parameter_names:
         want_mac.update(repr(parameters[parameter_name]))
         want_mac.update("\x00")
     if not compare_digest(want_mac.hexdigest(), got_mac):
-            raise SynapseError(
-                403, "HMAC incorrect",
-            )
+        logger.error("Failed to decode HMAC for parameters names: " +
+                     repr(parameter_names) +
+                     ' and values: ' +
+                     repr(parameter_json))
+
+        raise SynapseError(
+            403, "HMAC incorrect",
+        )
     return parameters
 
-
 @defer.inlineCallbacks
-def check_admin(auth, request):
+def _check_admin(auth, request):
     requester = yield auth.get_user_by_req(request)
     is_admin = yield auth.is_server_admin(requester.user)
     if not is_admin:
         raise AuthError(403, "You are not a server admin")
-    return
+
+@defer.inlineCallbacks
+def _check_admin_or_secret(config, auth, request, parameter_names):
+    auth_headers = request.requestHeaders.getRawHeaders("Authorization")
+    parameter_json = parse_json_object_from_request(request)
+
+    if auth_headers:
+        yield _check_admin(auth, request)
+        ret = parameter_json
+    else:
+        # auth by checking that the HMAC is valid. this raises an error otherwise.
+        ret = _decode_share_secret_parameters(config, parameter_names, parameter_json)
+
+    defer.returnValue(ret)
 
 class WatchaUserlistRestServlet(ClientV1RestServlet):
 
@@ -73,7 +95,7 @@ class WatchaUserlistRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        yield check_admin(self.auth, request)
+        yield _check_admin(self.auth, request)
         ret = yield self.handlers.watcha_admin_handler.watcha_user_list()
         defer.returnValue((200, ret))
 
@@ -87,7 +109,7 @@ class WatchaRoomlistRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        yield check_admin(self.auth, request)
+        yield _check_admin(self.auth, request)
         ret = yield self.handlers.watcha_admin_handler.watcha_room_list()
         defer.returnValue((200, ret))
 
@@ -101,7 +123,7 @@ class WatchaRoomMembershipRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        yield check_admin(self.auth, request)
+        yield _check_admin(self.auth, request)
         ret = yield self.handlers.watcha_admin_handler.watcha_room_membership()
         defer.returnValue((200, ret))
 
@@ -115,7 +137,7 @@ class WatchaRoomNameRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        yield check_admin(self.auth, request)
+        yield _check_admin(self.auth, request)
         ret = yield self.handlers.watcha_admin_handler.watcha_room_name()
         defer.returnValue((200, ret))
 
@@ -129,7 +151,7 @@ class WatchaDisplayNameRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        yield check_admin(self.auth, request)
+        yield _check_admin(self.auth, request)
         ret = yield self.handlers.watcha_admin_handler.watcha_display_name()
         defer.returnValue((200, ret))
 
@@ -142,7 +164,7 @@ class WatchaExtendRoomlistRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        yield check_admin(self.auth, request)
+        yield _check_admin(self.auth, request)
         ret = yield self.handlers.watcha_admin_handler.watcha_extend_room_list()
         defer.returnValue((200, ret))
 
@@ -155,7 +177,7 @@ class WatchaUpdateMailRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, target_user_id):
-        yield check_admin(self.auth, request)
+        yield _check_admin(self.auth, request)
         params = parse_json_object_from_request(request)
         new_email = params['new_email']
         if not new_email:
@@ -172,7 +194,7 @@ class WatchaUpdateToMember(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, target_user_id):
-        yield check_admin(self.auth, request)
+        yield _check_admin(self.auth, request)
         yield self.handlers.watcha_admin_handler.watcha_update_to_member(target_user_id)
         defer.returnValue((200, {}))
 
@@ -186,7 +208,7 @@ class WatchaServerState(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        yield check_admin(self.auth, request)
+        yield _check_admin(self.auth, request)
         ret = yield self.handlers.watcha_admin_handler.watcha_server_state()
         defer.returnValue((200, ret))
 
@@ -210,30 +232,13 @@ class WatchaAdminStats(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
-
+        yield _check_admin(self.auth, request)
         ret = yield self.handlers.watcha_admin_handler.watcha_admin_stat()
         defer.returnValue((200, ret))
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        auth_headers = request.requestHeaders.getRawHeaders("Authorization")
-        parameter_json = parse_json_object_from_request(request)
-
-        if auth_headers:
-            requester = yield self.auth.get_user_by_req(request)
-            is_admin = yield self.auth.is_server_admin(requester.user)
-            if not is_admin:
-                raise SynapseError(
-                    403, "You must be admin to get stats, or provide a shared secret",
-                )
-            params = parameter_json
-        else:
-            # auth by checking that the HMAC is valid. this raises an error otherwise.
-            params = _decode_share_secret_parameters(self.hs, ['ranges'], parameter_json)
+        params = yield _check_admin_or_secret(self.hs.config, self.auth, request, ['ranges'])
 
         ret = yield self.handlers.watcha_admin_handler.watcha_admin_stat(params['ranges'] or None)
         defer.returnValue((200, ret))
@@ -251,10 +256,7 @@ class WatchaUserIp(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, target_user_id):
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
+        yield _check_admin(self.auth, request)
         ret = yield self.handlers.watcha_admin_handler.watcha_user_ip(target_user_id)
         defer.returnValue((200, ret))
 
@@ -271,25 +273,10 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        yield run_on_reactor()
-        auth_headers = request.requestHeaders.getRawHeaders("Authorization")
-        parameter_json = parse_json_object_from_request(request)
+        params = yield _check_admin_or_secret(self.hs.config, self.auth, request,
+                                             ['user', 'full_name', 'email', 'admin'])
 
         logger.info("Adding Watcha user...")
-
-        if auth_headers:
-            requester = yield self.auth.get_user_by_req(request)
-            is_admin = yield self.auth.is_server_admin(requester.user)
-            if not is_admin:
-                raise SynapseError(
-                    403, "You must be admin to register a user, or provide a shared secret",
-                )
-            params = parameter_json
-        else:
-            # parse_json will not return unicode if it's only ascii... making hmac fail. Force it to be unicode.
-            parameter_json['full_name'] = unicode(parameter_json['full_name'])
-            # auth by checking that the HMAC is valid. this raises an error otherwise.
-            params = _decode_share_secret_parameters(self.hs, ['user', 'full_name', 'email', 'admin'], parameter_json)
 
         if params['user'].lower() != params['user']:
             raise SynapseError(
@@ -347,20 +334,12 @@ class WatchaResetPasswordRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        yield run_on_reactor()
-        auth_headers = request.requestHeaders.getRawHeaders("Authorization")
-        parameter_json = parse_json_object_from_request(request)
-        if auth_headers:
-            requester = yield self.auth.get_user_by_req(request)
-            is_admin = yield self.auth.is_server_admin(requester.user)
-            if not is_admin:
-                raise SynapseError(
-                    403, "You must be admin to reset passwords, or provide a shared secret",
-                )
-            user_id = parameter_json['user'] # We expect the "@" and the ":localhost" part here !
-        else:
-            # auth by checking that the HMAC is valid. this raises an error otherwise.
-            params = _decode_share_secret_parameters(self.hs, ['user'], parameter_json)
+        params = yield _check_admin_or_secret(self.hs.config, self.auth, request, ['user'])
+
+        user_id = params['user']
+        # FIXME: when called from the 'watcha_users' script,
+        # the user_id usually doesn't have the server name. add it.
+        if not user_id.startswith('@'):
             user_id = '@' + params['user'] + ':' + self.hs.get_config().server_name
 
         password = generate_password()
