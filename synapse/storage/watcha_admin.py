@@ -213,6 +213,17 @@ class WatchaAdminStore(SQLBaseStore):
         room_stats = yield self.get_room_count_per_type()
         user_admin = yield self.get_user_admin()
 
+        # TODO: add more stats that can be used in the UI, for commercial support (and ultimately for billing !),
+        # for: last 24 hours, last week, last month, 3 month, a year, since installation
+        # - number of user who connected ?
+        # - number of messages:
+        # select count(*) from events where type = 'm.room.message'and received_ts between 1554076800000 and 1    556582400000;
+        # - number of files
+        # select count(*) from events where type='m.room.message' and received_ts between 1553990400000 and 1559260800000 and content not like '%m.text%'
+        # - room creation:
+        # select count(*) from events where type='m.room.create' and received_ts between 1548979200000 and  1551312000
+        # (see https://docs.google.com/spreadsheets/d/19ejULn_tY7vwj0ZyNkb52jPFyPpW3f1a1kf8_T66BBo/edit#gid=0 for an example)
+
         result = { 'users': user_stats,
                    'rooms': room_stats,
                    'admins': user_admin,
