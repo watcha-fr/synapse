@@ -202,12 +202,17 @@ class WatchaAdminStats(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        # TODO: also give access using shared secret
-        # (see synapse/rest/client/v1/watcha.py for examples)
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
+        auth_headers = request.requestHeaders.getRawHeaders("Authorization")
+        if auth_headers:
+            requester = yield self.auth.get_user_by_req(request)
+            is_admin = yield self.auth.is_server_admin(requester.user)
+            if not is_admin:
+                raise AuthError(403, "You are not a server admin")
+        else:
+            # auth by checking that the HMAC is valid. this raises an error otherwise.
+            parameter_json = parse_json_object_from_request(request)
+            _decode_share_secret_parameters(self.hs, ['token'], parameter_json)
+
         ret = yield self.handlers.watcha_admin_handler.watcha_admin_stat()
         defer.returnValue((200, ret))
 
