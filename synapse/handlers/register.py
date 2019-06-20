@@ -163,6 +163,7 @@ class RegistrationHandler(BaseHandler):
         default_display_name=None,
         address=None,
         bind_emails=[],
+        make_partner=False
     ):
         """Registers a new client on the server.
 
@@ -229,6 +230,11 @@ class RegistrationHandler(BaseHandler):
                 was_guest=was_guest,
                 make_guest=make_guest,
                 create_profile_with_displayname=default_display_name,
+                make_partner=make_partner,
+                create_profile_with_localpart=(
+                    # If the user was a guest then they already have a profile
+                    None if was_guest else user.localpart
+                ),
                 admin=admin,
                 user_type=user_type,
                 address=address,
@@ -262,6 +268,8 @@ class RegistrationHandler(BaseHandler):
                         make_guest=make_guest,
                         create_profile_with_displayname=default_display_name,
                         address=address,
+                        make_partner=make_partner,
+                        create_profile_with_localpart=user.localpart,
                     )
                 except SynapseError:
                     # if user id is taken, just generate another

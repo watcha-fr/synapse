@@ -100,6 +100,7 @@ class EmailConfig(Config):
             self.email_enable_notifs
             or account_validity_renewal_enabled
             or self.email_password_reset_behaviour == "local"
+            or True # watcha modification, so that email config is available even if notifications are disabled
         ):
             # make sure we can import the required deps
             import jinja2

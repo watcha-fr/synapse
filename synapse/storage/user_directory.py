@@ -501,6 +501,44 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
 
         defer.returnValue(user_ids)
 
+    @defer.inlineCallbacks
+    def get_all_rooms(self):
+        """Get all room_ids we've ever known about, in ascending order of "size"
+        """
+        sql = """
+            SELECT room_id FROM current_state_events
+            GROUP BY room_id
+            ORDER BY count(*) ASC
+        """
+        rows = yield self._execute("get_all_rooms", None, sql)
+        defer.returnValue([room_id for room_id, in rows])
+
+    @defer.inlineCallbacks
+    def get_all_local_users(self):
+        """Get all local users
+        """
+        sql = """
+            SELECT name FROM users
+        """
+        rows = yield self._execute("get_all_local_users", None, sql)
+        defer.returnValue([name for name, in rows])
+
+    # method added by watcha
+    @defer.inlineCallbacks
+    def get_count_users_partners(self):
+        """Count the users, with distinction between local users and invited partners
+        """
+        sql1 = """
+            SELECT COUNT(*) as count FROM users WHERE is_partner = 0
+        """
+        local_users = yield self._execute("get_count_users_partners", None, sql1)
+        sql2 = """
+            SELECT COUNT(*) as count FROM users WHERE is_partner = 1
+        """
+        partner_users = yield self._execute("get_count_users_partners", None, sql2)
+
+        defer.returnValue({ "local": local_users[0][0], "partners": partner_users[0][0] })
+
     def add_users_who_share_private_room(self, room_id, user_id_tuples):
         """Insert entries into the users_who_share_private_rooms table. The first
         user should be a local user.
@@ -691,7 +729,9 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
                         {
                             "user_id": <user_id>,
                             "display_name": <display_name>,
-                            "avatar_url": <avatar_url>
+                            "avatar_url": <avatar_url>,
+                            "is_partner": 1 or 0
+                            "presence": depends on search_term
                         }
                     ]
                 }
@@ -712,7 +752,7 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
                 )
             """
 
-        if isinstance(self.database_engine, PostgresEngine):
+        if isinstance(self.database_engine, PostgresEngine) and search_term is not None:
             full_query, exact_query, prefix_query = _parse_query_postgres(search_term)
 
             # We order by rank and then if they have profile info
@@ -753,7 +793,7 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
                 where_clause,
             )
             args = join_args + (full_query, exact_query, prefix_query, limit + 1)
-        elif isinstance(self.database_engine, Sqlite3Engine):
+        elif isinstance(self.database_engine, Sqlite3Engine) and False: # disabled for watcha
             search_query = _parse_query_sqlite(search_term)
 
             sql = """
@@ -772,6 +812,39 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
                 where_clause,
             )
             args = join_args + (search_query, limit + 1)
+
+        elif isinstance(self.database_engine, Sqlite3Engine):
+            # inserted for watcha
+            # list the internal users, as well as the partners that have
+            # received an invitation from the users doing the query.
+            # in this query, UNION and UNION ALL give the same results
+
+            if (search_term is not None):
+                where_clause = """ AND (u.name LIKE '%%%s%%' OR
+                    display_name LIKE '%%%s%%' OR
+                    u.email LIKE '%%%s%%')
+                """ % (search_term, search_term, search_term)
+            else:
+                where_clause = ""
+
+            sql = """
+                SELECT u.name as user_id, u.is_active, u.is_partner, d.display_name, d.avatar_url, p.state as presence
+                FROM users AS u
+                LEFT OUTER JOIN user_directory AS d ON d.user_id = u.name
+                LEFT OUTER JOIN presence_stream AS p ON p.user_id = u.name
+                WHERE u.is_partner = 0 AND u.is_active = 1%s
+                UNION ALL
+                SELECT u.name as user_id, u.is_active, u.is_partner, d.display_name, d.avatar_url, coalesce(p.state, "invited") as presence
+                FROM users AS u
+                INNER JOIN partners_invited_by AS pib ON pib.partner = u.name AND pib.invited_by = ?
+                LEFT OUTER JOIN user_directory AS d ON d.user_id = u.name
+                LEFT OUTER JOIN presence_stream AS p ON p.user_id = u.name
+                WHERE u.is_partner = 1 AND u.is_active = 1%s
+            """ % (where_clause, where_clause)
+
+            logger.info(sql)
+            args = (user_id,)
+
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")
@@ -780,7 +853,10 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
             "search_user_dir", self.cursor_to_dict, sql, *args
         )
 
-        limited = len(results) > limit
+        if search_term is not None:
+            limited = len(results) > limit
+        else:
+            limited = False
 
         defer.returnValue({"limited": limited, "results": results})
 

@@ -366,7 +366,7 @@ class PasswordRestServlet(RestServlet):
         # In the second case, we require a password to confirm their identity.
 
         if self.auth.has_access_token(request):
-            requester = yield self.auth.get_user_by_req(request)
+            requester = yield self.auth.get_user_by_req(request, allow_partner=True)
             params = yield self.auth_handler.validate_user_via_ui_auth(
                 requester, body, self.hs.get_ip_from_request(request),
             )
@@ -545,7 +545,7 @@ class ThreepidRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request, allow_partner=True)
 
         threepids = yield self.datastore.user_get_threepids(
             requester.user.to_string()

@@ -149,8 +149,6 @@ def check(room_version, event, auth_events, do_sig_check=True, do_size_check=Tru
         logger.debug("Allowing! %s", event)
         return
 
-    _check_event_sender_in_room(event, auth_events)
-
     # Special case to allow m.room.third_party_invite events wherever
     # a user is allowed to issue invites.  Fixes
     # https://github.com/vector-im/vector-web/issues/1208 hopefully
@@ -313,6 +311,7 @@ def _is_membership_change_allowed(event, auth_events):
         # Joins are valid iff caller == target and they were:
         # invited: They are accepting the invitation
         # joined: It's a NOOP
+        # Watcha: we allow user with max level to force a user to join
         if event.user_id != target_user_id:
             raise AuthError(403, "Cannot force another user to join.")
         elif target_banned:

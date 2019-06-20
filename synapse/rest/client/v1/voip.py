@@ -35,7 +35,8 @@ class VoipRestServlet(RestServlet):
     def on_GET(self, request):
         requester = yield self.auth.get_user_by_req(
             request,
-            self.hs.config.turn_allow_guests
+            self.hs.config.turn_allow_guests,
+            allow_partner=True
         )
 
         turnUris = self.hs.config.turn_uris

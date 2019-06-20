@@ -51,6 +51,8 @@ from .receipts import ReceiptsStore
 from .registration import RegistrationStore
 from .rejections import RejectionsStore
 from .relations import RelationsStore
+from .invite_external import ExternalInvitationStore # Added for Watcha
+from .watcha_admin import WatchaAdminStore # Added for Watcha
 from .room import RoomStore
 from .roommember import RoomMemberStore
 from .search import SearchStore
@@ -67,6 +69,8 @@ logger = logging.getLogger(__name__)
 
 
 class DataStore(
+    ExternalInvitationStore, # Added for Watcha
+    WatchaAdminStore, # Added for Watcha
     EventsBackgroundUpdatesStore,
     RoomMemberStore,
     RoomStore,

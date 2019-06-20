@@ -98,6 +98,8 @@ class DeactivateAccountHandler(BaseHandler):
 
         yield self.store.user_set_password_hash(user_id, None)
 
+        yield self.store.watcha_deactivate_account(user_id)#added for watcha
+
         # Add the user to a table of users pending deactivation (ie.
         # removal from all the rooms they're a member of)
         yield self.store.add_user_pending_deactivation(user_id)

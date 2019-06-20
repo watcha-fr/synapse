@@ -97,7 +97,7 @@ class SyncRestServlet(RestServlet):
             )
 
         requester = yield self.auth.get_user_by_req(
-            request, allow_guest=True
+            request, allow_guest=True, allow_partner=True,
         )
         user = requester.user
         device_id = requester.device_id

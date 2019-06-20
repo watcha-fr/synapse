@@ -219,6 +219,11 @@ class SynapseRequest(Request):
                 It is possible to update this afterwards by updating
                 self.request_metrics.name.
         """
+        # insertion for watcha, to reduce log spam
+        if self.method == "OPTIONS":
+            return
+        # end of insertion
+
         self.start_time = time.time()
         self.request_metrics = RequestMetrics()
         self.request_metrics.start(

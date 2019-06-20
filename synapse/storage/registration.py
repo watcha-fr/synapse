@@ -29,6 +29,10 @@ from synapse.storage._base import SQLBaseStore
 from synapse.types import UserID
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
+
+import logging
+logger = logging.getLogger(__name__)
+
 THIRTY_MINUTES_IN_MS = 30 * 60 * 1000
 
 
@@ -48,6 +52,8 @@ class RegistrationWorkerStore(SQLBaseStore):
                 "name",
                 "password_hash",
                 "is_guest",
+                "is_partner",
+                "email",
                 "consent_version",
                 "consent_server_notice_sent",
                 "appservice_id",
@@ -262,7 +268,7 @@ class RegistrationWorkerStore(SQLBaseStore):
 
     def _query_for_auth(self, txn, token):
         sql = (
-            "SELECT users.name, users.is_guest, access_tokens.id as token_id,"
+            "SELECT users.name, users.is_guest, users.is_partner, users.email, access_tokens.id as token_id,"
             " access_tokens.device_id"
             " FROM users"
             " INNER JOIN access_tokens on users.name = access_tokens.user_id"
@@ -630,6 +636,7 @@ class RegistrationStore(
         password_hash=None,
         was_guest=False,
         make_guest=False,
+        make_partner=False,
         appservice_id=None,
         create_profile_with_displayname=None,
         admin=False,
@@ -665,6 +672,7 @@ class RegistrationStore(
             password_hash,
             was_guest,
             make_guest,
+            make_partner,
             appservice_id,
             create_profile_with_displayname,
             admin,
@@ -679,6 +687,7 @@ class RegistrationStore(
         password_hash,
         was_guest,
         make_guest,
+        make_partner,
         appservice_id,
         create_profile_with_displayname,
         admin,
@@ -725,6 +734,7 @@ class RegistrationStore(
                         "password_hash": password_hash,
                         "creation_ts": now,
                         "is_guest": 1 if make_guest else 0,
+                        "is_partner": 1 if make_partner else 0,
                         "appservice_id": appservice_id,
                         "admin": 1 if admin else 0,
                         "user_type": user_type,
@@ -758,6 +768,29 @@ class RegistrationStore(
 
         self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
         txn.call_after(self.is_guest.invalidate, (user_id,))
+
+    # Added for watcha...
+    def find_user_id_by_email(self, email):
+        """Find user that match email case insensitively.
+
+        Returns a user_id or None
+        """
+        def f(txn):
+            # there should be only one..
+            # but bad data have caused some accounts to be duplicated, so
+            # take a non-partner one by default
+            sql = (
+                "SELECT name FROM users"
+                " WHERE lower(email) = lower(?)"
+                " ORDER BY is_partner ASC"
+                " LIMIT 1"
+            )
+            txn.execute(sql, (email,))
+            rows = self.cursor_to_dict(txn)
+            return rows[0]['name'] if rows else None
+
+        return self.runInteraction("find_user_id_by_email_case_insensitive", f)
+    # ... end added for watcha.
 
     def user_set_password_hash(self, user_id, password_hash):
         """
@@ -1267,4 +1300,33 @@ class RegistrationStore(
         return self.runInteraction(
             "delete_threepid_session",
             delete_threepid_session_txn,
+        )
+
+
+    @defer.inlineCallbacks
+    def is_user_partner(self, user_id):
+
+        is_partner = yield self._simple_select_one_onecol(
+            "users",
+            keyvalues={"name": user_id},
+            retcol="is_partner",
+            desc="isUserPartner",
+        )
+        logger.info("login from user %s. is_partner=%s", user_id, is_partner)
+        defer.returnValue(is_partner)
+
+    @defer.inlineCallbacks
+    def user_set_email(self, user_id, email):
+        def user_set_email_txn(txn):
+            self._simple_update_one_txn(
+                txn,
+                'users', {
+                    'name': user_id
+                },
+                {
+                    'email': email
+                }
+            )
+        yield self.runInteraction(
+            "user_set_email", user_set_email_txn
         )

@@ -52,6 +52,8 @@ perf_logger = logging.getLogger("synapse.storage.TIME")
 
 sql_scheduling_timer = Histogram("synapse_storage_schedule_time", "sec")
 
+perf_logger.disabled = True # WATCHA disabled
+
 sql_query_timer = Histogram("synapse_storage_query_time", "sec", ["verb"])
 sql_txn_timer = Histogram("synapse_storage_transaction_time", "sec", ["desc"])
 

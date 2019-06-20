@@ -1044,6 +1044,34 @@ class AuthHandler(BaseHandler):
         else:
             return defer.succeed(False)
 
+    #insertion for watcha
+    @defer.inlineCallbacks
+    def is_partner(self, user_id):
+        ret = yield self.store.is_user_partner(
+            user_id,
+        )
+        defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def set_email(self, user_id, email):
+        ret = yield self.store.user_set_email(
+            user_id,
+            email
+        )
+
+        defer.returnValue(ret)
+    #end of insertion
+
+    # Added for Watcha...
+    @defer.inlineCallbacks
+    def find_user_id_by_email(self, email):
+        ret = yield self.store.find_user_id_by_email(
+            email
+        )
+
+        defer.returnValue(ret)
+    # ... end added for Watcha.
+
     def ratelimit_login_per_account(self, user_id):
         """Checks whether the process must be stopped because of ratelimiting.
 

@@ -121,6 +121,13 @@ def filter_events_for_client(store, user_id, events, is_peeking=False,
         else:
             visibility = "shared"
 
+        # added by watcha: for restricted history visibility, it is defined as the invitation event date. clearer UX for room admin
+        if visibility == "joined":
+            visibility = "invited"
+        # added by watcha: all rooms shall be private. so we convert world_readable into a full history for members-only ("shared").
+        if visibility == "world_readable":
+            visibility = "shared"
+
         if visibility not in VISIBILITY_PRIORITY:
             visibility = "shared"
 

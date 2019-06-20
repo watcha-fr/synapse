@@ -184,7 +184,7 @@ class Auth(object):
         return event_auth.get_public_keys(invite_event)
 
     @defer.inlineCallbacks
-    def get_user_by_req(self, request, allow_guest=False, rights="access"):
+    def get_user_by_req(self, request, allow_guest=False, allow_partner=False, rights="access"):
         """ Get a registered user's ID.
 
         Args:
@@ -227,6 +227,7 @@ class Auth(object):
             user = user_info["user"]
             token_id = user_info["token_id"]
             is_guest = user_info["is_guest"]
+            is_partner = user_info["is_partner"]
 
             # Deny the request if the user account has expired.
             if self._account_validity.enabled:
@@ -257,11 +258,17 @@ class Auth(object):
                     403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
                 )
 
+            if is_partner and not allow_partner:
+                raise AuthError(
+                    403, "Partner access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
+                )
+
             request.authenticated_entity = user.to_string()
 
             defer.returnValue(synapse.types.create_requester(
-                user, token_id, is_guest, device_id, app_service=app_service)
+                user, token_id, is_guest, device_id, is_partner, app_service=app_service)
             )
+
         except KeyError:
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token.",
@@ -529,6 +536,7 @@ class Auth(object):
             "token_id": ret.get("token_id", None),
             "is_guest": False,
             "device_id": ret.get("device_id"),
+            "is_partner": ret.get("is_partner"),
         }
         defer.returnValue(user_info)
 

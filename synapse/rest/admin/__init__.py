@@ -600,6 +600,8 @@ class ListMediaInRoom(RestServlet):
         defer.returnValue((200, {"local": local_mxcs, "remote": remote_mxcs}))
 
 
+'''Removed for watcha we disable this api since it allow the admin to choose the password for users
+
 class ResetPasswordRestServlet(RestServlet):
     """Post request to allow an administrator reset password for a user.
     This needs user to have administrator access in Synapse.
@@ -639,6 +641,7 @@ class ResetPasswordRestServlet(RestServlet):
             target_user_id, new_password, requester
         )
         defer.returnValue((200, {}))
+'''
 
 
 class GetUsersPaginatedRestServlet(RestServlet):
@@ -842,7 +845,7 @@ def register_servlets_for_client_rest_resource(hs, http_server):
     DeactivateAccountRestServlet(hs).register(http_server)
     PurgeHistoryRestServlet(hs).register(http_server)
     UsersRestServlet(hs).register(http_server)
-    ResetPasswordRestServlet(hs).register(http_server)
+#    ResetPasswordRestServlet(hs).register(http_server) removed for watcha
     GetUsersPaginatedRestServlet(hs).register(http_server)
     SearchUsersRestServlet(hs).register(http_server)
     ShutdownRoomRestServlet(hs).register(http_server)

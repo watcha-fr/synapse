@@ -78,6 +78,9 @@ class RoomCreateRestServlet(TransactionRestServlet):
     def on_POST(self, request):
         requester = yield self.auth.get_user_by_req(request)
 
+        if requester.is_partner:
+            raise AuthError(403, "Partners are not allowed to create rooms")
+
         info = yield self._room_creation_handler.create_room(
             requester, self.get_room_config(request)
         )
@@ -181,6 +184,49 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                 content=content,
             )
         else:
+            # added by watcha
+            # override history visibility incoming config requests.
+            if event_type == EventTypes.RoomHistoryVisibility:
+                logger.info("RoomHistoryEvent. Original content=" + str(content))
+                if content['history_visibility'] == "world_readable":
+                    content['history_visibility'] = "shared"
+                if content['history_visibility'] == "joined":
+                    content['history_visibility'] = "invited"
+                logger.info("RoomHistoryEvent. New content=" + str(content))
+
+            # added by watcha
+            # override room permissions config requests
+            # 0 means a generic user - 50 means a moderator - 100 means an administrator
+            if event_type == EventTypes.PowerLevels:
+                logger.info("PowerLevelsEvent. Original content=" + str(content))
+                content['events'][EventTypes.RoomAvatar] = 50; # change avatar of the room
+                content['events'][EventTypes.CanonicalAlias] = 50; # change the alias of the room
+                content['events'][EventTypes.Name] = 50; # change the name of the room
+                content['events'][EventTypes.PowerLevels] = 100; # change the permissions (name, revoke moderators)
+                content['events'][EventTypes.Topic] = 50; # change topic in the room
+                content['invite'] = 50; # invite users
+                content['kick'] = 50; # kick users
+                content['ban'] = 50; # permanently kick users from the room
+                content['redact'] = 50; # TODO option to prevent people from removing their posts.
+                content['state_default'] = 50; # change config of the room
+                content['users_default'] = 0; # default permission for new users.
+                logger.info("PowerLevelsEvent. New content=" + str(content))
+
+            if event_type == "org.matrix.room.preview_urls":
+                logger.info("PreviewUrlsEvent. Original content=" + str(content))
+                content['disable'] = True;
+                logger.info("PreviewUrlsEvent. New content=" + str(content))
+
+            if event_type == EventTypes.JoinRules:
+                logger.info("JoinRulesEvent. Original content=" + str(content))
+                content['join_rule'] = "invite"
+                logger.info("JoinRulesEvent. New content=" + str(content))
+
+            if event_type == EventTypes.GuestAccess:
+                logger.info("GuestAccessEvent. Original content=" + str(content))
+                content['guest_access'] = "forbidden"
+                logger.info("GuestAccessEvent. New content=" + str(content))
+
             event = yield self.event_creation_handler.create_and_send_nonmember_event(
                 requester,
                 event_dict,
@@ -208,7 +254,7 @@ class RoomSendEventRestServlet(TransactionRestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, event_type, txn_id=None):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True)
         content = parse_json_object_from_request(request)
 
         event_dict = {
@@ -255,6 +301,7 @@ class JoinRoomAliasServlet(TransactionRestServlet):
         requester = yield self.auth.get_user_by_req(
             request,
             allow_guest=True,
+            allow_partner=True,
         )
 
         try:
@@ -333,6 +380,9 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             else:
                 pass
 
+        # disabled for watcha
+        raise AuthError(403, "Directory is not available")
+
         limit = parse_integer(request, "limit", 0)
         since_token = parse_string(request, "since", None)
 
@@ -354,6 +404,9 @@ class PublicRoomListRestServlet(TransactionRestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         yield self.auth.get_user_by_req(request, allow_guest=True)
+
+        # disabled for watcha
+        raise AuthError(403, "Directory is not available")
 
         server = parse_string(request, "server", default=None)
         content = parse_json_object_from_request(request)
@@ -485,7 +538,7 @@ class RoomMessageListRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True)
         pagination_config = PaginationConfig.from_request(
             request, default_limit=10,
         )
@@ -681,13 +734,17 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         requester = yield self.auth.get_user_by_req(
             request,
             allow_guest=True,
+            allow_partner=True
         )
 
-        if requester.is_guest and membership_action not in {
+        if (requester.is_guest or requester.is_partner) and membership_action not in {
             Membership.JOIN,
             Membership.LEAVE
         }:
-            raise AuthError(403, "Guest access not allowed")
+            if requester.is_guest:
+                raise AuthError(403, "Guest access not allowed")
+            else:
+                raise AuthError(403, "Partners can only join and leave rooms")
 
         try:
             content = parse_json_object_from_request(request)
@@ -697,6 +754,19 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             content = {}
 
         if membership_action == "invite" and self._has_3pid_invite_keys(content):
+            logger.info("invitation: inviter id=%s, device_id=%s",
+                        requester.user, requester.device_id)
+
+            content["user_id"] = yield self.handlers.invite_external_handler.invite(
+                room_id=room_id,
+                inviter=requester.user,
+                inviter_device_id=str(requester.device_id),
+                invitee=content["address"]
+            )
+            logger.info("invitee email=%s has been invited as %s in room_id=%s",
+                        content["address"], content["user_id"], room_id)
+
+            """
             yield self.room_member_handler.do_3pid_invite(
                 room_id,
                 requester.user,
@@ -706,8 +776,9 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 requester,
                 txn_id
             )
-            defer.returnValue((200, {}))
-            return
+            """
+            #defer.returnValue((200, {}))
+            #return
 
         target = requester.user
         if membership_action in ["invite", "ban", "unban", "kick"]:
@@ -796,7 +867,7 @@ class RoomTypingRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_id, user_id):
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request, allow_partner=True)
 
         room_id = urlparse.unquote(room_id)
         target_user = UserID.from_string(urlparse.unquote(user_id))

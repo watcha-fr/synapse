@@ -33,6 +33,7 @@ from .logcontext import (
 
 logger = logging.getLogger(__name__)
 
+logger.disabled = True # WATCHA disabled
 
 class ObservableDeferred(object):
     """Wraps a deferred object so that we can add observer deferreds. These

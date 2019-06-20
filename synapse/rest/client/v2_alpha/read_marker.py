@@ -36,7 +36,7 @@ class ReadMarkerRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id):
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request, allow_partner=True)
 
         yield self.presence_handler.bump_presence_active_time(requester.user)
 

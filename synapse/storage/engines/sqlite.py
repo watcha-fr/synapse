@@ -17,6 +17,7 @@ import struct
 import threading
 
 from synapse.storage.prepare_database import prepare_database
+from synapse.storage.watcha import check_db_customization
 
 
 class Sqlite3Engine(object):
@@ -46,6 +47,7 @@ class Sqlite3Engine(object):
 
     def on_new_connection(self, db_conn):
         prepare_database(db_conn, self, config=None)
+        check_db_customization(db_conn, self)
         db_conn.create_function("rank", 1, _rank)
 
     def is_deadlock(self, error):

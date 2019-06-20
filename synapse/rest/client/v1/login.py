@@ -275,12 +275,14 @@ class LoginRestServlet(RestServlet):
         device_id, access_token = yield self.registration_handler.register_device(
             user_id, device_id, initial_display_name,
         )
+        is_partner = yield auth_handler.is_partner(canonical_user_id)
 
         result = {
             "user_id": user_id,
             "access_token": access_token,
             "home_server": self.hs.hostname,
             "device_id": device_id,
+            "is_partner": is_partner,
         }
 
         if callback is not None:
@@ -301,12 +303,14 @@ class LoginRestServlet(RestServlet):
         device_id, access_token = yield self.registration_handler.register_device(
             user_id, device_id, initial_display_name,
         )
+        is_partner = yield auth_handler.is_partner(user_id)
 
         result = {
             "user_id": user_id,  # may have changed
             "access_token": access_token,
             "home_server": self.hs.hostname,
             "device_id": device_id,
+            "is_partner": is_partner,
         }
 
         defer.returnValue(result)
@@ -366,6 +370,8 @@ class LoginRestServlet(RestServlet):
                 "access_token": access_token,
                 "home_server": self.hs.hostname,
             }
+
+        result["is_partner"] = yield auth_handler.is_partner(user_id)
 
         defer.returnValue(result)
 

@@ -42,7 +42,7 @@ class AccountDataServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id, account_data_type):
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request, allow_partner=True)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
 
@@ -105,6 +105,11 @@ class RoomAccountDataServlet(RestServlet):
                 "Cannot set m.fully_read through this API."
                 " Use /rooms/!roomId:server.name/read_markers"
             )
+
+        if account_data_type == "org.matrix.room.preview_urls":
+            logger.info("AccountDataPreviewUrls: original=" + str(body))
+            body["disable"] = True
+            logger.info("AccountDataPreviewUrls: new=" + str(body))
 
         max_id = yield self.store.add_account_data_to_room(
             user_id, room_id, account_data_type, body
