@@ -267,8 +267,8 @@ class WatchaRegisterRestServlet(RestServlet):
     PATTERNS = client_patterns("/watcha_register", v1=True)
 
     def __init__(self, hs):
-        RestServlet.__init__(self, hs)
-
+        super(WatchaRegisterRestServlet, self).__init__()
+        self.hs = hs
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -327,8 +327,9 @@ class WatchaResetPasswordRestServlet(RestServlet):
     PATTERNS = client_patterns("/watcha_reset_password", v1=True)
 
     def __init__(self, hs):
-        RestServlet.__init__(self, hs)
-        self.handlers =hs.get_handlers()
+        super(WatchaResetPasswordRestServlet, self).__init__()
+        self.hs = hs
+        self.handlers = hs.get_handlers()
 
 
     @defer.inlineCallbacks
