@@ -194,3 +194,14 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
         )
         self.render(request)
         self.assertEquals(403, channel.code, channel.result)
+
+    test_disabling_room_list.skip = "Directory is disabled for Watcha"
+    def test_room_list_is_disabled_for_watcha(self):
+        self.room_list_handler.enable_room_list_search = True
+        self.directory_handler.enable_room_list_search = True
+
+        # Room list is enabled so we should get some results
+        request, channel = self.make_request("GET", b"publicRooms")
+        self.render(request)
+        self.assertEquals(403, channel.code, channel.result)
+        self.assertEquals("Directory is not available", channel.json_body["error"])

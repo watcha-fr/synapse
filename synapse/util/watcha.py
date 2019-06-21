@@ -53,9 +53,14 @@ def generate_password():
 
 
 def send_mail(config, recipient, subject, template_name, fields):
-    '''This method should only be used in a Matrix APIs, 
+    '''This method should only be used in a Matrix APIs,
     i.e. called in the code of an HTTP end point, as it raises a SynapseError on error,
     and such errors are only handled correctly in endpoints (ie. passed back as 403 error)'''
+
+    if not config.email_smtp_host:
+        # (used in tests)
+        logger.error("Cannot send email, SMTP host not defined in config")
+        return
 
     message = MIMEMultipart('alternative')
     message['From'] = config.email_notif_from
@@ -98,7 +103,7 @@ def send_mail(config, recipient, subject, template_name, fields):
         connection.login(config.email_smtp_user, config.email_smtp_pass)
         connection.sendmail(config.email_notif_from, [recipient], message.as_string())
         logger.info("...email sent to %s (subject was: %s)", recipient, subject)
-    except Exception, exc:
+    except Exception as exc:
         error = str(exc)
         logger.error("...failed to send email: %s", error )
         raise SynapseError(

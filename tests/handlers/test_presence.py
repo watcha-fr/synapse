@@ -452,6 +452,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
 
         # Create a room with two local users
         room_id = self.helper.create_room_as(self.user_id)
+        self.helper.invite(room_id, src=self.user_id, targ="@test2:server") # added for Watcha: need to be invited
         self.helper.join(room_id, "@test2:server")
 
         # Mark test2 as online, test will be offline with a last_active of 0
@@ -479,9 +480,11 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             self.presence_handler.current_state_for_user("@test2:server")
         )
         self.assertEqual(expected_state.state, PresenceState.ONLINE)
-        self.federation_sender.send_presence_to_destinations.assert_called_once_with(
-            destinations=["server2"], states=[expected_state]
-        )
+        # MODIFIED FOR WATCHA: not sending presence to other servers
+        #self.federation_sender.send_presence_to_destinations.assert_called_once_with(
+        #    destinations=["server2"], states=[expected_state]
+        #)
+        self.federation_sender.send_presence_to_destinations.assert_not_called()
 
         #
         # Test that only the new server gets sent presence and not existing servers
@@ -491,9 +494,11 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         self._add_new_user(room_id, "@bob:server3")
 
         self.federation_sender.send_presence.assert_not_called()
-        self.federation_sender.send_presence_to_destinations.assert_called_once_with(
-            destinations=["server3"], states=[expected_state]
-        )
+        # MODIFIED FOR WATCHA: not sending presence to other servers
+        #self.federation_sender.send_presence_to_destinations.assert_called_once_with(
+        #    destinations=["server3"], states=[expected_state]
+        #)
+        self.federation_sender.send_presence_to_destinations.assert_not_called()
 
     def test_remote_gets_presence_when_local_user_joins(self):
         # We advance time to something that isn't 0, as we use 0 as a special
@@ -527,6 +532,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         self.federation_sender.reset_mock()
 
         # Join local user to room
+        self.helper.invite(room_id, src=self.user_id, targ="@test2:server") # added for Watcha: need to be invited
         self.helper.join(room_id, "@test2:server")
 
         self.reactor.pump([0])  # Wait for presence updates to be handled
@@ -539,8 +545,11 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             self.presence_handler.current_state_for_user("@test2:server")
         )
         self.assertEqual(expected_state.state, PresenceState.ONLINE)
+        # MODIFIED FOR WATCHA: not sending presence to other servers
         self.federation_sender.send_presence_to_destinations.assert_called_once_with(
-            destinations=set(("server2", "server3")), states=[expected_state]
+            # MODIFIED FOR WATCHA: not sending presence to other servers
+            #destinations=set(("server2", "server3")), states=[expected_state]
+            destinations=set(), states=[expected_state]
         )
 
     def _add_new_user(self, room_id, user_id):
@@ -575,5 +584,10 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         self.get_success(self.federation_handler.on_receive_pdu(hostname, event))
 
         # Check that it was successfully persisted.
-        self.get_success(self.store.get_event(event.event_id))
-        self.get_success(self.store.get_event(event.event_id))
+        # MODIFIED FOR WATCHA: makes sense that remote event is not persisted.
+        # .. but not enough to make the test work. disabled below.
+        #self.get_success(self.store.get_event(event.event_id))
+        #self.get_success(self.store.get_event(event.event_id))
+        from synapse.api.errors import NotFoundError
+        self.get_failure(self.store.get_event(event.event_id),
+                         NotFoundError)

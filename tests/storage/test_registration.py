@@ -49,6 +49,8 @@ class RegistrationStoreTestCase(unittest.TestCase):
                 "consent_server_notice_sent": None,
                 "appservice_id": None,
                 "creation_ts": 1000,
+                "email": None,
+                "is_partner": 0,
             },
             (yield self.store.get_user_by_id(self.user_id)),
         )

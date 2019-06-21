@@ -132,7 +132,7 @@ class InviteExternalHandler(BaseHandler):
             user_password = generate_password()
 
             try:
-                yield self.hs.get_handlers().registration_handler.register(
+                yield self.hs.get_registration_handler().register(
                     localpart=user_id,
                     password=user_password,
                     generate_token=True,
@@ -199,7 +199,7 @@ class InviteExternalHandler(BaseHandler):
         }
 
         if (new_user):
-            setupToken = base64.b64encode('{{"user":"{user_id}","pw":"{user_password}"}}'.format(user_id=user_id, user_password=user_password))
+            setupToken = base64.b64encode('{{"user":"{user_id}","pw":"{user_password}"}}'.format(user_id=user_id, user_password=user_password).encode("utf-8"))
             fields['setupToken'] = setupToken
             template_name = 'invite_new_account'
         else:

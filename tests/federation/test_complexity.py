@@ -88,3 +88,23 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code)
         complexity = channel.json_body["v1"]
         self.assertEqual(complexity, 1.23)
+
+
+    test_complexity_simple.skip = "Rooms are not public in Watcha thus this API is not working, see next test"
+
+    def test_complexity_failing_in_watcha_because_api_not_public(self):
+
+        u1 = self.register_user("u1", "pass")
+        u1_token = self.login("u1", "pass")
+
+        room_1 = self.helper.create_room_as(u1, tok=u1_token)
+        self.helper.send_state(
+            room_1, event_type="m.room.topic", body={"topic": "foo"}, tok=u1_token
+        )
+
+        # Get the room complexity
+        request, channel = self.make_request(
+            "GET", "/_matrix/federation/unstable/rooms/%s/complexity" % (room_1,)
+        )
+        self.render(request)
+        self.assertEquals(404, channel.code)

@@ -722,6 +722,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         super(RoomMembershipRestServlet, self).__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
+        self.handlers = hs.get_handlers()
 
     def register(self, http_server):
         # /rooms/$roomid/[invite|join|leave]

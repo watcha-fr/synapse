@@ -275,7 +275,7 @@ class LoginRestServlet(RestServlet):
         device_id, access_token = yield self.registration_handler.register_device(
             user_id, device_id, initial_display_name,
         )
-        is_partner = yield auth_handler.is_partner(canonical_user_id)
+        is_partner = yield self.auth_handler.is_partner(user_id)
 
         result = {
             "user_id": user_id,

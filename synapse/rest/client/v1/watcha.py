@@ -14,10 +14,9 @@ from hmac import compare_digest
 
 from twisted.internet import defer
 
-from synapse.util.async import run_on_reactor
 from synapse.api.errors import AuthError, SynapseError
-from .base import ClientV1RestServlet, client_path_patterns
-from synapse.http.servlet import parse_json_object_from_request
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.util.watcha import generate_password, send_mail
 from synapse.types import UserID, create_requester
 from synapse.api.constants import Membership
@@ -85,11 +84,11 @@ def _check_admin_or_secret(config, auth, request, parameter_names):
 
     defer.returnValue(ret)
 
-class WatchaUserlistRestServlet(ClientV1RestServlet):
+class WatchaUserlistRestServlet(RestServlet):
 
-    PATTERNS = client_path_patterns("/watcha_user_list")
+    PATTERNS = client_patterns("/watcha_user_list", v1=True)
     def __init__(self, hs):
-        super(WatchaUserlistRestServlet, self).__init__(hs)
+        super(WatchaUserlistRestServlet, self).__init__()
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
@@ -99,11 +98,11 @@ class WatchaUserlistRestServlet(ClientV1RestServlet):
         ret = yield self.handlers.watcha_admin_handler.watcha_user_list()
         defer.returnValue((200, ret))
 
-class WatchaRoomlistRestServlet(ClientV1RestServlet):
+class WatchaRoomlistRestServlet(RestServlet):
 
-    PATTERNS = client_path_patterns("/watcha_room_list")
+    PATTERNS = client_patterns("/watcha_room_list", v1=True)
     def __init__(self, hs):
-        super(WatchaRoomlistRestServlet, self).__init__(hs)
+        super(WatchaRoomlistRestServlet, self).__init__()
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
@@ -113,11 +112,11 @@ class WatchaRoomlistRestServlet(ClientV1RestServlet):
         ret = yield self.handlers.watcha_admin_handler.watcha_room_list()
         defer.returnValue((200, ret))
 
-class WatchaRoomMembershipRestServlet(ClientV1RestServlet):
+class WatchaRoomMembershipRestServlet(RestServlet):
 
-    PATTERNS = client_path_patterns("/watcha_room_membership")
+    PATTERNS = client_patterns("/watcha_room_membership", v1=True)
     def __init__(self, hs):
-        super(WatchaRoomMembershipRestServlet, self).__init__(hs)
+        super(WatchaRoomMembershipRestServlet, self).__init__()
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
@@ -127,11 +126,11 @@ class WatchaRoomMembershipRestServlet(ClientV1RestServlet):
         ret = yield self.handlers.watcha_admin_handler.watcha_room_membership()
         defer.returnValue((200, ret))
 
-class WatchaRoomNameRestServlet(ClientV1RestServlet):
+class WatchaRoomNameRestServlet(RestServlet):
 
-    PATTERNS = client_path_patterns("/watcha_room_name")
+    PATTERNS = client_patterns("/watcha_room_name", v1=True)
     def __init__(self, hs):
-        super(WatchaRoomNameRestServlet, self).__init__(hs)
+        super(WatchaRoomNameRestServlet, self).__init__()
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
@@ -141,11 +140,11 @@ class WatchaRoomNameRestServlet(ClientV1RestServlet):
         ret = yield self.handlers.watcha_admin_handler.watcha_room_name()
         defer.returnValue((200, ret))
 
-class WatchaDisplayNameRestServlet(ClientV1RestServlet):
+class WatchaDisplayNameRestServlet(RestServlet):
 
-    PATTERNS = client_path_patterns("/watcha_display_name")
+    PATTERNS = client_patterns("/watcha_display_name", v1=True)
     def __init__(self, hs):
-        super(WatchaDisplayNameRestServlet, self).__init__(hs)
+        super(WatchaDisplayNameRestServlet, self).__init__()
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
@@ -155,10 +154,10 @@ class WatchaDisplayNameRestServlet(ClientV1RestServlet):
         ret = yield self.handlers.watcha_admin_handler.watcha_display_name()
         defer.returnValue((200, ret))
 
-class WatchaExtendRoomlistRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/watcha_extend_room_list")
+class WatchaExtendRoomlistRestServlet(RestServlet):
+    PATTERNS = client_patterns("/watcha_extend_room_list", v1=True)
     def __init__(self, hs):
-        super(WatchaExtendRoomlistRestServlet, self).__init__(hs)
+        super(WatchaExtendRoomlistRestServlet, self).__init__()
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
@@ -168,10 +167,10 @@ class WatchaExtendRoomlistRestServlet(ClientV1RestServlet):
         ret = yield self.handlers.watcha_admin_handler.watcha_extend_room_list()
         defer.returnValue((200, ret))
 
-class WatchaUpdateMailRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/watcha_update_email/(?P<target_user_id>[^/]*)")
+class WatchaUpdateMailRestServlet(RestServlet):
+    PATTERNS = client_patterns("/watcha_update_email/(?P<target_user_id>[^/]*)", v1=True)
     def __init__(self, hs):
-        super(WatchaUpdateMailRestServlet, self).__init__(hs)
+        super(WatchaUpdateMailRestServlet, self).__init__()
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
@@ -185,10 +184,10 @@ class WatchaUpdateMailRestServlet(ClientV1RestServlet):
         yield self.handlers.watcha_admin_handler.watcha_update_mail(target_user_id, new_email)
         defer.returnValue((200, {}))
 
-class WatchaUpdateToMember(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/watcha_update_partner_to_member/(?P<target_user_id>[^/]*)")
+class WatchaUpdateToMember(RestServlet):
+    PATTERNS = client_patterns("/watcha_update_partner_to_member/(?P<target_user_id>[^/]*)", v1=True)
     def __init__(self, hs):
-        super(WatchaUpdateToMember, self).__init__(hs)
+        super(WatchaUpdateToMember, self).__init__()
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
@@ -198,11 +197,11 @@ class WatchaUpdateToMember(ClientV1RestServlet):
         yield self.handlers.watcha_admin_handler.watcha_update_to_member(target_user_id)
         defer.returnValue((200, {}))
 
-class WatchaServerState(ClientV1RestServlet):
+class WatchaServerState(RestServlet):
 
-    PATTERNS = client_path_patterns("/watcha_server_state")
+    PATTERNS = client_patterns("/watcha_server_state", v1=True)
     def __init__(self, hs):
-        super(WatchaServerState, self).__init__(hs)
+        super(WatchaServerState, self).__init__()
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
@@ -212,7 +211,7 @@ class WatchaServerState(ClientV1RestServlet):
         ret = yield self.handlers.watcha_admin_handler.watcha_server_state()
         defer.returnValue((200, ret))
 
-class WatchaAdminStats(ClientV1RestServlet):
+class WatchaAdminStats(RestServlet):
     '''Get stats on the server.
 
     For POST, a optional 'ranges' parameters in JSON input made of a list of time ranges,
@@ -222,9 +221,9 @@ class WatchaAdminStats(ClientV1RestServlet):
     label, start seconds since epoch, end seconds since epoch.
     '''
 
-    PATTERNS = client_path_patterns("/watcha_admin_stats")
+    PATTERNS = client_patterns("/watcha_admin_stats", v1=True)
     def __init__(self, hs):
-        super(WatchaAdminStats, self).__init__(hs)
+        super(WatchaAdminStats, self).__init__()
         self.hs = hs
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
@@ -244,11 +243,11 @@ class WatchaAdminStats(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 
-class WatchaUserIp(ClientV1RestServlet):
+class WatchaUserIp(RestServlet):
 
-    PATTERNS = client_path_patterns("/watcha_user_ip/(?P<target_user_id>[^/]*)")
+    PATTERNS = client_patterns("/watcha_user_ip/(?P<target_user_id>[^/]*)", v1=True)
     def __init__(self, hs):
-        super(WatchaUserIp, self).__init__(hs)
+        super(WatchaUserIp, self).__init__()
         self.hs = hs
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
@@ -260,15 +259,15 @@ class WatchaUserIp(ClientV1RestServlet):
         ret = yield self.handlers.watcha_admin_handler.watcha_user_ip(target_user_id)
         defer.returnValue((200, ret))
 
-class WatchaRegisterRestServlet(ClientV1RestServlet):
+class WatchaRegisterRestServlet(RestServlet):
     """
     Registration of users.
     Requester must either be logged in as an admin, or supply a valid HMAC (generated from the registration_shared_secret)
     """
-    PATTERNS = client_path_patterns("/watcha_register")
+    PATTERNS = client_patterns("/watcha_register", v1=True)
 
     def __init__(self, hs):
-        ClientV1RestServlet.__init__(self, hs)
+        RestServlet.__init__(self, hs)
 
 
     @defer.inlineCallbacks
@@ -324,11 +323,11 @@ class WatchaRegisterRestServlet(ClientV1RestServlet):
         defer.returnValue((200, { "user_id": user_id }))
 
 
-class WatchaResetPasswordRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/watcha_reset_password")
+class WatchaResetPasswordRestServlet(RestServlet):
+    PATTERNS = client_patterns("/watcha_reset_password", v1=True)
 
     def __init__(self, hs):
-        ClientV1RestServlet.__init__(self, hs)
+        RestServlet.__init__(self, hs)
         self.handlers =hs.get_handlers()
 
 

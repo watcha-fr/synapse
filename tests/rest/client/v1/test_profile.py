@@ -62,7 +62,7 @@ class MockHandlerProfileTestCase(unittest.TestCase):
             profile_handler=self.mock_handler,
         )
 
-        def _get_user_by_req(request=None, allow_guest=False):
+        def _get_user_by_req(request=None, allow_guest=False, allow_partner=False): # modified for watcha
             return synapse.types.create_requester(myid)
 
         hs.get_auth().get_user_by_req = _get_user_by_req
@@ -257,6 +257,7 @@ class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
     def test_in_shared_room(self):
         self.ensure_requester_left_room()
 
+        self.helper.invite(self.room_id, src=self.owner, tok=self.owner_tok, targ=self.requester) # added for Watcha: need to be invited
         self.helper.join(room=self.room_id, user=self.requester, tok=self.requester_tok)
 
         self.try_fetch_profile(200, self.requester_tok)

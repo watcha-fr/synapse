@@ -460,3 +460,5 @@ class URLPreviewTests(unittest.HomeserverTestCase):
                 'error': 'DNS resolution failure during URL preview generation',
             },
         )
+
+URLPreviewTests.skip = "Disabled for Watcha because URL preview is disabled"

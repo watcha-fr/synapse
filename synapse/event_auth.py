@@ -149,6 +149,8 @@ def check(room_version, event, auth_events, do_sig_check=True, do_size_check=Tru
         logger.debug("Allowing! %s", event)
         return
 
+    _check_event_sender_in_room(event, auth_events)
+
     # Special case to allow m.room.third_party_invite events wherever
     # a user is allowed to issue invites.  Fixes
     # https://github.com/vector-im/vector-web/issues/1208 hopefully

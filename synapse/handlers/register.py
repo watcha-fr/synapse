@@ -231,10 +231,6 @@ class RegistrationHandler(BaseHandler):
                 make_guest=make_guest,
                 create_profile_with_displayname=default_display_name,
                 make_partner=make_partner,
-                create_profile_with_localpart=(
-                    # If the user was a guest then they already have a profile
-                    None if was_guest else user.localpart
-                ),
                 admin=admin,
                 user_type=user_type,
                 address=address,
@@ -269,7 +265,6 @@ class RegistrationHandler(BaseHandler):
                         create_profile_with_displayname=default_display_name,
                         address=address,
                         make_partner=make_partner,
-                        create_profile_with_localpart=user.localpart,
                     )
                 except SynapseError:
                     # if user id is taken, just generate another
@@ -640,7 +635,8 @@ class RegistrationHandler(BaseHandler):
     def register_with_store(self, user_id, token=None, password_hash=None,
                             was_guest=False, make_guest=False, appservice_id=None,
                             create_profile_with_displayname=None, admin=False,
-                            user_type=None, address=None):
+                            user_type=None, address=None,
+                            make_partner=False):
         """Register user in the datastore.
 
         Args:
@@ -691,6 +687,8 @@ class RegistrationHandler(BaseHandler):
                 admin=admin,
                 user_type=user_type,
                 address=address,
+                # Watcha: this probably doesn't work, but is probably not used anyway
+                make_partner=make_partner,
             )
         else:
             return self.store.register(
@@ -703,6 +701,7 @@ class RegistrationHandler(BaseHandler):
                 create_profile_with_displayname=create_profile_with_displayname,
                 admin=admin,
                 user_type=user_type,
+                make_partner=make_partner,
             )
 
     @defer.inlineCallbacks

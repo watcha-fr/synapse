@@ -38,7 +38,7 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
 
         # Create a test user and room
         self.user = UserID("alice", "test")
-        self.requester = Requester(self.user, None, False, None, None)
+        self.requester = Requester(self.user, None, False, None, False, None) # modified for Watcha
         info = self.get_success(self.room_creator.create_room(self.requester, {}))
         self.room_id = info["room_id"]
 
