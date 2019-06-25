@@ -269,7 +269,8 @@ class WatchaRegisterRestServlet(RestServlet):
     def __init__(self, hs):
         super(WatchaRegisterRestServlet, self).__init__()
         self.hs = hs
-
+        self.auth = hs.get_auth()
+        
     @defer.inlineCallbacks
     def on_POST(self, request):
         params = yield _check_admin_or_secret(self.hs.config, self.auth, request,
@@ -330,7 +331,7 @@ class WatchaResetPasswordRestServlet(RestServlet):
         super(WatchaResetPasswordRestServlet, self).__init__()
         self.hs = hs
         self.handlers = hs.get_handlers()
-
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
