@@ -49,7 +49,7 @@ def generate_password():
     grouplen = 4
     password = "".join(random.sample(dictionary, grouplen) + ["-"] + random.sample(dictionary, grouplen) + ["-"] + random.sample(dictionary, grouplen))
 
-    return password
+    return unicode(password)
 
 
 def send_mail(config, recipient, subject, template_name, fields):
