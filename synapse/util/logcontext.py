@@ -320,9 +320,15 @@ class LoggingContext(object):
 
         # When we stop, let's record the cpu used since we started
         if not self.usage_start:
+            '''TEMPORARY REMOVED FOR WATCHA: it's causing lots of spam logs. 
+            Strangely this happens to me also on the upstream branch
+            (both on the tag, and on the latest develop branch fe2d876e2)
+            and it has not been reported nor fixed...
+            so maybe it is a config issue and not a code issue. For now just disabling
+
             logger.warning(
                 "Called stop on logcontext %s without calling start", self,
-            )
+            )'''
             return
 
         usage_end = get_thread_resource_usage()
