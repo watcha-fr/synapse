@@ -215,7 +215,7 @@ class WatchaIsAdmin(RestServlet):
 
     PATTERNS = client_patterns("/watcha_is_admin", v1=True)
     def __init__(self, hs):
-        super(WatchaIsAdmin, self).__init__(hs)
+        super(WatchaIsAdmin, self).__init__()
         self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
