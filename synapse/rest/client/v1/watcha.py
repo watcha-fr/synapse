@@ -277,7 +277,7 @@ class WatchaRegisterRestServlet(RestServlet):
         super(WatchaRegisterRestServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
-        self.registeration_handler = hs.get_registration_handler()
+        self.registration_handler = hs.get_registration_handler()
         
     @defer.inlineCallbacks
     def on_POST(self, request):
