@@ -213,7 +213,7 @@ class WatchaServerState(RestServlet):
 
 class WatchaIsAdmin(RestServlet):
 
-    PATTERNS = client_path_patterns("/watcha_is_admin", v1=True)
+    PATTERNS = client_patterns("/watcha_is_admin", v1=True)
     def __init__(self, hs):
         super(WatchaIsAdmin, self).__init__(hs)
         self.auth = hs.get_auth()
