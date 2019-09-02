@@ -211,9 +211,9 @@ class WatchaServerState(RestServlet):
         ret = yield self.handlers.watcha_admin_handler.watcha_server_state()
         defer.returnValue((200, ret))
 
-class WatchaIsAdmin(ClientV1RestServlet):
+class WatchaIsAdmin(RestServlet):
 
-    PATTERNS = client_path_patterns("/watcha_is_admin")
+    PATTERNS = client_path_patterns("/watcha_is_admin", v1=True)
     def __init__(self, hs):
         super(WatchaIsAdmin, self).__init__(hs)
         self.auth = hs.get_auth()
