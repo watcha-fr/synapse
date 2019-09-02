@@ -211,6 +211,19 @@ class WatchaServerState(RestServlet):
         ret = yield self.handlers.watcha_admin_handler.watcha_server_state()
         defer.returnValue((200, ret))
 
+class WatchaIsAdmin(ClientV1RestServlet):
+
+    PATTERNS = client_path_patterns("/watcha_is_admin")
+    def __init__(self, hs):
+        super(WatchaIsAdmin, self).__init__(hs)
+        self.auth = hs.get_auth()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        requester = yield self.auth.get_user_by_req(request)
+        is_admin = yield self.auth.is_server_admin(requester.user)
+        defer.returnValue((200, { 'is_admin': is_admin }))
+
 class WatchaAdminStats(RestServlet):
     '''Get stats on the server.
 
@@ -395,6 +408,7 @@ def register_servlets(hs, http_server):
     WatchaUpdateToMember(hs).register(http_server)
     WatchaUserIp(hs).register(http_server)
     WatchaAdminStats(hs).register(http_server)
+    WatchaIsAdmin(hs).register(http_server)
     WatchaServerState(hs).register(http_server)
     WatchaUpdateMailRestServlet(hs).register(http_server)
     WatchaUserlistRestServlet(hs).register(http_server)
