@@ -4,6 +4,7 @@
 import random
 import logging
 import os
+import base64
 from os.path import join, dirname, abspath
 
 from jinja2 import Environment, FileSystemLoader
@@ -49,11 +50,27 @@ def generate_password():
     grouplen = 4
     password = "".join(random.sample(dictionary, grouplen) + ["-"] + random.sample(dictionary, grouplen) + ["-"] + random.sample(dictionary, grouplen))
 
-    return unicode(password)
+    return password
 
 
-def send_mail(config, recipient, subject, template_name, fields):
-    '''This method should only be used in a Matrix APIs,
+def compute_token(user, password=None):
+    '''Creates a (weakly encrypted) token that can be passed in a URL or in a JSON for temporaly login
+    This cannot be strongly encrypted, because it will be decoded in Riot (in javascript).
+    '''
+    if password is None:
+        json = '{{"user":"{user}"}}'.format(user_id=user_id)
+    else:
+        json = '{{"user":"{user}","pw":"{password}"}}'.format(user=user,
+                                                              password=password)
+    return base64.b64encode(json.encode("utf-8"))                                
+    
+
+def send_mail(config, recipient, template_name, fields):
+    '''
+
+    The 'server' and 'title' variables can also used in the template. The 'title' will be created from the subject.
+
+    This method should only be used in a Matrix APIs,
     i.e. called in the code of an HTTP end point, as it raises a SynapseError on error,
     and such errors are only handled correctly in endpoints (ie. passed back as 403 error)'''
 
@@ -73,12 +90,19 @@ def send_mail(config, recipient, subject, template_name, fields):
     # Semi-relevant online discussions:
     # https://stackoverflow.com/questions/25671608/python-mail-puts-unaccounted-space-in-outlook-subject-line
     # https://bugs.python.org/issue1974
-    message['Subject'] = Header(subject, 'utf-8', 200)
 
-    # HACK: to avoid issues with setuptools/distutil,
+    # To avoid issues with setuptools/distutil,
     # (not easy to get the 'res/templates' folder to be included in the whl file...)
     # we ship the templates as .py files, and put them in the code tree itself.
     jinjaenv = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
+    
+    subject = jinjaenv.get_template(template_name + '.subject.py').render(fields)
+    message['Subject'] = Header(subject, 'utf-8', 200)
+    
+    fields['title'] = subject
+    # FIXME: we're using the public_baseurl incorrectly here.
+    # it should be server_name and/or riot_base (from the email settings)
+    fields['server'] = config.public_baseurl.rstrip('/')
 
     for mimetype, extension in {'plain': 'txt',
                                 'html': 'html'}.items():

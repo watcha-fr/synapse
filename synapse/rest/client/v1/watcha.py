@@ -2,7 +2,6 @@
 
 import sys
 
-import base64
 import hmac
 from hashlib import sha1
 
@@ -17,7 +16,7 @@ from twisted.internet import defer
 from synapse.api.errors import AuthError, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.rest.client.v2_alpha._base import client_patterns
-from synapse.util.watcha import generate_password, send_mail
+from synapse.util.watcha import generate_password, send_mail, compute_token
 from synapse.types import UserID, create_requester
 from synapse.api.constants import Membership
 
@@ -37,11 +36,6 @@ def _decode_share_secret_parameters(config, parameter_names, parameter_json):
     # Its important to check as we use null bytes as HMAC field separators
     if any("\x00" in parameters[parameter_name] for parameter_name in parameter_names):
         raise SynapseError(400, "Invalid message")
-
-    # FIXME: hack for create_user: parse_json will not return unicode if it's only ascii... making hmac fail.
-    # So force it to be unicode.
-    if 'full_name' in parameters:
-        parameters['full_name'] = unicode(parameters['full_name'])
 
     got_mac = str(parameter_json["mac"])
 
@@ -283,6 +277,7 @@ class WatchaRegisterRestServlet(RestServlet):
         super(WatchaRegisterRestServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
+        self.registeration_handler = hs.get_registration_handler()
         
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -297,9 +292,8 @@ class WatchaRegisterRestServlet(RestServlet):
             )
 
         password = generate_password()
-        handler = self.hs.get_handlers().registration_handler
         admin = (params['admin'] == 'admin')
-        user_id, token = yield handler.register(
+        user_id, token = yield self.registration_handler.register(
             localpart=params['user'],
             password=password,
             admin=admin,
@@ -307,31 +301,22 @@ class WatchaRegisterRestServlet(RestServlet):
 
         user = UserID.from_string(user_id)
         requester = create_requester(user_id)
-        self.hs.profile_handler.set_displayname(user, requester, params['full_name'], by_admin=True)
+        self.hs.profile_handler.set_displayname(user, requester,
+                                                params['full_name'], by_admin=True)
 
         yield self.hs.auth_handler.set_email(user_id, params['email'])
 
         display_name = yield self.hs.profile_handler.get_displayname(user)
 
-        setupToken = base64.b64encode('{"user":"' + user_id + '","pw":"' + password + '"}')
-
-        server = self.hs.config.public_baseurl.rstrip('/')
-        subject = u'''Invitation à l'espace de travail sécurisé Watcha {server}'''.format(server=server)
-
-        fields = {
-                'title': subject,
-                'full_name': display_name,
-                'user_login': user.localpart,
-                'setupToken': setupToken,
-                'server': server,
-        }
-
         send_mail(
             self.hs.config,
             params['email'],
-            subject=subject,
             template_name='new_account',
-            fields=fields,
+            fields={
+                'full_name': display_name,
+                'user_login': user.localpart,
+                'setupToken': compute_token(user_id, password),
+            }
         )
 
         defer.returnValue((200, { "user_id": user_id }))
@@ -377,25 +362,15 @@ class WatchaResetPasswordRestServlet(RestServlet):
         except:
             display_name = user.localpart
 
-        setupToken = base64.b64encode('{"user":"' + user_id + '","pw":"' + password + '"}')
-
-        server = self.hs.config.public_baseurl.rstrip('/')
-        subject = u'''Nouveau mot de passe pour l'espace de travail sécurisé Watcha {server}'''.format(server=server)
-
-        fields = {
-                'title': subject,
-                'full_name': display_name,
-                'user_login': user.localpart,
-                'setupToken': setupToken,
-                'server': server,
-        }
-
         send_mail(
             self.hs.config,
             user_info['email'],
-            subject=subject,
             template_name='reset_password',
-            fields=fields,
+            fields={
+                'full_name': display_name,
+                'user_login': user.localpart,
+                'oken': compute_token(user_id, password),
+            }
         )
 
         defer.returnValue((200, {}))

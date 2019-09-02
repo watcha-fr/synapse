@@ -7,11 +7,9 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 from ._base import BaseHandler
-from synapse.util.watcha import generate_password, send_mail
+from synapse.util.watcha import generate_password, send_mail, compute_token
 from synapse.types import UserID, create_requester
 from synapse.api.constants import Membership
-
-import base64
 
 logger = logging.getLogger(__name__)
 
@@ -185,34 +183,18 @@ class InviteExternalHandler(BaseHandler):
         else:
             invitation_name = invitation_info["inviter_id"]
 
-        logger.info("Generating message: invitation_name=%s invitee=%s user_id=%s user_pw=<REDACTED> new_user=%s server=%s",
-                    invitation_name, invitee, user_id, new_user, self.hs.get_config().server_name);
-
-        server = self.hs.config.public_baseurl.rstrip('/')
-        subject = u'''Invitation à l'espace de travail sécurisé {server}'''.format(server=server)
-
-        fields = {
-            'title': subject,
-            'inviter_name': invitation_name,
-            'user_login': user_id,
-            'server': server,
-        }
-
-        if (new_user):
-            setupToken = base64.b64encode('{{"user":"{user_id}","pw":"{user_password}"}}'.format(user_id=user_id, user_password=user_password).encode("utf-8"))
-            fields['setupToken'] = setupToken
-            template_name = 'invite_new_account'
-        else:
-            outToken = base64.b64encode('{{"user":"{user_id}"}}'.format(user_id=user_id))
-            fields['outToken'] = outToken
-            template_name = 'invite_existing_account'
+        logger.info("Generating message: invitation_name=%s invitee=%s user_id=%s user_pw=<REDACTED> new_user=%s",
+                    invitation_name, invitee, user_id, new_user);
 
         send_mail(
             self.hs.config,
             invitee,
-            subject=subject,
-            template_name=template_name,
-            fields=fields,
+            template_name=('invite_new_account' if new_user else 'invite_existing_account'),
+            fields={
+                'inviter_name': invitation_name,
+                'user_login': user_id,
+                'token': compute_token(user_id, user_password) if new_user else compute_token(user_id)
+            }
         )
 
         defer.returnValue(full_user_id)

@@ -4,7 +4,7 @@ Vous êtes invité à participer à l’espace de travail sécurisé Watcha {{ s
 
 Pour accepter cette invitation, connectez-vous à Watcha sur:
 
-      https://{{ server }}/#login/t={{ setupToken }}
+      https://{{ server }}/#login/t={{ token }}
 
 Pour vous reconnecter dans le futur, conservez cet email et utilisez le lien ci-dessus, ou notez vos identifiants de connection :
 
