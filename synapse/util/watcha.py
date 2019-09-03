@@ -83,15 +83,25 @@ def send_registration_email(config, recipient, template_name, token,
         logger.error("Cannot send email, SMTP host not defined in config")
         return
 
-    if not config.email_riot_base_url:
-        logger.error("Cannot send email, riot_base_url not defined in config")
-        return
-
+    # This would be the correct way...
+    #if not config.email_riot_base_url:
+    #    logger.error("Cannot send email, riot_base_url not defined in config")
+    #    return
+    #base_url = config.email_riot_base_url
+    #
+    #... but the email: riot_base_url is only loaded if notifs are enabled !!
+    # so we don't have access to it.
+    # Instead, use the server_name. This will work execpt for polypus,
+    # where server_name is incorrect (and can't be changed after install)
+    base_url = "http://" + config.server_name
+    if 'polypus' in base_url:
+        base_url = base_url.replace('-core', '')
+        
     fields = dict(additional_fields)
     fields['user_login'] = user_login
     fields['server'] = config.server_name
-    fields['login_url'] = "%s/#/login/t=%s" % (config.email_riot_base_url, token)
-    fields['setup_account_url'] = "%s/setup-account.html?t=%s" % (config.email_riot_base_url, token)
+    fields['login_url'] = "%s/#/login/t=%s" % (base_url, token)
+    fields['setup_account_url'] = "%s/setup-account.html?t=%s" % (base_url, token)
     
     # To avoid issues with setuptools/distutil,
     # (not easy to get the 'res/templates' folder to be included in the whl file...)
