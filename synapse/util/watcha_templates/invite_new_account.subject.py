@@ -1,1 +1,1 @@
-Invitation à l'espace de travail sécurisé {server}
+Invitation à l'espace de travail sécurisé {{ server }}

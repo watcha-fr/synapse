@@ -4,7 +4,7 @@ Bonjour,
 
 Pour accepter cette invitation, connectez-vous à Watcha sur:
 
-      https://{{ server }}/#login/t={{ token }}
+      {{ login_url }}
 
 Pour vous reconnecter dans le futur, conservez cet email et utilisez le lien ci-dessus, ou notez vos identifiants de connection :
 

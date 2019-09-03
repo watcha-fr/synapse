@@ -7,7 +7,7 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 from ._base import BaseHandler
-from synapse.util.watcha import generate_password, send_mail, compute_token
+from synapse.util.watcha import generate_password, send_registration_email, compute_registration_token
 from synapse.types import UserID, create_requester
 from synapse.api.constants import Membership
 
@@ -122,10 +122,6 @@ class InviteExternalHandler(BaseHandler):
             logger.info("invited user %s is not in the DB. Creating user (id is %s), inviting to room and sending invitation email.",
                         invitee, user_id)
 
-            # note about server names:
-            # self.hs.hostname is self.hs.get_config().server_name - the core's server
-            # self.hs.get_config().public_baseurl.rstrip('/') is the public URL - riot's
-
             full_user_id = UserID(user_id, self.hs.hostname).to_string()
             user_password = generate_password()
 
@@ -186,15 +182,20 @@ class InviteExternalHandler(BaseHandler):
         logger.info("Generating message: invitation_name=%s invitee=%s user_id=%s user_pw=<REDACTED> new_user=%s",
                     invitation_name, invitee, user_id, new_user);
 
-        send_mail(
+        if new_user:
+            token = compute_registration_token(user_id, user_password)
+            template_name = 'invite_new_account'
+        else:
+            token = compute_registration_token(user_id)
+            template_name = 'invite_existing_account'
+            
+        send_registration_email(
             self.hs.config,
             invitee,
-            template_name=('invite_new_account' if new_user else 'invite_existing_account'),
-            fields={
-                'inviter_name': invitation_name,
-                'user_login': user_id,
-                'token': compute_token(user_id, user_password) if new_user else compute_token(user_id)
-            }
+            template_name=template_name,
+            token=token,
+            user_login=user_id,
+            inviter_name=invitation_name
         )
 
         defer.returnValue(full_user_id)

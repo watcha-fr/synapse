@@ -16,7 +16,7 @@ from twisted.internet import defer
 from synapse.api.errors import AuthError, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.rest.client.v2_alpha._base import client_patterns
-from synapse.util.watcha import generate_password, send_mail, compute_token
+from synapse.util.watcha import generate_password, send_registration_email, compute_registration_token
 from synapse.types import UserID, create_requester
 from synapse.api.constants import Membership
 
@@ -308,15 +308,13 @@ class WatchaRegisterRestServlet(RestServlet):
 
         display_name = yield self.hs.profile_handler.get_displayname(user)
 
-        send_mail(
+        send_registration_email(
             self.hs.config,
             params['email'],
             template_name='new_account',
-            fields={
-                'full_name': display_name,
-                'user_login': user.localpart,
-                'setupToken': compute_token(user_id, password),
-            }
+            token=compute_registration_token(user_id, password),
+            user_login=user.localpart,
+            full_name=display_name
         )
 
         defer.returnValue((200, { "user_id": user_id }))
@@ -362,15 +360,13 @@ class WatchaResetPasswordRestServlet(RestServlet):
         except:
             display_name = user.localpart
 
-        send_mail(
+        send_registration_email(
             self.hs.config,
             user_info['email'],
             template_name='reset_password',
-            fields={
-                'full_name': display_name,
-                'user_login': user.localpart,
-                'oken': compute_token(user_id, password),
-            }
+            token=compute_registration_token(user_id, password),
+            user_login=user.localpart,
+            full_name=display_name
         )
 
         defer.returnValue((200, {}))

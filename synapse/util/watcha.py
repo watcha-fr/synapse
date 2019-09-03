@@ -53,22 +53,26 @@ def generate_password():
     return password
 
 
-def compute_token(user, password=None):
-    '''Creates a (weakly encrypted) token that can be passed in a URL or in a JSON for temporaly login
+def compute_registration_token(user, password=None):
+    '''Returns a (weakly encrypted) token that can be passed in a URL or in a JSON for temporaly login
     This cannot be strongly encrypted, because it will be decoded in Riot (in javascript).
     '''
     if password is None:
-        json = '{{"user":"{user}"}}'.format(user_id=user_id)
+        json = '{{"user":"{user}"}}'.format(user=user)
     else:
         json = '{{"user":"{user}","pw":"{password}"}}'.format(user=user,
                                                               password=password)
-    return base64.b64encode(json.encode("utf-8"))                                
+    return base64.b64encode(json.encode("utf-8")).decode("ascii")
     
 
-def send_mail(config, recipient, template_name, fields):
+def send_registration_email(config, recipient, template_name, token,
+                            user_login, **additional_fields):
     '''
+    Sends email related to user registration (invitation, reset password...)
 
-    The 'server' and 'title' variables can also used in the template. The 'title' will be created from the subject.
+    Beside the "additional_fields", the 'user_login', 'server', 'title', 'login_url', 
+    and 'setup_account_url' variables  also used in the template.
+    The 'title' will be created from the subject.
 
     This method should only be used in a Matrix APIs,
     i.e. called in the code of an HTTP end point, as it raises a SynapseError on error,
@@ -79,31 +83,34 @@ def send_mail(config, recipient, template_name, fields):
         logger.error("Cannot send email, SMTP host not defined in config")
         return
 
+    if not config.email_riot_base_url:
+        logger.error("Cannot send email, riot_base_url not defined in config")
+        return
+
+    fields = dict(additional_fields)
+    fields['user_login'] = user_login
+    fields['server'] = config.server_name
+    fields['login_url'] = "%s/#/login/t=%s" % (config.email_riot_base_url, token)
+    fields['setup_account_url'] = "%s/setup-account.html?t=%s" % (config.email_riot_base_url, token)
+    
+    # To avoid issues with setuptools/distutil,
+    # (not easy to get the 'res/templates' folder to be included in the whl file...)
+    # we ship the templates as .py files, and put them in the code tree itself.
+    jinjaenv = Environment(loader=FileSystemLoader(TEMPLATE_DIR))    
+    subject = jinjaenv.get_template(template_name + '.subject.py').render(fields)
+    fields['title'] = subject
+
     message = MIMEMultipart('alternative')
     message['From'] = config.email_notif_from
     message['To'] = recipient
 
     # Set the parameter maxlinelen https://docs.python.org/2.7/library/email.header.html
     # setting a high-enough value helps avoid glitches in the subject line (space added every 40-50 characters),
-    # when executed with Python 2.7.
-    #
-    # Semi-relevant online discussions:
+    # when executed with Python 2.7. Semi-relevant online discussions:
     # https://stackoverflow.com/questions/25671608/python-mail-puts-unaccounted-space-in-outlook-subject-line
     # https://bugs.python.org/issue1974
-
-    # To avoid issues with setuptools/distutil,
-    # (not easy to get the 'res/templates' folder to be included in the whl file...)
-    # we ship the templates as .py files, and put them in the code tree itself.
-    jinjaenv = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
-    
-    subject = jinjaenv.get_template(template_name + '.subject.py').render(fields)
     message['Subject'] = Header(subject, 'utf-8', 200)
     
-    fields['title'] = subject
-    # FIXME: we're using the public_baseurl incorrectly here.
-    # it should be server_name and/or riot_base (from the email settings)
-    fields['server'] = config.public_baseurl.rstrip('/')
-
     for mimetype, extension in {'plain': 'txt',
                                 'html': 'html'}.items():
         template_file_name = template_name + '.' + extension + '.py'

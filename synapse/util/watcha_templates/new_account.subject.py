@@ -1,1 +1,1 @@
-Invitation à l'espace de travail sécurisé Watcha {server}
+Invitation à l'espace de travail sécurisé Watcha {{ server }}

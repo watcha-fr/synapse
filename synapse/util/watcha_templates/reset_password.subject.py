@@ -1,1 +1,1 @@
-Nouveau mot de passe pour l'espace de travail sécurisé Watcha {server}
+Nouveau mot de passe pour l'espace de travail sécurisé Watcha {{ server }}
