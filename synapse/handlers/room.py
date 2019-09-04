@@ -621,7 +621,7 @@ class RoomCreationHandler(BaseHandler):
             )
 
         for invite_3pid in invite_3pid_list:
-
+            # ADDED BY WATCHA
             logger.info("invitation on creation: inviter id=%s, device_id=%s",
                 requester.user, requester.device_id)
 
@@ -640,7 +640,7 @@ class RoomCreationHandler(BaseHandler):
             if is_direct:
                 content["is_direct"] = is_direct
 
-            yield room_member_handler.update_membership(
+            yield self.room_member_handler.update_membership(
                 requester,
                 UserID.from_string(invite_3pid["user_id"]),
                 room_id,
@@ -648,6 +648,7 @@ class RoomCreationHandler(BaseHandler):
                 ratelimit=False,
                 content=content,
             )
+            # END ADDED BY WATCHA
 
             """ WATCHA DISABLED
             id_server = invite_3pid["id_server"]
