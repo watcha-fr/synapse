@@ -63,14 +63,14 @@ def compute_registration_token(user, password=None):
         json = '{{"user":"{user}","pw":"{password}"}}'.format(user=user,
                                                               password=password)
     return base64.b64encode(json.encode("utf-8")).decode("ascii")
-    
+
 
 def send_registration_email(config, recipient, template_name, token,
                             user_login, **additional_fields):
     '''
     Sends email related to user registration (invitation, reset password...)
 
-    Beside the "additional_fields", the 'user_login', 'server', 'title', 'login_url', 
+    Beside the "additional_fields", the 'user_login', 'server', 'title', 'login_url',
     and 'setup_account_url' variables  also used in the template.
     The 'title' will be created from the subject.
 
@@ -93,20 +93,20 @@ def send_registration_email(config, recipient, template_name, token,
     # so we don't have access to it.
     # Instead, use the server_name. This will work execpt for polypus,
     # where server_name is incorrect (and can't be changed after install)
-    base_url = "http://" + config.server_name
+    base_url = "https://" + config.server_name
     if 'polypus' in base_url:
         base_url = base_url.replace('-core', '')
-        
+
     fields = dict(additional_fields)
     fields['user_login'] = user_login
     fields['server'] = config.server_name
     fields['login_url'] = "%s/#/login/t=%s" % (base_url, token)
     fields['setup_account_url'] = "%s/setup-account.html?t=%s" % (base_url, token)
-    
+
     # To avoid issues with setuptools/distutil,
     # (not easy to get the 'res/templates' folder to be included in the whl file...)
     # we ship the templates as .py files, and put them in the code tree itself.
-    jinjaenv = Environment(loader=FileSystemLoader(TEMPLATE_DIR))    
+    jinjaenv = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
     subject = jinjaenv.get_template(template_name + '.subject.py').render(fields)
     fields['title'] = subject
 
@@ -120,7 +120,7 @@ def send_registration_email(config, recipient, template_name, token,
     # https://stackoverflow.com/questions/25671608/python-mail-puts-unaccounted-space-in-outlook-subject-line
     # https://bugs.python.org/issue1974
     message['Subject'] = Header(subject, 'utf-8', 200)
-    
+
     for mimetype, extension in {'plain': 'txt',
                                 'html': 'html'}.items():
         template_file_name = template_name + '.' + extension + '.py'
