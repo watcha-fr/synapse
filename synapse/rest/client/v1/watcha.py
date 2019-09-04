@@ -40,12 +40,12 @@ def _decode_share_secret_parameters(config, parameter_names, parameter_json):
     got_mac = str(parameter_json["mac"])
 
     want_mac = hmac.new(
-        key=config.registration_shared_secret,
+        key=config.registration_shared_secret.encode('utf-8'),
         digestmod=sha1,
     )
     for parameter_name in parameter_names:
-        want_mac.update(repr(parameters[parameter_name]))
-        want_mac.update("\x00")
+        want_mac.update(repr(parameters[parameter_name]).encode('utf-8'))
+        want_mac.update(b"\x00")
     if not compare_digest(want_mac.hexdigest(), got_mac):
         logger.error("Failed to decode HMAC for parameters names: " +
                      repr(parameter_names) +
