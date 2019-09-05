@@ -131,7 +131,7 @@ def send_registration_email(config, recipient, template_name, token,
     # message['Reply-To'] = ...
     #logger.info(message.as_string())
 
-    logger.info("Sending email to %s through host %s...", recipient, config.email_smtp_host)
+    logger.info("Sending email to '%s' through host %s...", recipient, config.email_smtp_host)
     connection = None
     try:
         connection = SMTP(config.email_smtp_host,
@@ -145,10 +145,10 @@ def send_registration_email(config, recipient, template_name, token,
         connection.sendmail(config.email_notif_from, [recipient], message.as_string())
         logger.info("...email sent to %s (subject was: %s)", recipient, subject)
     except Exception as exc:
-        error = str(exc)
-        logger.error("...failed to send email: %s", error )
+        message = "failed to send email: " + str(exc)
+        logger.exception("..." + message)
         raise SynapseError(
-            403, "Failed to send email: " + repr(error),
+            403, message,
         )
     finally:
         if connection:
