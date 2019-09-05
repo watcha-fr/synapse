@@ -288,9 +288,22 @@ class WatchaRegisterRestServlet(RestServlet):
 
         if params['user'].lower() != params['user']:
             raise SynapseError(
-                500, "user name must be lowercase",
+                500, "User name must be lowercase",
             )
 
+        if not params['email'].strip():
+            # the admin seems to have a bug and send empty email adresses sometimes.
+            # (never bad to be resilient in any case)
+            raise SynapseError(
+                500, "Email address cannot be empty",
+            )
+            
+        full_user_id = yield self.hs.auth_handler.find_user_id_by_email(params['email'])
+        if full_user_id:
+            raise SynapseError(
+                500, "A user with this email address already exists. Cannot create a new one.",
+            )
+            
         password = generate_password()
         admin = (params['admin'] == 'admin')
         user_id, token = yield self.registration_handler.register(
@@ -344,10 +357,9 @@ class WatchaResetPasswordRestServlet(RestServlet):
         user = UserID.from_string(user_id)
 
         user_info = yield self.hs.get_datastore().get_user_by_id(user_id)
-        # do not update password if email is not set
         if not user_info['email']:
             raise SynapseError(403,
-                               "email not defined for this user")
+                               "Email is not defined for this user, cannot reset password")
 
         requester = create_requester(user_id)
         yield self.hs.get_set_password_handler().set_password(
