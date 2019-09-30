@@ -729,9 +729,12 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
                         {
                             "user_id": <user_id>,
                             "display_name": <display_name>,
-                            "avatar_url": <avatar_url>,
+                            "avatar_url": <avatar_url>
+                            /* added for Watcha
+                            ,
                             "is_partner": 1 or 0
-                            "presence": depends on search_term
+                            "presence": "invited", "offline" or "online"
+                            */
                         }
                     ]
                 }
@@ -819,32 +822,25 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
             # received an invitation from the users doing the query.
             # in this query, UNION and UNION ALL give the same results
 
-            if (search_term is not None):
-                where_clause = """ AND (u.name LIKE '%%%s%%' OR
-                    display_name LIKE '%%%s%%' OR
-                    u.email LIKE '%%%s%%')
-                """ % (search_term, search_term, search_term)
-            else:
-                where_clause = ""
+            logger.info("Searching with search term: %s" % repr(search_term))
+            where_clause = """ AND (u.name LIKE ? OR display_name LIKE ? OR u.email LIKE ? )"""
 
             sql = """
                 SELECT u.name as user_id, u.is_active, u.is_partner, d.display_name, d.avatar_url, p.state as presence
                 FROM users AS u
                 LEFT OUTER JOIN user_directory AS d ON d.user_id = u.name
                 LEFT OUTER JOIN presence_stream AS p ON p.user_id = u.name
-                WHERE u.is_partner = 0 AND u.is_active = 1%s
+                WHERE u.is_partner = 0 AND u.is_active = 1 %s
                 UNION ALL
                 SELECT u.name as user_id, u.is_active, u.is_partner, d.display_name, d.avatar_url, coalesce(p.state, "invited") as presence
                 FROM users AS u
                 INNER JOIN partners_invited_by AS pib ON pib.partner = u.name AND pib.invited_by = ?
                 LEFT OUTER JOIN user_directory AS d ON d.user_id = u.name
                 LEFT OUTER JOIN presence_stream AS p ON p.user_id = u.name
-                WHERE u.is_partner = 1 AND u.is_active = 1%s
+                WHERE u.is_partner = 1 AND u.is_active = 1 %s
             """ % (where_clause, where_clause)
-
-            logger.info(sql)
-            args = (user_id,)
-
+            args = [  '%' + search_term + '%' ] * 3 + [ user_id ] + [  '%' + search_term + '%' ] * 3
+            logger.debug(sql)
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")

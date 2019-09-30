@@ -46,13 +46,17 @@ class UserDirectorySearchRestServlet(RestServlet):
             dict of the form::
 
                 {
+                    "limited": <bool>,  # whether there were more results or not
                     "results": [  # Ordered by best match first
                         {
                             "user_id": <user_id>,
                             "display_name": <display_name>,
-                            "avatar_url": <avatar_url>,
+                            "avatar_url": <avatar_url>
+                            /* added for Watcha
+                            ,
                             "is_partner": 1 or 0
                             "presence": "invited", "offline" or "online"
+                            */
                         }
                     ]
                 }
@@ -69,19 +73,12 @@ class UserDirectorySearchRestServlet(RestServlet):
         body = parse_json_object_from_request(request)
 
         limit = body.get("limit", 10)
-        limit = min(limit, 50)
+        # limit = min(limit, 50) Commented for watcha: no limit :)
 
         try:
-            # Modified for Watcha...
-            body = parse_json_object_from_request(request)
-            limit = body.get("limit", 10)
-            #limit = min(limit, 50) # upper bound for the number of results
-            search_term = body.get("search_term", "")
-            if search_term == "":
-                search_term = None
-        except:
-            limit = None
-            search_term = None
+            search_term = body["search_term"]
+        except Exception:
+            raise SynapseError(400, "`search_term` is required field")
 
         results = yield self.user_directory_handler.search_users(
             user_id, search_term, limit,

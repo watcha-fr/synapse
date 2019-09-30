@@ -78,6 +78,11 @@ class UserDirectoryHandler(StateDeltasHandler):
                             "user_id": <user_id>,
                             "display_name": <display_name>,
                             "avatar_url": <avatar_url>
+                            /* added for Watcha
+                            ,
+                            "is_partner": 1 or 0
+                            "presence": "invited", "offline" or "online"
+                            */
                         }
                     ]
                 }
