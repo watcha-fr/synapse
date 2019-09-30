@@ -755,7 +755,7 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
                 )
             """
 
-        if isinstance(self.database_engine, PostgresEngine) and search_term is not None:
+        if isinstance(self.database_engine, PostgresEngine):
             full_query, exact_query, prefix_query = _parse_query_postgres(search_term)
 
             # We order by rank and then if they have profile info
@@ -796,7 +796,8 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
                 where_clause,
             )
             args = join_args + (full_query, exact_query, prefix_query, limit + 1)
-        elif isinstance(self.database_engine, Sqlite3Engine) and False: # disabled for watcha
+        elif isinstance(self.database_engine, Sqlite3Engine):
+            ''' DISABLED FOR WATCHA - replaced by the code below
             search_query = _parse_query_sqlite(search_term)
 
             sql = """
@@ -815,9 +816,9 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
                 where_clause,
             )
             args = join_args + (search_query, limit + 1)
-
-        elif isinstance(self.database_engine, Sqlite3Engine):
-            # inserted for watcha
+            END DISABLED FOR WATCHA '''
+            # INSERTED FOR WATCHA
+            # TODO: do the same for Postgres !
             # list the internal users, as well as the partners that have
             # received an invitation from the users doing the query.
             # in this query, UNION and UNION ALL give the same results
@@ -849,10 +850,7 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
             "search_user_dir", self.cursor_to_dict, sql, *args
         )
 
-        if search_term is not None:
-            limited = len(results) > limit
-        else:
-            limited = False
+        limited = len(results) > limit
 
         defer.returnValue({"limited": limited, "results": results})
 
