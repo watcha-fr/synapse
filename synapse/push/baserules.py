@@ -370,8 +370,13 @@ BASE_APPEND_UNDERRIDE_RULES = [
                 '_id': '_message',
             }
         ],
+        #added for watcha so room with no push_rules notification will be notified anyway
         'actions': [
-            'notify', {
+            'notify',             
+            {
+                'set_tweak': 'sound',
+                'value': 'default'
+            }, {
                 'set_tweak': 'highlight',
                 'value': False
             }
