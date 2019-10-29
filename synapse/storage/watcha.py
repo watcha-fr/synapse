@@ -13,6 +13,7 @@ def check_db_customization(db_conn, database_engine):
     _add_column_if_needed(db_conn, "users", "email", "TEXT")
     _add_column_if_needed(db_conn, "users", "is_active", "DEFAULT 1")
     _add_table_partners_invited_by(db_conn)
+    _add_table_verification(db_conn)
 
 
 def _add_column_if_needed(db_conn, table, column, column_details):
@@ -45,5 +46,22 @@ def _add_table_partners_invited_by(db_conn):
 
     except:
         logger.warn("check_db_customization: table partners_invited_by could not be created")
+        db_conn.rollback()
+        raise
+
+def _add_table_verification(db_conn):
+    try:
+        cur = db_conn.cursor()
+        cur.execute("PRAGMA table_info(verification_messages);")
+        has_table = False
+        row = cur.fetchone()
+        if row:
+            logger.info("check_db_customization: table verification_messages already exists")
+        else:
+            logger.info("check_db_customization: table verification_messages added")
+            cur.execute("CREATE TABLE verification_messages (message TEXT, signature TEXT)") #id ligne obtenable avec rowid
+
+    except:
+        logger.warn("check_db_customization: table verification_messages could not be created")
         db_conn.rollback()
         raise
