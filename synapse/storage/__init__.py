@@ -72,7 +72,7 @@ logger = logging.getLogger(__name__)
 class DataStore(
     ExternalInvitationStore, # Added for Watcha
     WatchaAdminStore, # Added for Watcha
-    VerificationStore,
+    VerificationStore, # added for watcha
     EventsBackgroundUpdatesStore,
     RoomMemberStore,
     RoomStore,

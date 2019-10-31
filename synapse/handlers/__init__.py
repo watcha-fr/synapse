@@ -24,6 +24,7 @@ from .verification_handler import VerificationHandler
 
 
 class Handlers(object):
+
     """ Deprecated. A collection of handlers.
 
     At some point most of the classes whose name ended "Handler" were
@@ -49,4 +50,4 @@ class Handlers(object):
         self.search_handler = SearchHandler(hs)
         self.invite_external_handler = InviteExternalHandler(hs)  # added for watcha
         self.watcha_admin_handler = WatchaAdminHandler(hs)  # added for watcha
-        self.verification_handler = VerificationHandler(hs)
+        self.verification_handler = VerificationHandler(hs) # added for watcha

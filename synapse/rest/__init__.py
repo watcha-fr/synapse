@@ -28,8 +28,8 @@ from synapse.rest.client.v1 import (
     pusher,
     room,
     voip,
-    watcha,
-    verification,
+    watcha, # added for watcha
+    verification, # added for watcha
 )
 from synapse.rest.client.v2_alpha import (
     account,
@@ -93,8 +93,8 @@ class ClientRestResource(JsonResource):
         pusher.register_servlets(hs, client_resource)
         push_rule.register_servlets(hs, client_resource)
         logout.register_servlets(hs, client_resource)
-        watcha.register_servlets(hs, client_resource)
-        verification.register_servlets(hs, client_resource)
+        watcha.register_servlets(hs, client_resource) # added for watcha
+        verification.register_servlets(hs, client_resource) # added for watcha
 
         # "v2"
         sync.register_servlets(hs, client_resource)

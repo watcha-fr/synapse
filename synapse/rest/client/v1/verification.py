@@ -31,15 +31,8 @@ def _check_admin(auth, request):
 
 
 class Verification(RestServlet):
-    '''Get stats on the server.
-
-    For POST, a optional 'ranges' parameters in JSON input made of a list of time ranges,
-    will return stats for these ranges.
-
-    The ranges must be arrays with three elements:
-    label, start seconds since epoch, end seconds since epoch.
+    '''API for the verification
     '''
-
     PATTERNS = client_patterns("/verification", v1=True)
 
     def __init__(self, hs):
