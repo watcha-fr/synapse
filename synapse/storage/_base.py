@@ -1641,6 +1641,23 @@ class SQLBaseStore(object):
         return self.database_engine.server_version
 
 
+
+def _caller_name():
+    '''returns the name of the function calling the one calling this one'''
+    try:
+        return inspect.stack()[2][3]
+    except IndexError:
+        # seems to happen (related to iPython install ?)
+        return "<unknown function>"
+
+class WatchaSQLBaseStore(SQLBaseStore):
+    ''' Small helper to avoid code duplication... not great'''
+    def _execute_sql(self, sql, *args):
+        return self._execute(
+            _caller_name(),
+            None, sql, *args)
+
+
 class _RollbackButIsFineException(Exception):
     """ This exception is used to rollback a transaction without implying
     something went wrong.

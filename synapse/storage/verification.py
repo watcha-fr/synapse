@@ -7,7 +7,7 @@ import inspect
 
 from twisted.internet import defer
 
-from ._base import SQLBaseStore
+from ._base import WatchaSQLBaseStore
 
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 from synapse.api.constants import EventTypes, JoinRules
@@ -15,21 +15,7 @@ from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id, get_localpart_from_id
 
 
-def _caller_name():
-    '''returns the name of the function calling the one calling this one'''
-    try:
-        return inspect.stack()[2][3]
-    except IndexError:
-        # seems to happen (related to iPython install ?)
-        return "<unknown function>"
-
-
-class VerificationStore(SQLBaseStore):
-
-    def _execute_sql(self, sql, *args):
-        return self._execute(
-            _caller_name(),
-            None, sql, *args)
+class VerificationStore(WatchaSQLBaseStore):
 
     @defer.inlineCallbacks
     def verification_history(self):
