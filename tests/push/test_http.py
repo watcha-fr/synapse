@@ -119,7 +119,10 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # One push was attempted to be sent -- it'll be the first message
         self.assertEqual(len(self.push_attempts), 1)
-        self.assertEqual(self.push_attempts[0][1], "example.com")
+        # Modified for Watcha: hardcoded in synapse/push/pusherpool.py,
+        # because we need different AppIds for Android and iOS and the code doesn't support it
+        self.assertEqual(self.push_attempts[0][1],
+                         "http://127.0.0.1:5000/_matrix/push/v1/notify")
         self.assertEqual(
             self.push_attempts[0][2]["notification"]["content"]["body"], "Hi!"
         )
@@ -138,7 +141,9 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Now it'll try and send the second push message, which will be the second one
         self.assertEqual(len(self.push_attempts), 2)
-        self.assertEqual(self.push_attempts[1][1], "example.com")
+        # Modified for Watcha: see above
+        self.assertEqual(self.push_attempts[1][1],
+                         "http://127.0.0.1:5000/_matrix/push/v1/notify")
         self.assertEqual(
             self.push_attempts[1][2]["notification"]["content"]["body"], "There!"
         )
