@@ -33,7 +33,7 @@ def _check_admin(auth, request):
 class Verification(RestServlet):
     '''API for the verification
     '''
-    PATTERNS = client_patterns("/verification", v1=True)
+    PATTERNS = client_patterns("/verification(/(?P<nline>[0-9]+))?$", v1=True)
 
     def __init__(self, hs):
         super(Verification, self).__init__()
@@ -43,13 +43,13 @@ class Verification(RestServlet):
         self.handlers = hs.get_handlers()
 
     @defer.inlineCallbacks
-    def on_GET(self, request):
+    def on_GET(self, request, nline):
         # yield _check_admin(self.auth, request)
-        ret = yield self.handlers.verification_handler.verification_history()
+        ret = yield self.handlers.verification_handler.verification_history(nline)
         defer.returnValue((200, ret))
 
     @defer.inlineCallbacks
-    def on_POST(self, request):
+    def on_POST(self, request, nline):
         parameter_json = parse_json_object_from_request(request)
 
         ret = yield self.handlers.verification_handler.post_message(parameter_json)

@@ -9,8 +9,8 @@ logger = logging.getLogger(__name__)
 
 class VerificationHandler(BaseHandler):
     @defer.inlineCallbacks
-    def verification_history(self):
-        result = yield self.store.verification_history()
+    def verification_history(self, n):
+        result = yield self.store.verification_history(n)
         defer.returnValue(result)
 
     @defer.inlineCallbacks

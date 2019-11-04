@@ -21,6 +21,8 @@ import sys
 import threading
 import time
 
+import inspect
+
 from six import PY2, iteritems, iterkeys, itervalues
 from six.moves import builtins, intern, range
 

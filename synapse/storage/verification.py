@@ -18,12 +18,12 @@ from synapse.types import get_domain_from_id, get_localpart_from_id
 class VerificationStore(WatchaSQLBaseStore):
 
     @defer.inlineCallbacks
-    def verification_history(self):
+    def verification_history(self, n):
         now = int(round(time.time() * 1000))
 
         verification_messages = yield self._execute_sql("""
         SELECT rowid, message, signature FROM verification_messages
-        ORDER BY rowid ASC;
+        WHERE rowid >= """ + n + """ ORDER BY rowid ASC;
         """)
 
         result = yield (verification_messages)
