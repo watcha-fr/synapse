@@ -10,6 +10,8 @@ logger = logging.getLogger(__name__)
 class VerificationHandler(BaseHandler):
     @defer.inlineCallbacks
     def verification_history(self, n):
+        if not(type(n)==str):
+            n = "0"
         result = yield self.store.verification_history(n)
         defer.returnValue(result)
 
