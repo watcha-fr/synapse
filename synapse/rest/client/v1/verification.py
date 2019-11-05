@@ -49,10 +49,12 @@ class Verification(RestServlet):
         defer.returnValue((200, ret))
 
     @defer.inlineCallbacks
-    def on_POST(self, request, nline):
+    def on_POST(self, request, nline, hs):
         parameter_json = parse_json_object_from_request(request)
+        
 
-        ret = yield self.handlers.verification_handler.post_message(parameter_json)
+
+        ret = yield self.handlers.verification_handler.post_message(parameter_json, hs)
         defer.returnValue((200, ret))
 
 
