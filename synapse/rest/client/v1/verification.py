@@ -22,14 +22,6 @@ from synapse.api.constants import Membership
 logger = logging.getLogger(__name__)
 
 
-@defer.inlineCallbacks
-def _check_admin(auth, request):
-    requester = yield auth.get_user_by_req(request)
-    is_admin = yield auth.is_server_admin(requester.user)
-    if not is_admin:
-        raise AuthError(403, "You are not a server admin")
-
-
 class Verification(RestServlet):
     '''API for the verification
     '''
@@ -50,9 +42,10 @@ class Verification(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, nline):
+        requester = yield self.auth.get_user_by_req(request)
         parameter_json = parse_json_object_from_request(request)
 
-        ret = yield self.handlers.verification_handler.post_message(parameter_json)
+        ret = yield self.handlers.verification_handler.post_message(parameter_json, self.hs, requester)
         defer.returnValue((200, ret))
 
 
