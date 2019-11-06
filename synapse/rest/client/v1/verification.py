@@ -44,7 +44,7 @@ class Verification(RestServlet):
     def on_POST(self, request, nline):
         requester = yield self.auth.get_user_by_req(request)
         parameter_json = parse_json_object_from_request(request)
-
+        
         ret = yield self.handlers.verification_handler.post_message(parameter_json, self.hs, requester)
         defer.returnValue((200, ret))
 

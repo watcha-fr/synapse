@@ -3,6 +3,8 @@ import re
 
 from ._base import BaseHandler
 
+from synapse.types import UserID, create_requester
+
 import logging
 
 logger = logging.getLogger(__name__)
