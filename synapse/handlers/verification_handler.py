@@ -21,7 +21,7 @@ class VerificationHandler(BaseHandler):
     @defer.inlineCallbacks
     def post_message(self, parameter_json, hs, requester):
         if 'message' in parameter_json and 'signature' in parameter_json:
-            regex = re.search("^@[a-z0-9=_\-./]+:[a-zA-Z0-9./_\-]+ \/ [A-Z]+ : (entering)|(verifying) [A-Z]?$", parameter_json["message"])
+            regex = re.search("^@[a-z0-9=_\-./]+:[a-zA-Z0-9./_\-]+ \/ [A-Z]+ : (entering)|(verifying [A-Z]+)$", parameter_json["message"])
 
             if (not(regex)):
                 result = False
