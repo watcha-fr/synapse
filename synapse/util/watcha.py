@@ -90,6 +90,11 @@ def send_registration_email(config, recipient, template_name, token,
     fields = dict(additional_fields)
     fields['user_login'] = user_login
     fields['server'] = config.server_name
+    if config.server_name.contains('polypus-core.watcha.fr'):
+        # legacy... polypus was installed with an incorrect server name, and it can't be changed after install,
+        # so correcting it here... (see also devops.git/prod/install.sh)
+        fields['server'] = 'polypus.watcha.fr'
+        
     fields['login_url'] = "%s/#/login/t=%s" % (config.email_riot_base_url, token)
     fields['setup_account_url'] = "%s/setup-account.html?t=%s" % (config.email_riot_base_url, token)
 
