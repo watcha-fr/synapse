@@ -78,19 +78,10 @@ def send_registration_email(config, recipient, template_name, token,
     i.e. called in the code of an HTTP end point, as it raises a SynapseError on error,
     and such errors are only handled correctly in endpoints (ie. passed back as 403 error)'''
 
-    if not config.email_smtp_host:
-        # (used in tests)
-        logger.error("Cannot send email, SMTP host not defined in config")
-        return
-
-    if not config.email_riot_base_url:
-        logger.error("Cannot send email, riot_base_url not defined in config")
-        return
-
     fields = dict(additional_fields)
     fields['user_login'] = user_login
     fields['server'] = config.server_name
-    if config.server_name.contains('polypus-core.watcha.fr'):
+    if 'polypus-core.watcha.fr' in config.server_name:
         # legacy... polypus was installed with an incorrect server name, and it can't be changed after install,
         # so correcting it here... (see also devops.git/prod/install.sh)
         fields['server'] = 'polypus.watcha.fr'
@@ -125,6 +116,16 @@ def send_registration_email(config, recipient, template_name, token,
     # if needed to customize the reply-to field
     # message['Reply-To'] = ...
     #logger.info(message.as_string())
+
+    
+    if not config.email_smtp_host:
+        # (used in tests.rest.client.test_identity.IdentityTestCase.test_3pid_lookup_disabled: just skip it)
+        logger.error("Cannot send email, SMTP host not defined in config")
+        return
+
+    if not config.email_riot_base_url:
+        logger.error("Cannot send email, riot_base_url not defined in config")
+        return
 
     logger.info("Sending email to '%s' through host %s...", recipient, config.email_smtp_host)
     connection = None
