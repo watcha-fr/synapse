@@ -66,7 +66,7 @@ def compute_registration_token(user, password=None):
 
 
 def send_registration_email(config, recipient, template_name, token,
-                            user_login, **additional_fields):
+                            user_login, customised_message, **additional_fields):
     '''
     Sends email related to user registration (invitation, reset password...)
 
