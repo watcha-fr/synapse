@@ -205,7 +205,11 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 400, channel.result)
 
         res = self.get_displayname()
+        """ change for watcha
+        # fixed the test to work for ExternalUserProfileTestCase
         self.assertEqual(res, "owner")
+        """
+        self.assertEqual(res, synapse.types.UserID.from_string(self.owner).localpart)
 
     def get_displayname(self):
         request, channel = self.make_request(
@@ -215,6 +219,15 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
         return channel.json_body["displayname"]
+
+
+""" insertion for Watcha """
+class ExternalUserProfileTestCase(ProfileTestCase):
+    '''Test for the iOS workaround of not escaping user id when setting profile'''
+    def prepare(self, reactor, clock, hs):
+        self.owner = self.register_user("owner/myemailadress.com", "pass")
+        self.owner_tok = self.login("owner/myemailadress.com", "pass")
+""" end of insertion """
 
 
 class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
