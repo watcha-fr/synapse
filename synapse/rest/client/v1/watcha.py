@@ -327,7 +327,6 @@ class WatchaRegisterRestServlet(RestServlet):
             template_name='new_account',
             token=compute_registration_token(user_id, password),
             user_login=user.localpart,
-            customised_message=params['customised_message'],
             full_name=display_name
         )
 
