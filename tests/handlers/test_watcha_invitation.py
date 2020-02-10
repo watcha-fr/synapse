@@ -1,33 +1,17 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2020 Watcha SAS
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This code is not licensed unless agreed with Watcha SAS.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 
-"""Tests REST events for /profile paths."""
 import json
 
-from mock import Mock
-
-from twisted.internet import defer
-
-import synapse.types
-from synapse.api.errors import AuthError, SynapseError
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, profile, room
 
 from tests import unittest
 
-from ..utils import MockHttpResource, setup_test_homeserver
+from ..utils import setup_test_homeserver
 
 myid = "@1234ABCD:test"
 PATH_PREFIX = "/_matrix/client/r0"
