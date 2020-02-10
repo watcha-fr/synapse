@@ -69,7 +69,7 @@ class InviteExternalHandler(BaseHandler):
         defer.returnValue(result)
 
     # convert an email address into a user_id in a deterministic way
-    def gen_user_id_from_email(
+    def _gen_user_id_from_email(
         self,
         email
     ):
@@ -88,7 +88,7 @@ class InviteExternalHandler(BaseHandler):
         invitee
     ):
 
-        full_user_id = yield self.hs.auth_handler.find_user_id_by_email(invitee)
+        full_user_id = yield self.hs.get_auth_handler().find_user_id_by_email(invitee)
 
         # the user already exists. it is an internal user or an external user.
         if full_user_id:
@@ -96,7 +96,7 @@ class InviteExternalHandler(BaseHandler):
                         invitee, full_user_id, room_id)
 
             user = UserID.from_string(full_user_id)
-            yield self.hs.get_handlers().room_member_handler.update_membership(
+            yield self.hs.get_room_member_handler().update_membership(
                 requester=create_requester(inviter.to_string()),
                 target=user,
                 room_id=room_id,
@@ -109,16 +109,19 @@ class InviteExternalHandler(BaseHandler):
             user_id = user.localpart
             new_user = False
 
+            # TODO: This is probably very wrong !
+            # there is no reason to have a different behaviour for partner ??
+            
             # only send email if that user is external.
             # this restriction can be removed once internal users will also receive notifications from invitations by user ID.
-            is_partner = yield self.hs.auth_handler.is_partner(full_user_id)
+            is_partner = yield self.hs.get_auth_handler().is_partner(full_user_id)
             if not is_partner:
                 logger.info("Invitee is an internal user. Do not send a notification email.")
                 defer.returnValue(full_user_id)
 
         # the user does not exist. we create an account
         else:
-            user_id = self.gen_user_id_from_email(invitee)
+            user_id = self._gen_user_id_from_email(invitee)
             logger.info("invited user %s is not in the DB. Creating user (id is %s), inviting to room and sending invitation email.",
                         invitee, user_id)
 
@@ -136,7 +139,7 @@ class InviteExternalHandler(BaseHandler):
                     make_partner=True,
                 )
 
-                yield self.hs.auth_handler.set_email(full_user_id, invitee)
+                yield self.hs.get_auth_handler().set_email(full_user_id, invitee)
 
                 """
                 # we save the account type
