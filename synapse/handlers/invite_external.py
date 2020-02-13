@@ -15,59 +15,6 @@ logger = logging.getLogger(__name__)
 
 class InviteExternalHandler(BaseHandler):
 
-    # from room_id and user ID, get details about who invites and where.
-    # adapted from synapse/handlers/room_member.py
-    @defer.inlineCallbacks
-    def _get_invitation_info(
-        self,
-        room_id,
-        inviter,
-    ):
-        room_state = yield self.hs.get_state_handler().get_current_state(room_id)
-
-        inviter_display_name = ""
-        inviter_avatar_url = ""
-        member_event = room_state.get((EventTypes.Member, inviter.to_string()))
-        if member_event:
-            inviter_display_name = member_event.content.get("displayname", "")
-            inviter_avatar_url = member_event.content.get("avatar_url", "")
-            logger.debug(u"inviter: display_name=%s avatar_url=%s", inviter_display_name, inviter_avatar_url)
-
-        room_canonical_alias = ""
-        canonical_alias_event = room_state.get((EventTypes.CanonicalAlias, ""))
-        if canonical_alias_event:
-            room_canonical_alias = canonical_alias_event.content.get("alias", "")
-            logger.debug(u"room: canonical_alias=%s", room_canonical_alias)
-
-        room_name = ""
-        room_name_event = room_state.get((EventTypes.Name, ""))
-        if room_name_event:
-            room_name = room_name_event.content.get("name", "")
-            logger.debug(u"room: name=%s", room_name)
-
-        room_join_rules = ""
-        join_rules_event = room_state.get((EventTypes.JoinRules, ""))
-        if join_rules_event:
-            room_join_rules = join_rules_event.content.get("join_rule", "")
-            logger.debug(u"room: join_rules=%s", room_join_rules)
-
-        room_avatar_url = ""
-        room_avatar_event = room_state.get((EventTypes.RoomAvatar, ""))
-        if room_avatar_event:
-            room_avatar_url = room_avatar_event.content.get("url", "")
-
-        result = {
-            "inviter_id": inviter.to_string(),
-            "inviter_display_name":inviter_display_name,
-            "inviter_avatar_url":inviter_avatar_url,
-            "room_canonical_alias":room_canonical_alias,
-            "room_name":room_name,
-            "room_join_rules":room_join_rules,
-            "room_avatar_url":room_avatar_url
-        }
-
-        defer.returnValue(result)
-
     # convert an email address into a user_id in a deterministic way
     def _gen_user_id_from_email(
         self,
@@ -172,18 +119,19 @@ class InviteExternalHandler(BaseHandler):
             email_sent=True
         )
 
-        invitation_info = yield self._get_invitation_info(
-            room_id,
-            inviter
-        )
-
-        if (invitation_info["inviter_display_name"] is not None):
-            invitation_name = u''.join((invitation_info["inviter_display_name"], ' (', invitation_info["inviter_id"], ')'))
-        else:
-            invitation_name = invitation_info["inviter_id"]
+        # TODO: Test why was:
+        #inviter_room_state = yield self.hs.get_state_handler().get_current_state(room_id)
+        #inviter_member_event = inviter_room_state.get((EventTypes.Member, inviter.to_string()))
+        #inviter_display_name = inviter_member_event.content.get("displayname", "") if inviter_member_event else ""
+        # instead of:
+        inviter_display_name = yield self.hs.get_profile_handler().get_displayname(inviter)
+        # which seems to work too..
+        
+        inviter_user_info = yield self.store.get_user_by_id(inviter.to_string())
+        inviter_name = (inviter_display_name + ((' (' + inviter_user_info["email"] + ')') if inviter_user_info["email"] else "")) if inviter_display_name else inviter_user_info["email"]
 
         logger.info("Generating message: invitation_name=%s invitee=%s user_id=%s user_pw=<REDACTED> new_user=%s",
-                    invitation_name, invitee, user_id, new_user);
+                    inviter_name, invitee, user_id, new_user);
 
         if new_user:
             token = compute_registration_token(user_id, user_password)
@@ -198,7 +146,7 @@ class InviteExternalHandler(BaseHandler):
             template_name=template_name,
             token=token,
             user_login=user_id,
-            inviter_name=invitation_name
+            inviter_name=inviter_name
         )
 
         defer.returnValue(full_user_id)

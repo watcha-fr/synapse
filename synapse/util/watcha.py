@@ -71,7 +71,7 @@ def send_registration_email(config, recipient, template_name, token,
     Sends email related to user registration (invitation, reset password...)
 
     Beside the "additional_fields", the 'user_login', 'server', 'title', 'login_url',
-    and 'setup_account_url' variables  also used in the template.
+    and 'setup_account_url' variables also used in the template.
     The 'title' will be created from the subject.
 
     This method should only be used in a Matrix APIs,
@@ -119,7 +119,7 @@ def send_registration_email(config, recipient, template_name, token,
 
     
     if not config.email_smtp_host:
-        # (used in tests.rest.client.test_identity.IdentityTestCase.test_3pid_lookup_disabled: just skip it)
+        # (used in multipe tests, including tests.rest.client.test_identity.IdentityTestCase.test_3pid_lookup_disabled: just skip it)
         logger.error("Cannot send email, SMTP host not defined in config")
         return
 

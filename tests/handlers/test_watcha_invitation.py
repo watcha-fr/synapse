@@ -5,9 +5,10 @@
 #
 
 import json
+from mock import patch
 
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, profile, room
+from synapse.rest.client.v1 import login, profile, room, watcha
 
 from tests import unittest
 
@@ -23,6 +24,7 @@ class InvitationTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
         profile.register_servlets,
         room.register_servlets,
+        watcha.register_servlets,
     ]
 
     def make_homeserver(self, reactor, clock):
@@ -34,17 +36,12 @@ class InvitationTestCase(unittest.HomeserverTestCase):
         return self.hs
 
     def prepare(self, reactor, clock, hs):
-        # User owning the requested profile.
         self.owner = self.register_user("owner", "pass")
         self.owner_tok = self.login("owner", "pass")
 
         self.other_user_id = self.register_user("otheruser", "pass")
         self.other_access_token = self.login("otheruser", "pass")
         
-        # User requesting the profile.
-        self.requester = self.register_user("requester", "pass")
-        self.requester_tok = self.login("requester", "pass")
-
         self.room_id = self.helper.create_room_as(self.owner, tok=self.owner_tok)
 
     def _do_invite(self, room_id, request_content):
@@ -73,3 +70,97 @@ class InvitationTestCase(unittest.HomeserverTestCase):
         other_room_id = self.helper.create_room_as(self.owner, tok=self.owner_tok)
         self.test_external_invite()
         self._do_external_invite(other_room_id)
+
+class NotAdminWatchaRegisterRestServletTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+        profile.register_servlets,
+        room.register_servlets,
+        watcha.register_servlets,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+
+        config = self.default_config()
+        self.hs = self.setup_test_homeserver(config=config)
+
+        return self.hs
+
+    def prepare(self, reactor, clock, hs):
+        self.owner = self.register_user("owner", "pass", self.ADMIN)
+        self.owner_tok = self.login("owner", "pass")
+
+    def _do_request(self):
+        request, channel = self.make_request(
+            "POST",
+            "/watcha_register",
+            content=json.dumps({'user': 'new_user',
+                                'full_name': "Full Name",
+                                'email': "address@mail.com",
+                                'admin': 'notadmin',
+                                'inviter': self.owner}),
+            access_token=self.owner_tok,
+        )
+        self.render(request)
+        return channel
+    
+    ADMIN = False
+    def test_watcha_register_servlet(self):
+        channel = self._do_request()
+        self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.result['body'],
+                         b'{"errcode":"M_FORBIDDEN","error":"You are not a server admin"}')
+        
+class WatchaRegisterRestServletTestCase(NotAdminWatchaRegisterRestServletTestCase):
+    ADMIN = True
+    def test_watcha_register_servlet(self): 
+        channel = self._do_request()
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.result['body'], b'{"user_id":"@new_user:test"}')
+        
+class NoTokenWatchaRegisterRestServletTestCase(NotAdminWatchaRegisterRestServletTestCase):
+    ADMIN = True
+    def prepare(self, reactor, clock, hs):
+        self.owner = self.register_user("owner", "pass", self.ADMIN)
+        # not loggedin !
+
+    def _do_request(self):
+        request, channel = self.make_request(
+            "POST",
+            "/watcha_register",
+            content=json.dumps({'user': 'new_user',
+                                'full_name': "Full Name",
+                                'email': "address@mail.com",
+                                'admin': 'notadmin',
+                                'inviter': self.owner}),
+            # No token !
+            #access_token=self.owner_tok,
+        )
+        self.render(request)
+        return channel
+    
+    def test_watcha_register_servlet(self): 
+        with patch('synapse.rest.client.v1.watcha._decode_share_secret_parameters') as mock__decode_share_secret_parameters, \
+             patch('synapse.util.watcha.send_registration_email') as mock_send_registration_email:
+                mock__decode_share_secret_parameters.side_effect = lambda _, __, parameter_json: parameter_json
+                channel = self._do_request()
+                self.assertEqual(channel.code, 200)
+                self.assertEqual(channel.result['body'], b'{"user_id":"@new_user:test"}')
+                # TODO: should say it's called but says "Actual: not called.".
+                # But putting an exception in the send_registration_email function (without the mock) actually raises it !??!
+                #mock_send_registration_email.assert_called_with(recipient="recipient", template_name="template_name", 
+                #                                                user_login="user_login", inviter_name="inviter_name", additional_fields="XX")
+            
+class NoTokenNotAdminWatchaRegisterRestServletTestCase(NoTokenWatchaRegisterRestServletTestCase):
+    ADMIN = False
+    def test_watcha_register_servlet(self):
+        
+        with patch('synapse.rest.client.v1.watcha._decode_share_secret_parameters') as mock__decode_share_secret_parameters:
+            mock__decode_share_secret_parameters.side_effect = lambda _, __, parameter_json: parameter_json
+            channel = self._do_request()
+            self.assertEqual(channel.code, 500)
+            self.assertEqual(channel.result['body'],
+                             b'{"errcode":"M_UNKNOWN","error":"inviter user \'@owner:test\' is not admin. Valid admins are: "}')
+    
