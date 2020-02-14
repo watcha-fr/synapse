@@ -1,14 +1,17 @@
 Bonjour {{ full_name }},
 
-Vous êtes invité à participer à l’espace de travail sécurisé Watcha {{ server }}.
+{{inviter_name}} {{inviter_mail}} vous a invité(e) à rejoindre l'espace de travail sécurisé Watcha
+Vous pourrez y créer et utiliser des salons de discussion avec les autres utilisateurs.
 
-Pour accepter cette invitation, connectez-vous à Watcha sur:
+Pour vous connecter à Watcha, suivez ce lien:
 
       {{ login_url }}
 
 Pour vous reconnecter dans le futur, conservez cet email et utilisez le lien ci-dessus, ou notez vos identifiants de connection :
 
 Utilisateur : {{ user_login }}
+
+Mot de passe : ********(défini lors de la première connection)
 
 Serveur : {{ server }}
 
