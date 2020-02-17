@@ -150,7 +150,7 @@
 										<td class="content-block" style="font-family: 'Courier New', Courier, monospace; box-sizing: border-box; font-size: 14px; vertical-align: top; margin: 0; padding: 0 0 20px 20px;"
 										 valign="top">
 											<div style="width:200px; padding:9px;">
-                                                                                            {{user_name}}
+                                                                                            {{user_login}}
 											</div>
 										</td>
 									</tr>
@@ -179,7 +179,7 @@
 										<td class="content-block" style="font-family: 'Courier New', Courier, monospace; box-sizing: border-box; font-size: 14px; vertical-align: top; margin: 0; padding: 0 0 20px 20px;"
 										 valign="top">
 											<div style="width:200px; padding:9px; ">
-									                orange.watcha.fr	
+                                                                                        {{server}}
 											</div>
 										</td>
 									</tr>
