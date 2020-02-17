@@ -16,7 +16,7 @@ from twisted.internet import defer
 from synapse.api.errors import AuthError, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.rest.client.v2_alpha._base import client_patterns
-from synapse.util.watcha import generate_password, send_registration_email, compute_registration_token
+from synapse.util.watcha import generate_password, send_registration_email, compute_registration_token, create_display_inviter_name
 from synapse.types import UserID, create_requester
 from synapse.api.constants import Membership
 
@@ -278,7 +278,7 @@ class WatchaRegisterRestServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.registration_handler = hs.get_registration_handler()
-        
+
     @defer.inlineCallbacks
     def on_POST(self, request):
         # TODO: if the requester is admin, no need for 'inviter'...
@@ -298,7 +298,7 @@ class WatchaRegisterRestServlet(RestServlet):
             raise SynapseError(
                 500, "Email address cannot be empty",
             )
-            
+
         full_user_id = yield self.hs.auth_handler.find_user_id_by_email(params['email'])
         if full_user_id:
             raise SynapseError(
@@ -312,9 +312,9 @@ class WatchaRegisterRestServlet(RestServlet):
             raise SynapseError(
                 500, "inviter user '%s' is not admin. Valid admins are: %s" % (params['inviter'], ', '.join(stats['admins']))
             )
-        inviter_display_name = yield self.hs.get_profile_handler().get_displayname(inviter)
-        inviter_user_info = yield self.hs.get_datastore().get_user_by_id(params['inviter'])
-        inviter_name = (inviter_display_name + ((' (' + inviter_user_info["email"] + ')') if inviter_user_info["email"] else "")) if inviter_display_name else inviter_user_info["email"]
+
+        inviter_name = yield create_display_inviter_name(self.hs, inviter)
+
         password = generate_password()
         admin = (params['admin'] == 'admin')
         user_id, token = yield self.registration_handler.register(
