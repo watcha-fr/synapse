@@ -13,6 +13,8 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.header import Header
 
+from twisted.internet import defer
+
 from synapse.api.errors import SynapseError
 
 logger = logging.getLogger(__name__)
@@ -65,6 +67,22 @@ def compute_registration_token(user, password=None):
     return base64.b64encode(json.encode("utf-8")).decode("ascii")
 
 
+@defer.inlineCallbacks
+def create_display_inviter_name(hs, inviter):
+
+    # TODO: Test why was:
+    #inviter_room_state = yield hs.get_state_handler().get_current_state(room_id)
+    #inviter_member_event = inviter_room_state.get((EventTypes.Member, inviter.to_string()))
+    #inviter_display_name = inviter_member_event.content.get("displayname", "") if inviter_member_event else ""
+    # instead of:
+    #inviter_display_name = yield hs.get_profile_handler().get_displayname(inviter)
+    # which seems to work too..
+
+    inviter_display_name = yield hs.get_profile_handler().get_displayname(inviter)
+    inviter_user_info = yield hs.get_datastore().get_user_by_id(inviter.to_string())
+    inviter_name = (inviter_display_name + ((' (' + inviter_user_info["email"] + ')') if inviter_user_info["email"] else "")) if inviter_display_name else inviter_user_info["email"]
+    defer.returnValue(inviter_name)
+
 def send_registration_email(config, recipient, template_name, token,
                             user_login, **additional_fields):
     '''
@@ -85,7 +103,7 @@ def send_registration_email(config, recipient, template_name, token,
         # legacy... polypus was installed with an incorrect server name, and it can't be changed after install,
         # so correcting it here... (see also devops.git/prod/install.sh)
         fields['server'] = 'polypus.watcha.fr'
-        
+
     fields['login_url'] = "%s/#/login/t=%s" % (config.email_riot_base_url, token)
     fields['setup_account_url'] = "%s/setup-account.html?t=%s" % (config.email_riot_base_url, token)
 
@@ -117,7 +135,7 @@ def send_registration_email(config, recipient, template_name, token,
     # message['Reply-To'] = ...
     #logger.info(message.as_string())
 
-    
+
     if not config.email_smtp_host:
         # (used in multipe tests, including tests.rest.client.test_identity.IdentityTestCase.test_3pid_lookup_disabled: just skip it)
         logger.error("Cannot send email, SMTP host not defined in config")

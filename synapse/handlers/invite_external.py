@@ -7,7 +7,7 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 from ._base import BaseHandler
-from synapse.util.watcha import generate_password, send_registration_email, compute_registration_token
+from synapse.util.watcha import generate_password, send_registration_email, compute_registration_token, create_display_inviter_name
 from synapse.types import UserID, create_requester
 from synapse.api.constants import Membership
 
@@ -58,7 +58,7 @@ class InviteExternalHandler(BaseHandler):
 
             # TODO: This is probably very wrong !
             # there is no reason to have a different behaviour for partner ??
-            
+
             # only send email if that user is external.
             # this restriction can be removed once internal users will also receive notifications from invitations by user ID.
             is_partner = yield self.hs.get_auth_handler().is_partner(full_user_id)
@@ -119,16 +119,7 @@ class InviteExternalHandler(BaseHandler):
             email_sent=True
         )
 
-        # TODO: Test why was:
-        #inviter_room_state = yield self.hs.get_state_handler().get_current_state(room_id)
-        #inviter_member_event = inviter_room_state.get((EventTypes.Member, inviter.to_string()))
-        #inviter_display_name = inviter_member_event.content.get("displayname", "") if inviter_member_event else ""
-        # instead of:
-        inviter_display_name = yield self.hs.get_profile_handler().get_displayname(inviter)
-        # which seems to work too..
-        
-        inviter_user_info = yield self.store.get_user_by_id(inviter.to_string())
-        inviter_name = (inviter_display_name + ((' (' + inviter_user_info["email"] + ')') if inviter_user_info["email"] else "")) if inviter_display_name else inviter_user_info["email"]
+        inviter_name = yield create_display_inviter_name(self.hs, inviter)
 
         logger.info("Generating message: invitation_name=%s invitee=%s user_id=%s user_pw=<REDACTED> new_user=%s",
                     inviter_name, invitee, user_id, new_user);
@@ -139,7 +130,7 @@ class InviteExternalHandler(BaseHandler):
         else:
             token = compute_registration_token(user_id)
             template_name = 'invite_existing_account'
-            
+
         send_registration_email(
             self.hs.config,
             invitee,
