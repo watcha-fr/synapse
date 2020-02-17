@@ -114,7 +114,7 @@
 									<tr style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; margin: 0;">
 										<td class="content-block" style="font-family: 'Helvetica Neue',Helvetica,Arial,sans-serif; box-sizing: border-box; font-size: 14px; vertical-align: top; margin: 0; padding: 0 0 20px;"
 										 valign="top">
-                                                                                    {{inviter_name}} ({{inviter_mail}}) vous a invité(e) à rejoindre l'espace de travail sécurisé Watcha.<!-- pour Orange -->
+                                                                                    {{inviter_name}} {{inviter_mail}} vous a invité(e) à rejoindre l'espace de travail sécurisé Watcha.<!-- pour Orange -->
                                                                                   <br/>
                                                                                   <br/>
                                                                                 Vous pourrez y créer et utiliser des salons de discussion avec les autres utilisateurs.
