@@ -64,17 +64,38 @@ class InvitationTestCase(unittest.HomeserverTestCase):
                                   "medium":"email",
                                   "address":"asfsadf@qwf.com"})
 
+
     def test_simple_invite(self):
         self._do_invite(self.room_id, {"user_id":self.other_user_id})
 
     def test_external_invite(self):
         self._do_external_invite(self.room_id)
 
+
     def test_external_invite_second_time(self):
         other_room_id = self.helper.create_room_as(self.owner, tok=self.owner_tok)
         self.test_external_invite()
         self._do_external_invite(other_room_id)
 
+    def test_external_invite_twice__by_different_inviters(self):
+
+        self.test_external_invite()
+        other_room_id = self.helper.create_room_as(self.other_user_id, tok=self.other_access_token)
+
+        request, channel = self.make_request(
+            "POST",
+            "/rooms/%s/invite" % (other_room_id, ),
+            content=json.dumps(
+                {"id_server":"localhost",
+                 "medium":"email",
+                 "address":"asfsadf@qwf.com"}),
+            access_token=self.other_access_token,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.result['body'], b'{}')
+
+        
 class NotAdminWatchaRegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     servlets = [
