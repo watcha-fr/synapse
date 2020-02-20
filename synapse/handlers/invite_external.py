@@ -126,7 +126,7 @@ class InviteExternalHandler(BaseHandler):
 
         if new_user:
             token = compute_registration_token(user_id, user_password)
-            template_name = 'invite_new_account'
+            template_name = 'new_account'
         else:
             token = compute_registration_token(user_id)
             template_name = 'invite_existing_account'
