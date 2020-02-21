@@ -8,7 +8,7 @@ import json
 
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, profile, room
-
+from synapse.rest.client.v1 import watcha
 from tests import unittest
 
 from ..utils import setup_test_homeserver
@@ -23,6 +23,7 @@ class InvitationTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
         profile.register_servlets,
         room.register_servlets,
+        watcha.register_servlets,
     ]
 
     def make_homeserver(self, reactor, clock):
@@ -35,7 +36,7 @@ class InvitationTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         # User owning the requested profile.
-        self.owner = self.register_user("owner", "pass")
+        self.owner = self.register_user("owner", "pass",True)
         self.owner_tok = self.login("owner", "pass")
 
         self.other_user_id = self.register_user("otheruser", "pass")
@@ -57,6 +58,24 @@ class InvitationTestCase(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.result['body'], b'{}')
+
+    def test_register_user(self):
+    #/_matrix/client/r0/watcha_register
+        request, channel = self.make_request(
+            "POST",
+            "/watcha_register",
+            content=json.dumps({'user':'test',
+                                'email':'test@mail.com',
+                                'full_name':'test sdsads',
+                                'admin':'false',
+                                'inviter':'@test:localhost',
+                                }),
+            access_token=self.owner_tok,
+
+            )
+        self.render(request)                                  
+        self.assertEqual(channel.code, 200)
+        #self.assertEqual(channel.result['body'], b'{}')
 
     def _do_external_invite(self, room_id):
         self._do_invite(room_id, {"id_server":"localhost",

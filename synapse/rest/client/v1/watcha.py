@@ -306,7 +306,7 @@ class WatchaRegisterRestServlet(RestServlet):
             
         password = generate_password()
         admin = (params['admin'] == 'admin')
-        user_id, token = yield self.registration_handler.register(
+        user_id = yield self.registration_handler.register_user(
             localpart=params['user'],
             password=password,
             admin=admin,
@@ -330,7 +330,7 @@ class WatchaRegisterRestServlet(RestServlet):
             full_name=display_name
         )
 
-        defer.returnValue((200, { "user_id": user_id }))
+        return (200, { "user_id": user_id })
 
 
 class WatchaResetPasswordRestServlet(RestServlet):
