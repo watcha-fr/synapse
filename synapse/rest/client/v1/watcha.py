@@ -278,7 +278,7 @@ class WatchaRegisterRestServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.registration_handler = hs.get_registration_handler()
-        
+
     @defer.inlineCallbacks
     def on_POST(self, request):
         params = yield _check_admin_or_secret(self.hs.config, self.auth, request,
@@ -297,13 +297,13 @@ class WatchaRegisterRestServlet(RestServlet):
             raise SynapseError(
                 500, "Email address cannot be empty",
             )
-            
+
         full_user_id = yield self.hs.auth_handler.find_user_id_by_email(params['email'])
         if full_user_id:
             raise SynapseError(
                 500, "A user with this email address already exists. Cannot create a new one.",
             )
-            
+
         password = generate_password()
         admin = (params['admin'] == 'admin')
         user_id = yield self.registration_handler.register_user(
@@ -314,8 +314,8 @@ class WatchaRegisterRestServlet(RestServlet):
 
         user = UserID.from_string(user_id)
         requester = create_requester(user_id)
-        self.hs.profile_handler.set_displayname(user, requester,
-                                                params['full_name'], by_admin=True)
+        yield self.hs.profile_handler.set_displayname(user, requester,
+                                                      params['full_name'], by_admin=True)
 
         yield self.hs.auth_handler.set_email(user_id, params['email'])
 

@@ -23,7 +23,6 @@ class InvitationTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
         profile.register_servlets,
         room.register_servlets,
-        watcha.register_servlets,
     ]
 
     def make_homeserver(self, reactor, clock):
@@ -41,7 +40,7 @@ class InvitationTestCase(unittest.HomeserverTestCase):
 
         self.other_user_id = self.register_user("otheruser", "pass")
         self.other_access_token = self.login("otheruser", "pass")
-        
+
         # User requesting the profile.
         self.requester = self.register_user("requester", "pass")
         self.requester_tok = self.login("requester", "pass")
@@ -59,29 +58,11 @@ class InvitationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.result['body'], b'{}')
 
-    def test_register_user(self):
-    #/_matrix/client/r0/watcha_register
-        request, channel = self.make_request(
-            "POST",
-            "/watcha_register",
-            content=json.dumps({'user':'test',
-                                'email':'test@mail.com',
-                                'full_name':'test sdsads',
-                                'admin':'false',
-                                'inviter':'@test:localhost',
-                                }),
-            access_token=self.owner_tok,
-
-            )
-        self.render(request)                                  
-        self.assertEqual(channel.code, 200)
-        #self.assertEqual(channel.result['body'], b'{}')
-
     def _do_external_invite(self, room_id):
         self._do_invite(room_id, {"id_server":"localhost",
                                   "medium":"email",
                                   "address":"asfsadf@qwf.com"})
-        
+
     def test_simple_invite(self):
         self._do_invite(self.room_id, {"user_id":self.other_user_id})
 
@@ -92,3 +73,39 @@ class InvitationTestCase(unittest.HomeserverTestCase):
         other_room_id = self.helper.create_room_as(self.owner, tok=self.owner_tok)
         self.test_external_invite()
         self._do_external_invite(other_room_id)
+
+
+class RegistrationTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+        watcha.register_servlets,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+        config = self.default_config()
+        config["require_auth_for_profile_requests"] = True
+        self.hs = self.setup_test_homeserver(config=config)
+        return self.hs
+
+    def prepare(self, reactor, clock, hs):
+        self.owner = self.register_user("owner", "pass",True)
+        self.owner_tok = self.login("owner", "pass")
+
+    def test_register_user(self):
+        request, channel = self.make_request(
+            "POST",
+            "/watcha_register",
+            content=json.dumps({'user':'test',
+                                'email':'test@mail.com',
+                                'full_name':'FirstName LastName',
+                                'admin':'false',
+                                # not used yet... 'inviter':'@test:localhost',
+                                }),
+            access_token=self.owner_tok,
+
+            )
+        self.render(request)
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.result['body'], b'{"user_id":"@test:test"}')
