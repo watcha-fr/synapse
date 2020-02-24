@@ -7,66 +7,13 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 from ._base import BaseHandler
-from synapse.util.watcha import generate_password, send_registration_email, compute_registration_token
+from synapse.util.watcha import generate_password, send_registration_email, compute_registration_token, create_display_inviter_name
 from synapse.types import UserID, create_requester
 from synapse.api.constants import Membership
 
 logger = logging.getLogger(__name__)
 
 class InviteExternalHandler(BaseHandler):
-
-    # from room_id and user ID, get details about who invites and where.
-    # adapted from synapse/handlers/room_member.py
-    @defer.inlineCallbacks
-    def _get_invitation_info(
-        self,
-        room_id,
-        inviter,
-    ):
-        room_state = yield self.hs.get_state_handler().get_current_state(room_id)
-
-        inviter_display_name = ""
-        inviter_avatar_url = ""
-        member_event = room_state.get((EventTypes.Member, inviter.to_string()))
-        if member_event:
-            inviter_display_name = member_event.content.get("displayname", "")
-            inviter_avatar_url = member_event.content.get("avatar_url", "")
-            logger.debug(u"inviter: display_name=%s avatar_url=%s", inviter_display_name, inviter_avatar_url)
-
-        room_canonical_alias = ""
-        canonical_alias_event = room_state.get((EventTypes.CanonicalAlias, ""))
-        if canonical_alias_event:
-            room_canonical_alias = canonical_alias_event.content.get("alias", "")
-            logger.debug(u"room: canonical_alias=%s", room_canonical_alias)
-
-        room_name = ""
-        room_name_event = room_state.get((EventTypes.Name, ""))
-        if room_name_event:
-            room_name = room_name_event.content.get("name", "")
-            logger.debug(u"room: name=%s", room_name)
-
-        room_join_rules = ""
-        join_rules_event = room_state.get((EventTypes.JoinRules, ""))
-        if join_rules_event:
-            room_join_rules = join_rules_event.content.get("join_rule", "")
-            logger.debug(u"room: join_rules=%s", room_join_rules)
-
-        room_avatar_url = ""
-        room_avatar_event = room_state.get((EventTypes.RoomAvatar, ""))
-        if room_avatar_event:
-            room_avatar_url = room_avatar_event.content.get("url", "")
-
-        result = {
-            "inviter_id": inviter.to_string(),
-            "inviter_display_name":inviter_display_name,
-            "inviter_avatar_url":inviter_avatar_url,
-            "room_canonical_alias":room_canonical_alias,
-            "room_name":room_name,
-            "room_join_rules":room_join_rules,
-            "room_avatar_url":room_avatar_url
-        }
-
-        defer.returnValue(result)
 
     # convert an email address into a user_id in a deterministic way
     def _gen_user_id_from_email(
@@ -111,7 +58,7 @@ class InviteExternalHandler(BaseHandler):
 
             # TODO: This is probably very wrong !
             # there is no reason to have a different behaviour for partner ??
-            
+
             # only send email if that user is external.
             # this restriction can be removed once internal users will also receive notifications from invitations by user ID.
             is_partner = yield self.hs.get_auth_handler().is_partner(full_user_id)
@@ -172,33 +119,25 @@ class InviteExternalHandler(BaseHandler):
             email_sent=True
         )
 
-        invitation_info = yield self._get_invitation_info(
-            room_id,
-            inviter
-        )
-
-        if (invitation_info["inviter_display_name"] is not None):
-            invitation_name = u''.join((invitation_info["inviter_display_name"], ' (', invitation_info["inviter_id"], ')'))
-        else:
-            invitation_name = invitation_info["inviter_id"]
+        inviter_name = yield create_display_inviter_name(self.hs, inviter)
 
         logger.info("Generating message: invitation_name=%s invitee=%s user_id=%s user_pw=<REDACTED> new_user=%s",
-                    invitation_name, invitee, user_id, new_user);
+                    inviter_name, invitee, user_id, new_user);
 
         if new_user:
             token = compute_registration_token(user_id, user_password)
-            template_name = 'invite_new_account'
+            template_name = 'new_account'
         else:
             token = compute_registration_token(user_id)
             template_name = 'invite_existing_account'
-            
+
         send_registration_email(
             self.hs.config,
             invitee,
             template_name=template_name,
             token=token,
             user_login=user_id,
-            inviter_name=invitation_name
+            inviter_name=inviter_name
         )
 
         defer.returnValue(full_user_id)
