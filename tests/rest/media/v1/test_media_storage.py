@@ -190,12 +190,12 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         If the filename is filename=<ascii> then Synapse will decode it as an
         ASCII string, and use filename= in the response.
         """
-        channel = self._req(b"inline; filename=out.png")
+        channel = self._req(b"attachment; filename=out.png")
 
         headers = channel.headers
         self.assertEqual(headers.getRawHeaders(b"Content-Type"), [b"image/png"])
         self.assertEqual(
-            headers.getRawHeaders(b"Content-Disposition"), [b"inline; filename=out.png"]
+            headers.getRawHeaders(b"Content-Disposition"), [b"attachment; filename=out.png"]
         )
 
     def test_disposition_filenamestar_utf8escaped(self):
@@ -205,13 +205,13 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         response.
         """
         filename = parse.quote(u"\u2603".encode('utf8')).encode('ascii')
-        channel = self._req(b"inline; filename*=utf-8''" + filename + b".png")
+        channel = self._req(b"attachment; filename*=utf-8''" + filename + b".png")
 
         headers = channel.headers
         self.assertEqual(headers.getRawHeaders(b"Content-Type"), [b"image/png"])
         self.assertEqual(
             headers.getRawHeaders(b"Content-Disposition"),
-            [b"inline; filename*=utf-8''" + filename + b".png"],
+            [b"attachment; filename*=utf-8''" + filename + b".png"],
         )
 
     def test_disposition_none(self):

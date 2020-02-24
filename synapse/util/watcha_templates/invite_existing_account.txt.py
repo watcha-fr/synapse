@@ -7,7 +7,7 @@ Votre nom d’utilisateur est :
 
 Votre mot de passe est celui que vous avez défini lors de l'activation de votre compte sur cet espace de travail.
 
-Pour accéder à votre compte, cliquez ici:
+Pour accéder à votre compte, cliquez ici :
 	{{ login_url }}
 
 Nous pouvons vous aider à utiliser Watcha. Si vous rencontrez des difficultés, n'hésitez pas à répondre à cet email !
