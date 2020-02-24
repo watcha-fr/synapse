@@ -2,7 +2,7 @@ Bonjour {{ full_name }},
 
 Vous êtes invité à participer à l’espace de travail sécurisé Watcha {{ server }}.
 
-Pour accepter cette invitation, connectez-vous à Watcha sur:
+Pour accepter cette invitation, connectez-vous à Watcha sur :
 
       {{ login_url }}
 
