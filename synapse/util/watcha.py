@@ -85,7 +85,7 @@ def send_registration_email(config, recipient, template_name, token,
         # legacy... polypus was installed with an incorrect server name, and it can't be changed after install,
         # so correcting it here... (see also devops.git/prod/install.sh)
         fields['server'] = 'polypus.watcha.fr'
-        
+
     fields['login_url'] = "%s/#/login/t=%s" % (config.email_riot_base_url, token)
     fields['setup_account_url'] = "%s/setup-account.html?t=%s" % (config.email_riot_base_url, token)
 
@@ -117,7 +117,22 @@ def send_registration_email(config, recipient, template_name, token,
     # message['Reply-To'] = ...
     #logger.info(message.as_string())
 
-    
+
+    if config.email_smtp_host == 'TEST':
+        # For running on a local machine. Requires multiple configs in homeserver.yaml:
+        #email:
+        #   riot_base_url: "http://localhost:8080"
+        #   smtp_host: "TEST"
+        #   smtp_port: "0"
+        #   notif_from: "TEST"
+        #public_baseurl: "TEST"
+
+        logger.info("NOT Sending registration email to '%s', we are in test mode", recipient)
+        logger.info("Email subject is: " + subject)
+        logger.info("Email text content follows:")
+        logger.info(str(base64.b64decode(message.get_payload()[0].get_payload())))
+        return
+
     if not config.email_smtp_host:
         # (used in tests.rest.client.test_identity.IdentityTestCase.test_3pid_lookup_disabled: just skip it)
         logger.error("Cannot send email, SMTP host not defined in config")
