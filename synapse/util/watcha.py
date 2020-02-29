@@ -115,8 +115,6 @@ def send_registration_email(config, recipient, template_name, token,
 
     # if needed to customize the reply-to field
     # message['Reply-To'] = ...
-    #logger.info(message.as_string())
-
 
     if config.email_smtp_host == 'TEST':
         # For running on a local machine. Requires multiple configs in homeserver.yaml:
