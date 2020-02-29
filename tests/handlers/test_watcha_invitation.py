@@ -26,7 +26,9 @@ class InvitationTestCase(unittest.HomeserverTestCase):
     ]
 
     def make_homeserver(self, reactor, clock):
-        self.hs = self.setup_test_homeserver(config=config = {
+
+
+        self.hs = self.setup_test_homeserver(config={
             **self.default_config(),
             "require_auth_for_profile_requests": True,
             "email": {
