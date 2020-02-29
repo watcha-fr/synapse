@@ -26,16 +26,17 @@ class InvitationTestCase(unittest.HomeserverTestCase):
     ]
 
     def make_homeserver(self, reactor, clock):
-
-        config = self.default_config()
-        config["require_auth_for_profile_requests"] = True
-        config["email"] = {}
-        config["email"]["riot_base_url"] = 'http://localhost:8080'
-        config["email"]["smtp_host"] = 'TEST'
-        config["email"]["smtp_port"] = 10
-        config["email"]["notif_from"] = "TEST"
-        config["public_baseurl"] = "TEST"
-        self.hs = self.setup_test_homeserver(config=config)
+        self.hs = self.setup_test_homeserver(config=config = {
+            **self.default_config(),
+            "require_auth_for_profile_requests": True,
+            "email": {
+                "riot_base_url": "http://localhost:8080",
+                "smtp_host": "TEST",
+                "smtp_port": 10,
+                "notif_from": "TEST"
+            },
+            "public_baseurl": "TEST"
+        })
 
         return self.hs
 
