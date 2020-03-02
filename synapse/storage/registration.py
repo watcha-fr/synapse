@@ -30,8 +30,10 @@ from synapse.types import UserID
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
 
+# added for watcha
 import logging
 logger = logging.getLogger(__name__)
+# end added for watcha
 
 THIRTY_MINUTES_IN_MS = 30 * 60 * 1000
 
@@ -53,7 +55,7 @@ class RegistrationWorkerStore(SQLBaseStore):
                 "password_hash",
                 "is_guest",
                 "is_partner",
-                "email",
+                "email", # added for watcha
                 "consent_version",
                 "consent_server_notice_sent",
                 "appservice_id",
@@ -1302,7 +1304,7 @@ class RegistrationStore(
             delete_threepid_session_txn,
         )
 
-
+    # added for watcha
     @defer.inlineCallbacks
     def is_user_partner(self, user_id):
 
@@ -1330,3 +1332,4 @@ class RegistrationStore(
         yield self.runInteraction(
             "user_set_email", user_set_email_txn
         )
+    # end added for watcha
