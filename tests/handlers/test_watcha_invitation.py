@@ -72,10 +72,6 @@ class InvitationTestCase(unittest.HomeserverTestCase):
                                   "medium":"email",
                                   "address":"asfsadf@qwf.com"})
 
-<<<<<<< HEAD
-
-=======
->>>>>>> dev
     def test_simple_invite(self):
         self._do_invite(self.room_id, {"user_id":self.other_user_id})
 
