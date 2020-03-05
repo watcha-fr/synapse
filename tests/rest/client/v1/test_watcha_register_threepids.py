@@ -32,7 +32,7 @@ class WatchaRegisterThreePidServletTestCase(unittest.HomeserverTestCase):
         code = self._do_register_threepids(request_content)
         self.assertEqual(code, 200)
 
-
-
-
-    
+    def test_wrong_register_threepids(self):
+        request_content = {"user":"other_user","email":"test@test.com"}
+        code = self._do_register_threepids(request_content)
+        self.assertEqual(code, 403)
