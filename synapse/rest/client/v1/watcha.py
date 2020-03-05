@@ -383,6 +383,35 @@ class WatchaResetPasswordRestServlet(RestServlet):
 
         defer.returnValue((200, {}))
 
+class WatchaRegisterThreePidServlet(RestServlet):
+    PATTERNS = client_patterns("/watcha_threepids", v1=True)
+    
+    def __init__(self, hs):
+        super(WatchaRegisterThreePidServlet, self).__init__()
+        self.hs = hs
+        self.handlers = hs.get_handlers()
+        self.auth = hs.get_auth()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        auth_headers = request.requestHeaders.getRawHeaders("Authorization")
+        params = parse_json_object_from_request(request)
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True)
+        user_id = params['user']
+        email = params['email']
+        validated_at = self.hs.get_clock().time_msec()
+
+        if not user_id.startswith('@'):
+            user_id = '@' + params['user'] + ':' + self.hs.get_config().server_name 
+
+        user = UserID.from_string(user_id)
+
+        if user != requester.user:
+            raise AuthError(403, "Forbidden : user_id doesn't match requester.")
+        
+        yield self.handlers.auth_handler.add_threepid(user_id, 'email', email, validated_at)
+
+        defer.returnValue((200, {}))
 
 def register_servlets(hs, http_server):
     WatchaResetPasswordRestServlet(hs).register(http_server)
@@ -400,3 +429,4 @@ def register_servlets(hs, http_server):
     WatchaRoomMembershipRestServlet(hs).register(http_server)
     WatchaRoomNameRestServlet(hs).register(http_server)
     WatchaDisplayNameRestServlet(hs).register(http_server)
+    WatchaRegisterThreePidServlet(hs).register(http_server)
