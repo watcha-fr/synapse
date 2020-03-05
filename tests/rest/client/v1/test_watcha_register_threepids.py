@@ -32,13 +32,6 @@ class WatchaRegisterThreePidServletTestCase(unittest.HomeserverTestCase):
         code = self._do_register_threepids(request_content)
         self.assertEqual(code, 200)
 
-    #Tester le retour du signal 200 (user = requester_user) : 
-
-    #Tester le retour du signal 400 (user != requester_user) : 
-
-    #Tester le formatage du user_id (si user_id ne commance pas par @):
-
-    #Tester si l'email renseigné = email recupéré dans requester : 
 
 
 
