@@ -135,8 +135,21 @@ def send_registration_email(config, recipient, template_name, token,
 
     # if needed to customize the reply-to field
     # message['Reply-To'] = ...
-    #logger.info(message.as_string())
 
+    if config.email_smtp_host == 'TEST':
+        # For running on a local machine. Requires multiple configs in homeserver.yaml:
+        #email:
+        #   riot_base_url: "http://localhost:8080"
+        #   smtp_host: "TEST"
+        #   smtp_port: "0"
+        #   notif_from: "TEST"
+        #public_baseurl: "TEST"
+
+        logger.info("NOT Sending registration email to '%s', we are in test mode", recipient)
+        logger.info("Email subject is: " + subject)
+        logger.info("Email text content follows:")
+        logger.info(str(base64.b64decode(message.get_payload()[0].get_payload())))
+        return
 
     if not config.email_smtp_host:
         # (used in multipe tests, including tests.rest.client.test_identity.IdentityTestCase.test_3pid_lookup_disabled: just skip it)
