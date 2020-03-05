@@ -68,7 +68,7 @@ def compute_registration_token(user, password=None):
 
 
 @defer.inlineCallbacks
-def create_display_inviter_name(hs, inviter):
+def create_display_inviter_name(hs, inviter, inviter_is_new):
 
     # TODO: Test why was:
     #inviter_room_state = yield hs.get_state_handler().get_current_state(room_id)
@@ -77,10 +77,12 @@ def create_display_inviter_name(hs, inviter):
     # instead of:
     #inviter_display_name = yield hs.get_profile_handler().get_displayname(inviter)
     # which seems to work too..
-
-    inviter_display_name = yield hs.get_profile_handler().get_displayname(inviter)
-    inviter_user_info = yield hs.get_datastore().get_user_by_id(inviter.to_string())
-    inviter_name = (inviter_display_name + ((' (' + inviter_user_info["email"] + ')') if inviter_user_info["email"] else "")) if inviter_display_name else inviter_user_info["email"]
+    if inviter_is_new: 
+        inviter_name=inviter
+    else:  
+        inviter_display_name = yield hs.get_profile_handler().get_displayname(inviter)
+        inviter_user_info = yield hs.get_datastore().get_user_by_id(inviter.to_string())
+        inviter_name = (inviter_display_name + ((' (' + inviter_user_info["email"] + ')') if inviter_user_info["email"] else "")) if inviter_display_name else inviter_user_info["email"]
     defer.returnValue(inviter_name)
 
 def send_registration_email(config, recipient, template_name, token,
