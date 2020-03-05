@@ -27,9 +27,18 @@ class InvitationTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
 
-        config = self.default_config()
-        config["require_auth_for_profile_requests"] = True
-        self.hs = self.setup_test_homeserver(config=config)
+
+        self.hs = self.setup_test_homeserver(config={
+            **self.default_config(),
+            "require_auth_for_profile_requests": True,
+            "email": {
+                "riot_base_url": "http://localhost:8080",
+                "smtp_host": "TEST",
+                "smtp_port": 10,
+                "notif_from": "TEST"
+            },
+            "public_baseurl": "TEST"
+        })
 
         return self.hs
 
@@ -40,7 +49,7 @@ class InvitationTestCase(unittest.HomeserverTestCase):
 
         self.other_user_id = self.register_user("otheruser", "pass")
         self.other_access_token = self.login("otheruser", "pass")
-        
+
         # User requesting the profile.
         self.requester = self.register_user("requester", "pass")
         self.requester_tok = self.login("requester", "pass")
@@ -62,12 +71,19 @@ class InvitationTestCase(unittest.HomeserverTestCase):
         self._do_invite(room_id, {"id_server":"localhost",
                                   "medium":"email",
                                   "address":"asfsadf@qwf.com"})
-        
+
     def test_simple_invite(self):
         self._do_invite(self.room_id, {"user_id":self.other_user_id})
 
     def test_external_invite(self):
-        self._do_external_invite(self.room_id)
+        with self.assertLogs('synapse.util.watcha', level='INFO') as cm:
+            self._do_external_invite(self.room_id)
+            self.assertIn("INFO:synapse.util.watcha:NOT Sending registration email to \'asfsadf@qwf.com\', we are in test mode",
+                          ''.join(cm.output))
+            self.assertIn(" http://localhost:8080/#/login/t=",
+                          ''.join(cm.output))
+            self.assertIn("owner (@owner:test) vous a invit\\xc3",
+                          ''.join(cm.output))
 
     def test_external_invite_second_time(self):
         other_room_id = self.helper.create_room_as(self.owner, tok=self.owner_tok)
