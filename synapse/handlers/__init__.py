@@ -20,7 +20,6 @@ from .identity import IdentityHandler
 from .search import SearchHandler
 from .invite_external import InviteExternalHandler
 from .watcha_admin_handler import WatchaAdminHandler
-from .auth import AuthHandler
 
 
 class Handlers(object):
@@ -50,4 +49,3 @@ class Handlers(object):
         self.search_handler = SearchHandler(hs)
         self.invite_external_handler = InviteExternalHandler(hs) #added for watcha
         self.watcha_admin_handler = WatchaAdminHandler(hs) #added for watcha
-        self.auth_handler = AuthHandler(hs) #added for watcha

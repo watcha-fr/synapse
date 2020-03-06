@@ -383,33 +383,29 @@ class WatchaResetPasswordRestServlet(RestServlet):
 
         defer.returnValue((200, {}))
 
-class WatchaRegisterThreePidServlet(RestServlet):
+class WatchaAddThreepidsServlet(RestServlet):
     PATTERNS = client_patterns("/watcha_threepids", v1=True)
-    
+
     def __init__(self, hs):
-        super(WatchaRegisterThreePidServlet, self).__init__()
+        super(WatchaAddThreepidsServlet, self).__init__
         self.hs = hs
-        self.handlers = hs.get_handlers()
-        self.auth = hs.get_auth()
+        self.auth_handler = hs.get_auth_handler()
+        self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
-    def on_POST(self, request):
-        auth_headers = request.requestHeaders.getRawHeaders("Authorization")
-        params = parse_json_object_from_request(request)
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True)
-        user_id = params['user']
-        email = params['email']
+    def on_POST(self, resquest):
         validated_at = self.hs.get_clock().time_msec()
+        users_without_threepids = yield self.store._execute_sql("""SELECT users.name, users.email 
+                                                FROM users
+                                                LEFT JOIN user_threepids ON users.name = user_threepids.user_id
+                                                WHERE user_threepids.user_id IS NULL;""")
 
-        if not user_id.startswith('@'):
-            user_id = '@' + params['user'] + ':' + self.hs.get_config().server_name 
-
-        user = UserID.from_string(user_id)
-
-        if user != requester.user:
-            raise AuthError(403, "Forbidden : user_id doesn't match requester.")
+        threepids_added = [dict(zip(('user_id', 'email'), element)) for element in users_without_threepids]
         
-        yield self.handlers.auth_handler.add_threepid(user_id, 'email', email, validated_at)
+        for users in users_without_threepids:
+            yield self.auth_handler.add_threepid(users[0], 'email', users[1], validated_at)
+
+        logger.info("Threepids added : " + str(threepids_added))
 
         defer.returnValue((200, {}))
 
@@ -429,4 +425,4 @@ def register_servlets(hs, http_server):
     WatchaRoomMembershipRestServlet(hs).register(http_server)
     WatchaRoomNameRestServlet(hs).register(http_server)
     WatchaDisplayNameRestServlet(hs).register(http_server)
-    WatchaRegisterThreePidServlet(hs).register(http_server)
+    WatchaAddThreepidsServlet(hs).register(http_server)
