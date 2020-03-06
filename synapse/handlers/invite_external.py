@@ -119,7 +119,7 @@ class InviteExternalHandler(BaseHandler):
             email_sent=True
         )
 
-        inviter_name = yield create_display_inviter_name(self.hs, inviter)
+        inviter_name = yield create_display_inviter_name(self.hs, inviter, False)
 
         logger.info("Generating message: invitation_name=%s invitee=%s user_id=%s user_pw=<REDACTED> new_user=%s",
                     inviter_name, invitee, user_id, new_user);
