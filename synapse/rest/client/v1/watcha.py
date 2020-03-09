@@ -304,17 +304,23 @@ class WatchaRegisterRestServlet(RestServlet):
                 500, "A user with this email address already exists. Cannot create a new one.",
             )
            
+        password = generate_password()
+        admin = (params['admin'] == 'admin')
+        bind_emails = [params['email']]
         user_id, token = yield self.registration_handler.register(
             localpart=params['user'],
-            password=generate_password(),
-            admin=(params['admin'] == 'admin'),
-            bind_emails=[params['email']]
+            password=password,
+            admin=admin,
+            bind_emails=bind_emails
         )
 
         user = UserID.from_string(user_id)
         requester = create_requester(user_id)
         self.hs.profile_handler.set_displayname(user, requester,
                                                 params['full_name'], by_admin=True)
+
+        # TODO: to remove once we have upgrade all the server (and remove the implementation)
+        yield self.hs.auth_handler.set_email(user_id, params['email'])
 
         display_name = yield self.hs.profile_handler.get_displayname(user)
 
@@ -381,16 +387,21 @@ class WatchaResetPasswordRestServlet(RestServlet):
         defer.returnValue((200, {}))
 
 class WatchaAddThreepidsServlet(RestServlet):
+    '''temporary servlet to upgrade older servers'''
+
     PATTERNS = client_patterns("/watcha_threepids", v1=True)
 
     def __init__(self, hs):
         super(WatchaAddThreepidsServlet, self).__init__
         self.hs = hs
+        self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
-    def on_POST(self, resquest):
+    def on_POST(self, request):
+        yield _check_admin(self.auth, request)
+
         validated_at = self.hs.get_clock().time_msec()
         users_without_threepids = yield self.store._execute_sql("""SELECT users.name, users.email 
                                                                 FROM users
@@ -398,18 +409,12 @@ class WatchaAddThreepidsServlet(RestServlet):
                                                                 WHERE user_threepids.user_id IS NULL
                                                                     AND users.email IS NOT NULL;""")
 
-        if not users_without_threepids:
-            raise SynapseError(403,
-                    "There are no emails to bind with accounts.")
-        else:
-            threepids_added = [dict(zip(('user_id', 'email'), element)) for element in users_without_threepids]
+        return_value = {}
+        for name, email in users_without_threepids:
+            yield self.auth_handler.add_threepid(name, 'email', email, validated_at)
+            return_value[name] = email
             
-            for users in users_without_threepids:
-                yield self.auth_handler.add_threepid(users[0], 'email', users[1], validated_at)
-
-            logger.info("Threepids added : " + str(threepids_added))
-
-            defer.returnValue((200, {}))
+        defer.returnValue((200, return_value))
 
 
 def register_servlets(hs, http_server):

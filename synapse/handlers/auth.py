@@ -1051,6 +1051,15 @@ class AuthHandler(BaseHandler):
             user_id,
         )
         defer.returnValue(ret)
+
+    @defer.inlineCallbacks
+    def set_email(self, user_id, email):
+        ret = yield self.store.user_set_email(
+            user_id,
+            email
+        )
+
+        defer.returnValue(ret)
     #end of insertion
 
     # Added for Watcha...
