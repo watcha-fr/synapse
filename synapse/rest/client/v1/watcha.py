@@ -304,22 +304,17 @@ class WatchaRegisterRestServlet(RestServlet):
                 500, "A user with this email address already exists. Cannot create a new one.",
             )
            
-        password = generate_password()
-        admin = (params['admin'] == 'admin')
-        bind_emails = [params['email']]
         user_id, token = yield self.registration_handler.register(
             localpart=params['user'],
-            password=password,
-            admin=admin,
-            bind_emails= bind_emails
+            password=generate_password(),
+            admin=(params['admin'] == 'admin'),
+            bind_emails=[params['email']]
         )
 
         user = UserID.from_string(user_id)
         requester = create_requester(user_id)
         self.hs.profile_handler.set_displayname(user, requester,
                                                 params['full_name'], by_admin=True)
-
-        yield self.hs.auth_handler.set_email(user_id, params['email'])
 
         display_name = yield self.hs.profile_handler.get_displayname(user)
 

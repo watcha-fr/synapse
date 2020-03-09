@@ -1315,18 +1315,3 @@ class RegistrationStore(
         logger.info("login from user %s. is_partner=%s", user_id, is_partner)
         defer.returnValue(is_partner)
 
-    @defer.inlineCallbacks
-    def user_set_email(self, user_id, email):
-        def user_set_email_txn(txn):
-            self._simple_update_one_txn(
-                txn,
-                'users', {
-                    'name': user_id
-                },
-                {
-                    'email': email
-                }
-            )
-        yield self.runInteraction(
-            "user_set_email", user_set_email_txn
-        )
