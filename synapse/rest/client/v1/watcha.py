@@ -395,16 +395,22 @@ class WatchaAddThreepidsServlet(RestServlet):
         users_without_threepids = yield self.store._execute_sql("""SELECT users.name, users.email 
                                                                 FROM users
                                                                 LEFT JOIN user_threepids ON users.name = user_threepids.user_id
-                                                                WHERE user_threepids.user_id IS NULL;""")
+                                                                WHERE user_threepids.user_id IS NULL
+                                                                    AND users.email IS NOT NULL;""")
 
-        threepids_added = [dict(zip(('user_id', 'email'), element)) for element in users_without_threepids]
-        
-        for users in users_without_threepids:
-            yield self.auth_handler.add_threepid(users[0], 'email', users[1], validated_at)
+        if not users_without_threepids:
+            raise SynapseError(403,
+                    "There are no emails to bind with accounts.")
+        else:
+            threepids_added = [dict(zip(('user_id', 'email'), element)) for element in users_without_threepids]
+            
+            for users in users_without_threepids:
+                yield self.auth_handler.add_threepid(users[0], 'email', users[1], validated_at)
 
-        logger.info("Threepids added : " + str(threepids_added))
+            logger.info("Threepids added : " + str(threepids_added))
 
-        defer.returnValue((200, {}))
+            defer.returnValue((200, {}))
+
 
 def register_servlets(hs, http_server):
     WatchaResetPasswordRestServlet(hs).register(http_server)
