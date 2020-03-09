@@ -303,13 +303,15 @@ class WatchaRegisterRestServlet(RestServlet):
             raise SynapseError(
                 500, "A user with this email address already exists. Cannot create a new one.",
             )
-            
+           
         password = generate_password()
         admin = (params['admin'] == 'admin')
+        bind_emails = [params['email']]
         user_id, token = yield self.registration_handler.register(
             localpart=params['user'],
             password=password,
             admin=admin,
+            bind_emails= bind_emails
         )
 
         user = UserID.from_string(user_id)
@@ -396,9 +398,9 @@ class WatchaAddThreepidsServlet(RestServlet):
     def on_POST(self, resquest):
         validated_at = self.hs.get_clock().time_msec()
         users_without_threepids = yield self.store._execute_sql("""SELECT users.name, users.email 
-                                                FROM users
-                                                LEFT JOIN user_threepids ON users.name = user_threepids.user_id
-                                                WHERE user_threepids.user_id IS NULL;""")
+                                                                FROM users
+                                                                LEFT JOIN user_threepids ON users.name = user_threepids.user_id
+                                                                WHERE user_threepids.user_id IS NULL;""")
 
         threepids_added = [dict(zip(('user_id', 'email'), element)) for element in users_without_threepids]
         
