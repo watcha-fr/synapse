@@ -82,7 +82,7 @@ class InvitationTestCase(unittest.HomeserverTestCase):
                           ''.join(cm.output))
             self.assertIn(" http://localhost:8080/#/login/t=",
                           ''.join(cm.output))
-            self.assertIn("owner (@owner:test) vous a invit\\xc3",
+            self.assertIn("vous a invit\\xc3",
                           ''.join(cm.output))
 
 

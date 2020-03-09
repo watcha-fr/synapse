@@ -68,7 +68,7 @@ def compute_registration_token(user, password=None):
 
 
 @defer.inlineCallbacks
-def create_display_inviter_name(hs, inviter, inviter_is_new):
+def create_display_inviter_name(hs, inviter, inviter_is_new=False):
 
     # TODO: Test why was:
     #inviter_room_state = yield hs.get_state_handler().get_current_state(room_id)

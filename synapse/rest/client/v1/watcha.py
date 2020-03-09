@@ -312,7 +312,7 @@ class WatchaRegisterRestServlet(RestServlet):
         else:
             requester = yield self.auth.get_user_by_req(request)
             inviter=requester.user
-            inviter_name = yield create_display_inviter_name(self.hs, inviter,'inviter_is_new' in params)
+            inviter_name = yield create_display_inviter_name(self.hs, inviter)
         if not ('inviter_is_new' in params):
             is_admin = yield self.auth.is_server_admin(inviter)
             if not is_admin:
