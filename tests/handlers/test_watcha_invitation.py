@@ -79,11 +79,13 @@ class InvitationTestCase(unittest.HomeserverTestCase):
         with self.assertLogs('synapse.util.watcha', level='INFO') as cm:
             self._do_external_invite(self.room_id)
             self.assertIn("INFO:synapse.util.watcha:NOT Sending registration email to \'asfsadf@qwf.com\', we are in test mode",
-                          ''.join(cm.output))
+                          cm.output[0])
+            self.assertIn("INFO:synapse.util.watcha:Email subject is: Invitation à l'espace de travail sécurisé Watcha test",
+                          cm.output[1])
             self.assertIn(" http://localhost:8080/#/login/t=",
-                          ''.join(cm.output))
-            self.assertIn("vous a invit\\xc3",
-                          ''.join(cm.output))
+                          cm.output[3])
+            self.assertIn("Bonjour,\\n\\nowner vous a invit\\xc3",
+                          cm.output[3])
 
 
     def test_external_invite_second_time(self):

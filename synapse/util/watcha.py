@@ -101,6 +101,10 @@ def send_registration_email(config, recipient, template_name, token,
     fields = dict(additional_fields)
     fields['user_login'] = user_login
     fields['server'] = config.server_name
+    if 'full_name' in fields:
+        # hack to avoid double spaces if not set: no space before in template
+        fields['full_name'] = ' ' + fields['full_name']
+    
     if 'polypus-core.watcha.fr' in config.server_name:
         # legacy... polypus was installed with an incorrect server name, and it can't be changed after install,
         # so correcting it here... (see also devops.git/prod/install.sh)
