@@ -316,8 +316,7 @@ class WatchaRegisterRestServlet(RestServlet):
 
         user = UserID.from_string(user_id)
         requester = create_requester(user_id)
-        yield self.hs.profile_handler.set_displayname(user, requester,
-                                                params['full_name'], by_admin=True)
+        yield self.hs.profile_handler.set_displayname(user, requester, params['full_name'], by_admin=True)
 
         # TODO: to remove once we have upgrade all the server (and remove the implementation)
         yield self.hs.auth_handler.set_email(user_id, params['email'])
@@ -333,10 +332,7 @@ class WatchaRegisterRestServlet(RestServlet):
             full_name=display_name
         )
 
-        return_values = {}
-        return_values['display_name'] = display_name 
-        return_values['user_id'] = user_id 
-        defer.returnValue((200, return_values))
+        defer.returnValue((200, {'display_name':display_name, 'user_id':user_id}))
 
 class WatchaResetPasswordRestServlet(RestServlet):
     PATTERNS = client_patterns("/watcha_reset_password", v1=True)
