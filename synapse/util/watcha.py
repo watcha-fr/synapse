@@ -68,7 +68,7 @@ def compute_registration_token(user, password=None):
 
 
 @defer.inlineCallbacks
-def create_display_inviter_name(hs, inviter, inviter_is_new=False):
+def create_display_inviter_name(hs, inviter):
 
     # TODO: Test why was:
     #inviter_room_state = yield hs.get_state_handler().get_current_state(room_id)
@@ -77,12 +77,9 @@ def create_display_inviter_name(hs, inviter, inviter_is_new=False):
     # instead of:
     #inviter_display_name = yield hs.get_profile_handler().get_displayname(inviter)
     # which seems to work too..
-    if inviter_is_new: 
-        inviter_name=inviter
-    else:  
-        inviter_display_name = yield hs.get_profile_handler().get_displayname(inviter)
-        inviter_user_info = yield hs.get_datastore().get_user_by_id(inviter.to_string())
-        inviter_name = (inviter_display_name + ((' (' + inviter_user_info["email"] + ')') if inviter_user_info["email"] else "")) if inviter_display_name else inviter_user_info["email"]
+    inviter_display_name = yield hs.get_profile_handler().get_displayname(inviter)
+    inviter_user_info = yield hs.get_datastore().get_user_by_id(inviter.to_string())
+    inviter_name = (inviter_display_name + ((' (' + inviter_user_info["email"] + ')') if inviter_user_info["email"] else "")) if inviter_display_name else inviter_user_info["email"]
     defer.returnValue(inviter_name)
 
 def send_registration_email(config, recipient, template_name, token,
@@ -104,7 +101,7 @@ def send_registration_email(config, recipient, template_name, token,
     if 'full_name' in fields:
         # hack to avoid double spaces if not set: no space before in template
         fields['full_name'] = ' ' + fields['full_name']
-    
+
     if 'polypus-core.watcha.fr' in config.server_name:
         # legacy... polypus was installed with an incorrect server name, and it can't be changed after install,
         # so correcting it here... (see also devops.git/prod/install.sh)

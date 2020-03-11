@@ -281,9 +281,8 @@ class WatchaRegisterRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        # TODO: if the requester is admin, no need for 'inviter'...
         params = yield _check_admin_or_secret(self.hs.config, self.auth, request,
-                                             ['user', 'full_name', 'email', 'admin', 'inviter','inviter_is_new'])
+                                             ['user', 'full_name', 'email', 'admin', 'inviter'])
 
         logger.info("Adding Watcha user...")
 
@@ -304,24 +303,14 @@ class WatchaRegisterRestServlet(RestServlet):
             raise SynapseError(
                 500, "A user with this email address already exists. Cannot create a new one.",
             )
-        if 'inviter' in params:
-            if 'inviter_is_new' in params:
-                inviter = params['inviter']
-            else:
-                inviter = UserID.from_string(params['inviter'])
-        else:
-            requester = yield self.auth.get_user_by_req(request)
-            inviter = requester.user
-            inviter_name = yield create_display_inviter_name(self.hs, inviter,
-                                                             'inviter_is_new' in params)
-        if not ('inviter_is_new' in params):
-            is_admin = yield self.auth.is_server_admin(inviter)
-            if not is_admin:
-                stats = yield self.hs.get_handlers().watcha_admin_handler.watcha_admin_stat()
-                raise SynapseError(
-                    500, "inviter user '%s' is not admin. Valid admins are: %s" % (params['inviter'], ', '.join(stats['admins']))
-                )
 
+        try:
+            requester = yield self.auth.get_user_by_req(request)
+            inviter_name = yield create_display_inviter_name(self.hs, requester.user)
+        except AuthError: # raised by get_user_by_req if not logged in
+            if not params['inviter']:
+                raise AuthError(403, "'inviter' field is needed if not called from logged in admin user")
+            inviter_name = params['inviter']
 
         password = generate_password()
         admin = (params['admin'] == 'admin')
@@ -331,8 +320,7 @@ class WatchaRegisterRestServlet(RestServlet):
             admin=admin,
         )
         user = UserID.from_string(user_id)
-        requester = create_requester(user_id)
-        yield self.hs.profile_handler.set_displayname(user, requester,
+        yield self.hs.profile_handler.set_displayname(user, create_requester(user_id),
                                                       params['full_name'], by_admin=True)
 
 
@@ -346,7 +334,7 @@ class WatchaRegisterRestServlet(RestServlet):
             template_name='new_account',
             token=compute_registration_token(user_id, password),
             user_login=user.localpart,
-            inviter_name=inviter,
+            inviter_name=inviter_name,
             full_name=display_name,
         )
 

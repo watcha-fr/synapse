@@ -5,6 +5,7 @@
 #
 
 import json
+import hmac, hashlib
 from tests import unittest
 from mock import patch
 
@@ -21,6 +22,35 @@ from ..utils import setup_test_homeserver
 myid = "@1234ABCD:test"
 PATH_PREFIX = "/_matrix/client/r0"
 
+
+# Inspired by devops.git/watcha_users
+def _call_with_shared_secret(test, shared_secret, endpoint, parameters):
+    '''Order of parameters matters, so must be list of pairs'''
+    mac = hmac.new(
+        key=shared_secret.encode('utf-8'),
+        digestmod=hashlib.sha1,
+    )
+
+    for _, parameter_value in parameters:
+        mac.update(repr(parameter_value).encode('utf-8'))
+        mac.update(b"\x00")
+
+    mac = mac.hexdigest()
+
+    data = dict(parameters)
+    data["mac"] = mac
+
+
+    request, channel = test.make_request(
+        "POST",
+        endpoint,
+        content=json.dumps(data).encode('ascii')
+    )
+
+    test.render(request)
+    return channel
+
+
 class InvitationTestCase(unittest.HomeserverTestCase):
 
     servlets = [
@@ -32,7 +62,6 @@ class InvitationTestCase(unittest.HomeserverTestCase):
     ]
 
     def make_homeserver(self, reactor, clock):
-
 
         self.hs = self.setup_test_homeserver(config={
             **self.default_config(),
@@ -111,7 +140,7 @@ class InvitationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.result['body'], b'{}')
 
-        
+
 class NotAdminWatchaRegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     servlets = [
@@ -125,7 +154,18 @@ class NotAdminWatchaRegisterRestServletTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         config = self.default_config()
-        self.hs = self.setup_test_homeserver(config=config)
+        self.hs = self.setup_test_homeserver(config={
+            **self.default_config(),
+            "require_auth_for_profile_requests": True,
+            "registration_shared_secret": "shared", # also defined in tests/unittest.py, not sure why
+            "email": {
+                "riot_base_url": "http://localhost:8080",
+                "smtp_host": "TEST",
+                "smtp_port": 10,
+                "notif_from": "TEST"
+            },
+            "public_baseurl": "TEST"
+        })
 
         return self.hs
 
@@ -140,8 +180,7 @@ class NotAdminWatchaRegisterRestServletTestCase(unittest.HomeserverTestCase):
             content=json.dumps({'user': 'new_user',
                                 'full_name': "Full Name",
                                 'email': "address@mail.com",
-                                'admin': 'notadmin',
-                                'inviter': self.owner}),
+                                'admin': 'notadmin'}),
             access_token=self.owner_tok,
         )
         self.render(request)
@@ -161,51 +200,44 @@ class WatchaRegisterRestServletTestCase(NotAdminWatchaRegisterRestServletTestCas
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.result['body'], b'{"user_id":"@new_user:test"}')
 
-class NoTokenWatchaRegisterRestServletTestCase(NotAdminWatchaRegisterRestServletTestCase):
-    ADMIN = True
-    def prepare(self, reactor, clock, hs):
-        self.owner = self.register_user("owner", "pass", self.ADMIN)
-        # not loggedin !
+class WatchaRegisterWithSharedSecretRestServletTestCase(NotAdminWatchaRegisterRestServletTestCase):
+    def prepare(self, reactor, clock, hs):        
+        # no user, no login
+        pass
 
-    def _do_request(self):
-        request, channel = self.make_request(
-            "POST",
-            "/watcha_register",
-            content=json.dumps({'user': 'new_user',
-                                'full_name': "Full Name",
-                                'email': "address@mail.com",
-                                'admin': 'notadmin',
-                                'inviter': self.owner}),
-            # No token !
-            #access_token=self.owner_tok,
-        )
-        self.render(request)
-        return channel
+    def _do_request(self, content):
+        return _call_with_shared_secret(self, "shared",
+                                        '/watcha_register',
+                                        content)
 
     def test_watcha_register_servlet(self):
-        with patch('synapse.rest.client.v1.watcha._decode_share_secret_parameters') as mock__decode_share_secret_parameters, \
-             patch('synapse.util.watcha.send_registration_email') as mock_send_registration_email:
-                mock__decode_share_secret_parameters.side_effect = lambda _, __, parameter_json: parameter_json
-                channel = self._do_request()
-                self.assertEqual(channel.code, 200)
-                self.assertEqual(channel.result['body'], b'{"user_id":"@new_user:test"}')
-                # TODO: should say it's called but says "Actual: not called.".
-                # But putting an exception in the send_registration_email function (without the mock) actually raises it !??!
-                #mock_send_registration_email.assert_called_with(recipient="recipient", template_name="template_name",
-                #                                                user_login="user_login", inviter_name="inviter_name", additional_fields="XX")
+        with self.assertLogs('synapse.util.watcha', level='INFO') as cm:
+            channel = self._do_request([('user', 'new_user'),
+                                        ('full_name', "Full Name"),
+                                        ('email', "address@mail.com"),
+                                        ('admin', 'notadmin'),
+                                        ('inviter', 'Some Admin User')])
+            self.assertEqual(channel.code, 200)
+            self.assertEqual(channel.result['body'], b'{"user_id":"@new_user:test"}')
+            self.assertIn("INFO:synapse.util.watcha:NOT Sending registration email to \'address@mail.com\', we are in test mode",
+                          cm.output[0])
+            self.assertIn("INFO:synapse.util.watcha:Email subject is: Invitation à l'espace de travail sécurisé Watcha test",
+                          cm.output[1])
+            self.assertIn(" http://localhost:8080/#/login/t=",
+                          cm.output[3])
+            self.assertIn("Bonjour Full Name,\\n\\nSome Admin User vous a invit\\xc3",
+                          cm.output[3])
 
-class NoTokenNotAdminWatchaRegisterRestServletTestCase(NoTokenWatchaRegisterRestServletTestCase):
-    ADMIN = False
-    def test_watcha_register_servlet(self):
-
-        with patch('synapse.rest.client.v1.watcha._decode_share_secret_parameters') as mock__decode_share_secret_parameters:
-            mock__decode_share_secret_parameters.side_effect = lambda _, __, parameter_json: parameter_json
-            channel = self._do_request()
-            self.assertEqual(channel.code, 500)
+    def test_watcha_register_servlet_without_inviter(self):
+            channel = self._do_request([('user', 'new_user'),
+                                        ('full_name', "Full Name"),
+                                        ('email', "address@mail.com"),
+                                        ('admin', 'notadmin'),
+                                        ('inviter', '')]) # empty inviter
+            self.assertEqual(channel.code, 403)
             self.assertEqual(channel.result['body'],
-                             b'{"errcode":"M_UNKNOWN","error":"inviter user \'@owner:test\' is not admin. Valid admins are: "}')
-
-
+                             b'{"errcode":"M_FORBIDDEN","error":"\'inviter\' field is needed if not called from logged in admin user"}')
+            
 class InvitationDisplayNameTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
