@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
-
+import json
 import hmac
 from hashlib import sha1
 
@@ -410,8 +410,11 @@ class WatchaAddThreepidsServlet(RestServlet):
         return_value = {}
         for name, email in users_without_threepids:
             yield self.auth_handler.add_threepid(name, 'email', email, validated_at)
+            logger.info("Threepids added : {user_id:'%s', email:'%s' }", name, email)
             return_value[name] = email
-            
+   
+        return_value = json.dumps(return_value, sort_keys=True, indent=4)
+
         defer.returnValue((200, return_value))
 
 
