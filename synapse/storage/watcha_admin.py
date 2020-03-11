@@ -68,6 +68,7 @@ class WatchaAdminStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def watcha_user_list(self):
+        # TODO @OP-128 remove setup email process ==> delete email from FIELDS
         FIELDS = ["name", "is_guest", "is_partner", "admin", "email",
                   "creation_ts", "is_active" , "displayname", "last_seen"]
         COLUMNS = FIELDS[:-1] + ["MAX(last_seen)"]

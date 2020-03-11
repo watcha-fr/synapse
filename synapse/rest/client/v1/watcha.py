@@ -297,7 +297,7 @@ class WatchaRegisterRestServlet(RestServlet):
             raise SynapseError(
                 500, "Email address cannot be empty",
             )
-            
+
         full_user_id = yield self.hs.auth_handler.find_user_id_by_email(params['email'])
         if full_user_id:
             raise SynapseError(

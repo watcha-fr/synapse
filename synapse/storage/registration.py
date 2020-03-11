@@ -267,6 +267,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         defer.returnValue(res if res else False)
 
     def _query_for_auth(self, txn, token):
+        #TODO @OP-128 remove setup email process : delete users.email from the SELECT SQL clause.
         sql = (
             "SELECT users.name, users.is_guest, users.is_partner, users.email, access_tokens.id as token_id,"
             " access_tokens.device_id"
@@ -770,6 +771,7 @@ class RegistrationStore(
         txn.call_after(self.is_guest.invalidate, (user_id,))
 
     # Added for watcha...
+    #TODO  @OP-128 remove setup email process : change the way to find the user on database (without email column from users) 
     def find_user_id_by_email(self, email):
         """Find user that match email case insensitively.
 
