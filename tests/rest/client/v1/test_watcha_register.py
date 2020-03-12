@@ -85,9 +85,15 @@ class WatchaRegisterThreePidServletTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        # User register.
-        self.user_id = self.register_user("user_test", "pass", True)
-        self.user_access_token = self.login("user_test", "pass")
+        self.auth = hs.get_auth_handler()
+
+        # Admin register.
+        self.admin_id = self.register_user("user_test", "pass", True)
+        self.admin_access_token = self.login("user_test", "pass")
+
+        #User without threepids register :
+        self.user_id = self.register_user("admin_test", "pass", False)
+        self.auth.set_email(self.user_id, "test@test.com")
 
     def _do_register_threepids(self):
         request, channel = self.make_request(
@@ -100,17 +106,17 @@ class WatchaRegisterThreePidServletTestCase(unittest.HomeserverTestCase):
     def test_register_threepids(self):
         channel = self._do_register_threepids()
         self.assertEqual(channel.code, 200)
-        self.assertEqual(channel.result['body'], b'0')
+        self.assertEqual(channel.result['body'], b'1')
         
     def test_register_threepids_with_user(self):
-        room_id = self.helper.create_room_as(self.user_id, tok=self.user_access_token)
+        room_id = self.helper.create_room_as(self.admin_id, tok=self.admin_access_token)
         request, channel = self.make_request(
             "POST",
             "/rooms/%s/invite" % (room_id, ),
             content=json.dumps({"id_server":"localhost",
                                   "medium":"email",
                                   "address":"asfsadf@qwf.com"}),
-            access_token=self.user_access_token,
+            access_token=self.admin_access_token,
         )
         self.render(request)
         self.assertEqual(channel.code, 200)
@@ -118,4 +124,4 @@ class WatchaRegisterThreePidServletTestCase(unittest.HomeserverTestCase):
         
         channel = self._do_register_threepids()
         self.assertEqual(channel.code, 200)
-        self.assertEqual(channel.result['body'], b'0')
+        self.assertEqual(channel.result['body'], b'1')
