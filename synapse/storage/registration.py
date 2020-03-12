@@ -1317,7 +1317,7 @@ class RegistrationStore(
         logger.info("login from user %s. is_partner=%s", user_id, is_partner)
         defer.returnValue(is_partner)
 
-    # TODO: to remove once we have upgrade all the server (and remove the implementation)
+    # TODO @OP-128 remove setup email process : to remove once we have upgrade all the server (and remove the implementation)
     @defer.inlineCallbacks
     def user_set_email(self, user_id, email):
         def user_set_email_txn(txn):

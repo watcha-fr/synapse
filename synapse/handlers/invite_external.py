@@ -140,7 +140,7 @@ class InviteExternalHandler(BaseHandler):
                     bind_emails=invitee
                 )
 
-                # TODO: to remove once we have upgrade all the server (and remove the implementation)
+                # TODO: @OP-128 remove setup email process : to remove once we have upgrade all the server (and remove the implementation)
                 yield self.hs.get_auth_handler().set_email(full_user_id, invitee)
 
                 """

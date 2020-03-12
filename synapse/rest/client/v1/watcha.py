@@ -318,7 +318,7 @@ class WatchaRegisterRestServlet(RestServlet):
         requester = create_requester(user_id)
         yield self.hs.profile_handler.set_displayname(user, requester, params['full_name'], by_admin=True)
 
-        # TODO: to remove once we have upgrade all the server (and remove the implementation)
+        # TODO @OP-128 remove setup email process : to remove once we have upgrade all the server (and remove the implementation)
         yield self.hs.auth_handler.set_email(user_id, params['email'])
 
         display_name = yield self.hs.profile_handler.get_displayname(user)
@@ -392,13 +392,11 @@ class WatchaAddThreepidsServlet(RestServlet):
     def __init__(self, hs):
         super(WatchaAddThreepidsServlet, self).__init__
         self.hs = hs
-        self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        yield _check_admin(self.auth, request)
 
         validated_at = self.hs.get_clock().time_msec()
         users_without_threepids = yield self.store._execute_sql("""SELECT users.name, users.email 
@@ -407,13 +405,11 @@ class WatchaAddThreepidsServlet(RestServlet):
                                                                 WHERE user_threepids.user_id IS NULL
                                                                     AND users.email IS NOT NULL;""")
 
-        return_value = {}
+        return_value = 0
         for name, email in users_without_threepids:
             yield self.auth_handler.add_threepid(name, 'email', email, validated_at)
             logger.info("Threepids added : {user_id:'%s', email:'%s' }", name, email)
-            return_value[name] = email
-   
-        return_value = json.dumps(return_value, sort_keys=True, indent=4)
+            return_value += 1
 
         defer.returnValue((200, return_value))
 

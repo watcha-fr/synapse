@@ -93,7 +93,6 @@ class WatchaRegisterThreePidServletTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST",
             "/_matrix/client/r0/watcha_threepids",
-            access_token=self.user_access_token,
         )
         self.render(request)
         return channel
@@ -101,7 +100,7 @@ class WatchaRegisterThreePidServletTestCase(unittest.HomeserverTestCase):
     def test_register_threepids(self):
         channel = self._do_register_threepids()
         self.assertEqual(channel.code, 200)
-        self.assertEqual(channel.result['body'], b'{}')
+        self.assertEqual(channel.result['body'], b'0')
         
     def test_register_threepids_with_user(self):
         room_id = self.helper.create_room_as(self.user_id, tok=self.user_access_token)
@@ -119,10 +118,4 @@ class WatchaRegisterThreePidServletTestCase(unittest.HomeserverTestCase):
         
         channel = self._do_register_threepids()
         self.assertEqual(channel.code, 200)
-        self.assertEqual(channel.result['body'],
-                         b'{"@asfsadf/qwf.com:test":"asfsadf@qwf.com"}')
-
-    def test_register_threepids_without_auth(self):
-        self.user_access_token = None
-        channel = self._do_register_threepids()
-        self.assertEqual(channel.code, 401)
+        self.assertEqual(channel.result['body'], b'0')
