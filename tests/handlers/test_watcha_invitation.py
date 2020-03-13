@@ -8,7 +8,7 @@ import json
 
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, profile, room
-
+from synapse.rest.client.v1 import watcha
 from tests import unittest
 
 from ..utils import setup_test_homeserver
@@ -44,7 +44,7 @@ class InvitationTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         # User owning the requested profile.
-        self.owner = self.register_user("owner", "pass")
+        self.owner = self.register_user("owner", "pass",True)
         self.owner_tok = self.login("owner", "pass")
 
         self.other_user_id = self.register_user("otheruser", "pass")
@@ -89,3 +89,39 @@ class InvitationTestCase(unittest.HomeserverTestCase):
         other_room_id = self.helper.create_room_as(self.owner, tok=self.owner_tok)
         self.test_external_invite()
         self._do_external_invite(other_room_id)
+
+
+class RegistrationTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+        watcha.register_servlets,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+        config = self.default_config()
+        config["require_auth_for_profile_requests"] = True
+        self.hs = self.setup_test_homeserver(config=config)
+        return self.hs
+
+    def prepare(self, reactor, clock, hs):
+        self.owner = self.register_user("owner", "pass",True)
+        self.owner_tok = self.login("owner", "pass")
+
+    def test_register_user(self):
+        request, channel = self.make_request(
+            "POST",
+            "/watcha_register",
+            content=json.dumps({'user':'test',
+                                'email':'test@mail.com',
+                                'full_name':'FirstName LastName',
+                                'admin':'false',
+                                # not used yet... 'inviter':'@test:localhost',
+                                }),
+            access_token=self.owner_tok,
+
+            )
+        self.render(request)
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.result['body'], b'{"user_id":"@test:test"}')

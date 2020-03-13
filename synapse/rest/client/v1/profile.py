@@ -54,7 +54,7 @@ class ProfileDisplaynameRestServlet(RestServlet):
         if displayname is not None:
             ret["displayname"] = displayname
 
-        defer.returnValue((200, ret))
+        return (200, ret)
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
@@ -67,12 +67,11 @@ class ProfileDisplaynameRestServlet(RestServlet):
         try:
             new_name = content["displayname"]
         except Exception:
-            defer.returnValue((400, "Unable to parse name"))
+            return (400, "Unable to parse name")
 
-        yield self.profile_handler.set_displayname(
-            user, requester, new_name, is_admin)
+        yield self.profile_handler.set_displayname(user, requester, new_name, is_admin)
 
-        defer.returnValue((200, {}))
+        return (200, {})
 
     def on_OPTIONS(self, request, user_id):
         return (200, {})
@@ -105,7 +104,7 @@ class ProfileAvatarURLRestServlet(RestServlet):
         if avatar_url is not None:
             ret["avatar_url"] = avatar_url
 
-        defer.returnValue((200, ret))
+        return (200, ret)
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
@@ -117,12 +116,11 @@ class ProfileAvatarURLRestServlet(RestServlet):
         try:
             new_name = content["avatar_url"]
         except Exception:
-            defer.returnValue((400, "Unable to parse name"))
+            return (400, "Unable to parse name")
 
-        yield self.profile_handler.set_avatar_url(
-            user, requester, new_name, is_admin)
+        yield self.profile_handler.set_avatar_url(user, requester, new_name, is_admin)
 
-        defer.returnValue((200, {}))
+        return (200, {})
 
     def on_OPTIONS(self, request, user_id):
         return (200, {})
@@ -158,7 +156,7 @@ class ProfileRestServlet(RestServlet):
         if avatar_url is not None:
             ret["avatar_url"] = avatar_url
 
-        defer.returnValue((200, ret))
+        return (200, ret)
 
 
 def register_servlets(hs, http_server):

@@ -278,7 +278,7 @@ class WatchaRegisterRestServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.registration_handler = hs.get_registration_handler()
-        
+
     @defer.inlineCallbacks
     def on_POST(self, request):
         params = yield _check_admin_or_secret(self.hs.config, self.auth, request,
@@ -307,7 +307,7 @@ class WatchaRegisterRestServlet(RestServlet):
         password = generate_password()
         admin = (params['admin'] == 'admin')
         bind_emails = [params['email']]
-        user_id, token = yield self.registration_handler.register(
+        user_id = yield self.registration_handler.register_user(
             localpart=params['user'],
             password=password,
             admin=admin,
@@ -316,7 +316,8 @@ class WatchaRegisterRestServlet(RestServlet):
 
         user = UserID.from_string(user_id)
         requester = create_requester(user_id)
-        yield self.hs.profile_handler.set_displayname(user, requester, params['full_name'], by_admin=True)
+        yield self.hs.profile_handler.set_displayname(user, requester,
+                                                      params['full_name'], by_admin=True)
 
         # TODO @OP-128 remove setup email process : to remove once we have upgrade all the server (and remove the implementation)
         yield self.hs.auth_handler.set_email(user_id, params['email'])
@@ -332,7 +333,8 @@ class WatchaRegisterRestServlet(RestServlet):
             full_name=display_name
         )
 
-        defer.returnValue((200, {'display_name':display_name, 'user_id':user_id}))
+        return (200, {'display_name':display_name, 'user_id':user_id}))
+
 
 class WatchaResetPasswordRestServlet(RestServlet):
     PATTERNS = client_patterns("/watcha_reset_password", v1=True)

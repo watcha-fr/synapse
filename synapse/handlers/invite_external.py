@@ -111,7 +111,7 @@ class InviteExternalHandler(BaseHandler):
 
             # TODO: This is probably very wrong !
             # there is no reason to have a different behaviour for partner ??
-            
+
             # only send email if that user is external.
             # this restriction can be removed once internal users will also receive notifications from invitations by user ID.
             is_partner = yield self.hs.get_auth_handler().is_partner(full_user_id)
@@ -129,10 +129,9 @@ class InviteExternalHandler(BaseHandler):
             user_password = generate_password()
 
             try:
-                yield self.hs.get_registration_handler().register(
+                yield self.hs.get_registration_handler().register_user(
                     localpart=user_id,
                     password=user_password,
-                    generate_token=True,
                     guest_access_token=None,
                     make_guest=False,
                     admin=False,
@@ -142,6 +141,8 @@ class InviteExternalHandler(BaseHandler):
 
                 # TODO: @OP-128 remove setup email process : to remove once we have upgrade all the server (and remove the implementation)
                 yield self.hs.get_auth_handler().set_email(full_user_id, invitee)
+
+                # TODO: should we call auth_handler.issue_access_token ?
 
                 """
                 # we save the account type
@@ -193,7 +194,7 @@ class InviteExternalHandler(BaseHandler):
         else:
             token = compute_registration_token(user_id)
             template_name = 'invite_existing_account'
-            
+
         send_registration_email(
             self.hs.config,
             invitee,
