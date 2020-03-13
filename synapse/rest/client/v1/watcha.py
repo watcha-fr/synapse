@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
-
+import json
 import hmac
 from hashlib import sha1
 
@@ -314,15 +314,18 @@ class WatchaRegisterRestServlet(RestServlet):
 
         password = generate_password()
         admin = (params['admin'] == 'admin')
+        bind_emails = [params['email']]
         user_id = yield self.registration_handler.register_user(
             localpart=params['user'],
             password=password,
             admin=admin,
+            bind_emails=bind_emails
         )
         user = UserID.from_string(user_id)
         yield self.hs.profile_handler.set_displayname(user, create_requester(user_id),
                                                       params['full_name'], by_admin=True)
 
+        # TODO @OP-128 remove setup email process : to remove once we have upgrade all the server (and remove the implementation)
         yield self.hs.auth_handler.set_email(user_id, params['email'])
 
         display_name = yield self.hs.profile_handler.get_displayname(user)
@@ -337,7 +340,7 @@ class WatchaRegisterRestServlet(RestServlet):
             full_name=display_name,
         )
 
-        return (200, { "user_id": user_id })
+        return (200, {'display_name':display_name, 'user_id':user_id})
 
 
 class WatchaResetPasswordRestServlet(RestServlet):
@@ -390,6 +393,35 @@ class WatchaResetPasswordRestServlet(RestServlet):
 
         defer.returnValue((200, {}))
 
+class WatchaAddThreepidsServlet(RestServlet):
+    '''temporary servlet to upgrade older servers'''
+
+    PATTERNS = client_patterns("/watcha_threepids", v1=True)
+
+    def __init__(self, hs):
+        super(WatchaAddThreepidsServlet, self).__init__
+        self.hs = hs
+        self.auth_handler = hs.get_auth_handler()
+        self.store = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+
+        validated_at = self.hs.get_clock().time_msec()
+        users_without_threepids = yield self.store._execute_sql("""SELECT users.name, users.email 
+                                                                FROM users
+                                                                LEFT JOIN user_threepids ON users.name = user_threepids.user_id
+                                                                WHERE user_threepids.user_id IS NULL
+                                                                    AND users.email IS NOT NULL;""")
+
+        return_value = 0
+        for name, email in users_without_threepids:
+            yield self.auth_handler.add_threepid(name, 'email', email, validated_at)
+            logger.info("Threepids added : {user_id:'%s', email:'%s' }", name, email)
+            return_value += 1
+
+        defer.returnValue((200, return_value))
+
 
 def register_servlets(hs, http_server):
     WatchaResetPasswordRestServlet(hs).register(http_server)
@@ -407,3 +439,4 @@ def register_servlets(hs, http_server):
     WatchaRoomMembershipRestServlet(hs).register(http_server)
     WatchaRoomNameRestServlet(hs).register(http_server)
     WatchaDisplayNameRestServlet(hs).register(http_server)
+    WatchaAddThreepidsServlet(hs).register(http_server)
