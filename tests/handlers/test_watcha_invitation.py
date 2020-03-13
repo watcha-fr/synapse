@@ -124,4 +124,4 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             )
         self.render(request)
         self.assertEqual(channel.code, 200)
-        self.assertEqual(channel.result['body'], b'{"user_id":"@test:test"}')
+        self.assertEqual(channel.result['body'], b'{"display_name":"FirstName LastName","user_id":"@test:test"}')

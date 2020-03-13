@@ -333,7 +333,7 @@ class WatchaRegisterRestServlet(RestServlet):
             full_name=display_name
         )
 
-        return (200, {'display_name':display_name, 'user_id':user_id}))
+        return (200, {'display_name':display_name, 'user_id':user_id})
 
 
 class WatchaResetPasswordRestServlet(RestServlet):
