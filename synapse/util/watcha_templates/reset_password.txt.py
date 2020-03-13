@@ -1,4 +1,4 @@
-Bonjour {{ full_name }},
+Bonjour{{ full_name }},
 
 Votre mot de passe pour accéder à l’espace de travail sécurisé {{ server }} a été réinitialisé.
 

@@ -16,7 +16,7 @@ from twisted.internet import defer
 from synapse.api.errors import AuthError, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.rest.client.v2_alpha._base import client_patterns
-from synapse.util.watcha import generate_password, send_registration_email, compute_registration_token
+from synapse.util.watcha import generate_password, send_registration_email, compute_registration_token, create_display_inviter_name
 from synapse.types import UserID, create_requester
 from synapse.api.constants import Membership
 
@@ -282,7 +282,7 @@ class WatchaRegisterRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         params = yield _check_admin_or_secret(self.hs.config, self.auth, request,
-                                             ['user', 'full_name', 'email', 'admin'])
+                                             ['user', 'full_name', 'email', 'admin', 'inviter'])
 
         logger.info("Adding Watcha user...")
 
@@ -303,7 +303,15 @@ class WatchaRegisterRestServlet(RestServlet):
             raise SynapseError(
                 500, "A user with this email address already exists. Cannot create a new one.",
             )
- 
+
+        try:
+            requester = yield self.auth.get_user_by_req(request)
+            inviter_name = yield create_display_inviter_name(self.hs, requester.user)
+        except AuthError: # raised by get_user_by_req if not logged in
+            if not params['inviter']:
+                raise AuthError(403, "'inviter' field is needed if not called from logged in admin user")
+            inviter_name = params['inviter']
+
         password = generate_password()
         admin = (params['admin'] == 'admin')
         bind_emails = [params['email']]
@@ -313,10 +321,8 @@ class WatchaRegisterRestServlet(RestServlet):
             admin=admin,
             bind_emails=bind_emails
         )
-
         user = UserID.from_string(user_id)
-        requester = create_requester(user_id)
-        yield self.hs.profile_handler.set_displayname(user, requester,
+        yield self.hs.profile_handler.set_displayname(user, create_requester(user_id),
                                                       params['full_name'], by_admin=True)
 
         # TODO @OP-128 remove setup email process : to remove once we have upgrade all the server (and remove the implementation)
@@ -330,7 +336,8 @@ class WatchaRegisterRestServlet(RestServlet):
             template_name='new_account',
             token=compute_registration_token(user_id, password),
             user_login=user.localpart,
-            full_name=display_name
+            inviter_name=inviter_name,
+            full_name=display_name,
         )
 
         return (200, {'display_name':display_name, 'user_id':user_id})
