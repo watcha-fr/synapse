@@ -23,13 +23,12 @@ from twisted.internet import defer
 from twisted.internet.defer import CancelledError
 from twisted.python import failure
 
-from synapse.util import Clock, logcontext, unwrapFirstError
-
-from .logcontext import (
+from synapse.logging.context import (
     PreserveLoggingContext,
     make_deferred_yieldable,
     run_in_background,
 )
+from synapse.util import Clock, unwrapFirstError
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +95,7 @@ class ObservableDeferred(object):
             def remove(r):
                 self._observers.discard(d)
                 return r
+
             d.addBoth(remove)
 
             self._observers.add(d)
@@ -124,7 +124,9 @@ class ObservableDeferred(object):
 
     def __repr__(self):
         return "<ObservableDeferred object at %s, result=%r, _deferred=%r>" % (
-            id(self), self._result, self._deferred,
+            id(self),
+            self._result,
+            self._deferred,
         )
 
 
@@ -151,10 +153,12 @@ def concurrently_execute(func, args, limit):
         except StopIteration:
             pass
 
-    return logcontext.make_deferred_yieldable(defer.gatherResults([
-        run_in_background(_concurrently_execute_inner)
-        for _ in range(limit)
-    ], consumeErrors=True)).addErrback(unwrapFirstError)
+    return make_deferred_yieldable(
+        defer.gatherResults(
+            [run_in_background(_concurrently_execute_inner) for _ in range(limit)],
+            consumeErrors=True,
+        )
+    ).addErrback(unwrapFirstError)
 
 
 def yieldable_gather_results(func, iter, *args, **kwargs):
@@ -170,10 +174,12 @@ def yieldable_gather_results(func, iter, *args, **kwargs):
         Deferred[list]: Resolved when all functions have been invoked, or errors if
         one of the function calls fails.
     """
-    return logcontext.make_deferred_yieldable(defer.gatherResults([
-        run_in_background(func, item, *args, **kwargs)
-        for item in iter
-    ], consumeErrors=True)).addErrback(unwrapFirstError)
+    return make_deferred_yieldable(
+        defer.gatherResults(
+            [run_in_background(func, item, *args, **kwargs) for item in iter],
+            consumeErrors=True,
+        )
+    ).addErrback(unwrapFirstError)
 
 
 class Linearizer(object):
@@ -186,6 +192,7 @@ class Linearizer(object):
             # do some work.
 
     """
+
     def __init__(self, name=None, max_count=1, clock=None):
         """
         Args:
@@ -198,6 +205,7 @@ class Linearizer(object):
 
         if not clock:
             from twisted.internet import reactor
+
             clock = Clock(reactor)
         self._clock = clock
         self.max_count = max_count
@@ -222,7 +230,7 @@ class Linearizer(object):
             res = self._await_lock(key)
         else:
             logger.debug(
-                "Acquired uncontended linearizer lock %r for key %r", self.name, key,
+                "Acquired uncontended linearizer lock %r for key %r", self.name, key
             )
             entry[0] += 1
             res = defer.succeed(None)
@@ -267,9 +275,7 @@ class Linearizer(object):
         """
         entry = self.key_to_defer[key]
 
-        logger.debug(
-            "Waiting to acquire linearizer lock %r for key %r", self.name, key,
-        )
+        logger.debug("Waiting to acquire linearizer lock %r for key %r", self.name, key)
 
         new_defer = make_deferred_yieldable(defer.Deferred())
         entry[1][new_defer] = 1
@@ -294,14 +300,14 @@ class Linearizer(object):
             logger.info("defer %r got err %r", new_defer, e)
             if isinstance(e, CancelledError):
                 logger.debug(
-                    "Cancelling wait for linearizer lock %r for key %r",
-                    self.name, key,
+                    "Cancelling wait for linearizer lock %r for key %r", self.name, key
                 )
 
             else:
                 logger.warn(
                     "Unexpected exception waiting for linearizer lock %r for key %r",
-                    self.name, key,
+                    self.name,
+                    key,
                 )
 
             # we just have to take ourselves back out of the queue.
@@ -361,7 +367,7 @@ class ReadWriteLock(object):
                 new_defer.callback(None)
                 self.key_to_current_readers.get(key, set()).discard(new_defer)
 
-        defer.returnValue(_ctx_manager())
+        return _ctx_manager()
 
     @defer.inlineCallbacks
     def write(self, key):
@@ -391,7 +397,7 @@ class ReadWriteLock(object):
                 if self.key_to_current_writer[key] == new_defer:
                     self.key_to_current_writer.pop(key)
 
-        defer.returnValue(_ctx_manager())
+        return _ctx_manager()
 
 
 def _cancelled_to_timed_out_error(value, timeout):
@@ -439,7 +445,7 @@ def timeout_deferred(deferred, timeout, reactor, on_timeout_cancel=None):
 
         try:
             deferred.cancel()
-        except:   # noqa: E722, if we throw any exception it'll break time outs
+        except:  # noqa: E722, if we throw any exception it'll break time outs
             logger.exception("Canceller failed during timeout")
 
         if not new_d.called:

@@ -9,11 +9,9 @@ import hmac, hashlib
 from tests import unittest
 from mock import patch
 
-from twisted.internet import defer
-
-
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, profile, room, watcha
+from synapse.rest.client.v1 import login, profile, room
+from synapse.rest.client.v1 import watcha
 from synapse.util.watcha import create_display_inviter_name
 from synapse.types import UserID
 
@@ -252,9 +250,42 @@ class InvitationDisplayNameTestCase(unittest.HomeserverTestCase):
         self.pump()
         return self.hs
 
-    @defer.inlineCallbacks
     def test_invitation_display_name(self):
         # TODO: not working
-        yield
+        pass
         #inviter_display_name = create_display_inviter_name(self.hs, UserID.from_string("@userid:test"))
         #self.assertEquals(list(inviter_display_name), "User Display (userid@email.com)")
+
+        
+class RegistrationTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+        config = self.default_config()
+        config["require_auth_for_profile_requests"] = True
+        self.hs = self.setup_test_homeserver(config=config)
+        return self.hs
+
+    def prepare(self, reactor, clock, hs):
+        self.owner = self.register_user("owner", "pass",True)
+        self.owner_tok = self.login("owner", "pass")
+
+    def test_register_user(self):
+        request, channel = self.make_request(
+            "POST",
+            "/watcha_register",
+            content=json.dumps({'user':'test',
+                                'email':'test@mail.com',
+                                'full_name':'FirstName LastName',
+                                'admin':'false',
+                                # not used yet... 'inviter':'@test:localhost',
+                                }),
+            access_token=self.owner_tok,
+
+            )
+        self.render(request)
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.result['body'], b'{"user_id":"@test:test"}')

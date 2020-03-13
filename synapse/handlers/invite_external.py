@@ -76,10 +76,9 @@ class InviteExternalHandler(BaseHandler):
             user_password = generate_password()
 
             try:
-                yield self.hs.get_registration_handler().register(
+                yield self.hs.get_registration_handler().register_user(
                     localpart=user_id,
                     password=user_password,
-                    generate_token=True,
                     guest_access_token=None,
                     make_guest=False,
                     admin=False,
@@ -87,6 +86,8 @@ class InviteExternalHandler(BaseHandler):
                 )
 
                 yield self.hs.get_auth_handler().set_email(full_user_id, invitee)
+
+                # TODO: should we call auth_handler.issue_access_token ?
 
                 """
                 # we save the account type

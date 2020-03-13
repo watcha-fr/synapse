@@ -67,7 +67,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
             room_id string, tag string and content string.
         """
         if last_id == current_id:
-            defer.returnValue([])
+            return []
 
         def get_all_updated_tags_txn(txn):
             sql = (
@@ -108,7 +108,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
             )
             results.extend(tags)
 
-        defer.returnValue(results)
+        return results
 
     @defer.inlineCallbacks
     def get_updated_tags(self, user_id, stream_id):
@@ -136,7 +136,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
             user_id, int(stream_id)
         )
         if not changed:
-            defer.returnValue({})
+            return {}
 
         room_ids = yield self.runInteraction("get_updated_tags", get_updated_tags_txn)
 
@@ -146,7 +146,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
             for room_id in room_ids:
                 results[room_id] = tags_by_room.get(room_id, {})
 
-        defer.returnValue(results)
+        return results
 
     def get_tags_for_room(self, user_id, room_id):
         """Get all the tags for the given room
@@ -195,7 +195,7 @@ class TagsStore(TagsWorkerStore):
         self.get_tags_for_user.invalidate((user_id,))
 
         result = self._account_data_id_gen.get_current_token()
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def remove_tag_from_room(self, user_id, room_id, tag):
@@ -218,7 +218,7 @@ class TagsStore(TagsWorkerStore):
         self.get_tags_for_user.invalidate((user_id,))
 
         result = self._account_data_id_gen.get_current_token()
-        defer.returnValue(result)
+        return result
 
     def _update_revision_txn(self, txn, user_id, room_id, next_id):
         """Update the latest revision of the tags for the given user and room.
