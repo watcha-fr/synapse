@@ -183,7 +183,7 @@ class InviteExternalHandler(BaseHandler):
             invitation_name = invitation_info["inviter_id"]
 
         logger.info("Generating message: invitation_name=%s invitee=%s user_id=%s user_pw=<REDACTED> new_user=%s",
-                    invitation_name, invitee, user_id, new_user);
+                    invitation_name, invitee, user_id, new_user)
 
         if new_user:
             token = compute_registration_token(user_id, user_password)

@@ -291,14 +291,15 @@ class WatchaRegisterRestServlet(RestServlet):
                 500, "User name must be lowercase",
             )
 
-        if not params['email'].strip():
+        email = params['email']
+        if not email.strip():
             # the admin seems to have a bug and send empty email adresses sometimes.
             # (never bad to be resilient in any case)
             raise SynapseError(
                 500, "Email address cannot be empty",
             )
             
-        full_user_id = yield self.hs.auth_handler.find_user_id_by_email(params['email'])
+        full_user_id = yield self.hs.auth_handler.find_user_id_by_email(email)
         if full_user_id:
             raise SynapseError(
                 500, "A user with this email address already exists. Cannot create a new one.",
@@ -314,23 +315,24 @@ class WatchaRegisterRestServlet(RestServlet):
 
         user = UserID.from_string(user_id)
         requester = create_requester(user_id)
-        self.hs.profile_handler.set_displayname(user, requester,
+        yield self.hs.profile_handler.set_displayname(user, requester,
                                                 params['full_name'], by_admin=True)
 
-        yield self.hs.auth_handler.set_email(user_id, params['email'])
+        yield self.hs.auth_handler.set_email(user_id, email)
 
         display_name = yield self.hs.profile_handler.get_displayname(user)
+        token = compute_registration_token(user_id, email, password)
 
         send_registration_email(
             self.hs.config,
-            params['email'],
+            email,
             template_name='new_account',
-            token=compute_registration_token(user_id, password),
+            token=token,
             user_login=user.localpart,
             full_name=display_name
         )
 
-        defer.returnValue((200, { "user_id": user_id }))
+        defer.returnValue((200, { "user_id": user_id, "token": token , "password": password}))
 
 
 class WatchaResetPasswordRestServlet(RestServlet):
