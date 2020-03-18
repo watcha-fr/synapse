@@ -186,10 +186,10 @@ class InviteExternalHandler(BaseHandler):
                     invitation_name, invitee, user_id, new_user)
 
         if new_user:
-            token = compute_registration_token(user_id, user_password)
+            token = compute_registration_token(user_id, invitee, user_password)
             template_name = 'invite_new_account'
         else:
-            token = compute_registration_token(user_id)
+            token = compute_registration_token(user_id, invitee)
             template_name = 'invite_existing_account'
             
         send_registration_email(
