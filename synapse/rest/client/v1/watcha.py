@@ -378,7 +378,7 @@ class WatchaResetPasswordRestServlet(RestServlet):
             self.hs.config,
             user_info['email'],
             template_name='reset_password',
-            token=compute_registration_token(user_id, password),
+            token=compute_registration_token(user_id, user_info['email'], password),
             user_login=user.localpart,
             full_name=display_name
         )
