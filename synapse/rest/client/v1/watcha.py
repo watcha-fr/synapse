@@ -332,7 +332,7 @@ class WatchaRegisterRestServlet(RestServlet):
             full_name=display_name
         )
 
-        defer.returnValue((200, { "user_id": user_id, "token": token , "password": password}))
+        defer.returnValue((200, { "user_id": user_id }))
 
 
 class WatchaResetPasswordRestServlet(RestServlet):
