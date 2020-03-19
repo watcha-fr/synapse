@@ -164,7 +164,7 @@
 										<td class="content-block" style="font-family: 'Courier New', Courier, monospace; box-sizing: border-box; font-size: 14px; vertical-align: top; margin: 0; padding: 0 0 20px 20px;"
 										 valign="top">
 											<div style="width:200px; padding:9px;">
-                                                                                            *****&nbsp;<i>(d&eacute;fini&nbsp;lors&nbsp;de&nbsp;la&nbsp;premi&egrave;re&nbsp;connection)</i>
+                                                                                            <i>(d&eacute;fini&nbsp;lors&nbsp;de&nbsp;la&nbsp;premi&egrave;re&nbsp;connection)</i>
 											</div>
 										</td>
 									</tr>
