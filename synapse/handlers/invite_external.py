@@ -83,7 +83,7 @@ class InviteExternalHandler(BaseHandler):
                     make_guest=False,
                     admin=False,
                     make_partner=True,
-                    bind_emails=invitee
+                    bind_emails=[invitee]
                 )
 
                 # TODO: @OP-128 remove setup email process : to remove once we have upgrade all the server (and remove the implementation)
