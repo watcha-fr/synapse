@@ -11,7 +11,7 @@ Pour vous reconnecter dans le futur, conservez cet email et utilisez le lien ci-
 
 Utilisateur : {{ user_login }}
 
-Mot de passe : (défini lors de la première connection)
+Mot de passe : à définir lors de la première connection
 
 Serveur : {{ server }}
 
