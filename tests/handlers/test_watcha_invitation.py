@@ -196,10 +196,10 @@ class WatchaRegisterRestServletTestCase(NotAdminWatchaRegisterRestServletTestCas
     def test_watcha_register_servlet(self):
         channel = self._do_request()
         self.assertEqual(channel.code, 200)
-        self.assertEqual(channel.result['body'], b'{"user_id":"@new_user:test"}')
+        self.assertEqual(channel.result['body'], b'{"display_name":"Full Name","user_id":"@new_user:test"}')
 
 class WatchaRegisterWithSharedSecretRestServletTestCase(NotAdminWatchaRegisterRestServletTestCase):
-    def prepare(self, reactor, clock, hs):        
+    def prepare(self, reactor, clock, hs):
         # no user, no login
         pass
 
@@ -216,7 +216,7 @@ class WatchaRegisterWithSharedSecretRestServletTestCase(NotAdminWatchaRegisterRe
                                         ('admin', 'notadmin'),
                                         ('inviter', 'Some Admin User')])
             self.assertEqual(channel.code, 200)
-            self.assertEqual(channel.result['body'], b'{"user_id":"@new_user:test"}')
+            self.assertEqual(channel.result['body'], b'{"display_name":"Full Name","user_id":"@new_user:test"}')
             self.assertIn("INFO:synapse.util.watcha:NOT Sending registration email to \'address@mail.com\', we are in test mode",
                           cm.output[0])
             self.assertIn("INFO:synapse.util.watcha:Email subject is: Invitation à l'espace de travail sécurisé Watcha test",
@@ -235,14 +235,14 @@ class WatchaRegisterWithSharedSecretRestServletTestCase(NotAdminWatchaRegisterRe
             self.assertEqual(channel.code, 403)
             self.assertEqual(channel.result['body'],
                              b'{"errcode":"M_FORBIDDEN","error":"\'inviter\' field is needed if not called from logged in admin user"}')
-            
+
 class InvitationDisplayNameTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         self.hs = self.setup_test_homeserver()
         store = self.hs.get_datastore()
 
-        store.register(user_id="@userid:test", password_hash=None, create_profile_with_displayname="User Display")
+        store.register_user(user_id="@userid:test", password_hash=None, create_profile_with_displayname="User Display")
         self.pump()
 
         now = int(self.hs.get_clock().time_msec())
@@ -256,11 +256,12 @@ class InvitationDisplayNameTestCase(unittest.HomeserverTestCase):
         #inviter_display_name = create_display_inviter_name(self.hs, UserID.from_string("@userid:test"))
         #self.assertEquals(list(inviter_display_name), "User Display (userid@email.com)")
 
-        
+
 class RegistrationTestCase(unittest.HomeserverTestCase):
     servlets = [
         admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
+        watcha.register_servlets
     ]
 
     def make_homeserver(self, reactor, clock):
