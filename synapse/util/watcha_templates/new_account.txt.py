@@ -1,9 +1,9 @@
-Bonjour{{ full_name }},
+Bonjour {{ full_name }},
 
 {{inviter_name}} vous a invité(e) à rejoindre l'espace de travail sécurisé Watcha
 Vous pourrez y créer et utiliser des salons de discussion avec les autres utilisateurs.
 
-Pour vous connecter à Watcha, suivez ce lien:
+Pour vous connecter à Watcha, suivez ce lien :
 
       {{ login_url }}
 
