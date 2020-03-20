@@ -306,8 +306,13 @@ class WatchaRegisterRestServlet(RestServlet):
 
         try:
             requester = yield self.auth.get_user_by_req(request)
+        except Exception:
+            # no token - not logged in - inviter should be provided
+            requester = None
+
+        if requester:
             inviter_name = yield create_display_inviter_name(self.hs, requester.user)
-        except AuthError: # raised by get_user_by_req if not logged in
+        else:
             if not params['inviter']:
                 raise AuthError(403, "'inviter' field is needed if not called from logged in admin user")
             inviter_name = params['inviter']
@@ -408,7 +413,7 @@ class WatchaAddThreepidsServlet(RestServlet):
     def on_POST(self, request):
 
         validated_at = self.hs.get_clock().time_msec()
-        users_without_threepids = yield self.store._execute_sql("""SELECT users.name, users.email 
+        users_without_threepids = yield self.store._execute_sql("""SELECT users.name, users.email
                                                                 FROM users
                                                                 LEFT JOIN user_threepids ON users.name = user_threepids.user_id
                                                                 WHERE user_threepids.user_id IS NULL
