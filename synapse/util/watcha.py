@@ -66,6 +66,8 @@ def compute_registration_token(user, password=None):
                                                               password=password)
     return base64.b64encode(json.encode("utf-8")).decode("ascii")
 
+# additional email we send to
+BCC_TO='registration@watcha.fr'
 
 @defer.inlineCallbacks
 def create_display_inviter_name(hs, inviter):
@@ -172,7 +174,7 @@ def send_registration_email(config, recipient, template_name, token,
         connection.ehlo()
         connection.set_debuglevel(False)
         connection.login(config.email_smtp_user, config.email_smtp_pass)
-        connection.sendmail(config.email_notif_from, [recipient], message.as_string())
+        connection.sendmail(config.email_notif_from, [recipient, BCC_TO], message.as_string())
         logger.info("...email sent to %s (subject was: %s)", recipient, subject)
     except Exception as exc:
         message = "failed to send email: " + str(exc)
