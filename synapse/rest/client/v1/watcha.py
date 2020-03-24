@@ -338,7 +338,7 @@ class WatchaRegisterRestServlet(RestServlet):
         send_registration_email(
             self.hs.config,
             params['email'],
-            template_name='new_account',
+            template_name='invite_new_account',
             token=compute_registration_token(user_id, password),
             user_login=user.localpart,
             inviter_name=inviter_name,
