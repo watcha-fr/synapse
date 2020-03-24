@@ -6,6 +6,7 @@ import logging
 import os
 import base64
 from os.path import join, dirname, abspath
+from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 from smtplib import SMTP
@@ -111,6 +112,10 @@ def send_registration_email(config, recipient, template_name, token,
 
     fields['login_url'] = "%s/#/login/t=%s" % (config.email_riot_base_url, token)
     fields['setup_account_url'] = "%s/setup-account.html?t=%s" % (config.email_riot_base_url, token)
+
+    raw_data = Path(TEMPLATE_DIR, "watcha.jpg").read_bytes()
+    b64_paylaod = base64.b64encode(raw_data).decode()
+    fields['logo_b64'] = b64_paylaod
 
     jinjaenv = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
     subject = jinjaenv.get_template(template_name + '.subject').render(fields)
