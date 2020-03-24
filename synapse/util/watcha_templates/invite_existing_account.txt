@@ -1,12 +1,14 @@
 Bonjour{{ full_name }},
 
-{{ inviter_name }} vous a invité(e) à participer à l'espace de travail sécurisé Watcha {{ server }}.
+{{ inviter_name }} vous a invité(e) à participer à l'espace de travail sécurisé Watcha.
 
 ================================================================================
 | Nom d'utilisateur : {{ user_login }}                                         |
 |                                                                              |
 | Mot de passe : celui que vous avez défini lors de l'activation de votre      |
 |                compte sur cet espace de travail.                             |
+|                                                                              |
+| Serveur : {{ server }}                                                       |
 ================================================================================
 
 Pour vous connecter à Watcha, suivez ce lien :
