@@ -1,127 +1,13 @@
-<!doctype html>
-<html lang="fr">
+{% extends "base_invite_account.html" %}
 
-<head>
-	<meta charset="UTF-8">
-	<title>{{ title }}</title>
-	<style>
-		html {
-			font-family: sans-serif;
-		}
+{% block message %}
+<p><span class="hint">{{ inviter_name }}</span> vous a invité(e) à rejoindre l'espace de travail sécurisé Watcha.
+</p>
+<p>Vous pourrez y créer et utiliser des salons de discussion avec les autres utilisateurs.</p>
+<p>Pour vous reconnecter dans le futur, conservez cet email et utilisez le bouton de connection ci-dessus, ou notez
+	vos identifiants de connection.</p>
+{% endblock %}
 
-		body {
-			max-width: 600px;
-			padding: 1em;
-		}
-
-		#logo {
-			width: 8em;
-			height: auto;
-			max-width: 20vw;
-			margin-bottom: 2em;
-		}
-
-		.centered {
-			display: table;
-			margin: 0 auto;
-		}
-
-		.btn-outline-primary {
-			background-color: transparent;
-			border-radius: .25rem;
-			border: 1px solid #007bff;
-			color: #007bff;
-			font-family: sans-serif;
-			font-size: 1.25em;
-			font-weight: 400;
-			line-height: 1.5;
-			margin-bottom: 2em;
-			margin-top: 2em;
-			padding: .375rem .75rem;
-			text-decoration: none;
-			transition: 0.15s ease-in-out;
-		}
-
-		.btn-outline-primary:hover {
-			color: #fff;
-			background-color: #007bff;
-		}
-
-		.btn-outline-primary:active {
-			box-shadow: 0 0 0 .2rem rgba(0, 123, 255, .5);
-		}
-
-		.credential-table {
-			width: 100%;
-			margin-bottom: 3em;
-			padding: 1em;
-			border: 1px solid black;
-			border-radius: .25rem;
-			border-spacing: 0;
-		}
-
-		.credential-title {
-			padding-bottom: 0.75em;
-			font-weight: bold;
-		}
-
-		.credential {
-			padding-left: 3em;
-		}
-
-		.credential-table tr:not(:last-child)>.credential {
-			padding-bottom: 1.5em;
-		}
-
-		.hint {
-			color: rgb(100, 100, 100);
-		}
-
-		.help {
-			font-size: small;
-		}
-
-		.url {
-			word-break: break-all;
-		}
-	</style>
-</head>
-
-<body class="centered">
-	<img id="logo" class="centered" src="data:image/jpeg;base64,{{ logo_b64 }}" alt="Logo Watcha" />
-	<p>Bonjour{{ full_name }},</p>
-	<p><span class="hint">{{ inviter_name }}</span> vous a invité(e) à rejoindre l'espace de travail sécurisé Watcha.
-	</p>
-	<p>Vous pourrez y créer et utiliser des salons de discussion avec les autres utilisateurs.</p>
-	<p>Pour vous reconnecter dans le futur, conservez cet email et utilisez le bouton de connection ci-dessus, ou notez
-		vos identifiants de connection.</p>
-	<table class="credential-table">
-		<tbody>
-			<tr>
-				<td class="credential-title">Nom d'utilisateur&nbsp;:</td>
-			</tr>
-			<tr>
-				<td class="credential">{{ user_login }}</td>
-			</tr>
-			<tr>
-				<td class="credential-title">Mot de passe&nbsp;:</td>
-			</tr>
-			<tr>
-				<td class="credential hint">[ À définir lors de la première connection. ]</td>
-			</tr>
-			<tr>
-				<td class="credential-title">Espace de travail&nbsp;:</td>
-			</tr>
-			<tr>
-				<td class="credential">{{ server }}</td>
-			</tr>
-		</tbody>
-	</table>
-	<a class="btn-outline-primary centered" href="{{ login_url }}">Se connecter à Watcha</a>
-	<p class="help">Si le lien ne fonctionne pas, copiez-collez cette URL dans la barre d'adresse de votre navigateur
-		internet&nbsp;: <span class="url hint">{{ login_url }}</span></p>
-	<p>N'hésitez pas à nous contacter en répondant à cet email.</p>
-	<p>L'équipe Watcha</p>
-</body>
-
-</html>
+{% block password %}
+À définir lors de la première connection.
+{% endblock %}
