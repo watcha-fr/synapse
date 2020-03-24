@@ -125,7 +125,7 @@ def send_registration_email(
     fields["user_login"] = user_login
     fields["server"] = config.server_name
     if "full_name" in fields:
-        # hack to avoid double spaces if not set: no space before in template
+        # hack to avoid a space before the comma if the full_name variable is not passed to the template
         fields["full_name"] = " " + fields["full_name"]
 
     if "polypus-core.watcha.fr" in config.server_name:
