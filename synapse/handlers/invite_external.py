@@ -125,7 +125,7 @@ class InviteExternalHandler(BaseHandler):
         inviter_name = yield create_display_inviter_name(self.hs, inviter)
 
         logger.info("Generating message: invitation_name=%s invitee=%s user_id=%s user_pw=<REDACTED> new_user=%s",
-                    inviter_name, invitee, user_id, new_user);
+                    inviter_name, invitee, user_id, new_user)
 
         if new_user:
             token = compute_registration_token(user_id, user_password)
