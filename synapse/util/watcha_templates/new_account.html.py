@@ -2,7 +2,7 @@
 <html lang="fr">
 
 <head>
-	<meta charset="utf-8">
+	<meta charset="UTF-8">
 	<title>{{ title }}</title>
 	<style>
 		html {
@@ -51,20 +51,26 @@
 			box-shadow: 0 0 0 .2rem rgba(0, 123, 255, .5);
 		}
 
-		.credential-section {
+		.credential-table {
+			width: 100%;
 			margin-bottom: 3em;
-			padding-left: 1em;
-			padding-right: 1em;
+			padding: 1em;
 			border: 1px solid black;
 			border-radius: .25rem;
+			border-spacing: 0;
 		}
 
 		.credential-title {
+			padding-bottom: 0.75em;
 			font-weight: bold;
 		}
 
 		.credential {
-			margin-left: 3em;
+			padding-left: 3em;
+		}
+
+		.credential-table tr:not(:last-child)>.credential {
+			padding-bottom: 1.5em;
 		}
 
 		.hint {
@@ -84,15 +90,30 @@
 	<a class="btn-outline-primary centered" href="{{ login_url }}">Se connecter à Watcha</a>
 	<p>Pour vous reconnecter dans le futur, conservez cet email et utilisez le bouton de connection ci-dessus, ou notez
 		vos identifiants de connection.</p>
-	<div class="credential-section">
-		<p class="credential-title">Utilisateur&nbsp;:</p>
-		<p class="credential">{{ user_login }}</p>
-		<p class="credential-title">Mot de passe&nbsp;:</p>
-		<p class="credential hint">(à définir lors de la première connection)</p>
-		<p class="credential-title">Espace de travail&nbsp;:</p>
-		<p class="credential">{{ server }}</p>
-	</div>
+	<table class="credential-table">
+		<tbody>
+			<tr>
+				<td class="credential-title">Utilisateur&nbsp;:</td>
+			</tr>
+			<tr>
+				<td class="credential">{{ user_login }}</td>
+			</tr>
+			<tr>
+				<td class="credential-title">Mot de passe&nbsp;:</td>
+			</tr>
+			<tr>
+				<td class="credential hint">(à définir lors de la première connection)</td>
+			</tr>
+			<tr>
+				<td class="credential-title">Espace de travail&nbsp;:</td>
+			</tr>
+			<tr>
+				<td class="credential">{{ server }}</td>
+			</tr>
+		</tbody>
+	</table>
 	<p>N'hésitez pas à nous contacter en répondant cet email.</p>
 	<p>L'équipe Watcha</p>
+</body>
 
 </html>
