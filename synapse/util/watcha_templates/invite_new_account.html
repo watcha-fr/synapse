@@ -74,26 +74,31 @@
 		}
 
 		.hint {
-			font-style: italic;
+			color: rgb(100, 100, 100);
+		}
+
+		.help {
+			font-size: small;
+		}
+
+		.url {
+			word-break: break-all;
 		}
 	</style>
 </head>
 
 <body class="centered">
-	<img id="logo" class="centered"
-		src="data:image/jpeg;base64,{{ logo_b64 }}"
-		alt="Logo Watcha" />
+	<img id="logo" class="centered" src="data:image/jpeg;base64,{{ logo_b64 }}" alt="Logo Watcha" />
 	<p>Bonjour{{ full_name }},</p>
 	<p><span class="hint">{{ inviter_name }}</span> vous a invité(e) à rejoindre l'espace de travail sécurisé Watcha.
 	</p>
 	<p>Vous pourrez y créer et utiliser des salons de discussion avec les autres utilisateurs.</p>
-	<a class="btn-outline-primary centered" href="{{ login_url }}">Se connecter à Watcha</a>
 	<p>Pour vous reconnecter dans le futur, conservez cet email et utilisez le bouton de connection ci-dessus, ou notez
 		vos identifiants de connection.</p>
 	<table class="credential-table">
 		<tbody>
 			<tr>
-				<td class="credential-title">Utilisateur&nbsp;:</td>
+				<td class="credential-title">Nom d'utilisateur&nbsp;:</td>
 			</tr>
 			<tr>
 				<td class="credential">{{ user_login }}</td>
@@ -102,7 +107,7 @@
 				<td class="credential-title">Mot de passe&nbsp;:</td>
 			</tr>
 			<tr>
-				<td class="credential hint">(à définir lors de la première connection)</td>
+				<td class="credential hint">[ À définir lors de la première connection. ]</td>
 			</tr>
 			<tr>
 				<td class="credential-title">Espace de travail&nbsp;:</td>
@@ -112,7 +117,10 @@
 			</tr>
 		</tbody>
 	</table>
-	<p>N'hésitez pas à nous contacter en répondant cet email.</p>
+	<a class="btn-outline-primary centered" href="{{ login_url }}">Se connecter à Watcha</a>
+	<p class="help">Si le lien ne fonctionne pas, copiez-collez cette URL dans la barre d'adresse de votre navigateur
+		internet&nbsp;: <span class="url hint">{{ login_url }}</span></p>
+	<p>N'hésitez pas à nous contacter en répondant à cet email.</p>
 	<p>L'équipe Watcha</p>
 </body>
 
