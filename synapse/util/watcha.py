@@ -112,11 +112,8 @@ def send_registration_email(config, recipient, template_name, token,
     fields['login_url'] = "%s/#/login/t=%s" % (config.email_riot_base_url, token)
     fields['setup_account_url'] = "%s/setup-account.html?t=%s" % (config.email_riot_base_url, token)
 
-    # To avoid issues with setuptools/distutil,
-    # (not easy to get the 'res/templates' folder to be included in the whl file...)
-    # we ship the templates as .py files, and put them in the code tree itself.
     jinjaenv = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
-    subject = jinjaenv.get_template(template_name + '.subject.py').render(fields)
+    subject = jinjaenv.get_template(template_name + '.subject').render(fields)
     fields['title'] = subject
 
     message = MIMEMultipart('alternative')
@@ -132,7 +129,7 @@ def send_registration_email(config, recipient, template_name, token,
 
     for mimetype, extension in {'plain': 'txt',
                                 'html': 'html'}.items():
-        template_file_name = template_name + '.' + extension + '.py'
+        template_file_name = template_name + '.' + extension
         body = jinjaenv.get_template(template_file_name).render(fields)
         message.attach(MIMEText(body, mimetype, 'utf-8'))
 
@@ -146,7 +143,7 @@ def send_registration_email(config, recipient, template_name, token,
         #   smtp_host: "TEST"
         #   smtp_port: "0"
         #   notif_from: "TEST"
-        #public_baseurl: "TEST"
+        #public_baseurl: "http://localhost:8008"
 
         logger.info("NOT Sending registration email to '%s', we are in test mode", recipient)
         logger.info("Email subject is: " + subject)
