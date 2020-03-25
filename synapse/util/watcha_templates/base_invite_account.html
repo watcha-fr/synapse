@@ -27,10 +27,10 @@
 		}
 
 		.btn-outline-primary {
-			background-color: transparent;
+			background-color: #007bff;
 			border-radius: .25rem;
 			border: 1px solid #007bff;
-			color: #007bff;
+			color: #fff;
 			font-family: sans-serif;
 			font-size: 1.25em;
 			font-weight: 400;
@@ -43,12 +43,14 @@
 		}
 
 		.btn-outline-primary:hover {
-			color: #fff;
-			background-color: #007bff;
+			background-color: #0069d9;
+			border-color: #0062cc;
 		}
 
 		.btn-outline-primary:active {
-			box-shadow: 0 0 0 .2rem rgba(0, 123, 255, .5);
+			box-shadow: 0 0 0 .2rem rgba(38, 143, 255, .5);
+			background-color: #0062cc;
+			border-color: #005cbf;
 		}
 
 		.credential-table {
@@ -78,6 +80,7 @@
 		}
 
 		.fallback {
+			margin-bottom: 3em;
 			font-size: small;
 		}
 
@@ -91,6 +94,9 @@
 	<img id="logo" class="centered" src="data:image/jpeg;base64,{{ logo_b64 }}" alt="Logo Watcha" />
 	<p>Bonjour{{ full_name }},</p>
 	{% block message %}{% endblock %}
+	<a class="btn-outline-primary centered" href="{{ login_url }}">Se connecter à Watcha</a>
+	<p class="fallback">Si le lien ne fonctionne pas, copiez-collez cette URL dans la barre d'adresse de votre
+		navigateur internet&nbsp;: <span class="url hint">{{ login_url }}</span></p>
 	<table class="credential-table">
 		<tbody>
 			<tr>
@@ -103,7 +109,7 @@
 				<td class="credential-title">Mot de passe&nbsp;:</td>
 			</tr>
 			<tr>
-				<td class="credential hint">[ {% block password %}{% endblock %} ]</td>
+				<td class="credential hint">( <em>{% block password %}{% endblock %}</em> )</td>
 			</tr>
 			<tr>
 				<td class="credential-title">Espace de travail&nbsp;:</td>
@@ -113,10 +119,6 @@
 			</tr>
 		</tbody>
 	</table>
-	<a class="btn-outline-primary centered" href="{{ login_url }}">Se connecter à Watcha</a>
-	<p class="fallback">Si le lien ne fonctionne pas, copiez-collez cette URL dans la barre d'adresse de votre
-		navigateur
-		internet&nbsp;: <span class="url hint">{{ login_url }}</span></p>
 	<p>N'hésitez pas à nous contacter en répondant à cet email.</p>
 	<p>L'équipe Watcha</p>
 </body>

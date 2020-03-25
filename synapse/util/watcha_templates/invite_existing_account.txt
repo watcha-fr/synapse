@@ -1,6 +1,6 @@
 Bonjour{{ full_name }},
 
-{{ inviter_name }} vous a invité(e) à participer à l'espace de travail sécurisé Watcha.
+{{ inviter_name }} vous a invité à participer à l'espace de travail sécurisé Watcha.
 
 ================================================================================
 | Nom d'utilisateur : {{ user_login }}                                         |
