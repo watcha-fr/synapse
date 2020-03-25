@@ -109,7 +109,7 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
         yield self._simple_insert(TEMP_TABLE + "_position", {"position": new_pos})
 
         yield self._end_background_update("populate_user_directory_createtables")
-        return 1
+        defer.returnValue(1)
 
     @defer.inlineCallbacks
     def _populate_user_directory_cleanup(self, progress, batch_size):
@@ -131,7 +131,7 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
         )
 
         yield self._end_background_update("populate_user_directory_cleanup")
-        return 1
+        defer.returnValue(1)
 
     @defer.inlineCallbacks
     def _populate_user_directory_process_rooms(self, progress, batch_size):
@@ -177,7 +177,7 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
         # No more rooms -- complete the transaction.
         if not rooms_to_work_on:
             yield self._end_background_update("populate_user_directory_process_rooms")
-            return 1
+            defer.returnValue(1)
 
         logger.info(
             "Processing the next %d rooms of %d remaining"
@@ -257,9 +257,9 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
 
             if processed_event_count > batch_size:
                 # Don't process any more rooms, we've hit our batch size.
-                return processed_event_count
+                defer.returnValue(processed_event_count)
 
-        return processed_event_count
+        defer.returnValue(processed_event_count)
 
     @defer.inlineCallbacks
     def _populate_user_directory_process_users(self, progress, batch_size):
@@ -268,7 +268,7 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
         """
         if not self.hs.config.user_directory_search_all_users:
             yield self._end_background_update("populate_user_directory_process_users")
-            return 1
+            defer.returnValue(1)
 
         def _get_next_batch(txn):
             sql = "SELECT user_id FROM %s LIMIT %s" % (
@@ -298,7 +298,7 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
         # No more users -- complete the transaction.
         if not users_to_work_on:
             yield self._end_background_update("populate_user_directory_process_users")
-            return 1
+            defer.returnValue(1)
 
         logger.info(
             "Processing the next %d users of %d remaining"
@@ -322,7 +322,7 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
                 progress,
             )
 
-        return len(users_to_work_on)
+        defer.returnValue(len(users_to_work_on))
 
     @defer.inlineCallbacks
     def is_room_world_readable_or_publicly_joinable(self, room_id):
@@ -344,16 +344,16 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
             join_rule_ev = yield self.get_event(join_rules_id, allow_none=True)
             if join_rule_ev:
                 if join_rule_ev.content.get("join_rule") == JoinRules.PUBLIC:
-                    return True
+                    defer.returnValue(True)
 
         hist_vis_id = current_state_ids.get((EventTypes.RoomHistoryVisibility, ""))
         if hist_vis_id:
             hist_vis_ev = yield self.get_event(hist_vis_id, allow_none=True)
             if hist_vis_ev:
                 if hist_vis_ev.content.get("history_visibility") == "world_readable":
-                    return True
+                    defer.returnValue(True)
 
-        return False
+        defer.returnValue(False)
 
     def update_profile_in_user_dir(self, user_id, display_name, avatar_url):
         """
@@ -499,7 +499,7 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
         user_ids = set(user_ids_share_pub)
         user_ids.update(user_ids_share_priv)
 
-        return user_ids
+        defer.returnValue(user_ids)
 
     @defer.inlineCallbacks
     def get_all_rooms(self):
@@ -647,7 +647,7 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
 
         users = set(pub_rows)
         users.update(rows)
-        return list(users)
+        defer.returnValue(list(users))
 
     @defer.inlineCallbacks
     def get_rooms_in_common_for_users(self, user_id, other_user_id):
@@ -656,15 +656,15 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
         sql = """
             SELECT room_id FROM (
                 SELECT c.room_id FROM current_state_events AS c
-                INNER JOIN room_memberships AS m USING (event_id)
+                INNER JOIN room_memberships USING (event_id)
                 WHERE type = 'm.room.member'
-                    AND m.membership = 'join'
+                    AND membership = 'join'
                     AND state_key = ?
             ) AS f1 INNER JOIN (
                 SELECT c.room_id FROM current_state_events AS c
-                INNER JOIN room_memberships AS m USING (event_id)
+                INNER JOIN room_memberships USING (event_id)
                 WHERE type = 'm.room.member'
-                    AND m.membership = 'join'
+                    AND membership = 'join'
                     AND state_key = ?
             ) f2 USING (room_id)
         """
@@ -673,7 +673,7 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
             "get_rooms_in_common_for_users", None, sql, user_id, other_user_id
         )
 
-        return [room_id for room_id, in rows]
+        defer.returnValue([room_id for room_id, in rows])
 
     def delete_all_from_user_dir(self):
         """Delete the entire user directory
@@ -833,7 +833,7 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
                 LEFT OUTER JOIN presence_stream AS p ON p.user_id = u.name
                 WHERE u.is_partner = 0 AND u.is_active = 1 %s
                 UNION ALL
-                SELECT u.name as user_id, u.is_active, u.is_partner, d.display_name, d.avatar_url, coalesce(p.state, "invited") as presence
+                SELECT DISTINCT u.name as user_id, u.is_active, u.is_partner, d.display_name, d.avatar_url, coalesce(p.state, "invited") as presence
                 FROM users AS u
                 INNER JOIN partners_invited_by AS pib ON pib.partner = u.name AND pib.invited_by = ?
                 LEFT OUTER JOIN user_directory AS d ON d.user_id = u.name
@@ -852,7 +852,7 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
 
         limited = len(results) > limit
 
-        return {"limited": limited, "results": results}
+        defer.returnValue({"limited": limited, "results": results})
 
 
 def _parse_query_sqlite(search_term):
