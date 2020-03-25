@@ -289,7 +289,6 @@ class RegistrationWorkerStore(SQLBaseStore):
         return res if res else False
 
     def _query_for_auth(self, txn, token):
-        #TODO @OP-128 remove setup email process : delete users.email from the SELECT SQL clause.
         sql = (
             "SELECT users.name, users.is_guest, users.is_partner, access_tokens.id as token_id,"
             " access_tokens.device_id, access_tokens.valid_until_ms"
@@ -860,25 +859,27 @@ class RegistrationStore(
         txn.call_after(self.is_guest.invalidate, (user_id,))
 
     # Added for watcha...
-    #TODO  @OP-128 remove setup email process : change the way to find the user on database (without email column from users) 
     def find_user_id_by_email(self, email):
         """Find user that match email case insensitively.
 
         Returns a user_id or None
         """
         def f(txn):
-            # there should be only one..
-            # but bad data have caused some accounts to be duplicated, so
-            # take a non-partner one by default
+            # Modified after the remove of old setup email process
+            # Now, the email is selected in the user_threepids table
             sql = (
-                "SELECT name FROM users"
-                " WHERE lower(email) = lower(?)"
-                " ORDER BY is_partner ASC"
-                " LIMIT 1"
+                """
+                SELECT
+                    user_id
+                FROM user_threepids
+                WHERE medium = 'email'
+                    AND lower(address) = lower(?)
+                LIMIT 1
+                """
             )
             txn.execute(sql, (email,))
             rows = self.cursor_to_dict(txn)
-            return rows[0]['name'] if rows else None
+            return rows[0]['user_id'] if rows else None
 
         return self.runInteraction("find_user_id_by_email_case_insensitive", f)
     # ... end added for watcha.
@@ -1386,20 +1387,3 @@ class RegistrationStore(
         )
         logger.info("login from user %s. is_partner=%s", user_id, is_partner)
         defer.returnValue(is_partner)
-
-    # TODO @OP-128 remove setup email process : to remove once we have upgrade all the server (and remove the implementation)
-    @defer.inlineCallbacks
-    def user_set_email(self, user_id, email):
-        def user_set_email_txn(txn):
-            self._simple_update_one_txn(
-                txn,
-                'users', {
-                    'name': user_id
-                },
-                {
-                    'email': email
-                }
-            )
-        yield self.runInteraction(
-            "user_set_email", user_set_email_txn
-        )
