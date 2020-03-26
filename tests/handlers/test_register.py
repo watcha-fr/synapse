@@ -231,6 +231,18 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             self.handler.register_user(localpart=invalid_user_id), SynapseError
         )
 
+    # Insertion for watcha
+    def test_bind_email_parameter_is_not_a_list(self):
+        with self.assertLogs('synapse.handlers.register', level='WARNING') as cm:
+            user_id = self.get_success(self.handler.register_user(localpart="user", bind_emails="example@email.com"))
+            self.assertIn("WARNING:synapse.handlers.register:Cannot bind email to new account, because bind_email parameter is not a list.", cm.output[0])
+
+    def test_bind_email_parameter_is_a_list(self):
+        with self.assertLogs('synapse.handlers.register', level='INFO') as cm:
+            user_id = self.get_success(self.handler.register_user(localpart="user", bind_emails=["example@email.com"]))
+            self.assertIn("INFO:synapse.handlers.register:"+("Threepid added for the user : %s" %(user_id)), cm.output[0])
+    #End insertion for watcha
+
     @defer.inlineCallbacks
     def get_or_create_user(self, requester, localpart, displayname, password_hash=None):
         """Creates a new user if the user does not exist,

@@ -257,21 +257,21 @@ class RegistrationHandler(BaseHandler):
 
         # Bind any specified emails to this account
         # Modified for watcha
-+        if(type(bind_emails) == list):
-+            current_time = self.hs.get_clock().time_msec()
-+            for email in bind_emails:
-+                # generate threepid dict
-+                threepid_dict = {
-+                    "medium": "email",
-+                    "address": email,
-+                    "validated_at": current_time,
-+                }
-+
-+                # Bind email to new account
-+                yield self._register_email_threepid(user_id, threepid_dict, None, False)
-+        else:
-+            logger.warning("Cannot bind email to new account, because bind_email parameter is not a list.")
-+        #End of modified for watcha
+        if(type(bind_emails) == list):
+            current_time = self.hs.get_clock().time_msec()
+            for email in bind_emails:
+                # generate threepid dict
+                threepid_dict = {
+                    "medium": "email",
+                    "address": email,
+                    "validated_at": current_time,
+                }
+            
+                # Bind email to new account
+                yield self._register_email_threepid(user_id, threepid_dict, None, False)
+        else:
+            logger.warning("Cannot bind email to new account, because bind_email parameter is not a list.")
+        #End of modified for watcha
 
 
         return user_id
