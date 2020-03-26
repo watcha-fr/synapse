@@ -858,32 +858,6 @@ class RegistrationStore(
         self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
         txn.call_after(self.is_guest.invalidate, (user_id,))
 
-    # Added for watcha...
-    def find_user_id_by_email(self, email):
-        """Find user that match email case insensitively.
-
-        Returns a user_id or None
-        """
-        def f(txn):
-            # Modified after the remove of old setup email process
-            # Now, the email is selected in the user_threepids table
-            sql = (
-                """
-                SELECT
-                    user_id
-                FROM user_threepids
-                WHERE medium = 'email'
-                    AND lower(address) = lower(?)
-                LIMIT 1
-                """
-            )
-            txn.execute(sql, (email,))
-            rows = self.cursor_to_dict(txn)
-            return rows[0]['user_id'] if rows else None
-
-        return self.runInteraction("find_user_id_by_email_case_insensitive", f)
-    # ... end added for watcha.
-
     def user_set_password_hash(self, user_id, password_hash):
         """
         NB. This does *not* evict any cache because the one use for this

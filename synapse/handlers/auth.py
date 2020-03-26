@@ -1044,10 +1044,8 @@ class AuthHandler(BaseHandler):
 
     # Added for Watcha...
     @defer.inlineCallbacks
-    def find_user_id_by_email(self, email):
-        ret = yield self.store.find_user_id_by_email(
-            email
-        )
+    def find_user_id_by_email(self, address):
+        ret = yield self.store.get_user_id_by_threepid("email", address)
 
         defer.returnValue(ret)
     # ... end added for Watcha.
