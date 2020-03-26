@@ -256,17 +256,23 @@ class RegistrationHandler(BaseHandler):
             )
 
         # Bind any specified emails to this account
-        current_time = self.hs.get_clock().time_msec()
-        for email in bind_emails:
-            # generate threepid dict
-            threepid_dict = {
-                "medium": "email",
-                "address": email,
-                "validated_at": current_time,
-            }
+        # Modified for watcha
++        if(type(bind_emails) == list):
++            current_time = self.hs.get_clock().time_msec()
++            for email in bind_emails:
++                # generate threepid dict
++                threepid_dict = {
++                    "medium": "email",
++                    "address": email,
++                    "validated_at": current_time,
++                }
++
++                # Bind email to new account
++                yield self._register_email_threepid(user_id, threepid_dict, None, False)
++        else:
++            logger.warning("Cannot bind email to new account, because bind_email parameter is not a list.")
++        #End of modified for watcha
 
-            # Bind email to new account
-            yield self._register_email_threepid(user_id, threepid_dict, None, False)
 
         return user_id
 
@@ -744,6 +750,8 @@ class RegistrationHandler(BaseHandler):
         yield self._auth_handler.add_threepid(
             user_id, threepid["medium"], threepid["address"], threepid["validated_at"]
         )
+
+        logger.info("Threepid added for the user : %s" %(user_id))
 
         # And we add an email pusher for them by default, but only
         # if email notifications are enabled (so people don't start
