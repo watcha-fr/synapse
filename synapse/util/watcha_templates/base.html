@@ -26,7 +26,7 @@
 			margin: 0 auto;
 		}
 
-		.btn-outline-primary {
+		.btn-primary {
 			background-color: #007bff;
 			border-radius: .25rem;
 			border: 1px solid #007bff;
@@ -42,13 +42,13 @@
 			transition: 0.15s ease-in-out;
 		}
 
-		.btn-outline-primary:hover {
+		.btn-primary:hover {
 			background-color: #0069d9;
 			border-color: #0062cc;
 		}
 
-		.btn-outline-primary:active {
-			box-shadow: 0 0 0 .2rem rgba(38, 143, 255, .5);
+		.btn-primary:active {
+			box-shadow: 0 0 0 .2rem #7fbcff;
 			background-color: #0062cc;
 			border-color: #005cbf;
 		}
@@ -101,7 +101,7 @@
 	<img id="logo" class="centered" src="data:image/jpeg;base64,{{ logo_b64 }}" alt="Logo Watcha" />
 	<p>Bonjour{{ full_name }},</p>
 	{% block introduction %}{% endblock %}
-	<a class="btn-outline-primary centered" href="{{ login_url }}">{% block button %}Se connecter à Watcha{% endblock %}</a>
+	<a class="btn-primary centered" href="{{ login_url }}">{% block button %}Se connecter à Watcha{% endblock %}</a>
 	{% block usage %}{% endblock %}
 	<table class="credential-table">
 		<tbody>
