@@ -168,6 +168,12 @@ def send_registration_email(
     for mimetype in [ "plain", "html" ]:
         fields["mimetype"] = mimetype
         body = jinjaenv.get_template(template_name + ".j2").render(fields)
+        # suggested by https://www.htmlemailcheck.com/check/
+        # (also added ".ExternalClass" in the CSS)
+        body = body.replace('<div>', '<div style="mso-line-height-rule:exactly;">') 
+        #body = body.replace('<p ', '<p style="margin:0;" ') # breaking our style; not doing it
+        #body = body.replace('<p>', '<p style="margin:0;">')
+       
         message.attach(MIMEText(body, mimetype, "utf-8"))
         # useful for debugging...
         #open("/tmp/" + template_name + "." + mimetype, "w").write(body)
@@ -212,7 +218,7 @@ def send_registration_email(
         connection.set_debuglevel(False)
         connection.login(config.email_smtp_user, config.email_smtp_pass)
         connection.sendmail(
-            config.email_notif_from, recipient, message.as_string()
+            config.email_notif_from, recipients, message.as_string()
         )
         logger.info("...email sent to %s (subject was: %s)", recipient, subject)
     except Exception as exc:
