@@ -9,7 +9,7 @@ Bonjour{{ full_name }},
 
   Nom d'utilisateur :
 
-           {{ user_login }}
+           {{ user_login|striptags }}
 
   Mot de passe :
 

@@ -122,7 +122,8 @@ def send_registration_email(
     and such errors are only handled correctly in endpoints (ie. passed back as 403 error)"""
 
     fields = dict(additional_fields)
-    fields["user_login"] = user_login
+    # prevent xxx.com to become links in HTML mail clients
+    fields["user_login"] = user_login.replace(".", "<span>.</span>")
     fields["server"] = config.server_name
     if "full_name" in fields:
         # hack to avoid a space before the comma if the full_name variable is not passed to the template
