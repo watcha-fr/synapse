@@ -176,7 +176,7 @@ def send_registration_email(
        
         message.attach(MIMEText(body, mimetype, "utf-8"))
         # useful for debugging...
-        #open("/tmp/" + template_name + "." + mimetype, "w").write(body)
+        #Path("/tmp", f"{template_name}.{mimetype}").write_text(body)
     # if needed to customize the reply-to field
     # message['Reply-To'] = ...
 
