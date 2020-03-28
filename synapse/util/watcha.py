@@ -145,8 +145,11 @@ def send_registration_email(
     fields["logo_b64"] = b64_paylaod
 
     jinjaenv = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
-    # Overwrite the default "Strip HTML tag" filter,
-    # to make it keep EOLs (for text version of emails)
+
+    # Overwrite the default "Strip HTML tag" filter, to make it keep EOLs
+    # This is used for text version of emails: it means that EOLs are significant
+    # in our emails templates for text emails,
+    # they define the presentation and should be changed with care !
     jinjaenv.filters['striptags'] = lambda value: re.sub('<.*?>', '', value)
 
     subject = jinjaenv.get_template(template_name + "_subject.j2").render(fields)
