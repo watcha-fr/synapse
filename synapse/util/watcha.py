@@ -4,6 +4,7 @@
 import random
 import logging
 import os
+import re
 import base64
 from os.path import join, dirname, abspath
 from pathlib import Path
@@ -144,7 +145,11 @@ def send_registration_email(
     fields["logo_b64"] = b64_paylaod
 
     jinjaenv = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
-    subject = jinjaenv.get_template(template_name + ".subject").render(fields)
+    # Overwrite the default "Strip HTML tag" filter,
+    # to make it keep EOLs (for text version of emails)
+    jinjaenv.filters['striptags'] = lambda value: re.sub('<.*?>', '', value)
+
+    subject = jinjaenv.get_template(template_name + "_subject.j2").render(fields)
     fields["title"] = subject
 
     message = MIMEMultipart("alternative")
@@ -158,23 +163,17 @@ def send_registration_email(
     # https://bugs.python.org/issue1974
     message["Subject"] = Header(subject, "utf-8", 200)
 
-    for mimetype, extension in {"plain": "txt", "html": "html"}.items():
-        template_file_name = template_name + "." + extension
-        body = jinjaenv.get_template(template_file_name).render(fields)
+    for mimetype in [ "plain", "html" ]:
+        fields["mimetype"] = mimetype
+        body = jinjaenv.get_template(template_name + ".j2").render(fields)
         message.attach(MIMEText(body, mimetype, "utf-8"))
-
+        # useful for debugging...
+        #open("/tmp/" + template_name + "." + mimetype, "w").write(body)
     # if needed to customize the reply-to field
     # message['Reply-To'] = ...
 
     if config.email_smtp_host == "TEST":
-        # For running on a local machine. Requires multiple configs in homeserver.yaml:
-        # email:
-        #   riot_base_url: "http://localhost:8080"
-        #   smtp_host: "TEST"
-        #   smtp_port: "0"
-        #   notif_from: "TEST"
-        # public_baseurl: "http://localhost:8008"
-
+        # Used in tests only
         logger.info(
             "NOT Sending registration email to '%s', we are in test mode", recipient
         )

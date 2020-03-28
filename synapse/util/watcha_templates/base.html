@@ -80,6 +80,7 @@
 		}
 
 		.fallback {
+			margin-top: 0;
 			margin-bottom: 3em;
 			font-size: small;
 		}
@@ -93,10 +94,9 @@
 <body class="centered">
 	<img id="logo" class="centered" src="data:image/jpeg;base64,{{ logo_b64 }}" alt="Logo Watcha" />
 	<p>Bonjour{{ full_name }},</p>
-	{% block message %}{% endblock %}
-	<a class="btn-outline-primary centered" href="{{ login_url }}">Se connecter à Watcha</a>
-	<p class="fallback">Si le lien ne fonctionne pas, copiez-collez cette URL dans la barre d'adresse de votre
-		navigateur internet&nbsp;: <span class="url hint">{{ login_url }}</span></p>
+	{% block introduction %}{% endblock %}
+	<a class="btn-outline-primary centered" href="{{ login_url }}">{% block button %}Se connecter à Watcha{% endblock %}</a>
+	{% block usage %}{% endblock %}
 	<table class="credential-table">
 		<tbody>
 			<tr>
@@ -109,7 +109,7 @@
 				<td class="credential-title">Mot de passe&nbsp;:</td>
 			</tr>
 			<tr>
-				<td class="credential hint">( <em>{% block password %}{% endblock %}</em> )</td>
+				<td class="credential hint"><em>(&nbsp;{% block password %}{% endblock %}&nbsp;)</em></td>
 			</tr>
 			<tr>
 				<td class="credential-title">Espace de travail&nbsp;:</td>
@@ -119,7 +119,9 @@
 			</tr>
 		</tbody>
 	</table>
-	<p>N'hésitez pas à nous contacter en répondant à cet email.</p>
+	<p class="fallback">Si le lien ne fonctionne pas, copiez-collez cette URL dans la barre d'adresse de votre
+		navigateur internet&nbsp;: <span class="url hint">{{ login_url }}</span></p>
+	<p>N'hésitez pas à nous contacter en répondant à cet email,</p>
 	<p>L'équipe Watcha</p>
 </body>
 
