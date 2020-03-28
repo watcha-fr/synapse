@@ -8,7 +8,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class WatchaRegisterRestServletTestCase(unittest.HomeserverTestCase):
+class BaseHomeserverWithEmailTestCase(unittest.HomeserverTestCase):
 
     servlets = [
         admin.register_servlets_for_client_rest_resource,
@@ -47,6 +47,9 @@ class WatchaRegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.render(request)
         return channel
 
+
+class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
+
     def test_register_user(self):
         request_content = {"user":"user_test", "full_name":"test", "email":"test@test.com", "admin":False}
         with self.assertLogs('synapse.util.watcha', level='INFO') as cm:
@@ -75,8 +78,32 @@ class WatchaRegisterRestServletTestCase(unittest.HomeserverTestCase):
         channel = self._do_register_user(request_content)
         self.assertEqual(channel.code,500)
 
+
+class WatchaResetPasswordRestServletTestCase(BaseHomeserverWithEmailTestCase):
+
+    def test_reset_password(self):
+        self._do_register_user({"user":"user_test",
+                                "full_name":"test",
+                                "email":"test@test.com",
+                                "admin": False })
+        with self.assertLogs('synapse.util.watcha', level='INFO') as cm:
+            request, channel = self.make_request(
+                "POST",
+                "/_matrix/client/r0/watcha_reset_password",
+                content=json.dumps({ "user": "user_test" }),
+                access_token=self.user_access_token,
+            )
+            self.render(request)
+
+            self.assertIn("INFO:synapse.util.watcha:NOT Sending registration email to \'test@test.com\', we are in test mode",
+                            ''.join(cm.output))
+            self.assertIn("http://localhost:8080/setup-account.html?t=",
+                            ''.join(cm.output))
+            self.assertEqual(channel.code,200)
+
+
 class WatchaRegisterThreePidServletTestCase(unittest.HomeserverTestCase):
-    
+
     servlets = [
         admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
@@ -107,7 +134,7 @@ class WatchaRegisterThreePidServletTestCase(unittest.HomeserverTestCase):
         channel = self._do_register_threepids()
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.result['body'], b'1')
-        
+
     def test_register_threepids_with_user(self):
         room_id = self.helper.create_room_as(self.admin_id, tok=self.admin_access_token)
         request, channel = self.make_request(
@@ -121,7 +148,8 @@ class WatchaRegisterThreePidServletTestCase(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.result['body'], b'{}')
-        
+
         channel = self._do_register_threepids()
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.result['body'], b'1')
+        
