@@ -76,10 +76,9 @@ def compute_registration_token(user, password=None):
         )
     return base64.b64encode(json.encode("utf-8")).decode("ascii")
 
-
-# additional email we send to
-BCC_TO = "registration@watcha.fr"
-
+# additional email we send to, when not sending to a mail gun
+# (to keep a copy of the received emails)
+BCC_TO='registration+sent@watcha.fr'
 
 @defer.inlineCallbacks
 def create_display_inviter_name(hs, inviter):
@@ -175,6 +174,16 @@ def send_registration_email(
     # if needed to customize the reply-to field
     # message['Reply-To'] = ...
 
+    if not config.email_smtp_host:
+        # (used in multipe tests, including tests.rest.client.test_identity.IdentityTestCase.test_3pid_lookup_disabled: just skip it)
+        logger.error("Cannot send email, SMTP host not defined in config")
+        return
+
+    recipients = [ recipient ]
+    if not any(domain in config.email_smtp_host for domain in ['mailgun.org', 'sendinblue.com']):
+        recipients += BCC_TO
+
+
     if config.email_smtp_host == "TEST":
         # Used in tests only
         logger.info(
@@ -183,11 +192,6 @@ def send_registration_email(
         logger.info("Email subject is: " + subject)
         logger.info("Email text content follows:")
         logger.info(str(base64.b64decode(message.get_payload()[0].get_payload())))
-        return
-
-    if not config.email_smtp_host:
-        # (used in multipe tests, including tests.rest.client.test_identity.IdentityTestCase.test_3pid_lookup_disabled: just skip it)
-        logger.error("Cannot send email, SMTP host not defined in config")
         return
 
     if not config.email_riot_base_url:
@@ -208,7 +212,7 @@ def send_registration_email(
         connection.set_debuglevel(False)
         connection.login(config.email_smtp_user, config.email_smtp_pass)
         connection.sendmail(
-            config.email_notif_from, [recipient, BCC_TO], message.as_string()
+            config.email_notif_from, recipient, message.as_string()
         )
         logger.info("...email sent to %s (subject was: %s)", recipient, subject)
     except Exception as exc:
