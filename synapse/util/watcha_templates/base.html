@@ -55,7 +55,7 @@
 
 		.credential-table {
 			width: 100%;
-			margin-bottom: 3em;
+			margin-bottom: 1em;
 			padding: 1em;
 			border: 1px solid black;
 			border-radius: .25rem;
@@ -80,7 +80,6 @@
 		}
 
 		.fallback {
-			margin-top: 0;
 			margin-bottom: 3em;
 			font-size: small;
 		}
@@ -120,7 +119,7 @@
 		</tbody>
 	</table>
 	<p class="fallback">Si le lien ne fonctionne pas, copiez-collez cette URL dans la barre d'adresse de votre
-		navigateur internet&nbsp;: <span class="url hint">{{ login_url }}</span></p>
+		navigateur internet&nbsp;: <span class="url hint"><a href="{{ login_url }}">{{ login_url }}</a></span></p>
 	<p>N'hésitez pas à nous contacter en répondant à cet email,</p>
 	<p>L'équipe Watcha</p>
 </body>
