@@ -154,8 +154,10 @@ def send_registration_email(
     # This is used for text version of emails: it means that EOLs are significant
     # in our emails templates for text emails,
     # they define the presentation and should be changed with care !
-    jinjaenv.filters['striptags'] = lambda value: re.sub('<.*?>', '', value)
-
+    jinjaenv.filters['striptags'] = lambda value: re.sub(
+        '&nbsp;', ' ',
+        re.sub('<.*?>', '', value)
+    )
     subject = jinjaenv.get_template(template_name + "_subject.j2").render(fields)
     fields["title"] = subject
 
@@ -182,6 +184,7 @@ def send_registration_email(
         message.attach(MIMEText(body, mimetype, "utf-8"))
         # useful for debugging...
         #Path("/tmp", f"{template_name}.{mimetype}").write_text(body)
+
     # if needed to customize the reply-to field
     # message['Reply-To'] = ...
 
