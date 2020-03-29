@@ -1,4 +1,4 @@
-Bonjour{{ full_name }},
+Bonjour{{ full_name|spacebefore }},
 
 {% filter striptags %}{% block introduction %}{% endblock %}{% endfilter %}
 {% block link_text %}Pour vous connecter à Watcha, suivez ce lien :{% endblock %}
@@ -9,7 +9,7 @@ Bonjour{{ full_name }},
 
   Nom d'utilisateur :
 
-           {{ user_login|striptags }}
+           {{ user_login }}
 
   Mot de passe :
 

@@ -122,16 +122,9 @@ def send_registration_email(
     and such errors are only handled correctly in endpoints (ie. passed back as 403 error)"""
 
     fields = dict(additional_fields)
-    
-    # prevent xxx.com to become links in HTML mail clients
-    fields["user_login"] = user_login.replace(
-        ".",
-        "<a href='#' style='text-decoration:none;color:#000;cursor:default;'>.</a>"
-    )
+
+    fields["user_login"] = user_login
     fields["server"] = config.server_name
-    if "full_name" in fields:
-        # hack to avoid a space before the comma if the full_name variable is not passed to the template
-        fields["full_name"] = " " + fields["full_name"]
 
     if "polypus-core.watcha.fr" in config.server_name:
         # legacy... polypus was installed with an incorrect server name, and it can't be changed after install,
@@ -144,42 +137,38 @@ def send_registration_email(
         token,
     )
 
-    raw_data = Path(TEMPLATE_DIR, "watcha.jpg").read_bytes()
-    b64_paylaod = base64.b64encode(raw_data).decode()
-    fields["logo_b64"] = b64_paylaod
-
     jinjaenv = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
 
-    # Overwrite the default "Strip HTML tag" filter, to make it keep EOLs
-    # This is used for text version of emails: it means that EOLs are significant
-    # in our emails templates for text emails,
-    # they define the presentation and should be changed with care !
-    jinjaenv.filters['striptags'] = lambda value: re.sub(
-        '&nbsp;', ' ',
-        re.sub('<.*?>', '', value)
-    )
+    jinjaenv.filters.update({
+        # Overwrite existing 'striptags' filter, to make it keep EOLs:
+        # EOLs are significant in our templates for text emails,
+        # they define the presentation and should be changed with care !
+        'striptags': lambda text: re.sub('<.*?>', '', text).replace('&nbsp;', ' '),
+        # prevent "xxx.com"-like strings to become links in HTML mail clients
+        'preventlinks': lambda text: text.replace(
+            ".", "<a class=\"prevent-link\" href=\"#\">.</a>"
+        ),
+        'spacebefore': lambda text: (" " + text) if text else "",        
+        'b64content': lambda file_name: base64.b64encode(
+            Path(TEMPLATE_DIR, file_name).read_bytes()
+        ).decode()
+    })
+    
     subject = jinjaenv.get_template(template_name + "_subject.j2").render(fields)
     fields["title"] = subject
 
     message = MIMEMultipart("alternative")
     message["From"] = config.email_notif_from
     message["To"] = recipient
-
-    # Set the parameter maxlinelen https://docs.python.org/2.7/library/email.header.html
-    # setting a high-enough value helps avoid glitches in the subject line (space added every 40-50 characters),
-    # when executed with Python 2.7. Semi-relevant online discussions:
-    # https://stackoverflow.com/questions/25671608/python-mail-puts-unaccounted-space-in-outlook-subject-line
-    # https://bugs.python.org/issue1974
+    # maxlinelen to workaround https://bugs.python.org/issue1974, maybe not needed anymore
     message["Subject"] = Header(subject, "utf-8", 200)
 
     for mimetype in [ "plain", "html" ]:
         fields["mimetype"] = mimetype
         body = jinjaenv.get_template(template_name + ".j2").render(fields)
         # suggested by https://www.htmlemailcheck.com/check/
-        # (also added ".ExternalClass" in the CSS)
+        # (as well as ".ExternalClass" in the CSS)
         body = body.replace('<div>', '<div style="mso-line-height-rule:exactly;">') 
-        #body = body.replace('<p ', '<p style="margin:0;" ') # breaking our style; not doing it
-        #body = body.replace('<p>', '<p style="margin:0;">')
        
         message.attach(MIMEText(body, mimetype, "utf-8"))
         # useful for debugging...

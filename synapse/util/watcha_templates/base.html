@@ -88,6 +88,12 @@
 			word-break: break-all;
 		}
 
+                .prevent-link {
+			text-decoration: none;
+			color: #000;
+			cursor: default;
+		}
+                
 		.ExternalClass p, .ExternalClass span, .ExternalClass font, .ExternalClass td {
 			line-height: 100%;
 		}
@@ -98,8 +104,8 @@
 </head>
 
 <body class="centered">
-	<img id="logo" class="centered" src="data:image/jpeg;base64,{{ logo_b64 }}" alt="Logo Watcha" />
-	<p>Bonjour{{ full_name }},</p>
+	<img id="logo" class="centered" src="data:image/jpeg;base64,{{ "watcha.jpg"|b64content }}" alt="Logo Watcha" />
+	<p>Bonjour{{ full_name|spacebefore }},</p>
 	{% block introduction %}{% endblock %}
 	<a class="btn-primary centered" href="{{ login_url }}">{% block button %}Se connecter à Watcha{% endblock %}</a>
 	{% block usage %}{% endblock %}
@@ -109,7 +115,7 @@
 				<td class="credential-title">Nom d'utilisateur&nbsp;:</td>
 			</tr>
 			<tr>
-				<td class="credential">{{ user_login }}</td>
+				<td class="credential">{{ user_login|preventlinks }}</td>
 			</tr>
 			<tr>
 				<td class="credential-title">Mot de passe&nbsp;:</td>
