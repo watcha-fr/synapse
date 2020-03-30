@@ -231,19 +231,6 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             self.handler.register_user(localpart=invalid_user_id), SynapseError
         )
 
-    # Insertion for watcha
-    def test_email_is_correctly_insert_on_DB(self):
-        user_id = self.get_success(self.handler.register_user(localpart="user", bind_emails=["example@email.com"]))
-        email = self.get_success(self.store._simple_select_one_onecol("user_threepids", {"user_id": user_id}, "address"))
-        self.assertEqual(email, "example@email.com")
-
-    def test_email_is_correctly_insert_on_DB_after_two_same_registration(self):
-        user_id = self.get_success(self.handler.register_user(localpart="user", bind_emails=["example@email.com"]))
-        self.get_failure(self.handler.register_user(localpart="user", bind_emails=["example2@email.com"]), SynapseError)
-        email = self.get_success(self.store._simple_select_one_onecol("user_threepids", {"user_id": user_id}, "address"))
-        self.assertEqual(email, "example@email.com")  
-    #End insertion for watcha
-
     @defer.inlineCallbacks
     def get_or_create_user(self, requester, localpart, displayname, password_hash=None):
         """Creates a new user if the user does not exist,
