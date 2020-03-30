@@ -68,14 +68,27 @@ class WatchaAdminStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def watcha_user_list(self):
-        # TODO @OP-128 remove setup email process ==> delete email from FIELDS
+        # Modified after the remove of old setup email process
+        # Now, the email is selected in the user_threepids table
         FIELDS = ["name", "is_guest", "is_partner", "admin", "email",
                   "creation_ts", "is_active" , "displayname", "last_seen"]
-        COLUMNS = FIELDS[:-1] + ["MAX(last_seen)"]
-        SQL_USER_LIST = 'SELECT ' + ', '.join(COLUMNS) + ''' FROM users
-        LEFT JOIN user_ips ON users.name = user_ips.user_id
-        LEFT JOIN profiles ON users.name LIKE "@"||profiles.user_id||":%"
-        GROUP BY users.name'''
+        SQL_USER_LIST = '''
+            SELECT 
+                users.name
+                , users.is_guest
+                , users.is_partner
+                , users.admin
+                , user_threepids.address
+                , users.creation_ts
+                , users.is_active
+                , profiles.displayname
+                , user_ips.last_seen
+            FROM users
+                LEFT JOIN user_threepids ON users.name = user_threepids.user_id
+                LEFT JOIN user_ips ON users.name = user_ips.user_id
+                LEFT JOIN profiles ON users.name LIKE "@"||profiles.user_id||":%"
+            GROUP BY users.name
+            '''
 
         users = yield self._execute_sql(SQL_USER_LIST)
 
