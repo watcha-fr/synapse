@@ -174,6 +174,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         self.hs = self.setup_test_homeserver()
+        self.handler = self.hs.get_registration_handler()
         return self.hs
 
     def prepare(self, reactor, clock, hs):
@@ -219,6 +220,26 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.result)
         return channel.json_body["displayname"]
 
+    # insertion for watcha
+    def test_get_email_threepids(self):
+        user = self.get_success(self.handler.register_user("user", "pass", bind_emails=["example@email.com"]))
+        request, channel = self.make_request(
+            "GET", "/profile/%s" % (user)
+        )
+
+        time = self.hs.get_clock().time_msec()
+
+        expectedThreepids = [{
+            "added_at": time,
+            "address": "example@email.com",
+            "medium": "email",
+            "validated_at": time     
+        }]
+
+        self.render(request)
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.json_body["threepids"],expectedThreepids)
+    # deletion for watcha
 
 """ insertion for Watcha """
 class ExternalUserProfileTestCase(ProfileTestCase):
