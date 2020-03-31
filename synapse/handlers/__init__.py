@@ -18,7 +18,7 @@ from .directory import DirectoryHandler
 from .federation import FederationHandler
 from .identity import IdentityHandler
 from .search import SearchHandler
-from .invite_external import InviteExternalHandler
+from .watcha_invite_external import InviteExternalHandler
 from .watcha_admin_handler import WatchaAdminHandler
 
 

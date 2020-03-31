@@ -1,0 +1,25 @@
+Bonjour{{ full_name|spacebefore }},
+
+{% filter striptags %}{% block introduction %}{% endblock %}{% endfilter %}
+{% block link_text %}Pour vous connecter à Watcha, suivez ce lien :{% endblock %}
+
+      {{ login_url }}
+
+{% filter striptags %}{% block usage %}{% endblock %}{% endfilter %}
+
+  Nom d'utilisateur :
+
+           {{ user_login }}
+
+  Mot de passe :
+
+           {% block password %}{% endblock %}
+
+  Espace de travail :
+
+           {{ server }}
+
+
+N'hésitez pas à nous contacter en répondant à cet email,
+
+L'équipe Watcha
