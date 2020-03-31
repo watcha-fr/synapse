@@ -341,14 +341,15 @@ class WatchaRegisterRestServlet(RestServlet):
                 500, "User name must be lowercase",
             )
 
-        if not params["email"].strip():
+        email = params["email"]
+        if not email.strip():
             # the admin seems to have a bug and send empty email adresses sometimes.
             # (never bad to be resilient in any case)
             raise SynapseError(
                 500, "Email address cannot be empty",
             )
 
-        full_user_id = yield self.hs.auth_handler.find_user_id_by_email(params["email"])
+        full_user_id = yield self.hs.auth_handler.find_user_id_by_email(email)
         if full_user_id:
             raise SynapseError(
                 500,
@@ -386,15 +387,16 @@ class WatchaRegisterRestServlet(RestServlet):
         )
 
         # TODO @OP-128 remove setup email process : to remove once we have upgrade all the server (and remove the implementation)
-        yield self.hs.auth_handler.set_email(user_id, params["email"])
+        yield self.hs.auth_handler.set_email(user_id, email)
 
         display_name = yield self.hs.profile_handler.get_displayname(user)
+        token = compute_registration_token(user_id, email, password)
 
         send_registration_email(
             self.hs.config,
-            params["email"],
+            email,
             template_name="invite_new_account",
-            token=compute_registration_token(user_id, password),
+            token=token,
             user_login=user.localpart,
             inviter_name=inviter_name,
             full_name=display_name,
@@ -449,7 +451,7 @@ class WatchaResetPasswordRestServlet(RestServlet):
             self.hs.config,
             user_info["email"],
             template_name="reset_password",
-            token=compute_registration_token(user_id, password),
+            token=compute_registration_token(user_id, user_info["email"], password),
             user_login=user.localpart,
             full_name=display_name,
         )

@@ -64,15 +64,19 @@ def generate_password():
     return password
 
 
-def compute_registration_token(user, password=None):
+def compute_registration_token(user, email=None, password=None):
     """Returns a (weakly encrypted) token that can be passed in a URL or in a JSON for temporaly login
     This cannot be strongly encrypted, because it will be decoded in Riot (in javascript).
     """
-    if password is None:
+    if password is None and email is None:
         json = '{{"user":"{user}"}}'.format(user=user)
-    else:
+    elif password is None:
         json = '{{"user":"{user}","pw":"{password}"}}'.format(
             user=user, password=password
+        )
+    else:
+        json = '{{"user":"{user}", "email":"{email}", "pw":"{password}"}}'.format(
+            user=user, email=email, password=password
         )
     return base64.b64encode(json.encode("utf-8")).decode("ascii")
 
