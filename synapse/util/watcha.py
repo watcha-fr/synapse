@@ -71,8 +71,8 @@ def compute_registration_token(user, email=None, password=None):
     if password is None and email is None:
         json = '{{"user":"{user}"}}'.format(user=user)
     elif password is None:
-        json = '{{"user":"{user}","pw":"{password}"}}'.format(
-            user=user, password=password
+        json = '{{"user":"{user}", "email":"{email}"}}'.format(
+            user=user, email=email
         )
     else:
         json = '{{"user":"{user}", "email":"{email}", "pw":"{password}"}}'.format(
