@@ -134,6 +134,7 @@ class ProfileRestServlet(RestServlet):
         self.hs = hs
         self.profile_handler = hs.get_profile_handler()
         self.auth = hs.get_auth()
+        self.datastore = self.hs.get_datastore()
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
@@ -149,13 +150,16 @@ class ProfileRestServlet(RestServlet):
 
         displayname = yield self.profile_handler.get_displayname(user)
         avatar_url = yield self.profile_handler.get_avatar_url(user)
+        threepids = yield self.datastore.user_get_threepids(user_id)
 
         ret = {}
         if displayname is not None:
             ret["displayname"] = displayname
         if avatar_url is not None:
             ret["avatar_url"] = avatar_url
-
+        if threepids is not None:
+            ret["threepids"] = threepids
+            
         return (200, ret)
 
 
