@@ -220,11 +220,10 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.result)
         return channel.json_body["displayname"]
 
-    # insertion for watcha
+# insertion for watcha
     def test_get_email_threepids(self):
         
         threepids = {
-            "added_at": self.time,
             "address": "example@email.com",
             "medium": "email",
             "validated_at": self.time     
@@ -238,14 +237,20 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             "GET", "/profile/%s" % (self.owner.replace("/","%2F"))
         )
 
+        servletReturn = {
+            "added_at": self.time,
+            "address": "example@email.com",
+            "medium": "email",
+            "validated_at": self.time  
+        }
+
         self.render(request)
         self.assertEqual(channel.code, 200)
-        self.assertEqual(channel.json_body["threepids"], [threepids])
+        self.assertEqual(channel.json_body["threepids"], [servletReturn])
 
     def test_do_not_get_phone_threepids(self):
         
         threepids = {
-            "added_at": self.time,
             "address": "0612345678",
             "medium": "msisdn",
             "validated_at": self.time     
@@ -262,16 +267,15 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body["threepids"], [])
-    # deletion for watcha
 
-""" insertion for Watcha """
+
 class ExternalUserProfileTestCase(ProfileTestCase):
     '''Test for the iOS workaround of not escaping user id when setting profile'''
     def prepare(self, reactor, clock, hs):
         self.owner = self.register_user("owner/myemailadress.com", "pass")
         self.owner_tok = self.login("owner/myemailadress.com", "pass")
         self.time = self.hs.get_clock().time_msec()
-""" end of insertion """
+# end of insertion
 
 
 class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
