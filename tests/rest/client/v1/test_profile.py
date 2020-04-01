@@ -32,7 +32,6 @@ from ....utils import MockHttpResource, setup_test_homeserver
 myid = "@1234ABCD:test"
 PATH_PREFIX = "/_matrix/client/r0"
 
-
 class MockHandlerProfileTestCase(unittest.TestCase):
     """ Tests rest layer of profile management.
 
@@ -180,6 +179,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.owner = self.register_user("owner", "pass")
         self.owner_tok = self.login("owner", "pass")
+        self.time = self.hs.get_clock().time_msec()
 
     def test_set_displayname(self):
         request, channel = self.make_request(
@@ -222,23 +222,46 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
     # insertion for watcha
     def test_get_email_threepids(self):
-        user = self.get_success(self.handler.register_user("user", "pass", bind_emails=["example@email.com"]))
-        request, channel = self.make_request(
-            "GET", "/profile/%s" % (user)
-        )
-
-        time = self.hs.get_clock().time_msec()
-
-        expectedThreepids = [{
-            "added_at": time,
+        
+        threepids = {
+            "added_at": self.time,
             "address": "example@email.com",
             "medium": "email",
-            "validated_at": time     
-        }]
+            "validated_at": self.time     
+        }
+        
+        #Addition of email as a threepids :
+        self.handler._register_email_threepid(self.owner, threepids, self.owner_tok, bind_email=False)
+        
+        # '%F' is for escapement of '/' on ExternalUserProfileTestCase
+        request, channel = self.make_request(
+            "GET", "/profile/%s" % (self.owner.replace("/","%2F"))
+        )
 
         self.render(request)
         self.assertEqual(channel.code, 200)
-        self.assertEqual(channel.json_body["threepids"],expectedThreepids)
+        self.assertEqual(channel.json_body["threepids"], [threepids])
+
+    def test_do_not_get_phone_threepids(self):
+        
+        threepids = {
+            "added_at": self.time,
+            "address": "0612345678",
+            "medium": "msisdn",
+            "validated_at": self.time     
+        }
+
+        # Addition of phone number as a threepids : 
+        self.handler._register_msisdn_threepid(self.owner, threepids, bind_msisdn=False)
+        
+        # '%F' is for escapement of '/' on ExternalUserProfileTestCase
+        request, channel = self.make_request(
+            "GET", "/profile/%s" % (self.owner.replace("/","%2F"))
+        )
+
+        self.render(request)
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.json_body["threepids"], [])
     # deletion for watcha
 
 """ insertion for Watcha """
@@ -247,6 +270,7 @@ class ExternalUserProfileTestCase(ProfileTestCase):
     def prepare(self, reactor, clock, hs):
         self.owner = self.register_user("owner/myemailadress.com", "pass")
         self.owner_tok = self.login("owner/myemailadress.com", "pass")
+        self.time = self.hs.get_clock().time_msec()
 """ end of insertion """
 
 
