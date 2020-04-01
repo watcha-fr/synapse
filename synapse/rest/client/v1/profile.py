@@ -19,7 +19,8 @@ from twisted.internet import defer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import UserID
-
+import logging
+logger = logging.getLogger(__name__)
 
 class ProfileDisplaynameRestServlet(RestServlet):
     """ change for watcha
@@ -150,16 +151,25 @@ class ProfileRestServlet(RestServlet):
 
         displayname = yield self.profile_handler.get_displayname(user)
         avatar_url = yield self.profile_handler.get_avatar_url(user)
+        # insertion for watcha 
         threepids = yield self.datastore.user_get_threepids(user_id)
-
+        # end of insertion
+        logger.info("@@ threepids :"+str(threepids))
         ret = {}
         if displayname is not None:
             ret["displayname"] = displayname
         if avatar_url is not None:
             ret["avatar_url"] = avatar_url
+        # insertion for watcha
+        # For reason of personal data, we don't return phone number of the other users.
         if threepids is not None:
-            ret["threepids"] = threepids
-            
+            result = []
+            for threepid in threepids:
+                if threepid['medium'] == 'email':
+                    result.append(threepid)
+            ret["threepids"] = result
+        # end of insertion   
+        
         return (200, ret)
 
 
