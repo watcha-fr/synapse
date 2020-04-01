@@ -161,8 +161,7 @@ class ProfileRestServlet(RestServlet):
             ret["avatar_url"] = avatar_url
         # insertion for watcha
         # For personal data protection, we don't return phone number of the other users.
-        result = [threepid for threepid in threepids if threepid['medium'] == 'email']
-        ret["threepids"] = result
+        ret["threepids"] = [threepid for threepid in threepids if threepid['medium'] == 'email']
         # end of insertion   
         
         return (200, ret)
