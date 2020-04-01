@@ -8,6 +8,8 @@ include demo/demo.tls.dh
 include demo/*.py
 include demo/*.sh
 
+recursive-include synapse/util/watcha_templates *
+
 recursive-include synapse/storage/schema *.sql
 recursive-include synapse/storage/schema *.sql.postgres
 recursive-include synapse/storage/schema *.sql.sqlite
