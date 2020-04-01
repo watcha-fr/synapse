@@ -30,7 +30,9 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         self.hs.config.enable_registration_captcha = False
 
         return self.hs
+
     #insertion for Watcha
+
     def test_LOGIN_with_trim(self):
         self.register_user("kermit", "monkey")
 
@@ -43,6 +45,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(b"POST", LOGIN_URL, params)
         self.render(request)
         self.assertEquals(channel.code, 200, channel.result)
+
     #end of insertion
 
 
