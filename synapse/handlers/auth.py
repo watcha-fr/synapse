@@ -696,6 +696,7 @@ class AuthHandler(BaseHandler):
             LimitExceededError if the ratelimiter's login requests count for this
                 user is too high too proceed.
         """
+        username=username.strip()
 
         if username.startswith("@"):
             qualified_user_id = username
