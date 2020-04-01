@@ -123,7 +123,7 @@ class InvitationTestCase(unittest.HomeserverTestCase):
     def test_external_invite_second_time(self):
         other_room_id = self.helper.create_room_as(self.owner, tok=self.owner_tok)
         self.test_external_invite()
-        self._do_external_invite(other_room_id)
+        self._do_external_invite(other_room_id, "asfsadf@qwf.com")
 
     def test_external_invite_twice__by_different_inviters(self):
         self.test_external_invite()
