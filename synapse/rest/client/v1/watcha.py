@@ -427,8 +427,8 @@ class WatchaResetPasswordRestServlet(RestServlet):
         logger.info("Setting password for user %s", user_id)
         user = UserID.from_string(user_id)
 
-        user_info = yield self.hs.get_datastore().get_user_by_id(user_id)
-        if not user_info["email"]:
+        emails = yield self.hs.get_account_validity_handler()._get_email_addresses_for_user(user_id)
+        if not emails:
             raise SynapseError(
                 403, "Email is not defined for this user, cannot reset password"
             )
@@ -446,9 +446,9 @@ class WatchaResetPasswordRestServlet(RestServlet):
 
         send_registration_email(
             self.hs.config,
-            user_info["email"],
+            emails[0],
             template_name="reset_password",
-            token=compute_registration_token(user_id, user_info["email"], password),
+            token=compute_registration_token(user_id, emails[0], password),
             user_login=user.localpart,
             full_name=display_name,
         )
