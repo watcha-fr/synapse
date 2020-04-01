@@ -30,6 +30,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         self.hs.config.enable_registration_captcha = False
 
         return self.hs
+
     #insertion for Watcha
     def test_LOGIN_with_trim(self):
         self.register_user("kermit", "monkey")
