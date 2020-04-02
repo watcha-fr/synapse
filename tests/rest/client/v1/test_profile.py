@@ -28,6 +28,7 @@ from synapse.rest.client.v1 import login, profile, room
 from tests import unittest
 
 from ....utils import MockHttpResource, setup_test_homeserver
+from urllib.parse import quote
 
 myid = "@1234ABCD:test"
 PATH_PREFIX = "/_matrix/client/r0"
@@ -234,7 +235,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         
         # '%F' is for escapement of '/' on ExternalUserProfileTestCase
         request, channel = self.make_request(
-            "GET", "/profile/%s" % (self.owner.replace("/","%2F"))
+            "GET", "/profile/%s" % (quote(self.owner, safe=''))
         )
 
         servletReturn = {
@@ -261,7 +262,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         
         # '%F' is for escapement of '/' on ExternalUserProfileTestCase
         request, channel = self.make_request(
-            "GET", "/profile/%s" % (self.owner.replace("/","%2F"))
+            "GET", "/profile/%s" % (quote(self.owner, safe=''))
         )
 
         self.render(request)
