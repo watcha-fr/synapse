@@ -57,6 +57,7 @@ class RegistrationWorkerStore(SQLBaseStore):
                 "password_hash",
                 "is_guest",
                 "is_partner",
+                "email",
                 "consent_version",
                 "consent_server_notice_sent",
                 "appservice_id",
