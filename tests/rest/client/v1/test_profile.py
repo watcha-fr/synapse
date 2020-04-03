@@ -248,6 +248,23 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEquals(channel.json_body.get("email"), None)
 
+    def test_get_only_one_email_threepids(self):
+
+        #Addition of two emails as a threepids :
+        self.auth.add_threepid(self.owner, "email", "example@email.com", self.time)
+        self.auth.add_threepid(self.owner, "email", "second_example@email.com", self.time)
+
+        with self.assertLogs('synapse.rest.client.v1.profile', level='ERROR') as cm:
+            request, channel = self.make_request(
+                "GET", "/profile/%s" % (quote(self.owner, safe=''))
+            )
+
+            self.render(request)
+            self.assertIn("ERROR:synapse.rest.client.v1.profile:This user has multiple email linked to his account.", 
+                          cm.output[0])
+
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.json_body["email"], "example@email.com")
 
 
 class ExternalUserProfileTestCase(ProfileTestCase):
