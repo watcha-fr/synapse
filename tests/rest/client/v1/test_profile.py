@@ -237,16 +237,9 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             "GET", "/profile/%s" % (quote(self.owner, safe=''))
         )
 
-        servletReturn = {
-            "added_at": self.time,
-            "address": "example@email.com",
-            "medium": "email",
-            "validated_at": self.time  
-        }
-
         self.render(request)
         self.assertEqual(channel.code, 200)
-        self.assertEqual(channel.json_body["threepids"], [servletReturn])
+        self.assertEqual(channel.json_body["email"], "example@email.com")
 
     def test_do_not_get_phone_threepids(self):
         
