@@ -31,8 +31,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
         return self.hs
 
-    #insertion for Watcha
-
+    # insertion for Watcha
     def test_LOGIN_with_trim(self):
         self.register_user("kermit", "monkey")
 
@@ -45,8 +44,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(b"POST", LOGIN_URL, params)
         self.render(request)
         self.assertEquals(channel.code, 200, channel.result)
-
-    #end of insertion
+    # end of insertion for watcha
 
 
     def test_POST_ratelimiting_per_address(self):
