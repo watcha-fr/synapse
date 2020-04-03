@@ -31,7 +31,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
         return self.hs
 
-    # insertion for Watcha
+    # insertion for Watcha (op189)
     def test_LOGIN_with_trim(self):
         self.register_user("kermit", "monkey")
 
