@@ -696,9 +696,9 @@ class AuthHandler(BaseHandler):
             LimitExceededError if the ratelimiter's login requests count for this
                 user is too high too proceed.
         """
-        #insertion for watcha
+        # insertion for watcha (op189)
         username = username.strip()
-        #end of insertion for watcha
+        # end of insertion for watcha
 
         if username.startswith("@"):
             qualified_user_id = username
