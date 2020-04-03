@@ -174,7 +174,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         self.hs = self.setup_test_homeserver()
-        self.handler = self.hs.get_registration_handler()
+        self.auth = self.hs.get_auth_handler()
         return self.hs
 
     def prepare(self, reactor, clock, hs):
@@ -223,15 +223,9 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
 # insertion for watcha
     def test_get_email_threepids(self):
-        
-        threepids = {
-            "address": "example@email.com",
-            "medium": "email",
-            "validated_at": self.time     
-        }
-        
+               
         #Addition of email as a threepids :
-        self.handler._register_email_threepid(self.owner, threepids, self.owner_tok, bind_email=False)
+        self.auth.add_threepid(self.owner, "email", "example@email.com", self.time)
         
         request, channel = self.make_request(
             "GET", "/profile/%s" % (quote(self.owner, safe=''))
@@ -242,15 +236,9 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.json_body["email"], "example@email.com")
 
     def test_do_not_get_phone_threepids(self):
-        
-        threepids = {
-            "address": "0612345678",
-            "medium": "msisdn",
-            "validated_at": self.time     
-        }
 
         # Addition of phone number as a threepids : 
-        self.handler._register_msisdn_threepid(self.owner, threepids, bind_msisdn=False)
+        self.auth.add_threepid(self.owner, "msisdn", "0612345678", self.time)
         
         request, channel = self.make_request(
             "GET", "/profile/%s" % (quote(self.owner, safe=''))
