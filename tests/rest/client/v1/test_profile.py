@@ -233,7 +233,6 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         #Addition of email as a threepids :
         self.handler._register_email_threepid(self.owner, threepids, self.owner_tok, bind_email=False)
         
-        # '%F' is for escapement of '/' on ExternalUserProfileTestCase
         request, channel = self.make_request(
             "GET", "/profile/%s" % (quote(self.owner, safe=''))
         )
@@ -260,7 +259,6 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         # Addition of phone number as a threepids : 
         self.handler._register_msisdn_threepid(self.owner, threepids, bind_msisdn=False)
         
-        # '%F' is for escapement of '/' on ExternalUserProfileTestCase
         request, channel = self.make_request(
             "GET", "/profile/%s" % (quote(self.owner, safe=''))
         )
