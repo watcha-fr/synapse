@@ -28,10 +28,10 @@ from synapse.rest.client.v1 import login, profile, room
 from tests import unittest
 
 from ....utils import MockHttpResource, setup_test_homeserver
+from urllib.parse import quote
 
 myid = "@1234ABCD:test"
 PATH_PREFIX = "/_matrix/client/r0"
-
 
 class MockHandlerProfileTestCase(unittest.TestCase):
     """ Tests rest layer of profile management.
@@ -174,11 +174,13 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         self.hs = self.setup_test_homeserver()
+        self.auth = self.hs.get_auth_handler()
         return self.hs
 
     def prepare(self, reactor, clock, hs):
         self.owner = self.register_user("owner", "pass")
         self.owner_tok = self.login("owner", "pass")
+        self.time = self.hs.get_clock().time_msec()
 
     def test_set_displayname(self):
         request, channel = self.make_request(
@@ -219,14 +221,59 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.result)
         return channel.json_body["displayname"]
 
+# insertion for watcha
+    def test_get_email_threepids(self):
+               
+        #Addition of email as a threepids :
+        self.auth.add_threepid(self.owner, "email", "example@email.com", self.time)
+        
+        request, channel = self.make_request(
+            "GET", "/profile/%s" % (quote(self.owner, safe=''))
+        )
 
-""" insertion for Watcha """
+        self.render(request)
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.json_body["email"], "example@email.com")
+
+    def test_do_not_get_phone_threepids(self):
+
+        # Addition of phone number as a threepids : 
+        self.auth.add_threepid(self.owner, "msisdn", "0612345678", self.time)
+        
+        request, channel = self.make_request(
+            "GET", "/profile/%s" % (quote(self.owner, safe=''))
+        )
+
+        self.render(request)
+        self.assertEqual(channel.code, 200)
+        self.assertEquals(channel.json_body.get("email"), None)
+
+    def test_get_only_one_email_threepids(self):
+
+        #Addition of two emails as a threepids :
+        self.auth.add_threepid(self.owner, "email", "example@email.com", self.time)
+        self.auth.add_threepid(self.owner, "email", "second_example@email.com", self.time)
+
+        with self.assertLogs('synapse.rest.client.v1.profile', level='ERROR') as cm:
+            request, channel = self.make_request(
+                "GET", "/profile/%s" % (quote(self.owner, safe=''))
+            )
+
+            self.render(request)
+            self.assertIn("ERROR:synapse.rest.client.v1.profile:This user has multiple email linked to his account.", 
+                          cm.output[0])
+
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.json_body["email"], "example@email.com")
+
+
 class ExternalUserProfileTestCase(ProfileTestCase):
     '''Test for the iOS workaround of not escaping user id when setting profile'''
     def prepare(self, reactor, clock, hs):
         self.owner = self.register_user("owner/myemailadress.com", "pass")
         self.owner_tok = self.login("owner/myemailadress.com", "pass")
-""" end of insertion """
+        self.time = self.hs.get_clock().time_msec()
+# end of insertion
 
 
 class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
