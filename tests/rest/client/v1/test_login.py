@@ -31,6 +31,22 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
         return self.hs
 
+    # insertion for Watcha (op189)
+    def test_LOGIN_with_trim(self):
+        self.register_user("kermit", "monkey")
+
+        params = {
+            "type": "m.login.password",
+            "identifier": {"type": "m.id.user", "user": "kermit "},
+            "password": "monkey",
+        }
+        request_data = json.dumps(params)
+        request, channel = self.make_request(b"POST", LOGIN_URL, params)
+        self.render(request)
+        self.assertEquals(channel.code, 200, channel.result)
+    # end of insertion for watcha
+
+
     def test_POST_ratelimiting_per_address(self):
         self.hs.config.rc_login_address.burst_count = 5
         self.hs.config.rc_login_address.per_second = 0.17
