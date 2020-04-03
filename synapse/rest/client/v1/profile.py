@@ -166,7 +166,7 @@ class ProfileRestServlet(RestServlet):
         # insertion for watcha
         if len(emails) > 1 :
             logger.error("This user has multiple email linked to his account.")
-        if not len(emails) == 0:
+        if emails:
             ret["email"] = emails[0]
         # end of insertion   
         
