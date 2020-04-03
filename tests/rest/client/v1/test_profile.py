@@ -258,7 +258,8 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
         self.render(request)
         self.assertEqual(channel.code, 200)
-        self.assertEqual(channel.json_body["threepids"], [])
+        self.assertEquals(channel.json_body.get("email"), None)
+
 
 
 class ExternalUserProfileTestCase(ProfileTestCase):
