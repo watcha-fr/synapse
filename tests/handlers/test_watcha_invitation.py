@@ -94,18 +94,18 @@ class InvitationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.result['body'], b'{}')
 
-    def _do_external_invite(self, room_id):
+    def _do_external_invite(self, room_id, email):
         self._do_invite(room_id, {"id_server":"localhost",
                                   "medium":"email",
-                                  "address":"asfsadf@qwf.com"})
+                                  "address":email})
 
     def test_simple_invite(self):
         self._do_invite(self.room_id, {"user_id":self.other_user_id})
 
-    def test_external_invite(self):
+    def _do_test_external_invite(self, email):
         with self.assertLogs('synapse.util.watcha', level='INFO') as cm:
-            self._do_external_invite(self.room_id)
-            self.assertIn("INFO:synapse.util.watcha:NOT Sending registration email to \'asfsadf@qwf.com\', we are in test mode",
+            self._do_external_invite(self.room_id, email)
+            self.assertIn("INFO:synapse.util.watcha:NOT Sending registration email to \'%s\', we are in test mode" % email,
                           cm.output[0])
             self.assertIn("INFO:synapse.util.watcha:Email subject is: Invitation à l'espace de travail sécurisé Watcha test",
                           cm.output[1])
@@ -114,14 +114,18 @@ class InvitationTestCase(unittest.HomeserverTestCase):
             self.assertIn("Bonjour,\\n\\nowner vous a invit\\xc3",
                           cm.output[3])
 
-
+    def test_external_invite(self):
+        self._do_test_external_invite("asfsadf@qwf.com")
+            
+    def test_external_invite_with_plus_sign(self):
+        self._do_test_external_invite("asfsadf+test@qwf.com")
+            
     def test_external_invite_second_time(self):
         other_room_id = self.helper.create_room_as(self.owner, tok=self.owner_tok)
         self.test_external_invite()
-        self._do_external_invite(other_room_id)
+        self._do_external_invite(other_room_id, "asfsadf@qwf.com")
 
     def test_external_invite_twice__by_different_inviters(self):
-
         self.test_external_invite()
         other_room_id = self.helper.create_room_as(self.other_user_id, tok=self.other_access_token)
 
