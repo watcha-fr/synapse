@@ -95,18 +95,23 @@ def create_display_inviter_name(hs, inviter):
     # inviter_display_name = yield hs.get_profile_handler().get_displayname(inviter)
     # which seems to work too..
     inviter_display_name = yield hs.get_profile_handler().get_displayname(inviter)
-    inviter_user_info = yield hs.get_datastore().get_user_by_id(inviter.to_string())
+    inviter_threepids = yield hs.get_datastore().user_get_threepids(inviter.to_string())
+    inviter_emails = [ threepid["address"] for threepid in inviter_threepids if threepid["medium"] == "email"]
+    if inviter_emails:
+        inviter_email = inviter_emails[0]
+    else :
+        inviter_email = ""
     inviter_name = (
         (
             inviter_display_name
             + (
-                (" (" + inviter_user_info["email"] + ")")
-                if inviter_user_info["email"]
+                (" (" + inviter_email + ")")
+                if inviter_email
                 else ""
             )
         )
         if inviter_display_name
-        else inviter_user_info["email"]
+        else inviter_email
     )
     defer.returnValue(inviter_name)
 
