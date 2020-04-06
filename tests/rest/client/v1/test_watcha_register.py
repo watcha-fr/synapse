@@ -78,6 +78,17 @@ class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
         channel = self._do_register_user(request_content)
         self.assertEqual(channel.code,500)
 
+    def test_register_user_with_plus_in_email(self):
+        request_content = {"user":"user_test", "full_name":"test", "email":"test+test@test.com", "admin":False}
+        with self.assertLogs('synapse.util.watcha', level='INFO') as cm:
+            channel = self._do_register_user(request_content)
+            self.assertIn("INFO:synapse.util.watcha:NOT Sending registration email to \'test+test@test.com\', we are in test mode",
+                            ''.join(cm.output))
+            self.assertIn(" http://localhost:8080/#/login/t=",
+                            ''.join(cm.output))
+            self.assertEqual(channel.result['body'], b'{"display_name":"test","user_id":"@user_test:test"}')
+            self.assertEqual(channel.code,200)
+
 
 class WatchaResetPasswordRestServletTestCase(BaseHomeserverWithEmailTestCase):
 

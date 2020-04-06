@@ -25,7 +25,7 @@ class InviteExternalHandler(BaseHandler):
     def _gen_user_id_from_email(self, email):
         # user_id must be lowercase (and it's OK to consider email as case-insensitive)
         local_part, domain = email.lower().split("@")
-        user_id = local_part + "/" + domain
+        user_id = local_part.replace('+', '//') + "/" + domain
         logger.debug(
             "gen_user_id_from_email: email=%s leads to user_id=%s", email, user_id
         )
