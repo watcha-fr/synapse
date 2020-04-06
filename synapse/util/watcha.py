@@ -96,11 +96,11 @@ def create_display_inviter_name(hs, inviter):
     # which seems to work too..
     inviter_display_name = yield hs.get_profile_handler().get_displayname(inviter)
     inviter_threepids = yield hs.get_datastore().user_get_threepids(inviter.to_string())
-    inviter_emails = [ threepid["address"] for threepid in inviter_threepids if threepid["medium"] == "email"]
-    if inviter_emails:
-        inviter_email = inviter_emails[0]
-    else :
-        inviter_email = ""
+    inviter_email = ""
+    for threepid in inviter_threepids:
+        if threepid["medium"] == "email":
+            inviter_email = threepid["address"]
+            break
     inviter_name = (
         (
             inviter_display_name
