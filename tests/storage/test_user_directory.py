@@ -78,6 +78,7 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
         self.assertFalse(r["limited"])
         self.assertEqual(0, len(r["results"]))
 
+# Insertion for watcha
 class WatchaUserDirectoryStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
@@ -133,3 +134,5 @@ class WatchaUserDirectoryStoreTestCase(unittest.TestCase):
 
         sqlResult = yield self.store.search_user_dir(self.user_id, self.partner_id, 1)
         self.assertEquals(sqlResult["results"], [])
+# end of insertion
+        
