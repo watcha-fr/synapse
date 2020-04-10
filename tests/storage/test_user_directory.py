@@ -105,19 +105,19 @@ class WatchaUserDirectoryStoreTestCase(unittest.TestCase):
             self.assertIn('INFO:synapse.storage.user_directory:Searching with search term: %s' % repr(self.searched_user), ''.join(cm.output))
 
         self.assertFalse(sqlResult["limited"])
-        self.assertEquals(sqlResult["results"], [{'user_id': self.searched_user, 'is_active': 1, 'is_partner': 0, 'display_name': None, 'avatar_url': None, 'presence': None, 'address': None}])
+        self.assertEquals(sqlResult["results"], [{'user_id': self.searched_user, 'is_active': 1, 'is_partner': 0, 'display_name': None, 'avatar_url': None, 'presence': None, 'email': None}])
 
     @defer.inlineCallbacks
     def test_search_user_dir_with_email(self):
         yield self.store.user_add_threepid(self.searched_user, "email", "example@example.com", self.time, self.time)
         sqlResult = yield self.store.search_user_dir(self.user_id, self.searched_user, 1)
-        self.assertEquals(sqlResult["results"], [{'user_id': self.searched_user, 'is_active': 1, 'is_partner': 0, 'display_name': None, 'avatar_url': None, 'presence': None, 'address': "example@example.com"}])
+        self.assertEquals(sqlResult["results"], [{'user_id': self.searched_user, 'is_active': 1, 'is_partner': 0, 'display_name': None, 'avatar_url': None, 'presence': None, 'email': "example@example.com"}])
 
     @defer.inlineCallbacks
     def test_search_user_dir_with_displayname(self):
         yield self.store.update_profile_in_user_dir(self.searched_user, "user", None)
         sqlResult = yield self.store.search_user_dir(self.user_id, self.searched_user, 1)
-        self.assertEquals(sqlResult["results"], [{'user_id': self.searched_user, 'is_active': 1, 'is_partner': 0, 'display_name': 'user', 'avatar_url': None, 'presence': None, 'address': None}])
+        self.assertEquals(sqlResult["results"], [{'user_id': self.searched_user, 'is_active': 1, 'is_partner': 0, 'display_name': 'user', 'avatar_url': None, 'presence': None, 'email': None}])
 
     @defer.inlineCallbacks
     def test_search_user_dir_with_user_invite_partner(self):
@@ -125,7 +125,7 @@ class WatchaUserDirectoryStoreTestCase(unittest.TestCase):
         yield self.store.insert_partner_invitation(self.partner_id, self.user_id, 0, 0)
 
         sqlResult = yield self.store.search_user_dir(self.user_id, self.partner_id, 1)
-        self.assertEquals(sqlResult["results"], [{'user_id': self.partner_id, 'is_active': 1, 'is_partner': 1, 'display_name': None, 'avatar_url': None, 'presence': 'invited', 'address': None}])
+        self.assertEquals(sqlResult["results"], [{'user_id': self.partner_id, 'is_active': 1, 'is_partner': 1, 'display_name': None, 'avatar_url': None, 'presence': 'invited', 'email': None}])
 
     @defer.inlineCallbacks
     def test_search_user_dir_with_user_dont_invite_partner(self):
