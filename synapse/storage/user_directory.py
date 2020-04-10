@@ -834,7 +834,7 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
                     , d.display_name
                     , d.avatar_url
                     , p.state as presence
-                    , t.address
+                    , t.address as email
                 FROM users AS u
                 LEFT OUTER JOIN 
                     (SELECT 
@@ -858,7 +858,7 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
                     , d.display_name
                     , d.avatar_url
                     , coalesce(p.state, "invited") as presence
-                    , t.address
+                    , t.address as email
                 FROM users AS u
                 INNER JOIN partners_invited_by AS pib 
                     ON pib.partner = u.name AND pib.invited_by = ?
