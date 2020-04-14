@@ -254,13 +254,13 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.auth.add_threepid(self.owner, "email", "example@email.com", self.time)
         self.auth.add_threepid(self.owner, "email", "second_example@email.com", self.time)
 
-        with self.assertLogs('synapse.rest.client.v1.profile', level='ERROR') as cm:
+        with self.assertLogs('synapse.handlers.account_validity', level='ERROR') as cm:
             request, channel = self.make_request(
                 "GET", "/profile/%s" % (quote(self.owner, safe=''))
             )
 
             self.render(request)
-            self.assertIn("ERROR:synapse.rest.client.v1.profile:This user has multiple email linked to his account.", 
+            self.assertIn("ERROR:synapse.handlers.account_validity:This user has multiple email linked to his account.", 
                           cm.output[0])
 
         self.assertEqual(channel.code, 200)
