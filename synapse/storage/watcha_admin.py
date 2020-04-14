@@ -68,8 +68,7 @@ class WatchaAdminStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def watcha_user_list(self):
-        # Modified after the remove of old setup email process
-        # Now, the email is selected in the user_threepids table
+
         FIELDS = ["name", "is_guest", "is_partner", "admin", "email",
                   "creation_ts", "is_active" , "displayname", "last_seen"]
         SQL_USER_LIST = '''
@@ -78,13 +77,19 @@ class WatchaAdminStore(SQLBaseStore):
                 , users.is_guest
                 , users.is_partner
                 , users.admin
-                , user_threepids.address
+                , user_email.address
                 , users.creation_ts
                 , users.is_active
                 , profiles.displayname
                 , user_ips.last_seen
             FROM users
-                LEFT JOIN user_threepids ON users.name = user_threepids.user_id
+                LEFT JOIN
+                    (SELECT
+                        t.user_id
+                        , t.address
+                    FROM user_threepids AS t
+                    WHERE t.medium = 'email') AS user_email
+                    ON users.name = user_email.user_id
                 LEFT JOIN user_ips ON users.name = user_ips.user_id
                 LEFT JOIN profiles ON users.name LIKE "@"||profiles.user_id||":%"
             GROUP BY users.name
