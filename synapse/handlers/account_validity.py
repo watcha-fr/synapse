@@ -175,6 +175,28 @@ class AccountValidityHandler(object):
             )
 
         yield self.store.set_renewal_mail_status(user_id=user_id, email_sent=True)
+    # insertion for watcha
+    @defer.inlineCallbacks
+    def get_email_addresse_for_user(self, user_id):
+        """Retrieve only one email address attached to a user's account
+        
+        Args:
+            user_id (str): ID of the user to lookup email addresse for.
+
+        Returns:
+            defer.Deferred str: Email addresse for this account.
+        """
+
+        emails = yield self._get_email_addresses_for_user(user_id)
+
+        email = ""
+        if len(emails) > 1 :
+            logger.error("This user has multiple email linked to his account.")
+        if emails:
+            email = emails[0]
+
+        return email
+    # end of insertion
 
     @defer.inlineCallbacks
     def _get_email_addresses_for_user(self, user_id):
