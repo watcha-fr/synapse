@@ -68,7 +68,6 @@ class WatchaAdminStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def watcha_user_list(self):
-        """Return users's informations"""
 
         FIELDS = ["name", "is_guest", "is_partner", "admin", "email",
                   "creation_ts", "is_active" , "displayname", "last_seen"]
