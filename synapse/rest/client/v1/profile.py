@@ -136,7 +136,9 @@ class ProfileRestServlet(RestServlet):
         self.hs = hs
         self.profile_handler = hs.get_profile_handler()
         self.auth = hs.get_auth()
-        self.datastore = self.hs.get_datastore()
+        # insertion for watcha
+        self.account_activity_handler = hs.get_account_validity_handler()
+        # end of insertion
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
@@ -154,8 +156,7 @@ class ProfileRestServlet(RestServlet):
         avatar_url = yield self.profile_handler.get_avatar_url(user)
         # insertion for watcha 
         # For personal data protection, we don't return phone number of the other users.
-        threepids = yield self.datastore.user_get_threepids(user_id)
-        emails = [threepid['address'] for threepid in threepids if threepid['medium'] == 'email']
+        email = yield self.account_activity_handler.get_email_addresse_for_user(user_id)
         # end of insertion
 
         ret = {}
@@ -164,10 +165,8 @@ class ProfileRestServlet(RestServlet):
         if avatar_url is not None:
             ret["avatar_url"] = avatar_url
         # insertion for watcha
-        if len(emails) > 1 :
-            logger.error("This user has multiple email linked to his account.")
-        if emails:
-            ret["email"] = emails[0]
+        if email:
+            ret["email"] = email
         # end of insertion   
         
         return (200, ret)
