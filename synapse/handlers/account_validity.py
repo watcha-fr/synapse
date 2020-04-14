@@ -191,10 +191,14 @@ class AccountValidityHandler(object):
 
         email = ""
         if len(emails) > 1 :
-            logger.error("This user has multiple email linked to his account.")
+            logger.error("This user has multiple email addresses attached to his account.")
+            raise ValueError("Length of list greater than one")
         if emails:
             email = emails[0]
-
+        else:
+            logger.info("This user has no email address attached to his account")
+            raise ValueError("Empty string")
+ 
         return email
     # end of insertion
 
