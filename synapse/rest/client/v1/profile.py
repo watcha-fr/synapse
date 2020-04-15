@@ -166,7 +166,7 @@ class ProfileRestServlet(RestServlet):
         # insertion for watcha
         # For personal data protection, we don't return phone number of the other users.
         try:
-            email = yield self.account_activity_handler.get_email_addresse_for_user(
+            email = yield self.account_activity_handler.get_email_address_for_user(
                 user_id
             )
             ret["email"] = email

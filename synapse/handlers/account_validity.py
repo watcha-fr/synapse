@@ -192,7 +192,7 @@ class AccountValidityHandler(object):
         return threepids
 
     @defer.inlineCallbacks
-    def get_email_addresse_for_user(self, user_id):
+    def get_email_address_for_user(self, user_id):
         """Retrieve only one email address attached to a user's account
 
         Args:

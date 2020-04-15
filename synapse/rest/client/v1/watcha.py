@@ -430,7 +430,7 @@ class WatchaResetPasswordRestServlet(RestServlet):
         logger.info("Setting password for user %s", user_id)
         user = UserID.from_string(user_id)
 
-        email = yield self.account_activity_handler.get_email_addresse_for_user(user_id)
+        email = yield self.account_activity_handler.get_email_address_for_user(user_id)
 
         requester = create_requester(user_id)
         yield self.hs.get_set_password_handler().set_password(
