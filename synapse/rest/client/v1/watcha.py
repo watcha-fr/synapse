@@ -431,10 +431,6 @@ class WatchaResetPasswordRestServlet(RestServlet):
         user = UserID.from_string(user_id)
 
         email = yield self.account_activity_handler.get_email_addresse_for_user(user_id)
-        if not email:
-            raise SynapseError(
-                403, "Email is not defined for this user, cannot reset password"
-            )
 
         requester = create_requester(user_id)
         yield self.hs.get_set_password_handler().set_password(
