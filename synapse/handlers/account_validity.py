@@ -21,7 +21,7 @@ from email.mime.text import MIMEText
 
 from twisted.internet import defer
 
-from synapse.api.errors import StoreError
+from synapse.api.errors import StoreError, SynapseError # insertion for watcha (SynapseError only)
 from synapse.logging.context import make_deferred_yieldable
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import UserID
@@ -189,16 +189,13 @@ class AccountValidityHandler(object):
 
         emails = yield self._get_email_addresses_for_user(user_id)
 
-        email = ""
         if len(emails) > 1 :
-            logger.error("This user has multiple email addresses attached to his account.")
-            raise ValueError("Length of list greater than one")
-        if emails:
-            email = emails[0]
-        else:
-            logger.info("This user has no email address attached to his account")
-            raise ValueError("Empty string")
- 
+            raise SynapseError(403, "This user has multiple email addresses attached to his account.")
+        if not emails:
+            raise SynapseError(403, "This user has no email address attached to his account")
+
+        email = emails[0]
+
         return email
     # end of insertion
 
