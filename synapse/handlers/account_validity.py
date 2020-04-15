@@ -191,7 +191,6 @@ class AccountValidityHandler(object):
 
         return threepids
 
-
     @defer.inlineCallbacks
     def get_email_addresse_for_user(self, user_id):
         """Retrieve the list of threepids attached to a user's account
@@ -205,14 +204,19 @@ class AccountValidityHandler(object):
 
         emails = yield self._get_email_addresses_for_user(user_id)
 
-        if len(emails) > 1 :
-            raise SynapseError(403, "This user has multiple email addresses attached to his account.")
+        if len(emails) > 1:
+            raise SynapseError(
+                403, "This user has multiple email addresses attached to his account."
+            )
         if not emails:
-            raise SynapseError(403, "This user has no email address attached to his account")
+            raise SynapseError(
+                403, "This user has no email address attached to his account"
+            )
 
         email = emails[0]
 
         return email
+
     # end of insertion
 
     @defer.inlineCallbacks

@@ -21,7 +21,7 @@ from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import UserID
 # insertion for watcha
 from synapse.api.errors import SynapseError
-import logging 
+import logging
 
 logger = logging.getLogger(__name__)
 # end of insertion
@@ -163,14 +163,16 @@ class ProfileRestServlet(RestServlet):
             ret["displayname"] = displayname
         if avatar_url is not None:
             ret["avatar_url"] = avatar_url
-        # insertion for watcha 
+        # insertion for watcha
         # For personal data protection, we don't return phone number of the other users.
         try:
-            email = yield self.account_activity_handler.get_email_addresse_for_user(user_id)
-            ret["email"] = email  
+            email = yield self.account_activity_handler.get_email_addresse_for_user(
+                user_id
+            )
+            ret["email"] = email
         except SynapseError:
             logger.error("Email is not defined for this user.")
-        # end of insertion 
+        # end of insertion
         
         return (200, ret)
 
