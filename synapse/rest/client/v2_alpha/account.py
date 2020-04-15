@@ -535,7 +535,8 @@ class ThreepidRestServlet(RestServlet):
     def on_GET(self, request):
         requester = yield self.auth.get_user_by_req(request, allow_partner=True)
 
-        threepids = yield self.account_activity_handler.get_threepids_for_user(requester.user.to_string())
+        # threepids = yield self.datastore.user_get_threepids(requester.user.to_string()) # deletion for watcha
+        threepids = yield self.account_activity_handler.get_threepids_for_user(requester.user.to_string()) # insertion for watcha
 
         return (200, {"threepids": threepids})
 
