@@ -178,10 +178,10 @@ class AccountValidityHandler(object):
     # insertion for watcha
     @defer.inlineCallbacks
     def get_threepids_for_user(self, user_id):
-        """Retrieve only one email address attached to a user's account
+        """Retrieve the list of threepids attached to a user's account
         
         Args:
-            user_id (str): ID of the user to lookup email addresse for.
+            user_id (str): ID of the user to lookup threepids for.
 
         Returns:
             defer.Deferred str: List of threepids for this account.
@@ -193,13 +193,13 @@ class AccountValidityHandler(object):
 
     @defer.inlineCallbacks
     def get_email_addresse_for_user(self, user_id):
-        """Retrieve the list of threepids attached to a user's account
-        
+        """Retrieve only one email address attached to a user's account
+
         Args:
-            user_id (str): ID of the user to lookup threepids for.
+            user_id (str): ID of the user to lookup email address for.
 
         Returns:
-            defer.Deferred str: Email addresse for this account.
+            defer.Deferred str: Email address for this account.
         """
 
         emails = yield self._get_email_addresses_for_user(user_id)
