@@ -240,13 +240,17 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         # Addition of phone number as a threepids : 
         self.auth.add_threepid(self.owner, "msisdn", "0612345678", self.time)
         
-        request, channel = self.make_request(
-            "GET", "/profile/%s" % (quote(self.owner, safe=''))
-        )
+        with self.assertLogs('synapse.rest.client.v1.profile', level='ERROR') as cm:
+            request, channel = self.make_request(
+                "GET", "/profile/%s" % (quote(self.owner, safe=''))
+            )
 
-        self.render(request)
-        self.assertEqual(channel.code, 200)
-        self.assertEquals(channel.json_body.get("email"), None)
+            self.render(request)
+
+        self.assertEqual(channel.code, 500)
+        self.assertRaises(ValueError)
+        self.assertIn("ERROR:synapse.rest.client.v1.profile:Email is not defined for this user.",
+                          cm.output[0])
 
     def test_get_only_one_email_threepids(self):
 
@@ -254,14 +258,17 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.auth.add_threepid(self.owner, "email", "example@email.com", self.time)
         self.auth.add_threepid(self.owner, "email", "second_example@email.com", self.time)
 
-        request, channel = self.make_request(
-            "GET", "/profile/%s" % (quote(self.owner, safe=''))
-        )
+        with self.assertLogs('synapse.rest.client.v1.profile', level='ERROR') as cm:
+            request, channel = self.make_request(
+                "GET", "/profile/%s" % (quote(self.owner, safe=''))
+            )
 
-        self.render(request)
+            self.render(request)
 
-        self.assertEqual(channel.code, 200)
-        self.assertEqual(channel.json_body["email"], "example@email.com")
+        self.assertEqual(channel.code, 500)
+        self.assertRaises(ValueError)
+        self.assertIn("ERROR:synapse.rest.client.v1.profile:Email is not defined for this user.",
+                          cm.output[0])
 
 
 class ExternalUserProfileTestCase(ProfileTestCase):
