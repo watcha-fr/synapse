@@ -189,7 +189,6 @@ class AccountValidityHandler(object):
 
         emails = yield self._get_email_addresses_for_user(user_id)
 
-        email = ""
         if len(emails) > 1 :
             logger.error("This user has multiple email addresses attached to his account.")
             raise ValueError("Length of list greater than one")
