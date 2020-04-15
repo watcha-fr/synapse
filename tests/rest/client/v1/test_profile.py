@@ -247,8 +247,8 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
             self.render(request)
 
-        self.assertEqual(channel.code, 500)
-        self.assertRaises(ValueError)
+        self.assertEqual(channel.code, 200)
+        self.assertRaises(SynapseError)
         self.assertIn("ERROR:synapse.rest.client.v1.profile:Email is not defined for this user.",
                           cm.output[0])
 
@@ -265,8 +265,8 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
             self.render(request)
 
-        self.assertEqual(channel.code, 500)
-        self.assertRaises(ValueError)
+        self.assertEqual(channel.code, 200)
+        self.assertRaises(SynapseError)
         self.assertIn("ERROR:synapse.rest.client.v1.profile:Email is not defined for this user.",
                           cm.output[0])
 
