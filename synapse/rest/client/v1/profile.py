@@ -19,9 +19,12 @@ from twisted.internet import defer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import UserID
-import logging # added for watcha
+# insertion for watcha
+from synapse.api.errors import SynapseError
+import logging 
 
-logger = logging.getLogger(__name__) # added for watcha
+logger = logging.getLogger(__name__)
+# end of insertion
 
 class ProfileDisplaynameRestServlet(RestServlet):
     """ change for watcha
@@ -154,22 +157,20 @@ class ProfileRestServlet(RestServlet):
 
         displayname = yield self.profile_handler.get_displayname(user)
         avatar_url = yield self.profile_handler.get_avatar_url(user)
-        # insertion for watcha 
-        # For personal data protection, we don't return phone number of the other users.
-        try:
-            email = yield self.account_activity_handler.get_email_addresse_for_user(user_id)
-        except ValueError:
-            logger.error("Email is not defined for this user.")
-        # end of insertion
 
         ret = {}
         if displayname is not None:
             ret["displayname"] = displayname
         if avatar_url is not None:
             ret["avatar_url"] = avatar_url
-        # insertion for watcha
-        ret["email"] = email  
-        # end of insertion   
+        # insertion for watcha 
+        # For personal data protection, we don't return phone number of the other users.
+        try:
+            email = yield self.account_activity_handler.get_email_addresse_for_user(user_id)
+            ret["email"] = email  
+        except SynapseError:
+            logger.error("Email is not defined for this user.")
+        # end of insertion 
         
         return (200, ret)
 
