@@ -216,7 +216,6 @@ class AccountValidityHandler(object):
         email = emails[0]
 
         return email
-
     # end of insertion
 
     @defer.inlineCallbacks
