@@ -156,7 +156,10 @@ class ProfileRestServlet(RestServlet):
         avatar_url = yield self.profile_handler.get_avatar_url(user)
         # insertion for watcha 
         # For personal data protection, we don't return phone number of the other users.
-        email = yield self.account_activity_handler.get_email_addresse_for_user(user_id)
+        try:
+            email = yield self.account_activity_handler.get_email_addresse_for_user(user_id)
+        except ValueError:
+            logger.error("Email is not defined for this user.")
         # end of insertion
 
         ret = {}
@@ -165,8 +168,7 @@ class ProfileRestServlet(RestServlet):
         if avatar_url is not None:
             ret["avatar_url"] = avatar_url
         # insertion for watcha
-        if email:
-            ret["email"] = email
+        ret["email"] = email  
         # end of insertion   
         
         return (200, ret)
