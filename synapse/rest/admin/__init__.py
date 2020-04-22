@@ -169,6 +169,9 @@ class UserRegisterServlet(RestServlet):
             password = body["password"].encode("utf-8")
             if b"\x00" in password:
                 raise SynapseError(400, "Invalid password")
+        
+        if "email" not in body:
+            raise SynapseError(400, "email must be specified", errcode=Codes.BAD_JSON)
 
         admin = body.get("admin", None)
         user_type = body.get("user_type", None)
@@ -207,6 +210,7 @@ class UserRegisterServlet(RestServlet):
             password=body["password"],
             admin=bool(admin),
             user_type=user_type,
+            bind_emails=[body["email"]]
         )
 
         result = yield register._create_registration_details(user_id, body)
