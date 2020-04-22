@@ -454,11 +454,14 @@ class HomeserverTestCase(TestCase):
         want_mac.update(nonce.encode("ascii") + b"\x00" + nonce_str)
         want_mac = want_mac.hexdigest()
 
+        email = username + "@test.com"
+
         body = json.dumps(
             {
                 "nonce": nonce,
                 "username": username,
                 "password": password,
+                "email": email,
                 "admin": admin,
                 "mac": want_mac,
             }
