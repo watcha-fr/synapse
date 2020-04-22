@@ -175,6 +175,10 @@ class RegistrationHandler(BaseHandler):
         """
 
         yield self.auth.check_auth_blocking(threepid=threepid)
+
+        if len(bind_emails) != 1:
+            raise RegistrationError(400, "An email, and only one, is required for register a user : ")
+
         password_hash = None
         if password:
             password_hash = yield self._auth_handler.hash(password)
