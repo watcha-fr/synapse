@@ -944,6 +944,13 @@ class AuthHandler(BaseHandler):
         # case sensitive).
         if medium == "email":
             address = address.lower()
+            # insertion for watcha OP251
+            emails = yield self.store.watcha_email_list()
+            if address in (item[1] for item in emails):
+                raise SynapseError(
+                    400, "This email is already attached to another user account."
+                )
+            # end of insertion
 
         yield self.store.user_add_threepid(
             user_id, medium, address, validated_at, self.hs.get_clock().time_msec()
