@@ -410,7 +410,9 @@ class WatchaResetPasswordRestServlet(RestServlet):
         self.hs = hs
         self.handlers = hs.get_handlers()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        # insertion for watcha
+        self.account_activity_handler = hs.get_account_validity_handler()
+        # end of insertion
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -428,12 +430,7 @@ class WatchaResetPasswordRestServlet(RestServlet):
         logger.info("Setting password for user %s", user_id)
         user = UserID.from_string(user_id)
 
-        threepids = yield self.store.user_get_threepids(user_id)
-        adresses = [ threepid["address"] for threepid in threepids if threepid["medium"] == "email"]
-        if not adresses:
-            raise SynapseError(
-                403, "Email is not defined for this user, cannot reset password"
-            )
+        email = yield self.account_activity_handler.get_email_address_for_user(user_id)
 
         requester = create_requester(user_id)
         yield self.hs.get_set_password_handler().set_password(
@@ -448,9 +445,9 @@ class WatchaResetPasswordRestServlet(RestServlet):
 
         send_registration_email(
             self.hs.config,
-            adresses[0],
+            email,
             template_name="reset_password",
-            token=compute_registration_token(user_id, adresses[0], password),
+            token=compute_registration_token(user_id, email, password),
             user_login=user.localpart,
             full_name=display_name,
         )
