@@ -23,8 +23,9 @@ from synapse.handlers.register import RegistrationHandler
 from synapse.types import RoomAlias, UserID, create_requester
 
 from .. import unittest
+# insertion for watcha OP251
 from ..utils import setup_test_homeserver
-
+# end of insertion
 
 class RegistrationHandlers(object):
     def __init__(self, hs):
