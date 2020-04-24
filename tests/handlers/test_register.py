@@ -320,4 +320,14 @@ class WatchaRegistrationTestCase(unittest.HomeserverTestCase):
             "user_threepids", {"user_id": "@owner:test"}, "address"
         )
         self.assertEqual(email, "example@example.com")
+
+    @defer.inlineCallbacks
+    def test_email_cannot_used_two_times_with_same_value(self):
+        with self.assertRaises(SynapseError) as cm:
+            yield self.register_user_with_email("@user:test", "example@example.com")
+
+        self.assertEqual(cm.exception.code, 400)
+        self.assertEqual(
+            cm.exception.msg, "This email is already attached to another user account."
+        )
 # End insertion for watcha
