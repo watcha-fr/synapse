@@ -386,9 +386,6 @@ class WatchaRegisterRestServlet(RestServlet):
             user, create_requester(user_id), params["full_name"], by_admin=True
         )
 
-        # TODO @OP-128 remove setup email process : to remove once we have upgrade all the server (and remove the implementation)
-        yield self.hs.auth_handler.set_email(user_id, email)
-
         display_name = yield self.hs.profile_handler.get_displayname(user)
         token = compute_registration_token(user_id, email, password)
 
@@ -413,6 +410,9 @@ class WatchaResetPasswordRestServlet(RestServlet):
         self.hs = hs
         self.handlers = hs.get_handlers()
         self.auth = hs.get_auth()
+        # insertion for watcha
+        self.account_activity_handler = hs.get_account_validity_handler()
+        # end of insertion
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -430,11 +430,7 @@ class WatchaResetPasswordRestServlet(RestServlet):
         logger.info("Setting password for user %s", user_id)
         user = UserID.from_string(user_id)
 
-        user_info = yield self.hs.get_datastore().get_user_by_id(user_id)
-        if not user_info["email"]:
-            raise SynapseError(
-                403, "Email is not defined for this user, cannot reset password"
-            )
+        email = yield self.account_activity_handler.get_email_address_for_user(user_id)
 
         requester = create_requester(user_id)
         yield self.hs.get_set_password_handler().set_password(
@@ -449,47 +445,14 @@ class WatchaResetPasswordRestServlet(RestServlet):
 
         send_registration_email(
             self.hs.config,
-            user_info["email"],
+            email,
             template_name="reset_password",
-            token=compute_registration_token(user_id, user_info["email"], password),
+            token=compute_registration_token(user_id, email, password),
             user_login=user.localpart,
             full_name=display_name,
         )
 
         defer.returnValue((200, {}))
-
-
-class WatchaAddThreepidsServlet(RestServlet):
-    """temporary servlet to upgrade older servers"""
-
-    PATTERNS = client_patterns("/watcha_threepids", v1=True)
-
-    def __init__(self, hs):
-        super(WatchaAddThreepidsServlet, self).__init__
-        self.hs = hs
-        self.auth_handler = hs.get_auth_handler()
-        self.store = hs.get_datastore()
-
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-
-        validated_at = self.hs.get_clock().time_msec()
-        users_without_threepids = yield self.store._execute_sql(
-            """SELECT users.name, users.email
-                                                                FROM users
-                                                                LEFT JOIN user_threepids ON users.name = user_threepids.user_id
-                                                                WHERE user_threepids.user_id IS NULL
-                                                                    AND users.email IS NOT NULL;"""
-        )
-
-        return_value = 0
-        for name, email in users_without_threepids:
-            yield self.auth_handler.add_threepid(name, "email", email, validated_at)
-            logger.info("Threepids added : {user_id:'%s', email:'%s' }", name, email)
-            return_value += 1
-
-        defer.returnValue((200, return_value))
-
 
 def register_servlets(hs, http_server):
     WatchaResetPasswordRestServlet(hs).register(http_server)
@@ -507,4 +470,4 @@ def register_servlets(hs, http_server):
     WatchaRoomMembershipRestServlet(hs).register(http_server)
     WatchaRoomNameRestServlet(hs).register(http_server)
     WatchaDisplayNameRestServlet(hs).register(http_server)
-    WatchaAddThreepidsServlet(hs).register(http_server)
+    

@@ -1043,23 +1043,14 @@ class AuthHandler(BaseHandler):
             user_id,
         )
         defer.returnValue(ret)
-
-    # TODO @OP-128 remove setup email process : to remove once we have upgrade all the server (and remove the implementation)
-    @defer.inlineCallbacks
-    def set_email(self, user_id, email):
-        ret = yield self.store.user_set_email(
-            user_id,
-            email
-        )
-
-        defer.returnValue(ret)
     #end of insertion
 
     # Added for Watcha...
     @defer.inlineCallbacks
-    def find_user_id_by_email(self, email):
-        ret = yield self.store.find_user_id_by_email(
-            email
+    def find_user_id_by_email(self, address):
+        ret = yield self.store.get_user_id_by_threepid(
+            "email",
+            address
         )
 
         defer.returnValue(ret)

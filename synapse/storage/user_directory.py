@@ -827,18 +827,54 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
             where_clause = """ AND (u.name LIKE ? OR display_name LIKE ? OR u.email LIKE ? )"""
 
             sql = """
-                SELECT u.name as user_id, u.is_active, u.is_partner, d.display_name, d.avatar_url, p.state as presence
+                SELECT 
+                    u.name as user_id
+                    , u.is_active
+                    , u.is_partner
+                    , d.display_name
+                    , d.avatar_url
+                    , p.state as presence
+                    , t.address as email
                 FROM users AS u
+                LEFT OUTER JOIN 
+                    (SELECT 
+                        t.user_id
+                        , t.address
+                    FROM user_threepids AS t
+                    WHERE t.medium = 'email') AS t 
+                    ON t.user_id = u.name
                 LEFT OUTER JOIN user_directory AS d ON d.user_id = u.name
                 LEFT OUTER JOIN presence_stream AS p ON p.user_id = u.name
-                WHERE u.is_partner = 0 AND u.is_active = 1 %s
+                WHERE u.is_partner = 0 
+                    AND u.is_active = 1
+                    %s
+
                 UNION ALL
-                SELECT DISTINCT u.name as user_id, u.is_active, u.is_partner, d.display_name, d.avatar_url, coalesce(p.state, "invited") as presence
+
+                SELECT DISTINCT 
+                    u.name as user_id
+                    , u.is_active
+                    , u.is_partner
+                    , d.display_name
+                    , d.avatar_url
+                    , coalesce(p.state, "invited") as presence
+                    , t.address as email
                 FROM users AS u
-                INNER JOIN partners_invited_by AS pib ON pib.partner = u.name AND pib.invited_by = ?
+                INNER JOIN partners_invited_by AS pib 
+                    ON pib.partner = u.name AND pib.invited_by = ?
+                LEFT OUTER JOIN 
+                    (SELECT 
+                        t.user_id
+                        , t.medium
+                        , t.address
+                    FROM user_threepids AS t
+                    WHERE t.medium = 'email') AS t 
+                    ON t.user_id = u.name
                 LEFT OUTER JOIN user_directory AS d ON d.user_id = u.name
                 LEFT OUTER JOIN presence_stream AS p ON p.user_id = u.name
-                WHERE u.is_partner = 1 AND u.is_active = 1 %s
+                WHERE u.is_partner = 1 
+                    AND u.is_active = 1
+                    %s
             """ % (where_clause, where_clause)
             args = [  '%' + search_term + '%' ] * 3 + [ user_id ] + [  '%' + search_term + '%' ] * 3
             logger.debug(sql)

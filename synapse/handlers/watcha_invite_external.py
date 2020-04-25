@@ -94,11 +94,6 @@ class InviteExternalHandler(BaseHandler):
                     bind_emails=[invitee],
                 )
 
-                # TODO: @OP-128 remove setup email process : to remove once we have upgrade all the server (and remove the implementation)
-                yield self.hs.get_auth_handler().set_email(full_user_id, invitee)
-
-                # TODO: should we call auth_handler.issue_access_token ?
-
                 """
                 # we save the account type
                 result = yield self.store.set_partner(
