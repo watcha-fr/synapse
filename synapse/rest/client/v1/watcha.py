@@ -195,6 +195,8 @@ class WatchaUpdateMailRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self.account_activity_handler = hs.get_account_validity_handler()
+        self.admin_handler = hs.get_handlers().admin_handler
+        self.time = hs.get_clock().time_msec()
 
     @defer.inlineCallbacks
     def on_PUT(self, request, target_user_id):
@@ -205,12 +207,26 @@ class WatchaUpdateMailRestServlet(RestServlet):
         if not new_email:
             raise SynapseError(400, "Missing 'new_email' arg")
 
-        email = yield self.account_activity_handler.get_email_address_for_user(target_user_id)
+        users = yield self.admin_handler.get_users()
+        if not target_user_id in [user["name"] for user in users]:
+            raise SynapseError(
+                400, "The target user is not register in this homeserver."
+            )
 
-        if email:
-            raise SynapseError(400, "Email is already defined for this user.")
+        try:
+            email = yield self.account_activity_handler.get_email_address_for_user(
+                target_user_id
+            )
+        except SynapseError:
+            logger.error("No email are defined for this user.")
+            raise
 
-        yield self.auth_handler.add_threepid(target_user_id, "email", new_email, self.hs.get_clock().time_msec())
+        yield self.auth_handler.delete_threepid(
+            target_user_id, "email", email, id_server=None
+        )
+        yield self.auth_handler.add_threepid(
+            target_user_id, "email", new_email, self.time
+        )
 
         defer.returnValue((200, {}))
 
