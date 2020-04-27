@@ -223,9 +223,6 @@ class WatchaAdminStore(SQLBaseStore):
             desc=_caller_name(),
         )
 
-    def watcha_update_mail(self, user_id, email):
-        return self._update_user(user_id, email=email)
-
     def watcha_update_to_member(self, user_id):
         return self._update_user(user_id, is_partner=0)
 
