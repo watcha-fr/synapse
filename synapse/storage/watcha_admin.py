@@ -100,6 +100,21 @@ class WatchaAdminStore(SQLBaseStore):
         defer.returnValue([dict(zip(FIELDS, user)) for user in users])
 
     @defer.inlineCallbacks
+    def watcha_email_list(self):
+
+        SQL_EMAIL_LIST = """
+            SELECT
+                user_threepids.user_id
+                , user_threepids.address
+            FROM user_threepids
+            WHERE medium = "email"
+            """
+
+        emails = yield self._execute_sql(SQL_EMAIL_LIST)
+
+        defer.returnValue(emails)
+
+    @defer.inlineCallbacks
     def watcha_user_ip(self, user_id):
 
         user_ip = yield self._execute_sql("""
