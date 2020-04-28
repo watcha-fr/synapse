@@ -28,6 +28,7 @@ class BaseHomeserverWithEmailTestCase(unittest.HomeserverTestCase):
             },
             "public_baseurl": "TEST"
         })
+        self.account_activity_handler = self.hs.get_account_validity_handler()
 
         return self.hs
 
@@ -47,6 +48,16 @@ class BaseHomeserverWithEmailTestCase(unittest.HomeserverTestCase):
         self.render(request)
         return channel
 
+    def _do_update_email(self, user_id, email):
+        #Admin send the request with access_token :
+        request, channel = self.make_request(
+            "PUT",
+            "/_matrix/client/r0/watcha_update_email/%s" % user_id,
+            content=json.dumps({"new_email": email}),
+            access_token=self.user_access_token,
+        )
+        self.render(request)
+        return channel
 
 class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
 
@@ -111,3 +122,52 @@ class WatchaResetPasswordRestServletTestCase(BaseHomeserverWithEmailTestCase):
             self.assertIn("http://localhost:8080/setup-account.html?t=",
                             ''.join(cm.output))
             self.assertEqual(channel.code,200)
+
+class WatchaUpdateMailRestServletTestCase(BaseHomeserverWithEmailTestCase):
+    def test_update_email(self):
+        user_id = "@user_test:test"
+        self._do_register_user(
+            {
+                "user": "user_test",
+                "full_name": "test",
+                "email": "example@example.com",
+                "admin": False,
+            }
+        )
+
+        self._do_update_email(user_id, "example2@example.com")
+        self.assertEqual(
+            self.get_success(
+                self.account_activity_handler.get_email_address_for_user(user_id)
+            ),
+            "example2@example.com",
+        )
+
+    def test_update_email_when_a_email_is_not_defined(self):
+        self.register_user("user_test", "pass")
+
+        with self.assertLogs("synapse.rest.client.v1.watcha", level="ERROR") as cm:
+            channel = self._do_update_email("@user_test:test", "example@example.com")
+
+        self.assertEqual(channel.code, 403)
+        self.assertIn(
+            "ERROR:synapse.rest.client.v1.watcha:No email are defined for this user.",
+            cm.output[0],
+        )
+
+    def test_update_email_with_no_new_email_parameter(self):
+        channel = self._do_update_email("@user_test:test", None)
+        self.assertRaises(SynapseError)
+        self.assertEqual(channel.code, 400)
+        self.assertEqual(
+            json.loads(channel.result["body"])["error"], "Missing 'new_email' arg"
+        )
+
+    def test_update_email_with_wrong_target_user_id(self):
+        channel = self._do_update_email("@user_test:test", "example@example.com")
+        self.assertRaises(SynapseError)
+        self.assertEqual(channel.code, 400)
+        self.assertEqual(
+            json.loads(channel.result["body"])["error"],
+            "The target user is not register in this homeserver.",
+        )
