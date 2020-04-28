@@ -23,7 +23,9 @@ from synapse.handlers.register import RegistrationHandler
 from synapse.types import RoomAlias, UserID, create_requester
 
 from .. import unittest
-
+# insertion for watcha OP251
+from ..utils import setup_test_homeserver
+# end of insertion
 
 class RegistrationHandlers(object):
     def __init__(self, hs):
@@ -231,19 +233,6 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             self.handler.register_user(localpart=invalid_user_id), SynapseError
         )
 
-    # Insertion for watcha
-    def test_email_is_correctly_insert_on_DB(self):
-        user_id = self.get_success(self.handler.register_user(localpart="user", bind_emails=["example@email.com"]))
-        email = self.get_success(self.store._simple_select_one_onecol("user_threepids", {"user_id": user_id}, "address"))
-        self.assertEqual(email, "example@email.com")
-
-    def test_email_is_correctly_insert_on_DB_after_two_same_registration(self):
-        user_id = self.get_success(self.handler.register_user(localpart="user", bind_emails=["example@email.com"]))
-        self.get_failure(self.handler.register_user(localpart="user", bind_emails=["example2@email.com"]), SynapseError)
-        email = self.get_success(self.store._simple_select_one_onecol("user_threepids", {"user_id": user_id}, "address"))
-        self.assertEqual(email, "example@email.com")  
-    #End insertion for watcha
-
     @defer.inlineCallbacks
     def get_or_create_user(self, requester, localpart, displayname, password_hash=None):
         """Creates a new user if the user does not exist,
@@ -297,3 +286,49 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             )
 
         return (user_id, token)
+
+# Insertion for watcha
+class WatchaRegistrationTestCase(unittest.HomeserverTestCase):
+    @defer.inlineCallbacks
+    def setUp(self):
+        hs = yield setup_test_homeserver(self.addCleanup)
+        self.store = hs.get_datastore()
+        self.handler = hs.get_auth_handler()
+        self.time = int(hs.get_clock().time_msec())
+        yield self.register_user_with_email("@owner:test", "example@example.com")
+
+    @defer.inlineCallbacks
+    def register_user_with_email(self, user_id, email):
+        # register a user and add email as threepids
+        yield self.store.register_user(user_id, "pass")
+        yield self.handler.add_threepid(
+            user_id, "email", email, self.time,
+        )
+
+    @defer.inlineCallbacks
+    def test_email_is_correctly_insert_on_DB(self):
+        email = yield self.store._simple_select_one_onecol(
+            "user_threepids", {"user_id": "@owner:test"}, "address"
+        )
+        self.assertEqual(email, "example@example.com")
+
+    @defer.inlineCallbacks
+    def test_email_is_correctly_insert_on_DB_after_two_same_registration(self):
+        with self.assertRaises(SynapseError):
+            yield self.register_user_with_email("@owner:test", "example2@example.com")
+
+        email = yield self.store._simple_select_one_onecol(
+            "user_threepids", {"user_id": "@owner:test"}, "address"
+        )
+        self.assertEqual(email, "example@example.com")
+
+    @defer.inlineCallbacks
+    def test_email_cannot_used_two_times_with_same_value(self):
+        with self.assertRaises(SynapseError) as cm:
+            yield self.register_user_with_email("@user:test", "example@example.com")
+
+        self.assertEqual(cm.exception.code, 400)
+        self.assertEqual(
+            cm.exception.msg, "This email is already attached to another user account."
+        )
+# End insertion for watcha
