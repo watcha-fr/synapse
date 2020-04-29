@@ -129,7 +129,13 @@ class WatchaAdminStore(SQLBaseStore):
     def members_by_room(self):
         # (Does not return empty rooms)
         room_memberships = yield self._execute_sql("""
-        SELECT room_id, user_id, membership FROM room_memberships ORDER BY room_id, event_id ASC
+            SELECT
+                room_id
+                , state_key
+                , membership
+            FROM current_state_events
+            WHERE type = "m.room.member"
+                AND (membership = "join" OR membership = "invite");
         """)
 
         membership_by_room = defaultdict(list)
