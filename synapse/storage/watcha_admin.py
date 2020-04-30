@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import time
+import time, json
 import psutil
 from collections import defaultdict
 import inspect
@@ -34,35 +34,58 @@ class WatchaAdminStore(SQLBaseStore):
         """List the rooms, with two or less members, and with three or more members.
         """
 
-        now = int(round(time.time() * 1000))
-        ACTIVE_THRESHOLD = 1000 * 3600 * 24 * 7
-
-        rooms = yield self._execute_sql("""
-        SELECT rooms.room_id, last_events.last_received_ts FROM rooms
-        LEFT JOIN (SELECT max(received_ts) last_received_ts, room_id FROM events
-                   GROUP BY room_id HAVING type = "m.room.message") last_events
-              ON last_events.room_id = rooms.room_id
-        ORDER BY rooms.room_id ASC;
-        """)
-
         members_by_room = yield self.members_by_room()
 
-        room_details = {
-            room_id: { 'three_or_more': 1 if len(members_by_room[room_id]) > 3 else 0,
-                       'active': 1 if last_message_ts and (now - last_message_ts < ACTIVE_THRESHOLD) else 0
-            }
-            for room_id, last_message_ts in rooms
-            if room_id in members_by_room # don't show empty room (and avoid a possible exception)
-        }
+        # Get active rooms (message send last week in room):
+        active_rooms = yield self._execute_sql(
+            """
+            SELECT DISTINCT room_id 
+            FROM events
+            WHERE type = "m.room.message"
+                AND received_ts >= %s;
+        """
+            % (int(round(1000 * (time.time() - 3600 * 24 * 7))))
+        )
+        active_rooms = [element[0] for element in active_rooms]
 
-        result = (
-            {'now': now,
-             'active_threshold': ACTIVE_THRESHOLD,
-             "one_one_rooms_count": len([_ for _, counts in room_details.items() if counts['three_or_more']]),
-             "big_rooms_count": len([_ for _, counts in room_details.items() if not counts['three_or_more']]),
-             "big_rooms_count_active": len([_ for _, counts in room_details.items() if counts['active']]),
-             "room_details": room_details
-            })
+        # Get direct rooms (m.direct flag on account_data and with exactly two joinned or invited members):
+        direct_rooms_by_member = yield self._simple_select_onecol(
+            table="account_data",
+            keyvalues={"account_data_type": "m.direct"},
+            retcol="content",
+        )
+
+        direct_rooms_with_duplicate = [
+            [rooms[0] for rooms in list(element.values())]
+            for element in [json.loads(row) for row in direct_rooms_by_member]
+        ]
+        direct_rooms = []
+        for element in direct_rooms_with_duplicate:
+            for room in element:
+                if (
+                    room not in direct_rooms
+                    and room in members_by_room.keys()
+                    and len(members_by_room[room]) == 2
+                ):
+                    direct_rooms.append(room)
+
+        # Get rooms (all rooms less personnal conversation):
+        all_rooms = yield self._simple_select_onecol(
+            table="rooms", keyvalues=None, retcol="room_id",
+        )
+
+        non_direct_rooms = [room for room in all_rooms if room not in direct_rooms]
+
+        result = {
+            "direct_rooms_count": len(direct_rooms),
+            "direct_active_rooms_count": len(
+                [room for room in direct_rooms if room in active_rooms]
+            ),
+            "non_direct_rooms_count": len(non_direct_rooms),
+            "non_direct_active_rooms_count": len(
+                [room for room in non_direct_rooms if room in active_rooms]
+            ),
+        }
 
         defer.returnValue(result)
 
@@ -125,10 +148,11 @@ class WatchaAdminStore(SQLBaseStore):
 
         defer.returnValue(user_ip)
 
-    @defer.inlineCallbacks
+@defer.inlineCallbacks
     def members_by_room(self):
         # (Does not return empty rooms)
-        room_memberships = yield self._execute_sql("""
+        room_memberships = yield self._execute_sql(
+            """
             SELECT
                 room_id
                 , state_key
@@ -136,18 +160,30 @@ class WatchaAdminStore(SQLBaseStore):
             FROM current_state_events
             WHERE type = "m.room.member"
                 AND (membership = "join" OR membership = "invite");
-        """)
+        """
+        )
 
         membership_by_room = defaultdict(list)
         for room_id, user_id, membership in room_memberships:
             membership_by_room[room_id].append((user_id, membership))
 
-        defer.returnValue({
-            room_id: list(set(user_id for user_id, membership in members if membership in ["join", "invite"])
-                          -
-                          set(user_id for user_id, membership in members if membership == "leave"))
-            for room_id, members in membership_by_room.items()
-        })
+        defer.returnValue(
+            {
+                room_id: list(
+                    set(
+                        user_id
+                        for user_id, membership in members
+                        if membership in ["join", "invite"]
+                    )
+                    - set(
+                        user_id
+                        for user_id, membership in members
+                        if membership == "leave"
+                    )
+                )
+                for room_id, members in membership_by_room.items()
+            }
+        )
 
 
     @defer.inlineCallbacks
