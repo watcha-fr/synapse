@@ -7,9 +7,9 @@ Bonjour{{ full_name|spacebefore }},
 
 {% filter striptags %}{% block usage %}{% endblock %}{% endfilter %}
 
-  Nom d'utilisateur :
+  Email :
 
-           {{ user_login }}
+           {{ email }}
 
   Mot de passe :
 

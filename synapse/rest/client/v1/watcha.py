@@ -394,7 +394,6 @@ class WatchaRegisterRestServlet(RestServlet):
             email,
             template_name="invite_new_account",
             token=token,
-            user_login=user.localpart,
             inviter_name=inviter_name,
             full_name=display_name,
         )
@@ -441,14 +440,14 @@ class WatchaResetPasswordRestServlet(RestServlet):
         try:
             display_name = yield self.hs.profile_handler.get_displayname(user)
         except:
-            display_name = user.localpart
+            display_name = None
 
         send_registration_email(
             self.hs.config,
             email,
             template_name="reset_password",
             token=compute_registration_token(user_id, email, password),
-            user_login=user.localpart,
+            inviter_name=None,
             full_name=display_name,
         )
 
