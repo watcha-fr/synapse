@@ -190,10 +190,12 @@ class LoginRestServlet(RestServlet):
             "user" in identifier and
             '@' in parseaddr(identifier["user"])[1]):
             logger.info("Converting user login into third-party for Watcha")
-            dentifier["type"] = "m.id.thirdparty"
-            identifier["medium"] = "email"
-            identifier["address"] = identifier["user"]
-            del identifier["user"]
+            submission["identifier"] = {
+                "type": "m.id.thirdparty",
+                "medium": "email",
+                "address": identifier["user"],
+            }
+        identifier = login_submission["identifier"]            
         # end added temporarly for watcha
 
         # convert phone type identifiers to generic threepids
