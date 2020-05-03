@@ -119,8 +119,8 @@ def send_registration_email(
     """
     Sends email related to user registration (invitation, reset password...)
 
-    Beside 'inviter_name' and 'full_name', the 'server', 'title', 'login_url',
-    and 'setup_account_url' variables also used in the template.
+    The templates can use the 'inviter_name', 'full_name', 'email', 'server', 'title',
+    'login_url', and 'setup_account_url' variables.
     The 'title' will be created from the subject.
 
     This method should only be used in a Matrix APIs,
