@@ -238,7 +238,30 @@ class WatchaAdminStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_user_admin(self):
-        admins = yield self._execute_sql("SELECT name FROM users WHERE admin = 1")
+        admins = yield self._execute_sql(
+            """
+            SELECT
+                users.name
+                , user_emails.address
+                , user_directory.display_name
+            FROM users
+                INNER JOIN (
+                    SELECT
+                        user_threepids.user_id
+                        , user_threepids.address
+                    FROM user_threepids
+                    WHERE user_threepids.medium = "email") AS user_emails
+                    ON user_emails.user_id = users.name
+            LEFT JOIN user_directory ON users.name = user_directory.user_id
+            WHERE users.admin = 1;
+        """
+        )
+
+        admins = [
+            {"user_id": element[0], "email": element[1], "displayname": element[2]}
+            for element in admins
+        ]
+
         defer.returnValue(admins)
 
     @defer.inlineCallbacks
