@@ -148,7 +148,7 @@ class WatchaAdminStore(SQLBaseStore):
 
         defer.returnValue(user_ip)
 
-@defer.inlineCallbacks
+    @defer.inlineCallbacks
     def members_by_room(self):
         # (Does not return empty rooms)
         room_memberships = yield self._execute_sql(
