@@ -185,17 +185,17 @@ class LoginRestServlet(RestServlet):
 
         # added temporarly for watcha op322:
         # the iOS app (and android also ?) sends email as user identifier
-        from email.utils import parseaddr
+        import re
         if (identifier["type"] == "m.id.user" and
             "user" in identifier and
-            '@' in parseaddr(identifier["user"])[1]):
+            re.match('[^@]+@[^@]+\.[^@]+', identifier["user"])):
             logger.info("Converting user login into third-party for Watcha")
-            submission["identifier"] = {
+            login_submission["identifier"] = {
                 "type": "m.id.thirdparty",
                 "medium": "email",
                 "address": identifier["user"],
             }
-        identifier = login_submission["identifier"]            
+            identifier = login_submission["identifier"]
         # end added temporarly for watcha
 
         # convert phone type identifiers to generic threepids
