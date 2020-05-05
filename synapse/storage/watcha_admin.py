@@ -226,12 +226,12 @@ class WatchaAdminStore(SQLBaseStore):
     def watcha_update_mail(self, user_id, email):
         return self._update_user(user_id, email=email)
 
-    def watcha_update_user_statut(self, user_id, final_statut):
-        if final_statut == "member":
+    def watcha_update_user_statut(self, user_id, role):
+        if role == "member":
             return self._update_user(user_id, admin=0, is_partner=0)
-        elif final_statut == "admin":
+        elif role == "admin":
             return self._update_user(user_id, admin=1, is_partner=0)
-        elif final_statut == "partner":
+        elif role == "partner":
             return self._update_user(user_id, admin=0, is_partner=1)
 
     def watcha_deactivate_account(self, user_id):

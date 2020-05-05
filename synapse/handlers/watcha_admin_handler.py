@@ -50,23 +50,19 @@ class WatchaAdminHandler(BaseHandler):
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def watcha_update_user_statut(self, user_id, statut_action, final_statut):
-        user_statut = yield self.watcha_get_user_statut(user_id)
+    def watcha_update_user_role(self, user_id, role):
+        user_role = yield self.watcha_get_user_role(user_id)
 
-        if user_statut == final_statut:
-            raise SynapseError(400, "This user has already %s status" % final_statut)
-        if statut_action == "promote" and (user_statut == "admin" or final_statut == "partner"):
-            raise SynapseError(400, "The promotion is not possible with this couple of user status (%s) and desired statut (%s)." % (user_statut, final_statut))
-        elif (statut_action == "demote" and (user_statut == "partner" or final_statut == "admin")):
-            raise SynapseError(400, "The demotion is not possible with this couple of user status (%s) and desired statut (%s)." % (user_statut, final_statut))
+        if user_role == role:
+            raise SynapseError(400, "This user has already the %s status" % role)
 
-        yield self.store.watcha_update_user_statut(user_id, user_statut, final_statut)
+        yield self.store.watcha_update_user_role(user_id, user_statut, role)
         defer.returnValue(result)
 
     @defer.inlineCallbacks
     def watcha_get_user_statut(self, user_id):
         is_partner = yield self.hs.get_auth_handler().is_partner(user_id)
-        is_admin = yield self.auth.is_server_admin(user_id)
+        is_admin = yield self.hs.get_auth_handler().is_admin(user_id)
 
         status = "member"
 

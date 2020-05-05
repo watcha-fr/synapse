@@ -208,13 +208,13 @@ class WatchaUpdateMailRestServlet(RestServlet):
         defer.returnValue((200, {}))
 
 
-class WatchaUpdateUserStatut(RestServlet):
+class WatchaUpdateUserRole(RestServlet):
     PATTERNS = client_patterns(
-        "/watcha_update_user_statut/(?P<target_user_id>[^/]*)", v1=True
+        "/watcha_update_user_role/(?P<target_user_id>[^/]*)", v1=True
     )
 
     def __init__(self, hs):
-        super(WatchaUpdateUserStatut, self).__init__()
+        super(WatchaUpdateUserRole, self).__init__()
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
         self.admin_handler = hs.get_handlers().admin_handler
@@ -230,15 +230,11 @@ class WatchaUpdateUserStatut(RestServlet):
                 400, "The target user is not register in this homeserver."
             )
 
-        action = params["action"]
-        if action not in ["promote", "demote"]:
-            raise SynapseError(400, "You have to specified a correct action to do for this user (promote or demote).")
+        role = params["role"]
+        if role not in ["partner", "member", "admin"]:
+            raise SynapseError(400, "You have to specified a correct desired statut for this user ('admin', 'member' or 'partner'.")
 
-        final_statut = params["final_statut"]
-        if final_statut not in ["admin", "member", "partner"]:
-            raise SynapseError(400, "You have to specified a correct desired statut for this user (admin, member or partner.")
-
-        yield self.handlers.watcha_admin_handler.watcha_update_user_statut(target_user_id, action, final_statut)
+        yield self.handlers.watcha_admin_handler.watcha_update_user_role(target_user_id, role)
         defer.returnValue((200, {}))
 
 
@@ -473,7 +469,7 @@ class WatchaResetPasswordRestServlet(RestServlet):
 def register_servlets(hs, http_server):
     WatchaResetPasswordRestServlet(hs).register(http_server)
     WatchaRegisterRestServlet(hs).register(http_server)
-    WatchaUpdateUserStatut(hs).register(http_server)
+    WatchaUpdateUserRole(hs).register(http_server)
     WatchaUserIp(hs).register(http_server)
     WatchaAdminStats(hs).register(http_server)
     WatchaIsAdmin(hs).register(http_server)
