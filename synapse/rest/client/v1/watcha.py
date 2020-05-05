@@ -473,8 +473,7 @@ class WatchaResetPasswordRestServlet(RestServlet):
 def register_servlets(hs, http_server):
     WatchaResetPasswordRestServlet(hs).register(http_server)
     WatchaRegisterRestServlet(hs).register(http_server)
-
-    WatchaUpdateToMember(hs).register(http_server)
+    WatchaUpdateUserStatut(hs).register(http_server)
     WatchaUserIp(hs).register(http_server)
     WatchaAdminStats(hs).register(http_server)
     WatchaIsAdmin(hs).register(http_server)
