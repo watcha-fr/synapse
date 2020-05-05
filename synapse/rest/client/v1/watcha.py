@@ -208,7 +208,7 @@ class WatchaUpdateMailRestServlet(RestServlet):
         defer.returnValue((200, {}))
 
 
-class WatchaUpdateUserRole(RestServlet):
+class WatchaUpdateUserRoleRestServlet(RestServlet):
     PATTERNS = client_patterns(
         "/watcha_update_user_role/(?P<target_user_id>[^/]*)", v1=True
     )
@@ -469,7 +469,7 @@ class WatchaResetPasswordRestServlet(RestServlet):
 def register_servlets(hs, http_server):
     WatchaResetPasswordRestServlet(hs).register(http_server)
     WatchaRegisterRestServlet(hs).register(http_server)
-    WatchaUpdateUserRole(hs).register(http_server)
+    WatchaUpdateUserRoleRestServlet(hs).register(http_server)
     WatchaUserIp(hs).register(http_server)
     WatchaAdminStats(hs).register(http_server)
     WatchaIsAdmin(hs).register(http_server)
