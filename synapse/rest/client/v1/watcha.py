@@ -208,20 +208,37 @@ class WatchaUpdateMailRestServlet(RestServlet):
         defer.returnValue((200, {}))
 
 
-class WatchaUpdateToMember(RestServlet):
+class WatchaUpdateUserStatut(RestServlet):
     PATTERNS = client_patterns(
-        "/watcha_update_partner_to_member/(?P<target_user_id>[^/]*)", v1=True
+        "/watcha_update_user_statut/(?P<target_user_id>[^/]*)", v1=True
     )
 
     def __init__(self, hs):
-        super(WatchaUpdateToMember, self).__init__()
+        super(WatchaUpdateUserStatut, self).__init__()
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
+        self.admin_handler = hs.get_handlers().admin_handler
 
     @defer.inlineCallbacks
     def on_PUT(self, request, target_user_id):
         yield _check_admin(self.auth, request)
-        yield self.handlers.watcha_admin_handler.watcha_update_to_member(target_user_id)
+        params = parse_json_object_from_request(request) 
+        
+        users = yield self.admin_handler.get_users()
+        if not target_user_id in [user["name"] for user in users]:
+            raise SynapseError(
+                400, "The target user is not register in this homeserver."
+            )
+
+        action = params["action"]
+        if action not in ["promote", "demote"]:
+            raise SynapseError(400, "You have to specified a correct action to do for the user (promote or demote).")
+
+        final_statut = params["final_statut"]
+        if final_statut not in ["admin", "member", "partner"]:
+            raise SynapseError(400, "You have to specified a correct desired statut for the user (admin, member or partner.")
+
+        yield self.handlers.watcha_admin_handler.watcha_update_user_statut(target_user_id, action, final_statut)
         defer.returnValue((200, {}))
 
 
