@@ -1,5 +1,5 @@
 from twisted.internet import defer
-
+from synapse.api.errors import SynapseError
 from ._base import BaseHandler
 
 import logging
@@ -56,24 +56,23 @@ class WatchaAdminHandler(BaseHandler):
         if user_role == role:
             raise SynapseError(400, "This user has already the %s status" % role)
 
-        yield self.store.watcha_update_user_role(user_id, user_statut, role)
-        defer.returnValue(result)
+        yield self.store.watcha_update_user_role(user_id, role)
 
     @defer.inlineCallbacks
-    def watcha_get_user_statut(self, user_id):
+    def watcha_get_user_role(self, user_id):
         is_partner = yield self.hs.get_auth_handler().is_partner(user_id)
         is_admin = yield self.hs.get_auth_handler().is_admin(user_id)
 
-        status = "member"
+        role = "member"
 
         if is_partner and is_admin:
             raise SynapseError(400, "A user can't be admin and partner too.")
         elif is_partner:
-            status = "partner"
+            role = "partner"
         elif is_admin:
-            status = "admin"
+            role = "admin"
 
-        defer.returnValue(status)
+        defer.returnValue(role)
 
     @defer.inlineCallbacks
     def watchaDeactivateAccount(self, user_id):

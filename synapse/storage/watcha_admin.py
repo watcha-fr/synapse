@@ -226,7 +226,7 @@ class WatchaAdminStore(SQLBaseStore):
     def watcha_update_mail(self, user_id, email):
         return self._update_user(user_id, email=email)
 
-    def watcha_update_user_statut(self, user_id, role):
+    def watcha_update_user_role(self, user_id, role):
         if role == "member":
             return self._update_user(user_id, admin=0, is_partner=0)
         elif role == "admin":
