@@ -50,9 +50,34 @@ class WatchaAdminHandler(BaseHandler):
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def watcha_update_to_member(self, user_id):
-        result = yield self.store.watcha_update_to_member(user_id)
+    def watcha_update_user_statut(self, user_id, statut_action, final_statut):
+        user_statut = yield self.watcha_get_user_statut(user_id)
+
+        if user_statut == final_statut:
+            raise SynapseError(400, "This user has already %s status" % final_statut)
+        if statut_action == "promote" and (user_statut == "admin" or final_statut == "partner"):
+            raise SynapseError(400, "The promotion is not possible with this couple of user status (%s) and desired statut (%s)." % (user_statut, final_statut))
+        elif (statut_action == "demote" and (user_statut == "partner" or final_statut == "admin")):
+            raise SynapseError(400, "The demotion is not possible with this couple of user status (%s) and desired statut (%s)." % (user_statut, final_statut))
+
+        yield self.store.watcha_update_user_statut(user_id, user_statut, final_statut)
         defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def watcha_get_user_statut(self, user_id):
+        is_partner = yield self.hs.get_auth_handler().is_partner(full_user_id)
+        is_admin = yield self.auth.is_server_admin(user_id)
+
+        status = "member"
+
+        if is_partner and is_admin:
+            raise SynapseError(400, "A user can't be admin and partner too.")
+        elif is_partner:
+            status = "partner"
+        elif is_admin:
+            status = "admin"
+
+        defer.returnValue(status)
 
     @defer.inlineCallbacks
     def watchaDeactivateAccount(self, user_id):
