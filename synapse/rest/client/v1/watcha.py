@@ -214,7 +214,7 @@ class WatchaUpdateUserRoleRestServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(WatchaUpdateUserRole, self).__init__()
+        super(WatchaUpdateUserRoleRestServlet, self).__init__()
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
         self.admin_handler = hs.get_handlers().admin_handler
@@ -232,10 +232,10 @@ class WatchaUpdateUserRoleRestServlet(RestServlet):
 
         role = params["role"]
         if role not in ["partner", "member", "admin"]:
-            raise SynapseError(400, "You have to specified a correct desired statut for this user ('admin', 'member' or 'partner'.")
+            raise SynapseError(400, "%s is not a defined role." % role)
 
-        yield self.handlers.watcha_admin_handler.watcha_update_user_role(target_user_id, role)
-        defer.returnValue((200, {}))
+        result = yield self.handlers.watcha_admin_handler.watcha_update_user_role(target_user_id, role)
+        defer.returnValue((200, {"new_role": result}))
 
 
 class WatchaServerState(RestServlet):

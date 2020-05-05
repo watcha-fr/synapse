@@ -58,6 +58,8 @@ class WatchaAdminHandler(BaseHandler):
 
         yield self.store.watcha_update_user_role(user_id, role)
 
+        defer.returnValue(role)
+
     @defer.inlineCallbacks
     def watcha_get_user_role(self, user_id):
         is_partner = yield self.hs.get_auth_handler().is_partner(user_id)
