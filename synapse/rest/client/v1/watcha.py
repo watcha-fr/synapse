@@ -222,8 +222,8 @@ class WatchaUpdateUserRoleRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_PUT(self, request, target_user_id):
         yield _check_admin(self.auth, request)
-        params = parse_json_object_from_request(request) 
-        
+        params = parse_json_object_from_request(request)
+
         users = yield self.admin_handler.get_users()
         if not target_user_id in [user["name"] for user in users]:
             raise SynapseError(
@@ -234,7 +234,9 @@ class WatchaUpdateUserRoleRestServlet(RestServlet):
         if role not in ["partner", "member", "admin"]:
             raise SynapseError(400, "%s is not a defined role." % role)
 
-        result = yield self.handlers.watcha_admin_handler.watcha_update_user_role(target_user_id, role)
+        result = yield self.handlers.watcha_admin_handler.watcha_update_user_role(
+            target_user_id, role
+        )
         defer.returnValue((200, {"new_role": result}))
 
 

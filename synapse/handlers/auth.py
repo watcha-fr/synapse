@@ -1052,14 +1052,13 @@ class AuthHandler(BaseHandler):
         defer.returnValue(ret)
     #end of insertion
 
-    #insertion for watcha OP318
+    # insertion for watcha OP318
     @defer.inlineCallbacks
     def is_admin(self, user_id):
-        ret = yield self.store.is_user_admin(
-            user_id
-        )
+        ret = yield self.store.is_user_admin(user_id)
         defer.returnValue(ret)
-    #end of insertion
+
+    # end of insertion
 
     # Added for Watcha...
     @defer.inlineCallbacks

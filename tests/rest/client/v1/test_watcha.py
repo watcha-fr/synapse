@@ -113,13 +113,12 @@ class WatchaResetPasswordRestServletTestCase(BaseHomeserverWithEmailTestCase):
             self.assertEqual(channel.code,200)
 
 class WatchaUpdateUserRoleResterServletTestCase(BaseHomeserverWithEmailTestCase):
-
     def prepare(self, reactor, clock, hs):
-        #Register admin user :
+        # Register admin user :
         self.admin_id = self.register_user("admin_user", "pass", True)
         self.admin_access_token = self.login("admin_user", "pass")
 
-        #Register no admin user
+        # Register no admin user
         self.non_admin_id = self.register_user("no_admin_user", "pass", False)
         self.non_admin_user_token = self.login("no_admin_user", "pass")
 
@@ -137,30 +136,39 @@ class WatchaUpdateUserRoleResterServletTestCase(BaseHomeserverWithEmailTestCase)
         roles = ["partner", "member", "admin"]
 
         for role in roles:
-            channel = self._do_update_user_role(self.non_admin_id, self.admin_access_token, role)
+            channel = self._do_update_user_role(
+                self.non_admin_id, self.admin_access_token, role
+            )
 
             self.assertEqual(channel.code, 200)
             self.assertEqual(json.loads(channel.result["body"]), {"new_role": role})
 
     def test_do_update_user_role_on_ourself(self):
         role = "member"
-        channel = self._do_update_user_role(self.admin_id, self.admin_access_token, role)
+        channel = self._do_update_user_role(
+            self.admin_id, self.admin_access_token, role
+        )
 
         self.assertEqual(channel.code, 200)
         self.assertEqual(json.loads(channel.result["body"]), {"new_role": role})
 
     def test_do_update_user_role_with_same_role(self):
         role = "member"
-        channel = self._do_update_user_role(self.non_admin_id, self.admin_access_token, role)
+        channel = self._do_update_user_role(
+            self.non_admin_id, self.admin_access_token, role
+        )
 
         self.assertRaises(SyntaxError)
         self.assertEqual(channel.code, 400)
         self.assertEqual(
-            json.loads(channel.result["body"])["error"], "This user has already the %s status" % role
+            json.loads(channel.result["body"])["error"],
+            "This user has already the %s status" % role,
         )
 
     def test_do_update_user_role_without_admin_right(self):
-        channel = self._do_update_user_role(self.admin_id, self.non_admin_user_token, "admin")
+        channel = self._do_update_user_role(
+            self.admin_id, self.non_admin_user_token, "admin"
+        )
 
         self.assertRaises(SyntaxError)
         self.assertEqual(channel.code, 403)
@@ -169,20 +177,26 @@ class WatchaUpdateUserRoleResterServletTestCase(BaseHomeserverWithEmailTestCase)
         )
 
     def test_do_update_user_role_with_wrong_user_id(self):
-        channel = self._do_update_user_role("@user_test:test", self.admin_access_token, "admin")
+        channel = self._do_update_user_role(
+            "@user_test:test", self.admin_access_token, "admin"
+        )
 
         self.assertRaises(SyntaxError)
         self.assertEqual(channel.code, 400)
         self.assertEqual(
-            json.loads(channel.result["body"])["error"], "The target user is not register in this homeserver."
+            json.loads(channel.result["body"])["error"],
+            "The target user is not register in this homeserver.",
         )
 
     def test_do_update_user_role_with_wrong_role(self):
         role = "master"
-        channel = self._do_update_user_role(self.non_admin_id, self.admin_access_token, role)
+        channel = self._do_update_user_role(
+            self.non_admin_id, self.admin_access_token, role
+        )
 
         self.assertRaises(SyntaxError)
         self.assertEqual(channel.code, 400)
         self.assertEqual(
-            json.loads(channel.result["body"])["error"], "%s is not a defined role." % role
+            json.loads(channel.result["body"])["error"],
+            "%s is not a defined role." % role,
         )
