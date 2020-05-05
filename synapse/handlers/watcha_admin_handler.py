@@ -65,7 +65,7 @@ class WatchaAdminHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def watcha_get_user_statut(self, user_id):
-        is_partner = yield self.hs.get_auth_handler().is_partner(full_user_id)
+        is_partner = yield self.hs.get_auth_handler().is_partner(user_id)
         is_admin = yield self.auth.is_server_admin(user_id)
 
         status = "member"
