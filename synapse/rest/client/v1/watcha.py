@@ -232,11 +232,11 @@ class WatchaUpdateUserStatut(RestServlet):
 
         action = params["action"]
         if action not in ["promote", "demote"]:
-            raise SynapseError(400, "You have to specified a correct action to do for the user (promote or demote).")
+            raise SynapseError(400, "You have to specified a correct action to do for this user (promote or demote).")
 
         final_statut = params["final_statut"]
         if final_statut not in ["admin", "member", "partner"]:
-            raise SynapseError(400, "You have to specified a correct desired statut for the user (admin, member or partner.")
+            raise SynapseError(400, "You have to specified a correct desired statut for this user (admin, member or partner.")
 
         yield self.handlers.watcha_admin_handler.watcha_update_user_statut(target_user_id, action, final_statut)
         defer.returnValue((200, {}))
