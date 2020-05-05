@@ -1348,7 +1348,7 @@ class RegistrationStore(
             deactivated,
         )
 
-
+    # insertion for watcha OP318
     @defer.inlineCallbacks
     def is_user_partner(self, user_id):
 
@@ -1360,3 +1360,17 @@ class RegistrationStore(
         )
         logger.info("login from user %s. is_partner=%s", user_id, is_partner)
         defer.returnValue(is_partner)
+    # end of insertion
+
+    # insertion for watcha OP318
+    @defer.inlineCallbacks
+    def is_user_admin(self, user_id):
+
+        is_admin = yield self._simple_select_one_onecol(
+            "users",
+            keyvalues={"name": user_id},
+            retcol="admin",
+            desc="isUserAdmin",
+        )
+        defer.returnValue(is_admin)
+    # end of insertion
