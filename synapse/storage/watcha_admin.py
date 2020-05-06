@@ -35,7 +35,7 @@ class WatchaAdminStore(SQLBaseStore):
         """
 
         members_by_room = yield self.members_by_room()
-        logger.info(str(members_by_room))
+
         # Get active rooms (message send last week in room):
         active_rooms = yield self._execute_sql(
             """
@@ -79,11 +79,11 @@ class WatchaAdminStore(SQLBaseStore):
         result = {
             "direct_rooms_count": len(direct_rooms),
             "direct_active_rooms_count": len(
-                [room for room in direct_rooms if room in active_rooms]
+                set(direct_rooms).intersection(active_rooms)
             ),
             "non_direct_rooms_count": len(non_direct_rooms),
             "non_direct_active_rooms_count": len(
-                [room for room in non_direct_rooms if room in active_rooms]
+                set(non_direct_rooms).intersection(active_rooms)
             ),
         }
 
