@@ -13,7 +13,8 @@ from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id, get_localpart_from_id
-
+from logging import getLogger
+logger = getLogger(__name__)
 def _caller_name():
     '''returns the name of the function calling the one calling this one'''
     try:
@@ -42,12 +43,12 @@ class WatchaAdminStore(SQLBaseStore):
             SELECT DISTINCT room_id 
             FROM events
             WHERE type = "m.room.message"
-                AND received_ts >= %s;
+                AND received_ts >= (
+                    SELECT (strftime('%%s','now') || substr(strftime('%%f', 'now'),4)) - (3600 * 24 * 7 * 1000));
         """
-            % (int(round(1000 * (time.time() - 3600 * 24 * 7))))
         )
         active_rooms = [element[0] for element in active_rooms]
-
+        logger.info(str(active_rooms))
         # Get direct rooms (m.direct flag on account_data and with exactly two joinned or invited members):
         direct_rooms_by_member = yield self._simple_select_onecol(
             table="account_data",
