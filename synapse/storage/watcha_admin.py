@@ -13,8 +13,7 @@ from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id, get_localpart_from_id
-from logging import getLogger
-logger = getLogger(__name__)
+
 def _caller_name():
     '''returns the name of the function calling the one calling this one'''
     try:
@@ -36,7 +35,7 @@ class WatchaAdminStore(SQLBaseStore):
         """
 
         members_by_room = yield self.members_by_room()
-
+        logger.info(str(members_by_room))
         # Get active rooms (message send last week in room):
         active_rooms = yield self._execute_sql(
             """
@@ -48,7 +47,7 @@ class WatchaAdminStore(SQLBaseStore):
         """
         )
         active_rooms = [element[0] for element in active_rooms]
-        logger.info(str(active_rooms))
+
         # Get direct rooms (m.direct flag on account_data and with exactly two joinned or invited members):
         direct_rooms_by_member = yield self._simple_select_onecol(
             table="account_data",
@@ -56,19 +55,19 @@ class WatchaAdminStore(SQLBaseStore):
             retcol="content",
         )
 
-        direct_rooms_with_duplicate = [
-            [rooms[0] for rooms in list(element.values())]
-            for element in [json.loads(row) for row in direct_rooms_by_member]
-        ]
-        direct_rooms = []
-        for element in direct_rooms_with_duplicate:
-            for room in element:
-                if (
-                    room not in direct_rooms
-                    and room in members_by_room.keys()
-                    and len(members_by_room[room]) == 2
-                ):
-                    direct_rooms.append(room)
+        direct_rooms = list(
+            set(
+                [
+                    room
+                    for rooms_list in [
+                        [rooms[0] for rooms in list(member_rooms.values())]
+                        for member_rooms in [json.loads(row) for row in direct_rooms_by_member]
+                    ]
+                    for room in rooms_list
+                    if room in members_by_room and len(members_by_room[room]) == 2
+                ]
+            )
+        )
 
         # Get rooms (all rooms less personnal conversation):
         all_rooms = yield self._simple_select_onecol(
