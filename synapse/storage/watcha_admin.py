@@ -13,7 +13,8 @@ from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id, get_localpart_from_id
-
+import logging
+logger = logging.getLogger(__name__)
 def _caller_name():
     '''returns the name of the function calling the one calling this one'''
     try:
@@ -59,11 +60,9 @@ class WatchaAdminStore(SQLBaseStore):
             set(
                 [
                     room
-                    for rooms_list in [
-                        [rooms[0] for rooms in list(member_rooms.values())]
-                        for member_rooms in [json.loads(row) for row in direct_rooms_by_member]
-                    ]
-                    for room in rooms_list
+                    for row in direct_rooms_by_member
+                    for member_rooms in json.loads(row).values()
+                    for room in member_rooms
                     if room in members_by_room and len(members_by_room[room]) == 2
                 ]
             )
