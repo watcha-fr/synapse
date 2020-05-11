@@ -817,7 +817,7 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
             )
             args = join_args + (search_query, limit + 1)
             END DISABLED FOR WATCHA '''
-            # INSERTED FOR WATCHA
+            # insertion for watcha
             # TODO: do the same for Postgres !
             # list the internal users, as well as the partners that have
             # received an invitation from the users doing the query.
@@ -878,6 +878,7 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
             """ % (where_clause, where_clause)
             args = [  '%' + search_term + '%' ] * 2 + [ user_id ] + [  '%' + search_term + '%' ] * 2
             logger.debug(sql)
+            # end of insertion
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")
