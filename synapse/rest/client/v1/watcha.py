@@ -279,7 +279,7 @@ class WatchaIsAdmin(RestServlet):
         defer.returnValue((200, {"is_admin": is_admin}))
 
 
-class WatchaAdminStats(RestServlet):
+class WatchaAdminStatsRestServlet(RestServlet):
     """Get stats on the server.
 
     For POST, a optional 'ranges' parameters in JSON input made of a list of time ranges,
@@ -292,7 +292,7 @@ class WatchaAdminStats(RestServlet):
     PATTERNS = client_patterns("/watcha_admin_stats", v1=True)
 
     def __init__(self, hs):
-        super(WatchaAdminStats, self).__init__()
+        super(WatchaAdminStatsRestServlet, self).__init__()
         self.hs = hs
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
@@ -417,7 +417,6 @@ class WatchaRegisterRestServlet(RestServlet):
             email,
             template_name="invite_new_account",
             token=token,
-            user_login=user.localpart,
             inviter_name=inviter_name,
             full_name=display_name,
         )
@@ -464,14 +463,14 @@ class WatchaResetPasswordRestServlet(RestServlet):
         try:
             display_name = yield self.hs.profile_handler.get_displayname(user)
         except:
-            display_name = user.localpart
+            display_name = None
 
         send_registration_email(
             self.hs.config,
             email,
             template_name="reset_password",
             token=compute_registration_token(user_id, email, password),
-            user_login=user.localpart,
+            inviter_name=None,
             full_name=display_name,
         )
 
@@ -483,7 +482,7 @@ def register_servlets(hs, http_server):
 
     WatchaUpdateToMember(hs).register(http_server)
     WatchaUserIp(hs).register(http_server)
-    WatchaAdminStats(hs).register(http_server)
+    WatchaAdminStatsRestServlet(hs).register(http_server)
     WatchaIsAdmin(hs).register(http_server)
     WatchaServerState(hs).register(http_server)
     WatchaUpdateMailRestServlet(hs).register(http_server)

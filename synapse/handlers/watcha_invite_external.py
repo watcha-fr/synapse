@@ -145,8 +145,8 @@ class InviteExternalHandler(BaseHandler):
             invitee,
             template_name=template_name,
             token=token,
-            user_login=user_id,
             inviter_name=inviter_name,
+            full_name=None
         )
 
         defer.returnValue(full_user_id)

@@ -114,34 +114,32 @@ def create_display_inviter_name(hs, inviter):
 
 
 def send_registration_email(
-    config, recipient, template_name, token, user_login, **additional_fields
+    config, recipient, template_name, token, inviter_name, full_name
 ):
     """
     Sends email related to user registration (invitation, reset password...)
 
-    Beside the "additional_fields", the 'user_login', 'server', 'title', 'login_url',
-    and 'setup_account_url' variables also used in the template.
+    The templates can use the 'inviter_name', 'full_name', 'email', 'server', 'title',
+    'login_url', and 'setup_account_url' variables.
     The 'title' will be created from the subject.
 
     This method should only be used in a Matrix APIs,
     i.e. called in the code of an HTTP end point, as it raises a SynapseError on error,
     and such errors are only handled correctly in endpoints (ie. passed back as 403 error)"""
 
-    fields = dict(additional_fields)
-
-    fields["user_login"] = user_login
-    fields["server"] = config.server_name
-
-    if "polypus-core.watcha.fr" in config.server_name:
-        # legacy... polypus was installed with an incorrect server name, and it can't be changed after install,
+    fields = {
+        "inviter_name": inviter_name,
+        "full_name": full_name,
+        "email": recipient,
+        # legacy for polypus... was installed with an incorrect server name, and it can't be changed after install,
         # so correcting it here... (see also devops.git/prod/install.sh)
-        fields["server"] = "polypus.watcha.fr"
-
-    fields["login_url"] = "%s/#/login/t=%s" % (config.email_riot_base_url, token)
-    fields["setup_account_url"] = "%s/setup-account.html?t=%s" % (
-        config.email_riot_base_url,
-        token,
-    )
+        "server": "polypus.watcha.fr" if "polypus-core.watcha.fr" in config.server_name else config.server_name,
+        "login_url": "%s/#/login/t=%s" % (config.email_riot_base_url, token),
+        "setup_account_url": "%s/setup-account.html?t=%s" % (
+            config.email_riot_base_url,
+            token,
+        ),
+    }
 
     jinjaenv = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
 
