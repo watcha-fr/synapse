@@ -89,3 +89,21 @@ class WatchaAdminTestCase(unittest.TestCase):
                 user["create_profile_with_displayname"],
                 users_informations[user_index]["displayname"],
             )
+
+    @defer.inlineCallbacks
+    def test_watcha_update_user_role(self):
+        user_id = "@admin:test"
+        yield self.store.register_user(user_id, admin=True)
+
+        expected_values = [
+            {"role": "partner", "values": {"is_partner": 1, "is_admin": 0}},
+            {"role": "member", "values": {"is_partner": 0, "is_admin": 0}},
+            {"role": "admin", "values": {"is_partner": 0, "is_admin": 1}},
+        ]
+
+        for element in expected_values:
+            yield self.store.watcha_update_user_role(user_id, element["role"])
+            is_partner = yield self.store.is_user_partner(user_id)
+            is_admin = yield self.store.is_user_admin(user_id)
+            self.assertEquals(is_partner, element["values"]["is_partner"])
+            self.assertEquals(is_admin, element["values"]["is_admin"])

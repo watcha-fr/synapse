@@ -264,8 +264,16 @@ class WatchaAdminStore(SQLBaseStore):
             desc=_caller_name(),
         )
 
-    def watcha_update_to_member(self, user_id):
-        return self._update_user(user_id, is_partner=0)
+    def watcha_update_mail(self, user_id, email):
+        return self._update_user(user_id, email=email)
+
+    def watcha_update_user_role(self, user_id, role):
+        if role == "member":
+            return self._update_user(user_id, admin=0, is_partner=0)
+        elif role == "admin":
+            return self._update_user(user_id, admin=1, is_partner=0)
+        elif role == "partner":
+            return self._update_user(user_id, admin=0, is_partner=1)
 
     def watcha_deactivate_account(self, user_id):
         return self._update_user(user_id, is_active=0)

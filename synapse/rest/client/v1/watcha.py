@@ -231,21 +231,36 @@ class WatchaUpdateMailRestServlet(RestServlet):
         defer.returnValue((200, {}))
 
 
-class WatchaUpdateToMember(RestServlet):
+class WatchaUpdateUserRoleRestServlet(RestServlet):
     PATTERNS = client_patterns(
-        "/watcha_update_partner_to_member/(?P<target_user_id>[^/]*)", v1=True
+        "/watcha_update_user_role/(?P<target_user_id>[^/]*)", v1=True
     )
 
     def __init__(self, hs):
-        super(WatchaUpdateToMember, self).__init__()
+        super(WatchaUpdateUserRoleRestServlet, self).__init__()
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
+        self.admin_handler = hs.get_handlers().admin_handler
 
     @defer.inlineCallbacks
     def on_PUT(self, request, target_user_id):
         yield _check_admin(self.auth, request)
-        yield self.handlers.watcha_admin_handler.watcha_update_to_member(target_user_id)
-        defer.returnValue((200, {}))
+        params = parse_json_object_from_request(request)
+
+        users = yield self.admin_handler.get_users()
+        if not target_user_id in [user["name"] for user in users]:
+            raise SynapseError(
+                400, "The target user is not registered in this homeserver."
+            )
+
+        role = params["role"]
+        if role not in ["partner", "member", "admin"]:
+            raise SynapseError(400, "%s is not a defined role." % role)
+
+        result = yield self.handlers.watcha_admin_handler.watcha_update_user_role(
+            target_user_id, role
+        )
+        defer.returnValue((200, {"new_role": result}))
 
 
 class WatchaServerState(RestServlet):
@@ -479,8 +494,7 @@ class WatchaResetPasswordRestServlet(RestServlet):
 def register_servlets(hs, http_server):
     WatchaResetPasswordRestServlet(hs).register(http_server)
     WatchaRegisterRestServlet(hs).register(http_server)
-
-    WatchaUpdateToMember(hs).register(http_server)
+    WatchaUpdateUserRoleRestServlet(hs).register(http_server)
     WatchaUserIp(hs).register(http_server)
     WatchaAdminStatsRestServlet(hs).register(http_server)
     WatchaIsAdmin(hs).register(http_server)
