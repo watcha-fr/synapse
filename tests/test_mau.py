@@ -190,6 +190,7 @@ class TestMauLimit(unittest.HomeserverTestCase):
         request_data = json.dumps(
             {
                 "username": localpart,
+                "email": localpart + "@test.com",
                 "password": "monkey",
                 "auth": {"type": LoginType.DUMMY},
             }

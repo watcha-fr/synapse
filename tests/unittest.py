@@ -423,7 +423,7 @@ class HomeserverTestCase(TestCase):
         self.pump()
         return self.failureResultOf(d, exc)
 
-    def register_user(self, username, password, admin=False):
+    def register_user(self, username, password, admin=False, with_email=True):
         """
         Register a user. Requires the Admin API be registered.
 
@@ -461,7 +461,7 @@ class HomeserverTestCase(TestCase):
                 "nonce": nonce,
                 "username": username,
                 "password": password,
-                "email": email,
+                "email": email if with_email else None,
                 "admin": admin,
                 "mac": want_mac,
             }

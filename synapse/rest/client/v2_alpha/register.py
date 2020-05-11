@@ -470,6 +470,7 @@ class RegisterRestServlet(RestServlet):
                 guest_access_token=guest_access_token,
                 threepid=threepid,
                 address=client_addr,
+                bind_emails=[body["email"]] if "email" in body else None,
             )
             # Necessary due to auth checks prior to the threepid being
             # written to the db
