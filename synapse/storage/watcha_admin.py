@@ -30,7 +30,7 @@ class WatchaAdminStore(SQLBaseStore):
             None, sql, *args)
 
     @defer.inlineCallbacks
-    def get_room_count_per_type(self):
+    def _get_room_count_per_type(self):
         """List the rooms, with two or less members, and with three or more members.
         """
 
@@ -237,7 +237,7 @@ class WatchaAdminStore(SQLBaseStore):
         return self._update_user(user_id, is_active=1)
 
     @defer.inlineCallbacks
-    def get_user_admin(self):
+    def _get_user_admin(self):
         admins = yield self._execute_sql(
             """
             SELECT
@@ -276,8 +276,8 @@ class WatchaAdminStore(SQLBaseStore):
     def watcha_admin_stats(self, ranges=None):
         # ranges must be a list of arrays with three elements: label, start seconds since epoch, end seconds since epoch
         user_stats = yield self.get_count_users_partners()
-        room_stats = yield self.get_room_count_per_type()
-        user_admin = yield self.get_user_admin()
+        room_stats = yield self._get_room_count_per_type()
+        user_admin = yield self._get_user_admin()
 
         result = { 'users': user_stats,
                    'rooms': room_stats,
