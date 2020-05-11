@@ -30,7 +30,7 @@ class WatchaAdminStore(SQLBaseStore):
             None, sql, *args)
 
     @defer.inlineCallbacks
-    def get_room_count_per_type(self):
+    def _get_room_count_per_type(self):
         """List the rooms, with two or less members, and with three or more members.
         """
 
@@ -237,8 +237,31 @@ class WatchaAdminStore(SQLBaseStore):
         return self._update_user(user_id, is_active=1)
 
     @defer.inlineCallbacks
-    def get_user_admin(self):
-        admins = yield self._execute_sql("SELECT name FROM users WHERE admin = 1")
+    def _get_user_admin(self):
+        admins = yield self._execute_sql(
+            """
+            SELECT
+                users.name
+                , user_emails.address
+                , user_directory.display_name
+            FROM users
+                INNER JOIN (
+                    SELECT
+                        user_threepids.user_id
+                        , user_threepids.address
+                    FROM user_threepids
+                    WHERE user_threepids.medium = "email") AS user_emails
+                    ON user_emails.user_id = users.name
+            LEFT JOIN user_directory ON users.name = user_directory.user_id
+            WHERE users.admin = 1;
+        """
+        )
+
+        admins = [
+            {"user_id": element[0], "email": element[1], "displayname": element[2]}
+            for element in admins
+        ]
+
         defer.returnValue(admins)
 
     @defer.inlineCallbacks
@@ -253,8 +276,8 @@ class WatchaAdminStore(SQLBaseStore):
     def watcha_admin_stats(self, ranges=None):
         # ranges must be a list of arrays with three elements: label, start seconds since epoch, end seconds since epoch
         user_stats = yield self.get_count_users_partners()
-        room_stats = yield self.get_room_count_per_type()
-        user_admin = yield self.get_user_admin()
+        room_stats = yield self._get_room_count_per_type()
+        user_admin = yield self._get_user_admin()
 
         result = { 'users': user_stats,
                    'rooms': room_stats,
