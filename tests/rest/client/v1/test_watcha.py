@@ -191,7 +191,7 @@ class WatchaUpdateMailRestServletTestCase(BaseHomeserverWithEmailTestCase):
         self.assertEqual(channel.code, 400)
         self.assertEqual(
             json.loads(channel.result["body"])["error"],
-            "The target user is not register in this homeserver.",
+            "The target user is not registered in this homeserver.",
         )
 
 class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
