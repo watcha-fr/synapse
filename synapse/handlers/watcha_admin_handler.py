@@ -54,7 +54,7 @@ class WatchaAdminHandler(BaseHandler):
         user_role = yield self.watcha_get_user_role(user_id)
 
         if user_role == role:
-            raise SynapseError(400, "This user has already the %s status" % role)
+            raise SynapseError(400, "This user has already the %s role" % role)
 
         yield self.store.watcha_update_user_role(user_id, role)
 

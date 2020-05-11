@@ -162,7 +162,7 @@ class WatchaUpdateUserRoleResterServletTestCase(BaseHomeserverWithEmailTestCase)
         self.assertEqual(channel.code, 400)
         self.assertEqual(
             json.loads(channel.result["body"])["error"],
-            "This user has already the %s status" % role,
+            "This user has already the %s role" % role,
         )
 
     def test_do_update_user_role_without_admin_right(self):
@@ -185,7 +185,7 @@ class WatchaUpdateUserRoleResterServletTestCase(BaseHomeserverWithEmailTestCase)
         self.assertEqual(channel.code, 400)
         self.assertEqual(
             json.loads(channel.result["body"])["error"],
-            "The target user is not register in this homeserver.",
+            "The target user is not registered in this homeserver.",
         )
 
     def test_do_update_user_role_with_wrong_role(self):

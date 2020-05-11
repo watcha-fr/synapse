@@ -227,7 +227,7 @@ class WatchaUpdateUserRoleRestServlet(RestServlet):
         users = yield self.admin_handler.get_users()
         if not target_user_id in [user["name"] for user in users]:
             raise SynapseError(
-                400, "The target user is not register in this homeserver."
+                400, "The target user is not registered in this homeserver."
             )
 
         role = params["role"]
