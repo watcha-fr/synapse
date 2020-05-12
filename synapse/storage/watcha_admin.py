@@ -31,13 +31,9 @@ class WatchaAdminStore(SQLBaseStore):
             None, sql, *args)
 
     @defer.inlineCallbacks
-    def _get_room_count_per_type(self):
-        """List the rooms, with two or less members, and with three or more members.
-        """
+    def _get_active_rooms(self):
+        """List rooms where the last message was sent than less a week ago"""
 
-        members_by_room = yield self.members_by_room()
-
-        # Get active rooms (message send last week in room):
         active_rooms = yield self._execute_sql(
             """
             SELECT DISTINCT room_id 
@@ -47,7 +43,18 @@ class WatchaAdminStore(SQLBaseStore):
                     SELECT (strftime('%%s','now') || substr(strftime('%%f', 'now'),4)) - (3600 * 24 * 7 * 1000));
         """
         )
-        active_rooms = [element[0] for element in active_rooms]
+        active_rooms = [rooms[0] for rooms in active_rooms]
+
+        defer.returnValue(active_rooms)
+
+    @defer.inlineCallbacks
+    def _get_room_count_per_type(self):
+        """List the rooms, with two or less members, and with three or more members.
+        """
+
+        members_by_room = yield self.members_by_room()
+
+        active_rooms = yield self._get_active_rooms()
 
         # Get direct rooms (m.direct flag on account_data and with exactly two joinned or invited members):
         direct_rooms_by_member = yield self._simple_select_onecol(
