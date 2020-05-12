@@ -319,17 +319,6 @@ class WatchaAdminStatsRestServlet(RestServlet):
         ret = yield self.handlers.watcha_admin_handler.watcha_admin_stat()
         defer.returnValue((200, ret))
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        params = yield _check_admin_or_secret(
-            self.hs.config, self.auth, request, ["ranges"]
-        )
-
-        ret = yield self.handlers.watcha_admin_handler.watcha_admin_stat(
-            params["ranges"] or None
-        )
-        defer.returnValue((200, ret))
-
 
 class WatchaUserIp(RestServlet):
 

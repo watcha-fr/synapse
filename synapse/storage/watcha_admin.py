@@ -319,7 +319,7 @@ class WatchaAdminStore(SQLBaseStore):
         defer.returnValue(value[0][0])
 
     @defer.inlineCallbacks
-    def watcha_admin_stats(self, ranges=None):
+    def watcha_admin_stats(self):
         # ranges must be a list of arrays with three elements: label, start seconds since epoch, end seconds since epoch
         user_stats = yield self.get_count_users_partners()
         room_stats = yield self._get_room_count_per_type()
@@ -329,18 +329,5 @@ class WatchaAdminStore(SQLBaseStore):
                    'rooms': room_stats,
                    'admins': user_admin,
         }
-
-        if ranges:
-            result['stats'] = []
-            for index, time_range in enumerate(ranges):
-                message_count = yield self._get_range_count("type = 'm.room.message'", time_range)
-                file_count = yield self._get_range_count("type='m.room.message' AND content NOT LIKE '%m.text%'", time_range)
-                create_room_count = yield self._get_range_count("type = 'm.room.create'", time_range)
-                result['stats'].append({
-                    'label': time_range[0],
-                    'message_count': message_count,
-                    'file_count': file_count,
-                    'create_room_count': create_room_count,
-                })
 
         defer.returnValue(result)
