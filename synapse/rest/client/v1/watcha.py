@@ -106,22 +106,6 @@ class WatchaUserlistRestServlet(RestServlet):
         defer.returnValue((200, ret))
 
 
-class WatchaRoomlistRestServlet(RestServlet):
-
-    PATTERNS = client_patterns("/watcha_room_list", v1=True)
-
-    def __init__(self, hs):
-        super(WatchaRoomlistRestServlet, self).__init__()
-        self.auth = hs.get_auth()
-        self.handlers = hs.get_handlers()
-
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        yield _check_admin(self.auth, request)
-        ret = yield self.handlers.watcha_admin_handler.watcha_room_list()
-        defer.returnValue((200, ret))
-
-
 class WatchaRoomMembershipRestServlet(RestServlet):
 
     PATTERNS = client_patterns("/watcha_room_membership", v1=True)

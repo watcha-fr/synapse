@@ -16,12 +16,6 @@ class WatchaAdminHandler(BaseHandler):
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def watcha_room_list(self):
-        # TODO remove this - there is no 'watcha_room_list' in the store
-        result = yield self.store.watcha_room_list()
-        defer.returnValue(result)
-
-    @defer.inlineCallbacks
     def watcha_room_membership(self):
         result = yield self.store.watcha_room_membership()
         defer.returnValue(result)
