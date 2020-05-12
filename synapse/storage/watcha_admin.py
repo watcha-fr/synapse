@@ -77,17 +77,19 @@ class WatchaAdminStore(SQLBaseStore):
     def _get_room_count_per_type(self):
         """List the rooms, with two or less members, and with three or more members.
         """
-
+        members_by_room = yield self.members_by_room()
         active_rooms = yield self._get_active_rooms()
-
         direct_rooms = yield self._get_direct_rooms()
 
-        # Get rooms (all rooms less personnal conversation):
         all_rooms = yield self._simple_select_onecol(
             table="rooms", keyvalues=None, retcol="room_id",
         )
 
-        non_direct_rooms = [room for room in all_rooms if room not in direct_rooms]
+        non_direct_rooms = [
+            room
+            for room in all_rooms
+            if room not in direct_rooms and room in members_by_room
+        ]
 
         result = {
             "direct_rooms_count": len(direct_rooms),
