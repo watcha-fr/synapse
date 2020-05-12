@@ -89,6 +89,28 @@ class WatchaAdminStore(SQLBaseStore):
         defer.returnValue(result)
 
     @defer.inlineCallbacks
+    def _get_users_count_per_role(self):
+        """Retrieve a count of users per role (members and partners)"""
+
+        member_users = yield self._execute_sql(
+        """
+            SELECT COUNT(*) as count
+            FROM users
+            WHERE is_partner = 0
+        """
+        )
+
+        partner_users = yield self._execute_sql(
+        """
+            SELECT COUNT(*) as count
+            FROM users
+            WHERE is_partner = 1
+        """
+        )
+
+        defer.returnValue({ "member": member_users[0][0], "partners": partner_users[0][0] })
+
+    @defer.inlineCallbacks
     def watcha_user_list(self):
 
         FIELDS = ["name", "is_guest", "is_partner", "admin", "email",
@@ -321,7 +343,7 @@ class WatchaAdminStore(SQLBaseStore):
     @defer.inlineCallbacks
     def watcha_admin_stats(self, ranges=None):
         # ranges must be a list of arrays with three elements: label, start seconds since epoch, end seconds since epoch
-        user_stats = yield self.get_count_users_partners()
+        user_stats = yield self._get_users_count_per_role()
         room_stats = yield self._get_room_count_per_type()
         user_admin = yield self._get_user_admin()
 
