@@ -1,6 +1,5 @@
 import json
 import logging
-import re
 
 from tests import unittest
 from tests.utils import setup_test_homeserver
@@ -113,52 +112,3 @@ class WatchaResetPasswordRestServletTestCase(BaseHomeserverWithEmailTestCase):
             self.assertIn("http://localhost:8080/setup-account.html?t=",
                             ''.join(cm.output))
             self.assertEqual(channel.code,200)
-
-class WatchaAdminStatsRestServletTestCase(BaseHomeserverWithEmailTestCase):
-
-    def _do_watcha_admin_stats(self, content=None):
-        #Admin send the request with access_token :
-        request, channel = self.make_request(
-            "POST" if content else "GET",
-            "/_matrix/client/r0/watcha_admin_stats",
-            content=json.dumps(content) if content else None,
-            access_token=self.user_access_token,
-        )
-        self.render(request)
-        self.assertEqual(channel.code,200)
-        output = json.loads(channel.result['body'])
-        if "rooms" in output and "now" in output["rooms"]:
-            output["rooms"]["now"] = 0
-        return output
-        
-    def test_get_watcha_admin_stats(self):
-        self.assertEqual(self._do_watcha_admin_stats(),
-                          {'admins': [],
-                           'rooms': {'active_threshold': 604800000,
-                                     'big_rooms_count': 0,
-                                     'big_rooms_count_active': 0,
-                                     'now': 0,
-                                     'one_one_rooms_count': 0,
-                                     'room_details': {}},
-                           'users': {'local': 1, 'partners': 0}}
-        )
-
-    def test_post_watcha_admin_stats(self):
-        self.assertEqual(self._do_watcha_admin_stats({"ranges": [["one", 0, 1], ["two", 1, 2]]}),
-                         {'admins': [],
-                          'rooms': {'active_threshold': 604800000,
-                                    'big_rooms_count': 0,
-                                    'big_rooms_count_active': 0,
-                                    'now': 0,
-                                    'one_one_rooms_count': 0,
-                                    'room_details': {}},
-                          'stats': [{'create_room_count': 0,
-                                     'file_count': 0,
-                                     'label': 'one',
-                                     'message_count': 0},
-                                    {'create_room_count': 0,
-                                     'file_count': 0,
-                                     'label': 'two',
-                                     'message_count': 0}],
-                          'users': {'local': 1, 'partners': 0}}
-        )
