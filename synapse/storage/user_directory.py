@@ -817,14 +817,14 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
             )
             args = join_args + (search_query, limit + 1)
             END DISABLED FOR WATCHA '''
-            # INSERTED FOR WATCHA
+            # insertion for watcha
             # TODO: do the same for Postgres !
             # list the internal users, as well as the partners that have
             # received an invitation from the users doing the query.
             # in this query, UNION and UNION ALL give the same results
 
             logger.info("Searching with search term: %s" % repr(search_term))
-            where_clause = """ AND (u.name LIKE ? OR display_name LIKE ? OR u.email LIKE ? )"""
+            where_clause = """ AND (display_name LIKE ? OR t.address LIKE ? )"""
 
             sql = """
                 SELECT 
@@ -876,8 +876,9 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
                     AND u.is_active = 1
                     %s
             """ % (where_clause, where_clause)
-            args = [  '%' + search_term + '%' ] * 3 + [ user_id ] + [  '%' + search_term + '%' ] * 3
+            args = [  '%' + search_term + '%' ] * 2 + [ user_id ] + [  '%' + search_term + '%' ] * 2
             logger.debug(sql)
+            # end of insertion
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")

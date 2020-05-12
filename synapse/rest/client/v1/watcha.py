@@ -192,37 +192,75 @@ class WatchaUpdateMailRestServlet(RestServlet):
 
     def __init__(self, hs):
         super(WatchaUpdateMailRestServlet, self).__init__()
+        self.hs = hs
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
+        self.auth_handler = hs.get_auth_handler()
+        self.account_activity_handler = hs.get_account_validity_handler()
 
     @defer.inlineCallbacks
     def on_PUT(self, request, target_user_id):
         yield _check_admin(self.auth, request)
         params = parse_json_object_from_request(request)
         new_email = params["new_email"]
+
         if not new_email:
             raise SynapseError(400, "Missing 'new_email' arg")
-        yield self.handlers.watcha_admin_handler.watcha_update_mail(
-            target_user_id, new_email
+
+        users = yield self.handlers.admin_handler.get_users()
+        if not target_user_id in [user["name"] for user in users]:
+            raise SynapseError(
+                400, "The target user is not registered in this homeserver."
+            )
+
+        try:
+            email = yield self.account_activity_handler.get_email_address_for_user(
+                target_user_id
+            )
+        except SynapseError:
+            logger.error("No email are defined for this user.")
+            raise
+
+        yield self.auth_handler.delete_threepid(
+            target_user_id, "email", email, id_server=None
         )
+        yield self.auth_handler.add_threepid(
+            target_user_id, "email", new_email, self.hs.get_clock().time_msec()
+        )
+
         defer.returnValue((200, {}))
 
 
-class WatchaUpdateToMember(RestServlet):
+class WatchaUpdateUserRoleRestServlet(RestServlet):
     PATTERNS = client_patterns(
-        "/watcha_update_partner_to_member/(?P<target_user_id>[^/]*)", v1=True
+        "/watcha_update_user_role/(?P<target_user_id>[^/]*)", v1=True
     )
 
     def __init__(self, hs):
-        super(WatchaUpdateToMember, self).__init__()
+        super(WatchaUpdateUserRoleRestServlet, self).__init__()
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
+        self.admin_handler = hs.get_handlers().admin_handler
 
     @defer.inlineCallbacks
     def on_PUT(self, request, target_user_id):
         yield _check_admin(self.auth, request)
-        yield self.handlers.watcha_admin_handler.watcha_update_to_member(target_user_id)
-        defer.returnValue((200, {}))
+        params = parse_json_object_from_request(request)
+
+        users = yield self.admin_handler.get_users()
+        if not target_user_id in [user["name"] for user in users]:
+            raise SynapseError(
+                400, "The target user is not registered in this homeserver."
+            )
+
+        role = params["role"]
+        if role not in ["partner", "member", "admin"]:
+            raise SynapseError(400, "%s is not a defined role." % role)
+
+        result = yield self.handlers.watcha_admin_handler.watcha_update_user_role(
+            target_user_id, role
+        )
+        defer.returnValue((200, {"new_role": result}))
 
 
 class WatchaServerState(RestServlet):
@@ -256,7 +294,7 @@ class WatchaIsAdmin(RestServlet):
         defer.returnValue((200, {"is_admin": is_admin}))
 
 
-class WatchaAdminStats(RestServlet):
+class WatchaAdminStatsRestServlet(RestServlet):
     """Get stats on the server.
 
     For POST, a optional 'ranges' parameters in JSON input made of a list of time ranges,
@@ -269,7 +307,7 @@ class WatchaAdminStats(RestServlet):
     PATTERNS = client_patterns("/watcha_admin_stats", v1=True)
 
     def __init__(self, hs):
-        super(WatchaAdminStats, self).__init__()
+        super(WatchaAdminStatsRestServlet, self).__init__()
         self.hs = hs
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
@@ -456,10 +494,9 @@ class WatchaResetPasswordRestServlet(RestServlet):
 def register_servlets(hs, http_server):
     WatchaResetPasswordRestServlet(hs).register(http_server)
     WatchaRegisterRestServlet(hs).register(http_server)
-
-    WatchaUpdateToMember(hs).register(http_server)
+    WatchaUpdateUserRoleRestServlet(hs).register(http_server)
     WatchaUserIp(hs).register(http_server)
-    WatchaAdminStats(hs).register(http_server)
+    WatchaAdminStatsRestServlet(hs).register(http_server)
     WatchaIsAdmin(hs).register(http_server)
     WatchaServerState(hs).register(http_server)
     WatchaUpdateMailRestServlet(hs).register(http_server)
