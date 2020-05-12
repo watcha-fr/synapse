@@ -84,12 +84,10 @@ class WatchaAdminStore(SQLBaseStore):
         all_rooms = yield self._simple_select_onecol(
             table="rooms", keyvalues=None, retcol="room_id",
         )
-
-        non_direct_rooms = [
-            room
-            for room in all_rooms
-            if room not in direct_rooms and room in members_by_room
-        ]
+        
+        non_direct_rooms = non_direct_rooms2 = set(all_rooms) & set(
+            members_by_room.keys()
+        ) - set(direct_rooms)
 
         result = {
             "direct_rooms_count": len(direct_rooms),
