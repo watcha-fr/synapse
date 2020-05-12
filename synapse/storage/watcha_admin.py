@@ -202,7 +202,7 @@ class WatchaAdminStore(SQLBaseStore):
 
 
     @defer.inlineCallbacks
-    def watcha_extend_room_list(self):
+    def watcha_room_list(self):
         """ List the rooms their state and their users """
 
         rooms = yield self._execute_sql(

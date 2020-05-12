@@ -33,9 +33,8 @@ class WatchaAdminHandler(BaseHandler):
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def watcha_extend_room_list(self):
-        # TODO: rename to watcha_extended_room_list -- or better, to watcha_room_list since that one is not working
-        result = yield self.store.watcha_extend_room_list()
+    def watcha_room_list(self):
+        result = yield self.store.watcha_room_list()
         defer.returnValue(result)
 
     @defer.inlineCallbacks
