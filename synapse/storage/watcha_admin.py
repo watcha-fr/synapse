@@ -48,15 +48,11 @@ class WatchaAdminStore(SQLBaseStore):
         defer.returnValue(active_rooms)
 
     @defer.inlineCallbacks
-    def _get_room_count_per_type(self):
-        """List the rooms, with two or less members, and with three or more members.
-        """
+    def _get_direct_rooms(self):
+        """List rooms with m.direct flag on account_data and with exactly two joinned or invited members"""
 
         members_by_room = yield self.members_by_room()
 
-        active_rooms = yield self._get_active_rooms()
-
-        # Get direct rooms (m.direct flag on account_data and with exactly two joinned or invited members):
         direct_rooms_by_member = yield self._simple_select_onecol(
             table="account_data",
             keyvalues={"account_data_type": "m.direct"},
@@ -74,6 +70,17 @@ class WatchaAdminStore(SQLBaseStore):
                 ]
             )
         )
+
+        defer.returnValue(direct_rooms)
+
+    @defer.inlineCallbacks
+    def _get_room_count_per_type(self):
+        """List the rooms, with two or less members, and with three or more members.
+        """
+
+        active_rooms = yield self._get_active_rooms()
+
+        direct_rooms = yield self._get_direct_rooms()
 
         # Get rooms (all rooms less personnal conversation):
         all_rooms = yield self._simple_select_onecol(
