@@ -15,6 +15,7 @@ from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id, get_localpart_from_id
 import logging
 logger = logging.getLogger(__name__)
+
 def _caller_name():
     '''returns the name of the function calling the one calling this one'''
     try:
@@ -40,7 +41,7 @@ class WatchaAdminStore(SQLBaseStore):
             FROM events
             WHERE type = "m.room.message"
                 AND received_ts >= (
-                    SELECT (strftime('%%s','now') || substr(strftime('%%f', 'now'),4)) - (3600 * 24 * 7 * 1000));
+                    SELECT (strftime('%s','now') || substr(strftime('%f', 'now'),4)) - (3600 * 24 * 7 * 1000));
         """
         )
         active_rooms = [rooms[0] for rooms in active_rooms]
