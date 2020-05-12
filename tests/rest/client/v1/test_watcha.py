@@ -15,6 +15,7 @@ class BaseHomeserverWithEmailTestCase(unittest.HomeserverTestCase):
         admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         watcha.register_servlets,
+        room.register_servlets,
     ]
 
     def make_homeserver(self, reactor, clock):
@@ -47,6 +48,27 @@ class BaseHomeserverWithEmailTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
         return channel
+
+    def _create_room(self):
+        request, channel = self.make_request(
+            "POST",
+            "/createRoom",
+            content=json.dumps({}),
+            access_token=self.user_access_token,
+        )
+
+        self.render(request)
+        return json.loads(channel.result["body"])["room_id"]
+
+    def _invite_member_in_room(self, room_id, user_id):
+        request, channel = self.make_request(
+            "POST",
+            "/rooms/%s/invite" % room_id,
+            content=json.dumps({"user_id": user_id}),
+            access_token=self.user_access_token,
+        )
+
+        self.render(request)
 
 
 class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
@@ -112,3 +134,25 @@ class WatchaResetPasswordRestServletTestCase(BaseHomeserverWithEmailTestCase):
             self.assertIn("http://localhost:8080/setup-account.html?t=",
                             ''.join(cm.output))
             self.assertEqual(channel.code,200)
+
+
+class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
+    def test_get_watcha_admin_stats_room_type(self):
+        room_id = self._create_room()
+        self._invite_member_in_room(room_id, self.user_id)
+
+        request, channel = self.make_request(
+            "GET", "watcha_admin_stats", access_token=self.user_access_token
+        )
+        self.render(request)
+
+        self.assertEquals(
+            json.loads(channel.result["body"])["rooms"],
+            {
+                "direct_active_rooms_count": 0,
+                "direct_rooms_count": 0,
+                "non_direct_active_rooms_count": 0,
+                "non_direct_rooms_count": 1,
+            },
+        )
+        self.assertEquals(200, channel.code)
