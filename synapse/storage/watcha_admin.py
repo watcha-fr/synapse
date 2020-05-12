@@ -203,35 +203,45 @@ class WatchaAdminStore(SQLBaseStore):
     def watcha_extend_room_list(self):
         """ List the rooms their state and their users """
 
-
-        rooms = yield self._execute_sql("""
-        SELECT rooms.room_id, rooms.creator, room_names.name, last_events.last_received_ts FROM rooms
-        LEFT JOIN (SELECT max(event_id) event_id, room_id from room_names group by room_id) last_room_names
-              ON rooms.room_id = last_room_names.room_id
-        LEFT JOIN room_names on room_names.event_id = last_room_names.event_id
-        LEFT JOIN (SELECT max(received_ts) last_received_ts, room_id FROM events
-                   GROUP BY room_id HAVING type = "m.room.message") last_events
-              ON last_events.room_id = rooms.room_id
-        ORDER BY rooms.room_id ASC;
-        """)
+        rooms = yield self._execute_sql(
+            """
+            SELECT
+                rooms.room_id
+                , rooms.creator
+                , room_names.name
+            FROM rooms
+                LEFT JOIN (
+                    SELECT
+                        room_id
+                        , event_id
+                    FROM current_state_events
+                    WHERE type = "m.room.name") as last_room_names
+                    ON last_room_names.room_id = rooms.room_id
+                LEFT JOIN room_names
+                    ON room_names.event_id = last_room_names.event_id
+            ORDER BY rooms.room_id ASC;
+        """
+        )
 
         members_by_room = yield self.members_by_room()
+        active_rooms = yield self._get_active_rooms()
+        direct_rooms = yield self._get_direct_rooms()
 
-        now = int(round(time.time() * 1000))
-        ACTIVE_THRESHOLD = 1000 * 3600 * 24 * 7 # one week
-
-        defer.returnValue([
-            {
-                'room_id': room_id,
-                'creator': creator,
-                'name': name,
-                'members': members_by_room[room_id],
-                'type': "Room" if (len(members_by_room[room_id]) >= 3) else "One to one",
-                'active': 1 if last_received_ts and (now - last_received_ts < ACTIVE_THRESHOLD) else 0
-            }
-            for room_id, creator, name, last_received_ts in rooms
-            if room_id in members_by_room # don't show empty room (and avoid a possible exception)
-        ])
+        defer.returnValue(
+            [
+                {
+                    "room_id": room_id,
+                    "creator": creator,
+                    "name": name,
+                    "members": members_by_room[room_id],
+                    "type": "Personnal conversation" if room_id in direct_rooms else "Room",
+                    "active": 1 if room_id in active_rooms else 0,
+                }
+                for room_id, creator, name in rooms
+                if room_id
+                in members_by_room  # don't show empty room (and avoid a possible exception)
+            ]
+        )
 
 
     def watcha_room_membership(self):
