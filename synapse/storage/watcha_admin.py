@@ -13,8 +13,7 @@ from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id, get_localpart_from_id
-import logging
-logger = logging.getLogger(__name__)
+
 
 def _caller_name():
     '''returns the name of the function calling the one calling this one'''
