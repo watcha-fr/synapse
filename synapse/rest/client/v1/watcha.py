@@ -155,7 +155,7 @@ class WatchaDisplayNameRestServlet(RestServlet):
 
 
 class WatchaRoomlistRestServlet(RestServlet):
-    PATTERNS = client_patterns("/watcha_extend_room_list", v1=True)
+    PATTERNS = client_patterns("/watcha_room_list", v1=True)
 
     def __init__(self, hs):
         super(WatchaRoomlistRestServlet, self).__init__()
