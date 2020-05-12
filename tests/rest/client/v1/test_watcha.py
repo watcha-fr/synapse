@@ -156,3 +156,29 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
             },
         )
         self.assertEquals(200, channel.code)
+
+    def test_get_watcha_admin_stats_room_list(self):
+        rooms_id = []
+        for i in range(3):
+            room_id = self._create_room()
+            rooms_id.append(room_id)
+            self._invite_member_in_room(room_id, self.user_id)
+
+        request, channel = self.make_request(
+            "GET", "watcha_room_list", access_token=self.user_access_token
+        )
+        self.render(request)
+
+        for room_id in rooms_id:
+            self.assertEquals(
+                json.loads(channel.result["body"])[rooms_id.index(room_id)],
+                {
+                    "active": 0,
+                    "creator": "@admin:test",
+                    "members": ["@admin:test"],
+                    "name": None,
+                    "room_id": room_id,
+                    "type": "Room",
+                },
+            )
+        self.assertEquals(200, channel.code)
