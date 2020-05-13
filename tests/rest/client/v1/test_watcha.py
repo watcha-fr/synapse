@@ -164,6 +164,8 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
             rooms_id.append(room_id)
             self._invite_member_in_room(room_id, self.user_id)
 
+        rooms_id = sorted(rooms_id)
+
         request, channel = self.make_request(
             "GET", "watcha_room_list", access_token=self.user_access_token
         )
