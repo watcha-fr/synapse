@@ -85,7 +85,7 @@ class WatchaAdminStore(SQLBaseStore):
             table="rooms", keyvalues=None, retcol="room_id",
         )
         
-        non_direct_rooms = non_direct_rooms2 = set(all_rooms) & set(
+        non_direct_rooms = set(all_rooms) & set(
             members_by_room.keys()
         ) - set(direct_rooms)
 
@@ -96,7 +96,7 @@ class WatchaAdminStore(SQLBaseStore):
             ),
             "non_direct_rooms_count": len(non_direct_rooms),
             "non_direct_active_rooms_count": len(
-                set(non_direct_rooms).intersection(active_rooms)
+                non_direct_rooms.intersection(active_rooms)
             ),
         }
 
