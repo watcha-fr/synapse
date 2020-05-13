@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
-import time, json
+import time, json, calendar
+from datetime import datetime
 import psutil
 from collections import defaultdict
 import inspect
@@ -24,6 +25,10 @@ def _caller_name():
         return "<unknown function>"
 
 class WatchaAdminStore(SQLBaseStore):
+    def __init__(self, db_conn, hs):
+        super(WatchaAdminStore, self).__init__(db_conn, hs)
+
+        self.clock = hs.get_clock()
 
     def _execute_sql(self, sql, *args):
         return self._execute(
@@ -89,8 +94,8 @@ class WatchaAdminStore(SQLBaseStore):
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def _get_users_count_per_role(self):
-        """Retrieve a count of users per role (members and partners)"""
+    def _get_users_stats(self):
+        """Retrieve the count of users per role (members and partners) and some stats of connected users"""
 
         member_users = yield self._execute_sql(
         """
@@ -108,7 +113,44 @@ class WatchaAdminStore(SQLBaseStore):
         """
         )
 
-        defer.returnValue({ "member": member_users[0][0], "partners": partner_users[0][0] })
+        last_seen_ts_per_users = yield self._execute_sql(
+        """
+            SELECT
+                user_id
+                , max(last_seen)
+            FROM user_ips
+            GROUP BY user_id;
+        """
+        )
+
+        now = int(self.clock.time())
+        now_datetime = datetime.fromtimestamp(now)
+
+        MS_PER_DAY = 24 * 3600
+        WEEK_TRESHOLD = (now - 7 * MS_PER_DAY)*1000
+        MONTH_TRESHOLD = (now -
+            calendar.monthrange(now_datetime.year, now_datetime.month)[1] * MS_PER_DAY
+        )*1000
+
+        users_logged_at_least_once = [user_ts[0] for user_ts in last_seen_ts_per_users]
+
+        last_month_logged_users = [
+            user_ts[0] for user_ts in last_seen_ts_per_users if user_ts[1] > MONTH_TRESHOLD
+        ]
+
+        last_week_logged_users = [
+            user_ts[0] for user_ts in last_seen_ts_per_users if user_ts[1] > WEEK_TRESHOLD
+        ]
+
+        defer.returnValue(
+            {
+                "member": member_users[0][0],
+                "partners": partner_users[0][0],
+                "number_of_users_logged_at_least_once": len(users_logged_at_least_once),
+                "number_of_last_month_logged_users": len(last_month_logged_users),
+                "number_of_last_week_logged_users": len(last_week_logged_users),
+            }
+        )
 
     @defer.inlineCallbacks
     def watcha_user_list(self):
@@ -343,7 +385,7 @@ class WatchaAdminStore(SQLBaseStore):
     @defer.inlineCallbacks
     def watcha_admin_stats(self, ranges=None):
         # ranges must be a list of arrays with three elements: label, start seconds since epoch, end seconds since epoch
-        user_stats = yield self._get_users_count_per_role()
+        user_stats = yield self._get_users_stats()
         room_stats = yield self._get_room_count_per_type()
         user_admin = yield self._get_user_admin()
 
