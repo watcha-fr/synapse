@@ -93,7 +93,14 @@ class WatchaAdminHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def watcha_get_user_status(self, user_id):
-        result = yield self.store.watcha_get_user_status(user_id)
+        #TODO : handle invited status when OP355 will be done.
+        status = yield self.store.watcha_get_user_status(user_id)
+
+        result = "active"
+        
+        if status == 0:
+            result = "inactive"
+
         defer.returnValue(result)
 
     @defer.inlineCallbacks
