@@ -91,19 +91,19 @@ class WatchaAdminStore(SQLBaseStore):
     @defer.inlineCallbacks
     def watcha_user_list(self):
 
-        FIELDS = ["name", "is_guest", "is_partner", "admin", "email",
-                  "creation_ts", "is_active" , "displayname", "last_seen"]
-        SQL_USER_LIST = '''
+        FIELDS = ["user_id", "email_address", "display_name", "is_partner", "is_admin", "is_active"
+                  "last_seen", "creation_ts"]
+
+        SQL_USER_LIST = """
             SELECT 
                 users.name
-                , users.is_guest
+                , user_email.address
+                , profiles.displayname
                 , users.is_partner
                 , users.admin
-                , user_email.address
-                , users.creation_ts
                 , users.is_active
-                , profiles.displayname
-                , user_ips.last_seen
+                , users_last_seen.last_seen
+                , users.creation_ts
             FROM users
                 LEFT JOIN
                     (SELECT
@@ -112,10 +112,15 @@ class WatchaAdminStore(SQLBaseStore):
                     FROM user_threepids AS t
                     WHERE t.medium = 'email') AS user_email
                     ON users.name = user_email.user_id
-                LEFT JOIN user_ips ON users.name = user_ips.user_id
+                LEFT JOIN
+                    (SELECT
+                        user_ips.user_id
+                        , max(user_ips.last_seen) as last_seen
+                    FROM user_ips
+                    GROUP BY user_ips.user_id) as users_last_seen ON users_last_seen.user_id = users.name
                 LEFT JOIN profiles ON users.name LIKE "@"||profiles.user_id||":%"
             GROUP BY users.name
-            '''
+        """
 
         users = yield self._execute_sql(SQL_USER_LIST)
 
