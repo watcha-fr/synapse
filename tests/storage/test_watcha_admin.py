@@ -79,16 +79,18 @@ class WatchaAdminTestCase(unittest.TestCase):
 
         for user in register_users_list_sorted:
             user_index = register_users_list_sorted.index(user)
-            self.assertEquals(user["user_id"], users_informations[user_index]["name"])
+            self.assertEquals(user["user_id"], users_informations[user_index]["user_id"])
             self.assertEquals(
                 user["make_partner"], users_informations[user_index]["is_partner"]
             )
-            self.assertEquals(user["admin"], users_informations[user_index]["admin"])
-            self.assertEquals(user["email"], users_informations[user_index]["email"])
+            self.assertEquals(user["admin"], users_informations[user_index]["is_admin"])
+            self.assertEquals(user["email"], users_informations[user_index]["email_address"])
             self.assertEquals(
                 user["create_profile_with_displayname"],
-                users_informations[user_index]["displayname"],
+                users_informations[user_index]["display_name"],
             )
+            self.assertEquals(None, users_informations[user_index]["last_seen"])
+            self.assertEquals(self.time, users_informations[user_index]["creation_ts"]*1000)
 
     @defer.inlineCallbacks
     def test_watcha_update_user_role(self):
