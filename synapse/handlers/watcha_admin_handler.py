@@ -77,6 +77,14 @@ class WatchaAdminHandler(BaseHandler):
         defer.returnValue(role)
 
     @defer.inlineCallbacks
+    def watcha_get_user_status(self, user_id):
+        status = yield self.store.watcha_get_user_status(user_id)
+
+        result = "inactive" if status == 0 else "active"
+
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
     def watchaDeactivateAccount(self, user_id):
         result = yield self.store.watcha_deactivate_account(user_id)
         defer.returnValue(result)
