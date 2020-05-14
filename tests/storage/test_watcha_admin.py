@@ -97,8 +97,8 @@ class WatchaAdminTestCase(unittest.TestCase):
 
         expected_values = [
             {"role": "partner", "values": {"is_partner": 1, "is_admin": 0}},
-            {"role": "member", "values": {"is_partner": 0, "is_admin": 0}},
-            {"role": "admin", "values": {"is_partner": 0, "is_admin": 1}},
+            {"role": "collaborator", "values": {"is_partner": 0, "is_admin": 0}},
+            {"role": "administrator", "values": {"is_partner": 0, "is_admin": 1}},
         ]
 
         for element in expected_values:
