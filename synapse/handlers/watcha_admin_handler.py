@@ -97,7 +97,7 @@ class WatchaAdminHandler(BaseHandler):
         status = yield self.store.watcha_get_user_status(user_id)
 
         result = "active"
-        
+
         if status == 0:
             result = "inactive"
 

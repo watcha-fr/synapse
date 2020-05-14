@@ -91,7 +91,7 @@ class WatchaAdminStore(SQLBaseStore):
     @defer.inlineCallbacks
     def watcha_user_list(self):
 
-        FIELDS = ["user_id", "email_address", "display_name", "is_partner", "is_admin", "is_active"
+        FIELDS = ["user_id", "email_address", "display_name", "is_partner", "is_admin", "is_active",
                   "last_seen", "creation_ts"]
 
         SQL_USER_LIST = """
@@ -290,7 +290,7 @@ class WatchaAdminStore(SQLBaseStore):
     def watcha_get_user_status(self, user_id):
         status = yield self._simple_select_onecol(
             table="users",
-            keyvalues={"user_id": user_id},
+            keyvalues={"name": user_id},
             retcol="is_active",
         )
 
