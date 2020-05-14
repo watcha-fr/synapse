@@ -96,10 +96,7 @@ class WatchaAdminHandler(BaseHandler):
         #TODO : handle invited status when OP355 will be done.
         status = yield self.store.watcha_get_user_status(user_id)
 
-        result = "active"
-
-        if status == 0:
-            result = "inactive"
+        result = "inactive" if status == 0 else "active"
 
         defer.returnValue(result)
 
