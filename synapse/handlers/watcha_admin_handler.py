@@ -65,14 +65,14 @@ class WatchaAdminHandler(BaseHandler):
         is_partner = yield self.hs.get_auth_handler().is_partner(user_id)
         is_admin = yield self.hs.get_auth_handler().is_admin(user_id)
 
-        role = "member"
+        role = "collaborator"
 
         if is_partner and is_admin:
             raise SynapseError(400, "A user can't be admin and partner too.")
         elif is_partner:
             role = "partner"
         elif is_admin:
-            role = "admin"
+            role = "administrator"
 
         defer.returnValue(role)
 

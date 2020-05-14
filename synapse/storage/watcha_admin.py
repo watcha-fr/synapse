@@ -273,9 +273,9 @@ class WatchaAdminStore(SQLBaseStore):
         return self._update_user(user_id, email=email)
 
     def watcha_update_user_role(self, user_id, role):
-        if role == "member":
+        if role == "collaborator":
             return self._update_user(user_id, admin=0, is_partner=0)
-        elif role == "admin":
+        elif role == "administrator":
             return self._update_user(user_id, admin=1, is_partner=0)
         elif role == "partner":
             return self._update_user(user_id, admin=0, is_partner=1)
