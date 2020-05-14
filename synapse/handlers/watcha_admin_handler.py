@@ -12,7 +12,22 @@ class WatchaAdminHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def watcha_user_list(self):
-        result = yield self.store.watcha_user_list()
+        users = yield self.store.watcha_user_list()
+
+        result = []
+        for user in users:
+            role = yield self.watcha_get_user_role(user["user_id"])
+            status = yield self.watcha_get_user_status(user["user_id"])
+            result.append({
+                "user_id": user["user_id"],
+                "email_address": user["email_address"],
+                "display_name": user["display_name"],
+                "role": role,
+                "status": status,
+                "last_seen": user["last_seen"],
+                "creation_ts": user["creation_ts"],
+            })
+
         defer.returnValue(result)
 
     @defer.inlineCallbacks
