@@ -283,6 +283,16 @@ class WatchaAdminStore(SQLBaseStore):
         return self._update_user(user_id, is_active=1)
 
     @defer.inlineCallbacks
+    def watcha_get_user_status(self, user_id):
+        status = yield self._simple_select_onecol(
+            table="users",
+            keyvalues={"name": user_id},
+            retcol="is_active",
+        )
+
+        defer.returnValue(status)
+
+    @defer.inlineCallbacks
     def _get_user_admin(self):
         admins = yield self._execute_sql(
             """
