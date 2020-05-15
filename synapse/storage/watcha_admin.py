@@ -370,12 +370,12 @@ class WatchaAdminStore(SQLBaseStore):
             LEFT JOIN(
                     SELECT
                         user_ips.user_id
-                        , min(user_ips.last_seen) as last_seen
+                        , max(user_ips.last_seen) as last_seen
                     FROM user_ips
                     GROUP BY user_ips.user_id) as logged_users
                 ON logged_users.user_id = users.name
             WHERE logged_users.user_id is null
-            ORDER BY users.name DESC;
+            ORDER BY users.name ASC;
         """
         )
         never_logged_users = [user[0] for user in never_logged_users]
@@ -393,7 +393,7 @@ class WatchaAdminStore(SQLBaseStore):
                 ON users_logged_with_password_defined.user_id = devices.user_id
             WHERE users_logged_with_password_defined.user_id is null
                 AND devices.display_name = "Web setup account"
-            ORDER BY devices.user_id DESC;
+            ORDER BY devices.user_id ASC;
         """
         )
         nerver_logged_users_with_defined_password = [user[0] for user in nerver_logged_users_with_defined_password]
