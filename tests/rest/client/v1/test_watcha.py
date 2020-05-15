@@ -137,7 +137,7 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
                 "number_of_users_logged_at_least_once": 0,
                 "number_of_last_month_logged_users": 0,
                 "number_of_last_week_logged_users": 0,
-                'number_of_users_with_pending_invitation': 1,
+                'number_of_users_with_pending_invitation': 2,
             },
         )
         self.assertEquals(200, channel.code)
