@@ -107,3 +107,68 @@ class WatchaAdminTestCase(unittest.TestCase):
             is_admin = yield self.store.is_user_admin(user_id)
             self.assertEquals(is_partner, element["values"]["is_partner"])
             self.assertEquals(is_admin, element["values"]["is_admin"])
+
+    @defer.inlineCallbacks
+    def test_get_users_with_pending_invitation(self):
+
+        register_users_list = [
+            {
+                "user_id": "@user1:test",
+                "logged_user": False,
+                "defined_password": False,
+                "logged_with_defined_password": False,
+            },
+            {
+                "user_id": "@user2:test",
+                "logged_user": True,
+                "defined_password": True,
+                "logged_with_defined_password": False,
+            },
+            {
+                "user_id": "@user3:test",
+                "logged_user": True,
+                "defined_password": True,
+                "logged_with_defined_password": True,
+            },
+        ]
+
+        for user in register_users_list:
+            yield self.store.register_user(user["user_id"], "pass")
+
+            if user["logged_user"]:
+                yield self.store._execute_sql(
+                    """
+                        INSERT INTO user_ips(
+                            user_id
+                            , access_token
+                            , device_id
+                            , ip
+                            , user_agent
+                            , last_seen
+                        )VALUES(
+                            "%s"
+                            , "access_token"
+                            , "device_id"
+                            , "ip"
+                            , "user_agent"
+                            , %s
+                        );
+                    """
+                    % (user["user_id"], self.time)
+                )
+
+            if user["defined_password"]:
+                yield self.store.store_device(
+                    user["user_id"], "device_id", "Web setup account"
+                )
+
+            if user["logged_with_defined_password"]:
+                yield self.store.update_device(
+                    user["user_id"], "device_id", new_display_name="display_name"
+                )
+
+        users_with_pending_invitation = (
+            yield self.store._get_users_with_pending_invitation()
+        )
+
+        self.assertEquals(users_with_pending_invitation, {"@user1:test", "@user2:test"})
