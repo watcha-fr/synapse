@@ -288,13 +288,19 @@ class WatchaAdminStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def watcha_get_user_status(self, user_id):
-        status = yield self._simple_select_onecol(
-            table="users",
-            keyvalues={"name": user_id},
-            retcol="is_active",
-        )
+        users_with_pending_invitation = yield self._get_users_with_pending_invitation()
 
-        defer.returnValue(status)
+        if user_id in users_with_pending_invitation:
+            result = "invited"
+        else:
+            is_active = yield self._simple_select_onecol(
+                table="users", keyvalues={"name": user_id}, retcol="is_active",
+            )
+
+            result = "inactive" if status == 0 else "active"
+
+        defer.returnValue(result)
+
 
     @defer.inlineCallbacks
     def _get_users_with_pending_invitation(self):
