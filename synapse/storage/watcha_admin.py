@@ -297,6 +297,46 @@ class WatchaAdminStore(SQLBaseStore):
         defer.returnValue(status)
 
     @defer.inlineCallbacks
+    def _get_users_with_pending_invitation(self):
+        never_logged_users = yield self._execute_sql(
+        """
+            SELECT
+                users.name
+            FROM users
+            LEFT JOIN(
+                    SELECT
+                        user_ips.user_id
+                        , max(user_ips.last_seen) as last_seen
+                    FROM user_ips
+                    GROUP BY user_ips.user_id) as logged_users
+                ON logged_users.user_id = users.name
+            WHERE logged_users.user_id is null
+            ORDER BY users.name ASC;
+        """
+        )
+        never_logged_users = [user[0] for user in never_logged_users]
+
+        nerver_logged_users_with_defined_password = yield self._execute_sql(
+        """
+            SELECT distinct
+                devices.user_id
+            FROM devices
+            LEFT JOIN (
+                    SELECT DISTINCT
+                        devices.user_id
+                    FROM devices
+                    WHERE devices.display_name != "Web setup account") as users_logged_with_password_defined
+                ON users_logged_with_password_defined.user_id = devices.user_id
+            WHERE users_logged_with_password_defined.user_id is null
+                AND devices.display_name = "Web setup account"
+            ORDER BY devices.user_id ASC;
+        """
+        )
+        nerver_logged_users_with_defined_password = [user[0] for user in nerver_logged_users_with_defined_password]
+
+        defer.returnValue(set(never_logged_users) | set(nerver_logged_users_with_defined_password))
+
+    @defer.inlineCallbacks
     def _get_user_admin(self):
         admins = yield self._execute_sql(
             """
