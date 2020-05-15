@@ -139,7 +139,7 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
                     "email_address": None,
                     "last_seen": None,
                     "role": "administrator",
-                    "status": "active",
+                    "status": "invited",
                     "user_id": "@admin:test",
                 },
                 {
@@ -148,7 +148,7 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
                     "email_address": "test@test.com",
                     "last_seen": None,
                     "role": "collaborator",
-                    "status": "active",
+                    "status": "invited",
                     "user_id": "@user_test:test",
                 },
             ],
