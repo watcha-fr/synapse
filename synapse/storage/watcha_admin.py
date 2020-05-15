@@ -97,7 +97,7 @@ class WatchaAdminStore(SQLBaseStore):
     def _get_users_stats(self):
         """Retrieve the count of users per role (members and partners) and some stats of connected users"""
 
-        member_users = yield self._execute_sql(
+        collaborators_users = yield self._execute_sql(
         """
             SELECT COUNT(*) as count
             FROM users
@@ -144,7 +144,7 @@ class WatchaAdminStore(SQLBaseStore):
 
         defer.returnValue(
             {
-                "member": member_users[0][0],
+                "collaborators": collaborators_users[0][0],
                 "partners": partner_users[0][0],
                 "number_of_users_logged_at_least_once": len(users_logged_at_least_once),
                 "number_of_last_month_logged_users": len(last_month_logged_users),
