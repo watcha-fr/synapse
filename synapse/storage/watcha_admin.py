@@ -398,7 +398,7 @@ class WatchaAdminStore(SQLBaseStore):
         )
         nerver_logged_users_with_defined_password = [user[0][0] for user in nerver_logged_users_with_defined_password]
 
-        defer.returnValue(set(never_logged_users) + set(nerver_logged_users_with_defined_password))
+        defer.returnValue(set(never_logged_users) | set(nerver_logged_users_with_defined_password))
 
     @defer.inlineCallbacks
     def _get_user_admin(self):
