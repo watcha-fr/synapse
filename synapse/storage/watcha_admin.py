@@ -297,7 +297,7 @@ class WatchaAdminStore(SQLBaseStore):
                 table="users", keyvalues={"name": user_id}, retcol="is_active",
             )
 
-            result = "inactive" if status == 0 else "active"
+            result = "inactive" if is_active == 0 else "active"
 
         defer.returnValue(result)
 
