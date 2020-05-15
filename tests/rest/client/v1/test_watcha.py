@@ -112,3 +112,31 @@ class WatchaResetPasswordRestServletTestCase(BaseHomeserverWithEmailTestCase):
             self.assertIn("http://localhost:8080/setup-account.html?t=",
                             ''.join(cm.output))
             self.assertEqual(channel.code,200)
+
+
+class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
+    
+    def test_get_watcha_admin_user_stats(self):
+        self._do_register_user({"user":"user_test",
+                                "full_name":"test",
+                                "email":"test@test.com",
+                                "admin": False })
+
+        request, channel = self.make_request(
+                "GET",
+                "/watcha_admin_stats",
+                access_token=self.user_access_token,
+        )
+        self.render(request)
+
+        self.assertEquals(
+            json.loads(channel.result["body"])["users"],
+            {
+                "member": 2,
+                "partners": 0,
+                "number_of_users_logged_at_least_once": 0,
+                "number_of_last_month_logged_users": 0,
+                "number_of_last_week_logged_users": 0,
+            },
+        )
+        self.assertEquals(200, channel.code)
