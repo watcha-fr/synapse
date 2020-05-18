@@ -146,7 +146,7 @@ class WatchaAdminStore(SQLBaseStore):
             calendar.monthrange(now_datetime.year, now_datetime.month)[1] * MS_PER_DAY
         )*1000
 
-        number_of_collaborators = member_users[0][0]
+        number_of_collaborators = collaborators_users[0][0]
         number_of_partners = partner_users[0][0]
 
         last_month_logged_users = [
@@ -159,13 +159,11 @@ class WatchaAdminStore(SQLBaseStore):
 
         users_with_pending_invitation = yield self._get_users_with_pending_invitation()
 
-        number_of_users_logged_at_least_once = number_of_collaborators + number_of_partners - len(users_with_pending_invitation)
-
         defer.returnValue(
             {
                 "collaborators": collaborators_users[0][0],
                 "partners": partner_users[0][0],
-                "number_of_users_logged_at_least_once": len(users_logged_at_least_once),
+                "number_of_users_logged_at_least_once": number_of_collaborators + number_of_partners - len(users_with_pending_invitation),
                 "number_of_last_month_logged_users": len(last_month_logged_users),
                 "number_of_last_week_logged_users": len(last_week_logged_users),
                 "number_of_users_with_pending_invitation": len(users_with_pending_invitation),

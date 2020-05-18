@@ -193,7 +193,7 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
         self.assertEquals(
             json.loads(channel.result["body"])["users"],
             {
-                "member": 2,
+                "collaborators": 2,
                 "partners": 0,
                 "number_of_users_logged_at_least_once": 0,
                 "number_of_last_month_logged_users": 0,
