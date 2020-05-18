@@ -322,7 +322,7 @@ class WatchaAdminStore(SQLBaseStore):
         )
         never_logged_users = [user[0] for user in never_logged_users]
 
-        nerver_logged_users_with_defined_password = yield self._execute_sql(
+        never_logged_users_with_defined_password = yield self._execute_sql(
         """
             SELECT distinct
                 devices.user_id
@@ -338,9 +338,9 @@ class WatchaAdminStore(SQLBaseStore):
             ORDER BY devices.user_id ASC;
         """
         )
-        nerver_logged_users_with_defined_password = [user[0] for user in nerver_logged_users_with_defined_password]
+        never_logged_users_with_defined_password = [user[0] for user in never_logged_users_with_defined_password]
 
-        defer.returnValue(set(never_logged_users) | set(nerver_logged_users_with_defined_password))
+        defer.returnValue(set(never_logged_users) | set(never_logged_users_with_defined_password))
 
     @defer.inlineCallbacks
     def _get_user_admin(self):
