@@ -36,25 +36,28 @@ class WatchaAdminStore(SQLBaseStore):
             None, sql, *args)
 
     @defer.inlineCallbacks
-    def _get_room_count_per_type(self):
-        """List the rooms, with two or less members, and with three or more members.
-        """
+    def _get_active_rooms(self):
+        """List rooms where the last message was sent than less a week ago"""
 
-        members_by_room = yield self.members_by_room()
-
-        # Get active rooms (message send last week in room):
         active_rooms = yield self._execute_sql(
             """
             SELECT DISTINCT room_id 
             FROM events
             WHERE type = "m.room.message"
                 AND received_ts >= (
-                    SELECT (strftime('%%s','now') || substr(strftime('%%f', 'now'),4)) - (3600 * 24 * 7 * 1000));
+                    SELECT (strftime('%s','now') || substr(strftime('%f', 'now'),4)) - (3600 * 24 * 7 * 1000));
         """
         )
-        active_rooms = [element[0] for element in active_rooms]
+        active_rooms = [rooms[0] for rooms in active_rooms]
 
-        # Get direct rooms (m.direct flag on account_data and with exactly two joinned or invited members):
+        defer.returnValue(active_rooms)
+
+    @defer.inlineCallbacks
+    def _get_direct_rooms(self):
+        """List rooms with m.direct flag on account_data and with exactly two joinned or invited members"""
+
+        members_by_room = yield self.members_by_room()
+
         direct_rooms_by_member = yield self._simple_select_onecol(
             table="account_data",
             keyvalues={"account_data_type": "m.direct"},
@@ -73,12 +76,23 @@ class WatchaAdminStore(SQLBaseStore):
             )
         )
 
-        # Get rooms (all rooms less personnal conversation):
+        defer.returnValue(direct_rooms)
+
+    @defer.inlineCallbacks
+    def _get_room_count_per_type(self):
+        """List the rooms, with two or less members, and with three or more members.
+        """
+        members_by_room = yield self.members_by_room()
+        active_rooms = yield self._get_active_rooms()
+        direct_rooms = yield self._get_direct_rooms()
+
         all_rooms = yield self._simple_select_onecol(
             table="rooms", keyvalues=None, retcol="room_id",
         )
-
-        non_direct_rooms = [room for room in all_rooms if room not in direct_rooms]
+        
+        non_direct_rooms = set(all_rooms) & set(
+            members_by_room.keys()
+        ) - set(direct_rooms)
 
         result = {
             "direct_rooms_count": len(direct_rooms),
@@ -87,7 +101,7 @@ class WatchaAdminStore(SQLBaseStore):
             ),
             "non_direct_rooms_count": len(non_direct_rooms),
             "non_direct_active_rooms_count": len(
-                set(non_direct_rooms).intersection(active_rooms)
+                non_direct_rooms.intersection(active_rooms)
             ),
         }
 
@@ -261,38 +275,48 @@ class WatchaAdminStore(SQLBaseStore):
 
 
     @defer.inlineCallbacks
-    def watcha_extend_room_list(self):
+    def watcha_room_list(self):
         """ List the rooms their state and their users """
 
-
-        rooms = yield self._execute_sql("""
-        SELECT rooms.room_id, rooms.creator, room_names.name, last_events.last_received_ts FROM rooms
-        LEFT JOIN (SELECT max(event_id) event_id, room_id from room_names group by room_id) last_room_names
-              ON rooms.room_id = last_room_names.room_id
-        LEFT JOIN room_names on room_names.event_id = last_room_names.event_id
-        LEFT JOIN (SELECT max(received_ts) last_received_ts, room_id FROM events
-                   GROUP BY room_id HAVING type = "m.room.message") last_events
-              ON last_events.room_id = rooms.room_id
-        ORDER BY rooms.room_id ASC;
-        """)
+        rooms = yield self._execute_sql(
+            """
+            SELECT
+                rooms.room_id
+                , rooms.creator
+                , room_names.name
+            FROM rooms
+                LEFT JOIN (
+                    SELECT
+                        room_id
+                        , event_id
+                    FROM current_state_events
+                    WHERE type = "m.room.name") as last_room_names
+                    ON last_room_names.room_id = rooms.room_id
+                LEFT JOIN room_names
+                    ON room_names.event_id = last_room_names.event_id
+            ORDER BY rooms.room_id ASC;
+        """
+        )
 
         members_by_room = yield self.members_by_room()
+        active_rooms = yield self._get_active_rooms()
+        direct_rooms = yield self._get_direct_rooms()
 
-        now = int(round(time.time() * 1000))
-        ACTIVE_THRESHOLD = 1000 * 3600 * 24 * 7 # one week
-
-        defer.returnValue([
-            {
-                'room_id': room_id,
-                'creator': creator,
-                'name': name,
-                'members': members_by_room[room_id],
-                'type': "Room" if (len(members_by_room[room_id]) >= 3) else "One to one",
-                'active': 1 if last_received_ts and (now - last_received_ts < ACTIVE_THRESHOLD) else 0
-            }
-            for room_id, creator, name, last_received_ts in rooms
-            if room_id in members_by_room # don't show empty room (and avoid a possible exception)
-        ])
+        defer.returnValue(
+            [
+                {
+                    "room_id": room_id,
+                    "creator": creator,
+                    "name": name,
+                    "members": members_by_room[room_id],
+                    "type": "Personnal conversation" if room_id in direct_rooms else "Room",
+                    "active": 1 if room_id in active_rooms else 0,
+                }
+                for room_id, creator, name in rooms
+                if room_id
+                in members_by_room  # don't show empty room (and avoid a possible exception)
+            ]
+        )
 
 
     def watcha_room_membership(self):
@@ -449,7 +473,7 @@ class WatchaAdminStore(SQLBaseStore):
         defer.returnValue(value[0][0])
 
     @defer.inlineCallbacks
-    def watcha_admin_stats(self, ranges=None):
+    def watcha_admin_stats(self):
         # ranges must be a list of arrays with three elements: label, start seconds since epoch, end seconds since epoch
         user_stats = yield self._get_users_stats()
         room_stats = yield self._get_room_count_per_type()
@@ -459,18 +483,5 @@ class WatchaAdminStore(SQLBaseStore):
                    'rooms': room_stats,
                    'admins': user_admin,
         }
-
-        if ranges:
-            result['stats'] = []
-            for index, time_range in enumerate(ranges):
-                message_count = yield self._get_range_count("type = 'm.room.message'", time_range)
-                file_count = yield self._get_range_count("type='m.room.message' AND content NOT LIKE '%m.text%'", time_range)
-                create_room_count = yield self._get_range_count("type = 'm.room.create'", time_range)
-                result['stats'].append({
-                    'label': time_range[0],
-                    'message_count': message_count,
-                    'file_count': file_count,
-                    'create_room_count': create_room_count,
-                })
 
         defer.returnValue(result)

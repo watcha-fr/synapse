@@ -15,6 +15,7 @@ class BaseHomeserverWithEmailTestCase(unittest.HomeserverTestCase):
         admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         watcha.register_servlets,
+        room.register_servlets,
     ]
 
     def make_homeserver(self, reactor, clock):
@@ -47,6 +48,27 @@ class BaseHomeserverWithEmailTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
         return channel
+
+    def _create_room(self):
+        request, channel = self.make_request(
+            "POST",
+            "/createRoom",
+            content=json.dumps({}),
+            access_token=self.user_access_token,
+        )
+
+        self.render(request)
+        return json.loads(channel.result["body"])["room_id"]
+
+    def _invite_member_in_room(self, room_id, user_id):
+        request, channel = self.make_request(
+            "POST",
+            "/rooms/%s/invite" % room_id,
+            content=json.dumps({"user_id": user_id}),
+            access_token=self.user_access_token,
+        )
+
+        self.render(request)
 
 
 class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
@@ -179,4 +201,50 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
                 'number_of_users_with_pending_invitation': 2,
             },
         )
+    def test_get_watcha_admin_stats_room_type(self):
+        room_id = self._create_room()
+        self._invite_member_in_room(room_id, self.user_id)
+
+        request, channel = self.make_request(
+            "GET", "watcha_admin_stats", access_token=self.user_access_token
+        )
+        self.render(request)
+
+        self.assertEquals(
+            json.loads(channel.result["body"])["rooms"],
+            {
+                "direct_active_rooms_count": 0,
+                "direct_rooms_count": 0,
+                "non_direct_active_rooms_count": 0,
+                "non_direct_rooms_count": 1,
+            },
+        )
+        self.assertEquals(200, channel.code)
+
+    def test_get_watcha_admin_stats_room_list(self):
+        rooms_id = []
+        for i in range(3):
+            room_id = self._create_room()
+            rooms_id.append(room_id)
+            self._invite_member_in_room(room_id, self.user_id)
+
+        rooms_id = sorted(rooms_id)
+
+        request, channel = self.make_request(
+            "GET", "watcha_room_list", access_token=self.user_access_token
+        )
+        self.render(request)
+
+        for room_id in rooms_id:
+            self.assertEquals(
+                json.loads(channel.result["body"])[rooms_id.index(room_id)],
+                {
+                    "active": 0,
+                    "creator": "@admin:test",
+                    "members": ["@admin:test"],
+                    "name": None,
+                    "room_id": room_id,
+                    "type": "Room",
+                },
+            )
         self.assertEquals(200, channel.code)

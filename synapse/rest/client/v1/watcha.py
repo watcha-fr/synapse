@@ -106,22 +106,6 @@ class WatchaUserlistRestServlet(RestServlet):
         defer.returnValue((200, ret))
 
 
-class WatchaRoomlistRestServlet(RestServlet):
-
-    PATTERNS = client_patterns("/watcha_room_list", v1=True)
-
-    def __init__(self, hs):
-        super(WatchaRoomlistRestServlet, self).__init__()
-        self.auth = hs.get_auth()
-        self.handlers = hs.get_handlers()
-
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        yield _check_admin(self.auth, request)
-        ret = yield self.handlers.watcha_admin_handler.watcha_room_list()
-        defer.returnValue((200, ret))
-
-
 class WatchaRoomMembershipRestServlet(RestServlet):
 
     PATTERNS = client_patterns("/watcha_room_membership", v1=True)
@@ -170,18 +154,18 @@ class WatchaDisplayNameRestServlet(RestServlet):
         defer.returnValue((200, ret))
 
 
-class WatchaExtendRoomlistRestServlet(RestServlet):
-    PATTERNS = client_patterns("/watcha_extend_room_list", v1=True)
+class WatchaRoomlistRestServlet(RestServlet):
+    PATTERNS = client_patterns("/watcha_room_list", v1=True)
 
     def __init__(self, hs):
-        super(WatchaExtendRoomlistRestServlet, self).__init__()
+        super(WatchaRoomlistRestServlet, self).__init__()
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
         yield _check_admin(self.auth, request)
-        ret = yield self.handlers.watcha_admin_handler.watcha_extend_room_list()
+        ret = yield self.handlers.watcha_admin_handler.watcha_room_list()
         defer.returnValue((200, ret))
 
 
@@ -317,17 +301,6 @@ class WatchaAdminStatsRestServlet(RestServlet):
     def on_GET(self, request):
         yield _check_admin(self.auth, request)
         ret = yield self.handlers.watcha_admin_handler.watcha_admin_stat()
-        defer.returnValue((200, ret))
-
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        params = yield _check_admin_or_secret(
-            self.hs.config, self.auth, request, ["ranges"]
-        )
-
-        ret = yield self.handlers.watcha_admin_handler.watcha_admin_stat(
-            params["ranges"] or None
-        )
         defer.returnValue((200, ret))
 
 
@@ -502,7 +475,6 @@ def register_servlets(hs, http_server):
     WatchaUpdateMailRestServlet(hs).register(http_server)
     WatchaUserlistRestServlet(hs).register(http_server)
     WatchaRoomlistRestServlet(hs).register(http_server)
-    WatchaExtendRoomlistRestServlet(hs).register(http_server)
     WatchaRoomMembershipRestServlet(hs).register(http_server)
     WatchaRoomNameRestServlet(hs).register(http_server)
     WatchaDisplayNameRestServlet(hs).register(http_server)
