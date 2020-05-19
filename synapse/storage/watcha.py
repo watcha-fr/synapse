@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 def check_db_customization(db_conn, database_engine):
     # put here the list of db customizations
     # (database_engine will be used later to for postgres)
+    _drop_column_if_needed(db_conn, "users", "email", "TEXT")
     _add_column_if_needed(db_conn, "users", "is_partner", "DEFAULT 0")
     _add_column_if_needed(db_conn, "users", "is_active", "DEFAULT 1")
     _add_table_partners_invited_by(db_conn)
@@ -25,6 +26,39 @@ def _add_column_if_needed(db_conn, table, column, column_details):
             logger.info("check_db_customization: column %s.%s already present", column, table)
     except:
         logger.warn("check_db_customization: could not check %s.%s column", column, table)
+        db_conn.rollback()
+        raise
+
+def _drop_column_if_needed(db_conn, table, column_to_drop, column_details):
+    try:
+        cur = db_conn.cursor()
+        cur.execute("PRAGMA table_info(%s);" % table)
+        columns = [ {"column_name": row[1], "type": row[2], "dflt_value": "DEFAULT "+row[4] if row[4] else "", "notnull": "NOT NULL" if row[3] else "", "pk": "PRIMARY KEY" if row[5] else ""} for row in cur.fetchall()]
+        all_columns_name = [column["column_name"] for column in columns]
+
+        if column_to_drop in all_columns_name:
+            columns = [column for column in columns if column["column_name"] != column_to_drop]
+            all_columns_name.remove(column_to_drop)
+
+            sql_create_table_query = """CREATE TABLE IF NOT EXISTS users_copy (
+                    %s
+                , UNIQUE(name));""" % ",".join([" ".join(dict.values(column)) for column in columns])
+
+            sql_copy_table_query = """INSERT INTO users_copy(%s)
+                SELECT %s
+                FROM users;""" % (", ".join(all_columns_name), ", ".join(all_columns_name))
+
+            cur.execute("BEGIN TRANSACTION;")
+            cur.execute(sql_create_table_query)
+            cur.execute(sql_copy_table_query)
+            cur.execute("DROP TABLE users;")
+            cur.execute("ALTER TABLE users_copy RENAME TO users;")
+            db_conn.commit()
+            logger.info("check_db_customization: column %s droped to table %s", column_to_drop, table)
+        else:
+            logger.info("check_db_customization: column %s. Already droped from %s", column_to_drop, table)
+    except:
+        logger.warn("check_db_customization: could not check %s.%s column", column_to_drop, table)
         db_conn.rollback()
         raise
 
