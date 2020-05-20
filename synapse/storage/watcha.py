@@ -41,57 +41,53 @@ def _drop_column_if_needed(db_conn, table, copy_table, column_to_drop):
     try:
         cur = db_conn.cursor()
         cur.execute("PRAGMA table_info({});".format(table))
-        columns = [
-            {
-                "column_name": row[1],
-                "type": row[2],
-                "dflt_value": "DEFAULT " + row[4] if row[4] else "",
-                "notnull": "NOT NULL" if row[3] else "",
-                "pk": "PRIMARY KEY" if row[5] else "",
-            }
+        columns = {
+            row[1]: " ".join(
+                [
+                    row[1],
+                    row[2],
+                    "DEFAULT " + row[4] if row[4] else "",
+                    "NOT NULL" if row[3] else "",
+                    "PRIMARY KEY" if row[5] else "",
+                ]
+            )
             for row in cur.fetchall()
-        ]
+        }
 
-        all_columns_name = [column["column_name"] for column in columns]
-
-        if column_to_drop in all_columns_name:
-            columns = [
-                column for column in columns if column["column_name"] != column_to_drop
-            ]
-
-            all_columns_name.remove(column_to_drop)
-
-            sql_create_table_query = """CREATE TABLE IF NOT EXISTS {} (
-                    {}
-                , UNIQUE(name));""".format(
-                copy_table,
-                ",".join([" ".join(dict.values(column)) for column in columns]),
-            )
-
-            sql_copy_table_query = """INSERT INTO {}({})
-                SELECT {}
-                FROM users;""".format(
-                copy_table, ", ".join(all_columns_name), ", ".join(all_columns_name)
-            )
-
-            cur.execute("BEGIN TRANSACTION;")
-            cur.execute(sql_create_table_query)
-            cur.execute(sql_copy_table_query)
-            cur.execute("DROP TABLE {};".format(table))
-            cur.execute("ALTER TABLE {} RENAME TO {};".format(copy_table, table))
-            db_conn.commit()
-
-            logger.info(
-                "check_db_customization: column %s dropped to table %s",
-                column_to_drop,
-                table,
-            )
-        else:
+        if column_to_drop not in columns:
             logger.info(
                 "check_db_customization: column %s. Already dropped from %s",
                 column_to_drop,
                 table,
             )
+            return
+
+        del columns[column_to_drop]
+
+        sql_create_table_query = """CREATE TABLE IF NOT EXISTS {} (
+                {}
+            , UNIQUE(name));""".format(
+            copy_table, ",".join(columns.values())
+        )
+
+        sql_copy_table_query = """INSERT INTO {}({})
+            SELECT {}
+            FROM users;""".format(
+            copy_table, ", ".join(columns.keys()), ", ".join(columns.keys())
+        )
+
+        cur.execute("BEGIN TRANSACTION;")
+        cur.execute(sql_create_table_query)
+        cur.execute(sql_copy_table_query)
+        cur.execute("DROP TABLE {};".format(table))
+        cur.execute("ALTER TABLE {} RENAME TO {};".format(copy_table, table))
+        db_conn.commit()
+
+        logger.info(
+            "check_db_customization: column %s dropped to table %s",
+            column_to_drop,
+            table,
+        )
     except:
         logger.warn(
             "check_db_customization: could not check %s.%s column",
