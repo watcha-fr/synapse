@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 def check_db_customization(db_conn, database_engine):
     # put here the list of db customizations
     # (database_engine will be used later to for postgres)
-    _drop_column_if_needed(db_conn, "users", "email", "TEXT")
+    _drop_column_if_needed(db_conn, "users", "email")
     _add_column_if_needed(db_conn, "users", "is_partner", "DEFAULT 0")
     _add_column_if_needed(db_conn, "users", "is_active", "DEFAULT 1")
     _add_table_partners_invited_by(db_conn)
@@ -29,7 +29,7 @@ def _add_column_if_needed(db_conn, table, column, column_details):
         db_conn.rollback()
         raise
 
-def _drop_column_if_needed(db_conn, table, column_to_drop, column_details):
+def _drop_column_if_needed(db_conn, table, column_to_drop):
     try:
         cur = db_conn.cursor()
         cur.execute("PRAGMA table_info(%s);" % table)
