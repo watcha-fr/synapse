@@ -20,12 +20,20 @@ def _add_column_if_needed(db_conn, table, column, column_details):
         cur = db_conn.cursor()
         cur.execute("PRAGMA table_info(%s);" % table)
         if column not in [row[1] for row in cur.fetchall()]:
-            cur.execute("ALTER TABLE %s ADD COLUMN %s %s;" % (table, column, column_details))
-            logger.info("check_db_customization: column %s added to table %s", column, table)
+            cur.execute(
+                "ALTER TABLE %s ADD COLUMN %s %s;" % (table, column, column_details)
+            )
+            logger.info(
+                "check_db_customization: column %s added to table %s", column, table
+            )
         else:
-            logger.info("check_db_customization: column %s.%s already present", column, table)
+            logger.info(
+                "check_db_customization: column %s.%s already present", column, table
+            )
     except:
-        logger.warn("check_db_customization: could not check %s.%s column", column, table)
+        logger.warn(
+            "check_db_customization: could not check %s.%s column", column, table
+        )
         db_conn.rollback()
         raise
 
@@ -33,20 +41,38 @@ def _drop_column_if_needed(db_conn, table, copy_table, column_to_drop):
     try:
         cur = db_conn.cursor()
         cur.execute("PRAGMA table_info({});".format(table))
-        columns = [ {"column_name": row[1], "type": row[2], "dflt_value": "DEFAULT "+row[4] if row[4] else "", "notnull": "NOT NULL" if row[3] else "", "pk": "PRIMARY KEY" if row[5] else ""} for row in cur.fetchall()]
+        columns = [
+            {
+                "column_name": row[1],
+                "type": row[2],
+                "dflt_value": "DEFAULT " + row[4] if row[4] else "",
+                "notnull": "NOT NULL" if row[3] else "",
+                "pk": "PRIMARY KEY" if row[5] else "",
+            }
+            for row in cur.fetchall()
+        ]
+
         all_columns_name = [column["column_name"] for column in columns]
 
         if column_to_drop in all_columns_name:
-            columns = [column for column in columns if column["column_name"] != column_to_drop]
+            columns = [
+                column for column in columns if column["column_name"] != column_to_drop
+            ]
+
             all_columns_name.remove(column_to_drop)
 
             sql_create_table_query = """CREATE TABLE IF NOT EXISTS {} (
                     {}
-                , UNIQUE(name));""".format(copy_table, ",".join([" ".join(dict.values(column)) for column in columns]))
+                , UNIQUE(name));""".format(
+                copy_table,
+                ",".join([" ".join(dict.values(column)) for column in columns]),
+            )
 
             sql_copy_table_query = """INSERT INTO {}({})
                 SELECT {}
-                FROM users;""".format(copy_table, ", ".join(all_columns_name), ", ".join(all_columns_name))
+                FROM users;""".format(
+                copy_table, ", ".join(all_columns_name), ", ".join(all_columns_name)
+            )
 
             cur.execute("BEGIN TRANSACTION;")
             cur.execute(sql_create_table_query)
@@ -54,11 +80,24 @@ def _drop_column_if_needed(db_conn, table, copy_table, column_to_drop):
             cur.execute("DROP TABLE users;")
             cur.execute("ALTER TABLE {} RENAME TO {};".format(copy_table, table))
             db_conn.commit()
-            logger.info("check_db_customization: column %s dropped to table %s", column_to_drop, table)
+
+            logger.info(
+                "check_db_customization: column %s dropped to table %s",
+                column_to_drop,
+                table,
+            )
         else:
-            logger.info("check_db_customization: column %s. Already dropped from %s", column_to_drop, table)
+            logger.info(
+                "check_db_customization: column %s. Already dropped from %s",
+                column_to_drop,
+                table,
+            )
     except:
-        logger.warn("check_db_customization: could not check %s.%s column", column_to_drop, table)
+        logger.warn(
+            "check_db_customization: could not check %s.%s column",
+            column_to_drop,
+            table,
+        )
         db_conn.rollback()
         raise
 
