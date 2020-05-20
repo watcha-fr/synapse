@@ -77,7 +77,7 @@ def _drop_column_if_needed(db_conn, table, copy_table, column_to_drop):
             cur.execute("BEGIN TRANSACTION;")
             cur.execute(sql_create_table_query)
             cur.execute(sql_copy_table_query)
-            cur.execute("DROP TABLE users;")
+            cur.execute("DROP TABLE {};".format(table))
             cur.execute("ALTER TABLE {} RENAME TO {};".format(copy_table, table))
             db_conn.commit()
 
