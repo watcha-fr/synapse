@@ -54,9 +54,9 @@ def _drop_column_if_needed(db_conn, table, column_to_drop, column_details):
             cur.execute("DROP TABLE users;")
             cur.execute("ALTER TABLE users_copy RENAME TO users;")
             db_conn.commit()
-            logger.info("check_db_customization: column %s droped to table %s", column_to_drop, table)
+            logger.info("check_db_customization: column %s dropped to table %s", column_to_drop, table)
         else:
-            logger.info("check_db_customization: column %s. Already droped from %s", column_to_drop, table)
+            logger.info("check_db_customization: column %s. Already dropped from %s", column_to_drop, table)
     except:
         logger.warn("check_db_customization: could not check %s.%s column", column_to_drop, table)
         db_conn.rollback()
