@@ -38,6 +38,8 @@ def _add_column_if_needed(db_conn, table, column, column_details):
         raise
 
 def _drop_column_if_needed(db_conn, table, copy_table, column_to_drop):
+    """ WARNING : if the table has default string value, PLEASE TEST as it may remove this default value."""
+
     try:
         cur = db_conn.cursor()
         cur.execute("PRAGMA table_info({});".format(table))
