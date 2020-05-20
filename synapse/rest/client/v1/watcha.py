@@ -154,11 +154,11 @@ class WatchaDisplayNameRestServlet(RestServlet):
         defer.returnValue((200, ret))
 
 
-class WatchaRoomlistRestServlet(RestServlet):
+class WatchaRoomListRestServlet(RestServlet):
     PATTERNS = client_patterns("/watcha_room_list", v1=True)
 
     def __init__(self, hs):
-        super(WatchaRoomlistRestServlet, self).__init__()
+        super(WatchaRoomListRestServlet, self).__init__()
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
@@ -474,7 +474,7 @@ def register_servlets(hs, http_server):
     WatchaServerState(hs).register(http_server)
     WatchaUpdateMailRestServlet(hs).register(http_server)
     WatchaUserlistRestServlet(hs).register(http_server)
-    WatchaRoomlistRestServlet(hs).register(http_server)
+    WatchaRoomListRestServlet(hs).register(http_server)
     WatchaRoomMembershipRestServlet(hs).register(http_server)
     WatchaRoomNameRestServlet(hs).register(http_server)
     WatchaDisplayNameRestServlet(hs).register(http_server)
