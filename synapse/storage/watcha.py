@@ -42,7 +42,7 @@ def _drop_column_if_needed(db_conn, table, copy_table, column_to_drop):
 
     try:
         cur = db_conn.cursor()
-        cur.execute("PRAGMA table_info({});".format(table))
+        cur.execute("PRAGMA table_info({table});".format(table=table))
         columns = {
             row[1]: " ".join(
                 [
@@ -66,23 +66,29 @@ def _drop_column_if_needed(db_conn, table, copy_table, column_to_drop):
 
         del columns[column_to_drop]
 
-        sql_create_table_query = """CREATE TABLE IF NOT EXISTS {} (
-                {}
+        columns_definition = ",".join(columns.values())
+        sql_create_table_query = """CREATE TABLE IF NOT EXISTS {table} (
+                {values}
             , UNIQUE(name));""".format(
-            copy_table, ",".join(columns.values())
+            table=copy_table, values=columns_definition
         )
 
-        sql_copy_table_query = """INSERT INTO {}({})
-            SELECT {}
+        columns_name = ", ".join(columns.keys())
+        sql_copy_table_query = """INSERT INTO {table}({columns})
+            SELECT {values}
             FROM users;""".format(
-            copy_table, ", ".join(columns.keys()), ", ".join(columns.keys())
+            table=copy_table, columns=columns_name, values=columns_name
         )
 
         cur.execute("BEGIN TRANSACTION;")
         cur.execute(sql_create_table_query)
         cur.execute(sql_copy_table_query)
-        cur.execute("DROP TABLE {};".format(table))
-        cur.execute("ALTER TABLE {} RENAME TO {};".format(copy_table, table))
+        cur.execute("DROP TABLE {table};".format(table=table))
+        cur.execute(
+            "ALTER TABLE {table} RENAME TO {table_name};".format(
+                table=copy_table, table_name=table
+            )
+        )
         db_conn.commit()
 
         logger.info(
