@@ -42,7 +42,7 @@ def _drop_column_if_needed(db_conn, table, copy_table, column_to_drop):
 
     try:
         cursor = db_conn.cursor()
-        cursor.execute("PRAGMA table_info({table});".format(table=table))
+        cursor.execute("PRAGMA table_info({});".format(table))
         columns = {
             row[1]: " ".join(
                 [
@@ -66,29 +66,23 @@ def _drop_column_if_needed(db_conn, table, copy_table, column_to_drop):
 
         del columns[column_to_drop]
 
-        columns_definition = ",".join(columns.values())
-        sql_create_table_query = """CREATE TABLE IF NOT EXISTS {table} (
-                {values}
-            , UNIQUE(name));""".format(
-            table=copy_table, values=columns_definition
+        sql_script = """
+            BEGIN TRANSACTION;
+            CREATE TABLE IF NOT EXISTS {new_table} (
+                {columns_definition}
+            , UNIQUE(name));
+            INSERT INTO {new_table}({columns_name})
+            SELECT {columns_name}
+            FROM users;
+            DROP TABLE {old_table};
+            ALTER TABLE {new_table} RENAME TO {old_table};
+        """.format(
+            new_table=copy_table, columns_definition=",".join(columns.values()), columns_name=", ".join(columns.keys()), old_table=table
         )
 
-        columns_name = ", ".join(columns.keys())
-        sql_copy_table_query = """INSERT INTO {table}({columns})
-            SELECT {values}
-            FROM users;""".format(
-            table=copy_table, columns=columns_name, values=columns_name
-        )
+        for line in sql_script.split(";"):
+            cursor.execute(line)
 
-        cursor.execute("BEGIN TRANSACTION;")
-        cursor.execute(sql_create_table_query)
-        cursor.execute(sql_copy_table_query)
-        cursor.execute("DROP TABLE {table};".format(table=table))
-        cursor.execute(
-            "ALTER TABLE {table} RENAME TO {table_name};".format(
-                table=copy_table, table_name=table
-            )
-        )
         db_conn.commit()
 
         logger.info(
