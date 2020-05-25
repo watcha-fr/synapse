@@ -41,8 +41,8 @@ def _drop_column_if_needed(db_conn, table, copy_table, column_to_drop):
     """ WARNING : if the table has default string value, PLEASE TEST as it may remove this default value."""
 
     try:
-        cur = db_conn.cursor()
-        cur.execute("PRAGMA table_info({table});".format(table=table))
+        cursor = db_conn.cursor()
+        cursor.execute("PRAGMA table_info({table});".format(table=table))
         columns = {
             row[1]: " ".join(
                 [
@@ -53,7 +53,7 @@ def _drop_column_if_needed(db_conn, table, copy_table, column_to_drop):
                     "PRIMARY KEY" if row[5] else "",
                 ]
             )
-            for row in cur.fetchall()
+            for row in cursor.fetchall()
         }
 
         if column_to_drop not in columns:
@@ -80,11 +80,11 @@ def _drop_column_if_needed(db_conn, table, copy_table, column_to_drop):
             table=copy_table, columns=columns_name, values=columns_name
         )
 
-        cur.execute("BEGIN TRANSACTION;")
-        cur.execute(sql_create_table_query)
-        cur.execute(sql_copy_table_query)
-        cur.execute("DROP TABLE {table};".format(table=table))
-        cur.execute(
+        cursor.execute("BEGIN TRANSACTION;")
+        cursor.execute(sql_create_table_query)
+        cursor.execute(sql_copy_table_query)
+        cursor.execute("DROP TABLE {table};".format(table=table))
+        cursor.execute(
             "ALTER TABLE {table} RENAME TO {table_name};".format(
                 table=copy_table, table_name=table
             )
