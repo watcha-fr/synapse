@@ -118,6 +118,7 @@ class WatchaAdminStore(SQLBaseStore):
             SELECT COUNT(*) as count
             FROM users
             WHERE is_partner = 0
+                AND admin = 0
         """
         )
 
@@ -126,6 +127,7 @@ class WatchaAdminStore(SQLBaseStore):
             SELECT COUNT(*) as count
             FROM users
             WHERE is_partner = 1
+                AND admin = 0
         """
         )
 
