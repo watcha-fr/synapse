@@ -152,6 +152,7 @@ class WatchaAdminStore(SQLBaseStore):
 
         number_of_collaborators = collaborators_users[0][0]
         number_of_partners = partner_users[0][0]
+        number_of_administrators = len(administrators_users)
 
         last_month_logged_users = [
             user_ts[0] for user_ts in last_seen_ts_per_users if user_ts[1] > MONTH_TRESHOLD
@@ -166,13 +167,14 @@ class WatchaAdminStore(SQLBaseStore):
         defer.returnValue(
             {
                 "users_per_role": {
-                    "administrator": len(administrators_users),
-                    "collaborators": collaborators_users[0][0],
-                    "partners": partner_users[0][0],
+                    "administrator": number_of_administrators,
+                    "collaborators": number_of_collaborators,
+                    "partners": number_of_partners,
                 },
                 "connected_users": {
                     "number_of_users_logged_at_least_once": number_of_collaborators
-                    + number_of_partners
+                    + number_of_partners 
+                    + number_of_administrators
                     - len(users_with_pending_invitation),
                     "number_of_last_month_logged_users": len(last_month_logged_users),
                     "number_of_last_week_logged_users": len(last_week_logged_users),
