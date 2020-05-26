@@ -163,12 +163,18 @@ class WatchaAdminStore(SQLBaseStore):
 
         defer.returnValue(
             {
-                "administrator": len(administrators_users)
-                "collaborators": collaborators_users[0][0],
-                "partners": partner_users[0][0],
-                "number_of_users_logged_at_least_once": number_of_collaborators + number_of_partners - len(users_with_pending_invitation),
-                "number_of_last_month_logged_users": len(last_month_logged_users),
-                "number_of_last_week_logged_users": len(last_week_logged_users),
+                "users_per_role": {
+                    "administrator": len(administrators_users),
+                    "collaborators": collaborators_users[0][0],
+                    "partners": partner_users[0][0],
+                },
+                "connected_users": {
+                    "number_of_users_logged_at_least_once": number_of_collaborators
+                    + number_of_partners
+                    - len(users_with_pending_invitation),
+                    "number_of_last_month_logged_users": len(last_month_logged_users),
+                    "number_of_last_week_logged_users": len(last_week_logged_users),
+                },
                 "number_of_users_with_pending_invitation": len(users_with_pending_invitation),
             }
         )
