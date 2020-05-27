@@ -196,6 +196,9 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
         self.assertEquals(
             json.loads(channel.result["body"])["users"],
             {
+                "administrators_users": [{"displayname": None,
+                    "email": "example@email.com",
+                    "user_id": "@admin:test"}],
                 "users_per_role": {
                     "administrators": 1,
                     "collaborators": 1,
