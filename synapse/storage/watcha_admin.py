@@ -166,6 +166,7 @@ class WatchaAdminStore(SQLBaseStore):
 
         defer.returnValue(
             {
+                "administrators_users": administrators_users,
                 "users_per_role": {
                     "administrators": number_of_administrators,
                     "collaborators": number_of_collaborators,
@@ -490,11 +491,9 @@ class WatchaAdminStore(SQLBaseStore):
         # ranges must be a list of arrays with three elements: label, start seconds since epoch, end seconds since epoch
         user_stats = yield self._get_users_stats()
         room_stats = yield self._get_room_count_per_type()
-        user_admin = yield self._get_user_admin()
 
         result = { 'users': user_stats,
                    'rooms': room_stats,
-                   'admins': user_admin,
         }
 
         defer.returnValue(result)
