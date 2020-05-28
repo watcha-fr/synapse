@@ -329,19 +329,6 @@ class WatchaAdminStore(SQLBaseStore):
             desc = "get_rooms",
         )
 
-    def watcha_server_state(self):
-        return {
-            'disk': psutil.disk_usage('/')._asdict(),
-            'memory': {
-                'memory': psutil.virtual_memory()._asdict(),
-                'swap': psutil.swap_memory()._asdict()
-            },
-            'cpu': {
-                'average': psutil.cpu_percent(interval=1),
-                'detailed': psutil.cpu_percent(interval=1, percpu=True),
-            }
-        }
-
     def watcha_room_name(self):
         return self._simple_select_list(
             table="room_names",
