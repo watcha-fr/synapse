@@ -186,6 +186,34 @@ class WatchaAdminStore(SQLBaseStore):
             }
         )
 
+    def _get_server_state(self):
+        watcha_conf_content = []
+        watcha_conf_file_path = "/home/kimist/Bureau/watcha.conf"
+        try:
+            with open(watcha_conf_file_path, "r") as f:
+                watcha_conf_content = f.read().splitlines()
+        except FileNotFoundError:
+            logger.info("No such file : %s" % watcha_conf)
+
+        return {
+            "disk": psutil.disk_usage("/")._asdict(),
+            "watcha_release": [
+                line.split("=")[1]
+                for line in watcha_conf_content
+                if "WATCHA_RELEASE" in line
+            ][0],
+            "upgrade_date": [
+                line.split("=")[1]
+                for line in watcha_conf_content
+                if "INSTALL_DATE" in line
+            ][0],
+            "install_date": [
+                line.split("=")[1].split("T")[0]
+                for line in watcha_conf_content
+                if "UPGRADE_DATE" in line
+            ][0],
+        }
+
     @defer.inlineCallbacks
     def watcha_user_list(self):
 
@@ -345,19 +373,6 @@ class WatchaAdminStore(SQLBaseStore):
             desc = "get_rooms",
         )
 
-    def watcha_server_state(self):
-        return {
-            'disk': psutil.disk_usage('/')._asdict(),
-            'memory': {
-                'memory': psutil.virtual_memory()._asdict(),
-                'swap': psutil.swap_memory()._asdict()
-            },
-            'cpu': {
-                'average': psutil.cpu_percent(interval=1),
-                'detailed': psutil.cpu_percent(interval=1, percpu=True),
-            }
-        }
-
     def watcha_room_name(self):
         return self._simple_select_list(
             table="room_names",
@@ -491,9 +506,11 @@ class WatchaAdminStore(SQLBaseStore):
         # ranges must be a list of arrays with three elements: label, start seconds since epoch, end seconds since epoch
         user_stats = yield self._get_users_stats()
         room_stats = yield self._get_room_count_per_type()
+        server_stats = yield self._get_server_state()
 
         result = { 'users': user_stats,
                    'rooms': room_stats,
+                   "server": server_stats,
         }
 
         defer.returnValue(result)

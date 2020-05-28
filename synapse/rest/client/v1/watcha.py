@@ -247,22 +247,6 @@ class WatchaUpdateUserRoleRestServlet(RestServlet):
         defer.returnValue((200, {"new_role": result}))
 
 
-class WatchaServerState(RestServlet):
-
-    PATTERNS = client_patterns("/watcha_server_state", v1=True)
-
-    def __init__(self, hs):
-        super(WatchaServerState, self).__init__()
-        self.auth = hs.get_auth()
-        self.handlers = hs.get_handlers()
-
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        yield _check_admin(self.auth, request)
-        ret = yield self.handlers.watcha_admin_handler.watcha_server_state()
-        defer.returnValue((200, ret))
-
-
 class WatchaIsAdmin(RestServlet):
 
     PATTERNS = client_patterns("/watcha_is_admin", v1=True)
@@ -471,7 +455,6 @@ def register_servlets(hs, http_server):
     WatchaUserIp(hs).register(http_server)
     WatchaAdminStatsRestServlet(hs).register(http_server)
     WatchaIsAdmin(hs).register(http_server)
-    WatchaServerState(hs).register(http_server)
     WatchaUpdateMailRestServlet(hs).register(http_server)
     WatchaUserlistRestServlet(hs).register(http_server)
     WatchaRoomListRestServlet(hs).register(http_server)
