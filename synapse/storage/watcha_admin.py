@@ -474,7 +474,7 @@ class WatchaAdminStore(SQLBaseStore):
                 , user_emails.address
                 , user_directory.display_name
             FROM users
-                INNER JOIN (
+                LEFT JOIN (
                     SELECT
                         user_threepids.user_id
                         , user_threepids.address
