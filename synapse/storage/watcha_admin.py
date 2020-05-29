@@ -188,32 +188,30 @@ class WatchaAdminStore(SQLBaseStore):
         )
 
     def _get_server_state(self):
-        watcha_conf_content = []
+        result = {
+            "disk": psutil.disk_usage("/")._asdict(),
+            "watcha_release": "",
+            "upgrade_date": "",
+            "install_date": "",
+        }
+
         watcha_conf_file_path = "/etc/watcha.conf"
+
         try:
             with open(watcha_conf_file_path, "r") as f:
                 watcha_conf_content = f.read().splitlines()
-        except FileNotFoundError:
-            logger.info("No such file : %s" % watcha_conf)
 
-        return {
-            "disk": psutil.disk_usage("/")._asdict(),
-            "watcha_release": [
-                line.split("=")[1]
-                for line in watcha_conf_content
-                if "WATCHA_RELEASE" in line
-            ][0],
-            "upgrade_date": [
-                line.split("=")[1]
-                for line in watcha_conf_content
-                if "INSTALL_DATE" in line
-            ][0],
-            "install_date": [
-                line.split("=")[1].split("T")[0]
-                for line in watcha_conf_content
-                if "UPGRADE_DATE" in line
-            ][0],
-        }
+        except FileNotFoundError:
+            logger.info("No such file : %s" % watcha_conf_file_path)
+        else:
+            for value in ["WATCHA_RELEASE", "UPGRADE_DATE", "INSTALL_DATE"]:
+                result[value.lower()] = [
+                    line.split("=")[1].split("T")[0]
+                    for line in watcha_conf_content
+                    if value in line
+                ][0]
+
+        return result
 
     @defer.inlineCallbacks
     def watcha_user_list(self):
