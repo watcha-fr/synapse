@@ -732,7 +732,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
     def on_POST(self, request, room_id, membership_action, txn_id=None):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True)
 
-        if (requester.is_guest or requester.is_partner) and membership_action not in {
+        if (requester.is_guest) and membership_action not in {
             Membership.JOIN,
             Membership.LEAVE,
         }:
