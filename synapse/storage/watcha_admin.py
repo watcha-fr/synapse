@@ -206,7 +206,12 @@ class WatchaAdminStore(SQLBaseStore):
         else:
             for value in ["WATCHA_RELEASE", "UPGRADE_DATE", "INSTALL_DATE"]:
                 result[value.lower()] = [
-                    line.split("=")[1].split("T")[0]
+                    datetime.strptime(line.split("=")[1], "%Y-%m-%dT%H:%M:%S").strftime(
+                        "%d/%m/%Y"
+                    )
+                    if (value == "UPGRADE_DATE" or value == "INSTALL_DATE")
+                    and line.split("=")[1]
+                    else line.split("=")[1]
                     for line in watcha_conf_content
                     if value in line
                 ][0]
