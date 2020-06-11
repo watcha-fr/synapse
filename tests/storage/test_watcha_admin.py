@@ -174,3 +174,9 @@ class WatchaAdminTestCase(unittest.TestCase):
         )
 
         self.assertEquals(users_with_pending_invitation, {"@user1:test", "@user2:test"})
+
+    def test_get_server_state(self):
+
+        server_state = self.store._get_server_state()
+        self.assertEquals(len(server_state), 4)
+        self.assertEquals(list(server_state.keys()), ["disk", "watcha_release", "upgrade_date", "install_date"])
