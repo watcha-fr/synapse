@@ -7,6 +7,7 @@
 from twisted.internet import defer
 from tests import unittest
 from tests.utils import setup_test_homeserver
+from datetime import datetime
 
 
 class WatchaAdminTestCase(unittest.TestCase):
@@ -180,3 +181,13 @@ class WatchaAdminTestCase(unittest.TestCase):
         server_state = self.store._get_server_state()
         self.assertEquals(len(server_state), 4)
         self.assertEquals(list(server_state.keys()), ["disk", "watcha_release", "upgrade_date", "install_date"])
+        self.assertEquals(list(server_state["disk"].keys()), ["total", "used", "free", "percent"])
+
+        for date in server_state:
+            if date in ["upgrade_date", "install_date"]:
+                error = False
+                try:
+                    datetime.strptime(server_state[date], "%d/%m/%Y")
+                except:
+                    error = True
+                self.assertFalse(error)
