@@ -195,7 +195,7 @@ class WatchaAdminStore(SQLBaseStore):
             "install_date": "",
         }
 
-        watcha_conf_file_path = "/etc/watcha.conf"
+        watcha_conf_file_path = "/home/kevin/Bureau/watcha.conf"
 
         try:
             with open(watcha_conf_file_path, "r") as f:
@@ -204,14 +204,14 @@ class WatchaAdminStore(SQLBaseStore):
         except FileNotFoundError:
             logger.info("No such file : %s" % watcha_conf_file_path)
         else:
+            def _parse_date(label, value):
+                return datetime.strptime(value, "%Y-%m-%dT%H:%M:%S").strftime(
+                        "%d/%m/%Y"
+                    ) if ((label == "UPGRADE_DATE" or label == "INSTALL_DATE") and value) else value
+
             for value in ["WATCHA_RELEASE", "UPGRADE_DATE", "INSTALL_DATE"]:
                 result[value.lower()] = [
-                    datetime.strptime(line.split("=")[1], "%Y-%m-%dT%H:%M:%S").strftime(
-                        "%d/%m/%Y"
-                    )
-                    if (value == "UPGRADE_DATE" or value == "INSTALL_DATE")
-                    and line.split("=")[1]
-                    else line.split("=")[1]
+                    _parse_date(line.split("=")[0], line.split("=")[1])
                     for line in watcha_conf_content
                     if value in line
                 ][0]
