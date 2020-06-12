@@ -195,7 +195,7 @@ class WatchaAdminStore(SQLBaseStore):
             "install_date": "",
         }
 
-        watcha_conf_file_path = "/home/kevin/Bureau/watcha.conf"
+        watcha_conf_file_path = "/etc/watcha.conf"
 
         try:
             with open(watcha_conf_file_path, "r") as f:
