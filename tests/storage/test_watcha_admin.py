@@ -185,9 +185,7 @@ class WatchaAdminTestCase(unittest.TestCase):
 
         for date in server_state:
             if date in ["upgrade_date", "install_date"]:
-                error = False
                 try:
                     datetime.strptime(server_state[date], "%d/%m/%Y")
                 except:
-                    error = True
-                self.assertFalse(error)
+                    self.fail("Wrong date format in watcha.conf file for %s parameter" % date)
