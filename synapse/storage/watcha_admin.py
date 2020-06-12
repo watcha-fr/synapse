@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import time, json, calendar
+import time, json, calendar, logging
 from datetime import datetime
 import psutil
 from collections import defaultdict
@@ -15,6 +15,7 @@ from synapse.api.constants import EventTypes, JoinRules
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id, get_localpart_from_id
 
+logger = logging.getLogger(__name__)
 
 def _caller_name():
     '''returns the name of the function calling the one calling this one'''
@@ -111,11 +112,14 @@ class WatchaAdminStore(SQLBaseStore):
     def _get_users_stats(self):
         """Retrieve the count of users per role (members and partners) and some stats of connected users"""
 
+        administrators_users = yield self._get_user_admin()
+
         collaborators_users = yield self._execute_sql(
         """
             SELECT COUNT(*) as count
             FROM users
             WHERE is_partner = 0
+                AND admin = 0
         """
         )
 
@@ -124,6 +128,7 @@ class WatchaAdminStore(SQLBaseStore):
             SELECT COUNT(*) as count
             FROM users
             WHERE is_partner = 1
+                AND admin = 0
         """
         )
 
@@ -148,6 +153,7 @@ class WatchaAdminStore(SQLBaseStore):
 
         number_of_collaborators = collaborators_users[0][0]
         number_of_partners = partner_users[0][0]
+        number_of_administrators = len(administrators_users)
 
         last_month_logged_users = [
             user_ts[0] for user_ts in last_seen_ts_per_users if user_ts[1] > MONTH_TRESHOLD
@@ -161,14 +167,56 @@ class WatchaAdminStore(SQLBaseStore):
 
         defer.returnValue(
             {
-                "collaborators": collaborators_users[0][0],
-                "partners": partner_users[0][0],
-                "number_of_users_logged_at_least_once": number_of_collaborators + number_of_partners - len(users_with_pending_invitation),
-                "number_of_last_month_logged_users": len(last_month_logged_users),
-                "number_of_last_week_logged_users": len(last_week_logged_users),
-                "number_of_users_with_pending_invitation": len(users_with_pending_invitation),
+                "administrators_users": administrators_users,
+                "users_per_role": {
+                    "administrators": number_of_administrators,
+                    "collaborators": number_of_collaborators,
+                    "partners": number_of_partners,
+                },
+                "connected_users": {
+                    "number_of_users_logged_at_least_once": number_of_collaborators
+                    + number_of_partners 
+                    + number_of_administrators
+                    - len(users_with_pending_invitation),
+                    "number_of_last_month_logged_users": len(last_month_logged_users),
+                    "number_of_last_week_logged_users": len(last_week_logged_users),
+                },
+                "other_statistics":{
+                    "number_of_users_with_pending_invitation": len(users_with_pending_invitation),
+                },
             }
         )
+
+    def _get_server_state(self):
+        result = {
+            "disk": psutil.disk_usage("/")._asdict(),
+            "watcha_release": "",
+            "upgrade_date": "",
+            "install_date": "",
+        }
+
+        watcha_conf_file_path = "/etc/watcha.conf"
+
+        try:
+            with open(watcha_conf_file_path, "r") as f:
+                watcha_conf_content = f.read().splitlines()
+
+        except FileNotFoundError:
+            logger.info("No such file : %s" % watcha_conf_file_path)
+        else:
+            def _parse_date(label, value):
+                return datetime.strptime(value, "%Y-%m-%dT%H:%M:%S").strftime(
+                        "%d/%m/%Y"
+                    ) if ((label == "UPGRADE_DATE" or label == "INSTALL_DATE") and value) else value
+
+            for value in ["WATCHA_RELEASE", "UPGRADE_DATE", "INSTALL_DATE"]:
+                result[value.lower()] = [
+                    _parse_date(line.split("=")[0], line.split("=")[1])
+                    for line in watcha_conf_content
+                    if value in line
+                ][0]
+
+        return result
 
     @defer.inlineCallbacks
     def watcha_user_list(self):
@@ -329,19 +377,6 @@ class WatchaAdminStore(SQLBaseStore):
             desc = "get_rooms",
         )
 
-    def watcha_server_state(self):
-        return {
-            'disk': psutil.disk_usage('/')._asdict(),
-            'memory': {
-                'memory': psutil.virtual_memory()._asdict(),
-                'swap': psutil.swap_memory()._asdict()
-            },
-            'cpu': {
-                'average': psutil.cpu_percent(interval=1),
-                'detailed': psutil.cpu_percent(interval=1, percpu=True),
-            }
-        }
-
     def watcha_room_name(self):
         return self._simple_select_list(
             table="room_names",
@@ -443,7 +478,7 @@ class WatchaAdminStore(SQLBaseStore):
                 , user_emails.address
                 , user_directory.display_name
             FROM users
-                INNER JOIN (
+                LEFT JOIN (
                     SELECT
                         user_threepids.user_id
                         , user_threepids.address
@@ -475,11 +510,11 @@ class WatchaAdminStore(SQLBaseStore):
         # ranges must be a list of arrays with three elements: label, start seconds since epoch, end seconds since epoch
         user_stats = yield self._get_users_stats()
         room_stats = yield self._get_room_count_per_type()
-        user_admin = yield self._get_user_admin()
+        server_stats = yield self._get_server_state()
 
         result = { 'users': user_stats,
                    'rooms': room_stats,
-                   'admins': user_admin,
+                   "server": server_stats,
         }
 
         defer.returnValue(result)

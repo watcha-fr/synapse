@@ -30,13 +30,16 @@ class BaseHomeserverWithEmailTestCase(unittest.HomeserverTestCase):
             },
             "public_baseurl": "TEST"
         })
+        self.auth = self.hs.get_auth_handler()
 
         return self.hs
 
     def prepare(self, reactor, clock, hs):
         # Admin_user register.
+        self.time = self.hs.get_clock().time_msec()
         self.user_id = self.register_user("admin", "pass", True)
         self.user_access_token = self.login("admin", "pass")
+        self.auth.add_threepid(self.user_id, "email", "example@email.com", self.time)
 
     def _do_register_user(self, request_content):
         #Admin send the request with access_token :
@@ -159,7 +162,7 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
                 {
                     "creation_ts": 0,
                     "display_name": "admin",
-                    "email_address": None,
+                    "email_address": "example@email.com",
                     "last_seen": None,
                     "role": "administrator",
                     "status": "invited",
@@ -193,14 +196,25 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
         self.assertEquals(
             json.loads(channel.result["body"])["users"],
             {
-                "collaborators": 2,
-                "partners": 0,
-                "number_of_users_logged_at_least_once": 0,
-                "number_of_last_month_logged_users": 0,
-                "number_of_last_week_logged_users": 0,
-                'number_of_users_with_pending_invitation': 2,
+                "administrators_users": [{"displayname": None,
+                    "email": "example@email.com",
+                    "user_id": "@admin:test"}],
+                "users_per_role": {
+                    "administrators": 1,
+                    "collaborators": 1,
+                    "partners": 0,
+                },
+                "connected_users": {
+                    "number_of_users_logged_at_least_once":0,
+                    "number_of_last_month_logged_users":0,
+                    "number_of_last_week_logged_users": 0,
+                },
+                "other_statistics": {
+                    "number_of_users_with_pending_invitation": 2,
+                },
             },
         )
+
     def test_get_watcha_admin_stats_room_type(self):
         room_id = self._create_room()
         self._invite_member_in_room(room_id, self.user_id)
