@@ -238,7 +238,7 @@ class WatchaUpdateUserRoleRestServlet(RestServlet):
             )
 
         role = params["role"]
-        if role not in ["partner", "member", "admin"]:
+        if role not in ["partner", "collaborator", "admin"]:
             raise SynapseError(400, "%s is not a defined role." % role)
 
         result = yield self.handlers.watcha_admin_handler.watcha_update_user_role(
