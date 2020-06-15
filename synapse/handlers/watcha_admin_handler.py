@@ -12,13 +12,22 @@ class WatchaAdminHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def watcha_user_list(self):
-        result = yield self.store.watcha_user_list()
-        defer.returnValue(result)
+        users = yield self.store.watcha_user_list()
 
-    @defer.inlineCallbacks
-    def watcha_room_list(self):
-        # TODO remove this - there is no 'watcha_room_list' in the store
-        result = yield self.store.watcha_room_list()
+        result = []
+        for user in users:
+            role = yield self.watcha_get_user_role(user["user_id"])
+            status = yield self.watcha_get_user_status(user["user_id"])
+            result.append({
+                "user_id": user["user_id"],
+                "email_address": user["email_address"],
+                "display_name": user["display_name"],
+                "role": role,
+                "status": status,
+                "last_seen": user["last_seen"],
+                "creation_ts": user["creation_ts"],
+            })
+
         defer.returnValue(result)
 
     @defer.inlineCallbacks
@@ -39,9 +48,8 @@ class WatchaAdminHandler(BaseHandler):
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def watcha_extend_room_list(self):
-        # TODO: rename to watcha_extended_room_list -- or better, to watcha_room_list since that one is not working
-        result = yield self.store.watcha_extend_room_list()
+    def watcha_room_list(self):
+        result = yield self.store.watcha_room_list()
         defer.returnValue(result)
 
     @defer.inlineCallbacks
@@ -65,16 +73,21 @@ class WatchaAdminHandler(BaseHandler):
         is_partner = yield self.hs.get_auth_handler().is_partner(user_id)
         is_admin = yield self.hs.get_auth_handler().is_admin(user_id)
 
-        role = "member"
+        role = "collaborator"
 
         if is_partner and is_admin:
             raise SynapseError(400, "A user can't be admin and partner too.")
         elif is_partner:
             role = "partner"
         elif is_admin:
-            role = "admin"
+            role = "administrator"
 
         defer.returnValue(role)
+
+    @defer.inlineCallbacks
+    def watcha_get_user_status(self, user_id):
+        result = yield self.store.watcha_get_user_status(user_id)
+        defer.returnValue(result)
 
     @defer.inlineCallbacks
     def watchaDeactivateAccount(self, user_id):
@@ -82,13 +95,8 @@ class WatchaAdminHandler(BaseHandler):
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def watcha_server_state(self):
-        result = yield self.store.watcha_server_state()
-        defer.returnValue(result)
-
-    @defer.inlineCallbacks
-    def watcha_admin_stat(self, ranges=None):
-        result = yield self.store.watcha_admin_stats(ranges)
+    def watcha_admin_stat(self):
+        result = yield self.store.watcha_admin_stats()
         defer.returnValue(result)
 
     @defer.inlineCallbacks
