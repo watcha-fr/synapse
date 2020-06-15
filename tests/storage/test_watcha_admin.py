@@ -91,7 +91,7 @@ class WatchaAdminTestCase(unittest.TestCase):
                 users_informations[user_index]["display_name"],
             )
             self.assertEquals(None, users_informations[user_index]["last_seen"])
-            self.assertEquals(self.time, users_informations[user_index]["creation_ts"]*1000)
+            self.assertEquals(self.time, users_informations[user_index]["creation_ts"])
 
     @defer.inlineCallbacks
     def test_watcha_update_user_role(self):

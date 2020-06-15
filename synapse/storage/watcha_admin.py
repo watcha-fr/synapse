@@ -233,7 +233,7 @@ class WatchaAdminStore(SQLBaseStore):
                 , users.admin
                 , users.is_active
                 , users_last_seen.last_seen
-                , users.creation_ts
+                , users.creation_ts * 1000
             FROM users
                 LEFT JOIN
                     (SELECT
