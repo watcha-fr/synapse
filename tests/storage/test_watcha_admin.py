@@ -7,7 +7,6 @@
 from twisted.internet import defer
 from tests import unittest
 from tests.utils import setup_test_homeserver
-from datetime import datetime
 
 
 class WatchaAdminTestCase(unittest.TestCase):
@@ -80,18 +79,16 @@ class WatchaAdminTestCase(unittest.TestCase):
 
         for user in register_users_list_sorted:
             user_index = register_users_list_sorted.index(user)
-            self.assertEquals(user["user_id"], users_informations[user_index]["user_id"])
+            self.assertEquals(user["user_id"], users_informations[user_index]["name"])
             self.assertEquals(
                 user["make_partner"], users_informations[user_index]["is_partner"]
             )
-            self.assertEquals(user["admin"], users_informations[user_index]["is_admin"])
-            self.assertEquals(user["email"], users_informations[user_index]["email_address"])
+            self.assertEquals(user["admin"], users_informations[user_index]["admin"])
+            self.assertEquals(user["email"], users_informations[user_index]["email"])
             self.assertEquals(
                 user["create_profile_with_displayname"],
-                users_informations[user_index]["display_name"],
+                users_informations[user_index]["displayname"],
             )
-            self.assertEquals(None, users_informations[user_index]["last_seen"])
-            self.assertEquals(self.time, users_informations[user_index]["creation_ts"])
 
     @defer.inlineCallbacks
     def test_watcha_update_user_role(self):
@@ -100,8 +97,8 @@ class WatchaAdminTestCase(unittest.TestCase):
 
         expected_values = [
             {"role": "partner", "values": {"is_partner": 1, "is_admin": 0}},
-            {"role": "collaborator", "values": {"is_partner": 0, "is_admin": 0}},
-            {"role": "administrator", "values": {"is_partner": 0, "is_admin": 1}},
+            {"role": "member", "values": {"is_partner": 0, "is_admin": 0}},
+            {"role": "admin", "values": {"is_partner": 0, "is_admin": 1}},
         ]
 
         for element in expected_values:
@@ -110,82 +107,3 @@ class WatchaAdminTestCase(unittest.TestCase):
             is_admin = yield self.store.is_user_admin(user_id)
             self.assertEquals(is_partner, element["values"]["is_partner"])
             self.assertEquals(is_admin, element["values"]["is_admin"])
-
-    @defer.inlineCallbacks
-    def test_get_users_with_pending_invitation(self):
-
-        register_users_list = [
-            {
-                "user_id": "@user1:test",
-                "logged_user": False,
-                "defined_password": False,
-                "logged_with_defined_password": False,
-            },
-            {
-                "user_id": "@user2:test",
-                "logged_user": True,
-                "defined_password": True,
-                "logged_with_defined_password": False,
-            },
-            {
-                "user_id": "@user3:test",
-                "logged_user": True,
-                "defined_password": True,
-                "logged_with_defined_password": True,
-            },
-        ]
-
-        for user in register_users_list:
-            yield self.store.register_user(user["user_id"], "pass")
-
-            if user["logged_user"]:
-                yield self.store._execute_sql(
-                    """
-                        INSERT INTO user_ips(
-                            user_id
-                            , access_token
-                            , device_id
-                            , ip
-                            , user_agent
-                            , last_seen
-                        )VALUES(
-                            "%s"
-                            , "access_token"
-                            , "device_id"
-                            , "ip"
-                            , "user_agent"
-                            , %s
-                        );
-                    """
-                    % (user["user_id"], self.time)
-                )
-
-            if user["defined_password"]:
-                yield self.store.store_device(
-                    user["user_id"], "device_id", "Web setup account"
-                )
-
-            if user["logged_with_defined_password"]:
-                yield self.store.update_device(
-                    user["user_id"], "device_id", new_display_name="display_name"
-                )
-
-        users_with_pending_invitation = (
-            yield self.store._get_users_with_pending_invitation()
-        )
-
-        self.assertEquals(users_with_pending_invitation, {"@user1:test", "@user2:test"})
-
-    def test_get_server_state(self):
-
-        server_state = self.store._get_server_state()
-        self.assertEquals(len(server_state), 4)
-        self.assertEquals(list(server_state.keys()), ["disk", "watcha_release", "upgrade_date", "install_date"])
-        self.assertEquals(list(server_state["disk"].keys()), ["total", "used", "free", "percent"])
-
-        for date in server_state:
-            if date in ["upgrade_date", "install_date"]:
-                try:
-                    datetime.strptime(server_state[date], "%d/%m/%Y")
-                except:
-                    self.fail("Wrong date format in watcha.conf file for %s parameter" % date)
