@@ -17,6 +17,8 @@ from synapse.types import get_domain_from_id, get_localpart_from_id
 
 logger = logging.getLogger(__name__)
 
+WATCHA_CONF_FILE_PATH = "/etc/watcha.conf"
+
 def _caller_name():
     '''returns the name of the function calling the one calling this one'''
     try:
@@ -195,10 +197,8 @@ class WatchaAdminStore(SQLBaseStore):
             "install_date": "",
         }
 
-        watcha_conf_file_path = "/etc/watcha.conf"
-
         try:
-            with open(watcha_conf_file_path, "r") as f:
+            with open(WATCHA_CONF_FILE_PATH, "r") as f:
                 watcha_conf_content = f.read().splitlines()
 
         except FileNotFoundError:
