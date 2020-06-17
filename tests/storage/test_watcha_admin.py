@@ -4,11 +4,11 @@
 # This code is not licensed unless agreed with Watcha SAS.
 #
 
-from twisted.internet import defer
+import tempfile
+from os.path import join
 from tests import unittest
+from twisted.internet import defer
 from tests.utils import setup_test_homeserver
-from datetime import datetime
-
 
 class WatchaAdminTestCase(unittest.TestCase):
     @defer.inlineCallbacks
@@ -178,14 +178,29 @@ class WatchaAdminTestCase(unittest.TestCase):
 
     def test_get_server_state(self):
 
-        server_state = self.store._get_server_state()
-        self.assertEquals(len(server_state), 4)
-        self.assertEquals(list(server_state.keys()), ["disk", "watcha_release", "upgrade_date", "install_date"])
-        self.assertEquals(list(server_state["disk"].keys()), ["total", "used", "free", "percent"])
+        with tempfile.TemporaryDirectory() as temp_dirname:
+            test_configfile = join(temp_dirname, "watcha.conf")
+            with open(test_configfile, 'w') as fd:
+                fd.write('''WATCHA_RELEASE=1.7.0
+WATCHA_REVISION=8e185
+SYGNAL_RELEASE=0.0.1_g20180417_1954_efd7389
+RIOT_RELEASE=20200602-1516-8984de36-9352f5888-a9e324aa
+SYNAPSE_RELEASE=1.3.1_g20200525_0731_dev_11061ab90
+WATCHA_ADMIN_RELEASE=20200615-1157-dev-3bcb74c-a9e324aa
+INSTALL_DATE=
+UPGRADE_DATE=2020-06-16T22:43:29
+''')
+            from synapse.storage import watcha_admin
+            initial_WATCHA_CONF_FILE_PATH = watcha_admin.WATCHA_CONF_FILE_PATH
+            try:
+                watcha_admin.WATCHA_CONF_FILE_PATH = test_configfile
+                server_state = self.store._get_server_state()
+            finally:
+                watcha_admin.WATCHA_CONF_FILE_PATH = initial_WATCHA_CONF_FILE_PATH
 
-        for date in server_state:
-            if date in ["upgrade_date", "install_date"]:
-                try:
-                    datetime.strptime(server_state[date], "%d/%m/%Y")
-                except:
-                    self.fail("Wrong date format in watcha.conf file for %s parameter" % date)
+            self.assertEquals(len(server_state), 4)
+            self.assertEquals(list(server_state.keys()), ["disk", "watcha_release", "upgrade_date", "install_date"])
+            self.assertEquals(list(server_state["disk"].keys()), ["total", "used", "free", "percent"])
+
+            self.assertEquals(server_state["install_date"], "")
+            self.assertEquals(server_state["upgrade_date"], "16/06/2020")
