@@ -202,7 +202,7 @@ class WatchaAdminStore(SQLBaseStore):
                 watcha_conf_content = f.read().splitlines()
 
         except FileNotFoundError:
-            logger.info("No such file : %s" % watcha_conf_file_path)
+            logger.info("No such file : %s" % WATCHA_CONF_FILE_PATH)
         else:
             def _parse_date(label, value):
                 return datetime.strptime(value, "%Y-%m-%dT%H:%M:%S").strftime(
