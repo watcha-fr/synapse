@@ -39,6 +39,22 @@ class WatchaAdminStore(SQLBaseStore):
             None, sql, *args)
 
     @defer.inlineCallbacks
+    def _get_new_rooms(self):
+        """List rooms where are recevied m.room.create event before a week ago"""
+
+        new_rooms = yield self._execute_sql(
+            """
+            SELECT DISTINCT room_id
+            FROM events
+            WHERE type = "m.room.create"
+                AND received_ts >= (SELECT (strftime('%s','now') || substr(strftime('%f', 'now'),4)) - (3600 * 24 * 7 * 1000));
+        """
+        )
+        new_rooms = [rooms[0] for rooms in new_rooms]
+
+        defer.returnValue(new_rooms)
+
+    @defer.inlineCallbacks
     def _get_active_rooms(self):
         """List rooms where the last message was sent than less a week ago"""
 
@@ -86,8 +102,11 @@ class WatchaAdminStore(SQLBaseStore):
         """List the rooms, with two or less members, and with three or more members.
         """
         members_by_room = yield self.members_by_room()
-        active_rooms = yield self._get_active_rooms()
         direct_rooms = yield self._get_direct_rooms()
+        new_rooms = yield self._get_new_rooms()
+        active_rooms = yield self._get_active_rooms()
+
+        active_rooms = set(active_rooms).union(new_rooms)
 
         all_rooms = yield self._simple_select_onecol(
             table="rooms", keyvalues=None, retcol="room_id",
@@ -345,6 +364,7 @@ class WatchaAdminStore(SQLBaseStore):
         )
 
         members_by_room = yield self.members_by_room()
+        new_rooms = yield self._get_new_rooms()
         active_rooms = yield self._get_active_rooms()
         direct_rooms = yield self._get_direct_rooms()
 
@@ -356,7 +376,7 @@ class WatchaAdminStore(SQLBaseStore):
                     "name": name,
                     "members": members_by_room[room_id],
                     "type": "Personnal conversation" if room_id in direct_rooms else "Room",
-                    "active": 1 if room_id in active_rooms else 0,
+                    "status": "new" if room_id in new_rooms else "active" if room_id in active_rooms else "inactive",
                 }
                 for room_id, creator, name in rooms
                 if room_id
