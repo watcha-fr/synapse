@@ -93,7 +93,7 @@ class RoomAccountDataServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id, room_id, account_data_type):
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request, allow_partner=True) # modified for watcha op388
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
 
