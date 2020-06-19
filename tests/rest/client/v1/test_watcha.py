@@ -253,11 +253,11 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
             self.assertEquals(
                 json.loads(channel.result["body"])[rooms_id.index(room_id)],
                 {
-                    "active": 0,
                     "creator": "@admin:test",
                     "members": ["@admin:test"],
                     "name": None,
                     "room_id": room_id,
+                    "status": "inactive",
                     "type": "Room",
                 },
             )
