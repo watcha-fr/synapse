@@ -22,7 +22,7 @@ PATH_PREFIX = "/_matrix/client/r0"
 
 
 # Inspired by devops.git/watcha_users
-def _call_with_shared_secret(test, shared_secret, endpoint, parameters):
+def _call_with_shared_secret(test, shared_secret, endpoint, parameters, additionnal_parameters={}):
     '''Order of parameters matters, so must be list of pairs'''
     mac = hmac.new(
         key=shared_secret.encode('utf-8'),
@@ -37,7 +37,7 @@ def _call_with_shared_secret(test, shared_secret, endpoint, parameters):
 
     data = dict(parameters)
     data["mac"] = mac
-
+    data.update(additionnal_parameters)
 
     request, channel = test.make_request(
         "POST",
@@ -207,10 +207,11 @@ class WatchaRegisterWithSharedSecretRestServletTestCase(NotAdminWatchaRegisterRe
         # no user, no login
         pass
 
-    def _do_request(self, content):
+    def _do_request(self, content, additionnal_parameters={}):
         return _call_with_shared_secret(self, "shared",
                                         '/watcha_register',
-                                        content)
+                                        content,
+                                        additionnal_parameters)
 
     def test_watcha_register_servlet(self):
         with self.assertLogs('synapse.util.watcha', level='INFO') as cm:
@@ -240,6 +241,20 @@ class WatchaRegisterWithSharedSecretRestServletTestCase(NotAdminWatchaRegisterRe
             self.assertEqual(channel.result['body'],
                              b'{"errcode":"M_FORBIDDEN","error":"\'inviter\' field is needed if not called from logged in admin user"}')
 
+    def test_watcha_register_servlet_with_password(self):
+        with self.assertLogs('synapse.rest.client.v1.watcha', level='INFO') as cm:
+            channel = self._do_request([('user', 'new_user'),
+                                        ('full_name', "Full Name"),
+                                        ('email', "address@mail.com"),
+                                        ('admin', 'notadmin'),
+                                        ('inviter', 'Some Admin User')], {'password': '1234'})
+            self.assertEqual(channel.code, 200)
+            self.assertEqual(channel.result['body'], b'{"display_name":"Full Name","user_id":"@new_user:test"}')
+            self.assertIn("INFO:synapse.rest.client.v1.watcha:Not sending email for user password for user @new_user:test, password is defined by sender",
+                          cm.output[1])
+            self.assertIsNotNone(self.login("address@mail.com", "1234"))
+            self.assertIsNotNone(self.login("@new_user:test", "1234"))
+            
 class InvitationDisplayNameTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
