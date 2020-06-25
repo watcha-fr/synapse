@@ -28,24 +28,19 @@ from synapse.api.constants import Membership
 logger = logging.getLogger(__name__)
 
 
-def _decode_share_secret_parameters(config, parameter_names, parameter_json):
+def _decode_share_secret_parameters(config, parameter_names, parameters):
     for parameter_name in parameter_names:
-        if parameter_name not in parameter_json:
+        if parameter_name not in parameters:
             raise SynapseError(400, "Expected %s." % parameter_name)
 
     if not config.registration_shared_secret:
         raise SynapseError(400, "Shared secret registration is not enabled")
 
-    parameters = {
-        parameter_name: parameter_json[parameter_name]
-        for parameter_name in parameter_names
-    }
-
     # Its important to check as we use null bytes as HMAC field separators
     if any("\x00" in parameters[parameter_name] for parameter_name in parameter_names):
         raise SynapseError(400, "Invalid message")
 
-    got_mac = str(parameter_json["mac"])
+    got_mac = str(parameters["mac"])
 
     want_mac = hmac.new(
         key=config.registration_shared_secret.encode("utf-8"), digestmod=sha1,
@@ -58,7 +53,7 @@ def _decode_share_secret_parameters(config, parameter_names, parameter_json):
             "Failed to decode HMAC for parameters names: "
             + repr(parameter_names)
             + " and values: "
-            + repr(parameter_json)
+            + repr(parameters)
         )
 
         raise SynapseError(
@@ -367,7 +362,11 @@ class WatchaRegisterRestServlet(RestServlet):
                 )
             inviter_name = params["inviter"]
 
-        password = generate_password()
+        if 'password' in params:
+            password = params['password']
+        else:            
+            password = generate_password()
+
         admin = params["admin"] == "admin"
         bind_emails = [params["email"]]
         user_id = yield self.registration_handler.register_user(
@@ -382,16 +381,20 @@ class WatchaRegisterRestServlet(RestServlet):
         )
 
         display_name = yield self.hs.profile_handler.get_displayname(user)
-        token = compute_registration_token(user_id, email, password)
 
-        send_registration_email(
-            self.hs.config,
-            email,
-            template_name="invite_new_account",
-            token=token,
-            inviter_name=inviter_name,
-            full_name=display_name,
-        )
+        if 'password' not in params:
+            token = compute_registration_token(user_id, email, password)
+
+            send_registration_email(
+                self.hs.config,
+                email,
+                template_name="invite_new_account",
+                token=token,
+                inviter_name=inviter_name,
+                full_name=display_name,
+            )
+        else:
+            logger.info("Not sending email for user password for user %s, password is defined by sender", user_id)
 
         return (200, {"display_name": display_name, "user_id": user_id})
 
