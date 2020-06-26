@@ -94,6 +94,10 @@ class EventTypes(object):
     ServerACL = "m.room.server_acl"
     Pinned = "m.room.pinned_events"
 
+    # insertion for watcha - OP433
+    VectorSetting = "im.vector.web.settings"
+    # end of insertion
+
 
 class RejectedReason(object):
     AUTH_ERROR = "auth_error"
