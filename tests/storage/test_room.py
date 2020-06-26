@@ -17,10 +17,11 @@
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
+from synapse.api.room_versions import RoomVersions
 from synapse.types import RoomAlias, RoomID, UserID
 
 from tests import unittest
-from tests.utils import setup_test_homeserver
+from tests.utils import create_room, setup_test_homeserver
 
 
 class RoomStoreTestCase(unittest.TestCase):
@@ -110,3 +111,51 @@ class RoomEventsStoreTestCase(unittest.TestCase):
 
     # Not testing the various 'level' methods for now because there's lots
     # of them and need coalescing; see JIRA SPEC-11
+
+
+# insertion for watcha - OP433
+class WatchaRoomEventsStoreTestCase(unittest.TestCase):
+    @defer.inlineCallbacks
+    def setUp(self):
+        hs = yield setup_test_homeserver(self.addCleanup)
+
+        self.store = hs.get_datastore()
+        self.event_builder_factory = hs.get_event_builder_factory()
+        self.event_creation_handler = hs.get_event_creation_handler()
+
+        self.user = UserID.from_string("@user:test")
+        self.room = RoomID.from_string("!abc123:test")
+
+        yield create_room(hs, self.room.to_string(), self.user.to_string())
+
+    @defer.inlineCallbacks
+    def test_store_room_link_with_NC(self):
+        nextcloud_folder_url = (
+            "http://test.watcha.fr/nextcloud/apps/files/?dir=/test_folder"
+        )
+
+        builder = self.event_builder_factory.for_room_version(
+            RoomVersions.V1,
+            {
+                "type": EventTypes.VectorSetting,
+                "sender": self.user.to_string(),
+                "room_id": self.room.to_string(),
+                "content": {"nextcloud": nextcloud_folder_url},
+            },
+        )
+
+        event, context = yield self.event_creation_handler.create_new_client_event(
+            builder
+        )
+
+        yield self.store.persist_event(event, context)
+
+        result = yield self.store._simple_select_one(
+            table="room_mapping_with_NC",
+            keyvalues={"room_id": self.room.to_string()},
+            retcols={"link_url", "is_active"},
+        )
+
+        self.assertEquals(result["link_url"], nextcloud_folder_url)
+        self.assertEquals(result["is_active"], 1)
+# end of insertion
