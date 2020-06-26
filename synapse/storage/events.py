@@ -1423,7 +1423,6 @@ class EventsStore(
                 events_and_context.
             backfilled (bool): True if the events were backfilled
         """
-
         # Insert all the push actions into the event_push_actions table.
         self._set_push_actions_for_event_and_users_txn(
             txn,
@@ -1471,6 +1470,10 @@ class EventsStore(
             elif event.type == EventTypes.GuestAccess:
                 # Insert into the event_search table.
                 self._store_guest_access_txn(txn, event)
+            # insertion for watcha - OP433
+            elif event.type == EventTypes.VectorSetting and "nextcloud" in event.content:
+                self._store_room_link_with_NC(txn, event)
+            # end of insertion
 
             self._handle_event_relations(txn, event)
 
