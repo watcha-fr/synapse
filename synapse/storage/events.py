@@ -1423,6 +1423,7 @@ class EventsStore(
                 events_and_context.
             backfilled (bool): True if the events were backfilled
         """
+
         # Insert all the push actions into the event_push_actions table.
         self._set_push_actions_for_event_and_users_txn(
             txn,
