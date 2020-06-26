@@ -437,6 +437,56 @@ class RoomStore(RoomWorkerStore, SearchStore):
             )
             txn.execute(sql, (event.event_id, event.room_id, event.content[key]))
 
+    # insertion for watcha - OP433 :
+    def _store_room_link_with_NC(self, txn, event):
+        """ Store the link between Watcha room and Nextcloud folder
+        """
+
+        nextcloud_folder_url = event.content["nextcloud"]
+        room_id = event.room_id
+        is_active = 1 if nextcloud_folder_url else 0
+
+        txn.execute(
+            """
+            SELECT
+                room_id
+            FROM room_mapping_with_NC
+            WHERE room_id like "{}"
+            """.format(room_id)
+        )
+        row = txn.fetchone()
+
+        if row:
+            txn.execute(
+                """
+                UPDATE room_mapping_with_NC
+                SET
+                    link_URL = "{nextcloud_folder_url}"
+                    , is_active = {is_active}
+                WHERE room_id like "{room_id}"
+                """.format(
+                    nextcloud_folder_url=nextcloud_folder_url,
+                    is_active=is_active,
+                    room_id=room_id,
+                )
+            )
+        else:
+            txn.execute(
+                """
+                INSERT INTO room_mapping_with_NC
+                VALUES (
+                    "{room_id}"
+                    , "{nextcloud_folder_url}"
+                    , {is_active}
+                )
+                """.format(
+                    room_id=room_id,
+                    nextcloud_folder_url=nextcloud_folder_url,
+                    is_active=is_active,
+                )
+            )
+    # end of insertion
+
     def add_event_report(
         self, room_id, event_id, user_id, reason, content, received_ts
     ):
