@@ -125,15 +125,14 @@ class WatchaRoomEventsStoreTestCase(unittest.TestCase):
 
         self.user = UserID.from_string("@user:test")
         self.room = RoomID.from_string("!abc123:test")
+        self.nextcloud_folder_url = "http://test.watcha.fr/nextcloud/apps/files/?dir=/test_folder"
+
+        yield self.send_room_mapping_event(self.nextcloud_folder_url)
 
         yield create_room(hs, self.room.to_string(), self.user.to_string())
 
     @defer.inlineCallbacks
-    def test_store_room_link_with_NC(self):
-        nextcloud_folder_url = (
-            "http://test.watcha.fr/nextcloud/apps/files/?dir=/test_folder"
-        )
-
+    def send_room_mapping_event(self, nextcloud_folder_url):
         builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
             {
@@ -150,12 +149,39 @@ class WatchaRoomEventsStoreTestCase(unittest.TestCase):
 
         yield self.store.persist_event(event, context)
 
-        result = yield self.store._simple_select_one(
+    @defer.inlineCallbacks
+    def test_insert_new_room_link_with_NC(self):
+
+        result = yield self.store._simple_select_onecol(
             table="room_mapping_with_NC",
             keyvalues={"room_id": self.room.to_string()},
-            retcols={"link_url", "is_active"},
+            retcol="link_url",
         )
 
-        self.assertEquals(result["link_url"], nextcloud_folder_url)
-        self.assertEquals(result["is_active"], 1)
+        self.assertEquals(result[0], self.nextcloud_folder_url)
+
+    @defer.inlineCallbacks
+    def test_update_room_link_with_NC(self):
+        new_nextcloud_folder_url = "http://test.watcha.fr/nextcloud/apps/files/?dir=/test_folder2"
+        yield self.send_room_mapping_event(new_nextcloud_folder_url)
+
+        result = yield self.store._simple_select_onecol(
+            table="room_mapping_with_NC",
+            keyvalues={"room_id": self.room.to_string()},
+            retcol="link_url",
+        )
+
+        self.assertEquals(result[0], new_nextcloud_folder_url)
+
+    @defer.inlineCallbacks
+    def test_delete_room_link_with_NC(self):
+        yield self.send_room_mapping_event("")
+
+        result = yield self.store._simple_select_onecol(
+            table="room_mapping_with_NC",
+            keyvalues={"room_id": self.room.to_string()},
+            retcol="link_url",
+        )
+
+        self.assertFalse(result)
 # end of insertion
