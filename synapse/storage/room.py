@@ -440,7 +440,7 @@ class RoomStore(RoomWorkerStore, SearchStore):
     # insertion for watcha - OP433 :
     def _store_room_link_with_NC(self, txn, event):
         """ Store the link between Watcha room and Nextcloud folder in Sqlite.
-        With PostgreSql, the clause 'INSERT or REPLACE' doesn't works and has to be replaced by 'UPSERT'.
+        @TODO : With PostgreSql, the clause 'INSERT or REPLACE' doesn't works and has to be replaced by 'UPSERT'.
         """
 
         if hasattr(event, "content") and "nextcloud" in event.content:
