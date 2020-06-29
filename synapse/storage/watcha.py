@@ -10,7 +10,7 @@ def check_db_customization(db_conn, database_engine):
     # put here the list of db customizations
     # (database_engine will be used later to for postgres)
     create_table_partner_invited_by_query = "CREATE TABLE partners_invited_by (partner TEXT, invited_by TEXT, invitation_ts BIGINT, device_id TEXT, email_sent SMALLINT NOT NULL DEFAULT 0)"
-    create_table_room_mapping_with_NC_query = "CREATE TABLE room_mapping_with_NC (room_id TEXT NOT NULL PRIMARY KEY, link_URL TEXT, is_active SMALLINT)"
+    create_table_room_mapping_with_NC_query = "CREATE TABLE room_mapping_with_NC (room_id TEXT NOT NULL PRIMARY KEY, link_URL TEXT)"
     _drop_column_if_needed(db_conn, "users", "users_copy", "email")
     _add_column_if_needed(db_conn, "users", "is_partner", "DEFAULT 0")
     _add_column_if_needed(db_conn, "users", "is_active", "DEFAULT 1")
