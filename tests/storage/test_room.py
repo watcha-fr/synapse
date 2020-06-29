@@ -132,7 +132,7 @@ class WatchaRoomEventsStoreTestCase(unittest.TestCase):
         yield create_room(hs, self.room.to_string(), self.user.to_string())
 
     @defer.inlineCallbacks
-    def send_room_mapping_event(self, nextcloud_folder_url):
+    def _send_room_mapping_event(self, nextcloud_folder_url):
         builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
             {
