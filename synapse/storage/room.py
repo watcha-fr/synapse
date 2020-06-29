@@ -442,48 +442,19 @@ class RoomStore(RoomWorkerStore, SearchStore):
         """ Store the link between Watcha room and Nextcloud folder
         """
 
-        nextcloud_folder_url = event.content["nextcloud"]
-        room_id = event.room_id
-        is_active = 1 if nextcloud_folder_url else 0
+        if hasattr(event, "content") and "nextcloud" in event.content:
+            nextcloud_folder_url = event.content["nextcloud"]
+            room_id = event.room_id
 
-        txn.execute(
-            """
-            SELECT
-                room_id
-            FROM room_mapping_with_NC
-            WHERE room_id like "{}"
-            """.format(room_id)
-        )
-        row = txn.fetchone()
-
-        if row:
             txn.execute(
                 """
-                UPDATE room_mapping_with_NC
-                SET
-                    link_URL = "{nextcloud_folder_url}"
-                    , is_active = {is_active}
-                WHERE room_id like "{room_id}"
-                """.format(
-                    nextcloud_folder_url=nextcloud_folder_url,
-                    is_active=is_active,
-                    room_id=room_id,
-                )
-            )
-        else:
-            txn.execute(
-                """
-                INSERT INTO room_mapping_with_NC
+                INSERT OR REPLACE INTO room_mapping_with_NC
                 VALUES (
-                    "{room_id}"
-                    , "{nextcloud_folder_url}"
-                    , {is_active}
+                    %{room_id}s
+                    , %{nextcloud_folder_url}s
                 )
-                """.format(
-                    room_id=room_id,
-                    nextcloud_folder_url=nextcloud_folder_url,
-                    is_active=is_active,
-                )
+                """,
+                {"room_id": room_id, "nextcloud_folder_url": nextcloud_folder_url},
             )
     # end of insertion
 
