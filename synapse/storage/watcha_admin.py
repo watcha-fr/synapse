@@ -240,7 +240,7 @@ class WatchaAdminStore(SQLBaseStore):
     @defer.inlineCallbacks
     def watcha_user_list(self):
 
-        FIELDS = ["user_id", "email_address", "display_name", "is_partner", "is_admin", "is_active",
+        FIELDS = ["user_id", "email_address", "display_name", "is_partner", "is_admin",
                   "last_seen", "creation_ts"]
 
         SQL_USER_LIST = """
@@ -250,7 +250,6 @@ class WatchaAdminStore(SQLBaseStore):
                 , profiles.displayname
                 , users.is_partner
                 , users.admin
-                , users.is_active
                 , users_last_seen.last_seen
                 , users.creation_ts * 1000
             FROM users
@@ -444,7 +443,7 @@ class WatchaAdminStore(SQLBaseStore):
                 table="users", keyvalues={"name": user_id}, retcol="is_active",
             )
 
-            result = "inactive" if is_active == 0 else "active"
+            result = "inactive" if is_active[0] == 0 else "active"
 
         defer.returnValue(result)
 
