@@ -74,25 +74,27 @@ class DeactivateAccountHandler(BaseHandler):
         identity_server_supports_unbinding = True
 
         # deletion for Watcha - OP416
-        # threepids = yield self.store.user_get_threepids(user_id)
-        # for threepid in threepids:
-        #     try:
-        #         result = yield self._identity_handler.try_unbind_threepid(
-        #             user_id,
-        #             {
-        #                 "medium": threepid["medium"],
-        #                 "address": threepid["address"],
-        #                 "id_server": id_server,
-        #             },
-        #         )
-        #         identity_server_supports_unbinding &= result
-        #     except Exception:
-        #         # Do we want this to be a fatal error or should we carry on?
-        #         logger.exception("Failed to remove threepid from ID server")
-        #         raise SynapseError(400, "Failed to remove threepid from ID server")
-        #     yield self.store.user_delete_threepid(
-        #         user_id, threepid["medium"], threepid["address"]
-        #     )
+        """
+        threepids = yield self.store.user_get_threepids(user_id)
+        for threepid in threepids:
+            try:
+                result = yield self._identity_handler.try_unbind_threepid(
+                    user_id,
+                    {
+                        "medium": threepid["medium"],
+                        "address": threepid["address"],
+                        "id_server": id_server,
+                    },
+                )
+                identity_server_supports_unbinding &= result
+            except Exception:
+                # Do we want this to be a fatal error or should we carry on?
+                logger.exception("Failed to remove threepid from ID server")
+                raise SynapseError(400, "Failed to remove threepid from ID server")
+            yield self.store.user_delete_threepid(
+                user_id, threepid["medium"], threepid["address"]
+            )
+        """
         # end of deletion
 
         # delete any devices belonging to the user, which will also
