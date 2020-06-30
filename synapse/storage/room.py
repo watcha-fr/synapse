@@ -450,6 +450,19 @@ class RoomStore(RoomWorkerStore, SearchStore):
             if nextcloud_folder_url:
                 txn.execute(
                     """
+                    SELECT link_url
+                    FROM room_mapping_with_NC
+                    WHERE link_url = ?;
+                    """,
+                    (nextcloud_folder_url,),
+                )
+                row = txn.fetchone()
+
+                if row:
+                    raise StoreError(500, "This Nextcloud folder is already linked.")
+
+                txn.execute(
+                    """
                     INSERT OR REPLACE INTO room_mapping_with_NC
                     VALUES (
                         ?
