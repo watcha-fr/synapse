@@ -23,7 +23,7 @@ from synapse.util.watcha import (
     create_display_inviter_name,
 )
 from synapse.types import UserID, create_requester
-from synapse.api.constants import Membership
+from synapse.api.constants import Membership, EventTypes
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,6 @@ def _check_admin(auth, request):
 def _check_admin_or_secret(config, auth, request, parameter_names):
     auth_headers = request.requestHeaders.getRawHeaders("Authorization")
     parameter_json = parse_json_object_from_request(request)
-
     if auth_headers:
         yield _check_admin(auth, request)
         ret = parameter_json
@@ -131,6 +130,68 @@ class WatchaRoomNameRestServlet(RestServlet):
         yield _check_admin(self.auth, request)
         ret = yield self.handlers.watcha_admin_handler.watcha_room_name()
         defer.returnValue((200, ret))
+
+
+class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
+
+    PATTERNS = client_patterns("/watcha_room_nextcloud_activity", v1=True)
+
+    def __init__(self, hs):
+        super(WatchaSendNextcloudActivityToWatchaRoomServlet, self).__init__()
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.event_creation_handler = hs.get_event_creation_handler()
+        self.store = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        params = yield _check_admin_or_secret(
+            self.hs.config, self.auth, request, ["file_name", "link", "directory"],
+        )
+
+        nc_file_name = params["file_name"]
+        nc_link = params["link"]
+        nc_directory = params["directory"]
+
+        if not nc_file_name or not nc_link or not nc_directory:
+            raise SynapseError(
+                400, "'file_name', 'link' and 'directory args cannot be empty.",
+            )
+
+        room_id = yield self.store.get_roomId_from_NC_folder_url(nc_directory)
+
+        if not room_id:
+            raise SynapseError(
+                400, "No room has linked with this nextcloud folder url."
+            )
+
+        admins = yield self.store.get_room_admins(room_id)
+
+        if not admins:
+            raise SynapseError(
+                400,
+                "No administrators are  in the room. The nextcloud notification cannot be posted.",
+            )
+
+        requester = create_requester(admins[0][0])
+
+        event_dict = {
+            "type": EventTypes.Message,
+            "content": {
+                "body": nc_file_name,
+                "filename": nc_file_name,
+                "msgtype": "m.file",
+                "url": nc_link,
+            },
+            "room_id": room_id,
+            "sender": requester.user.to_string(),
+        }
+
+        event = yield self.event_creation_handler.create_and_send_nonmember_event(
+            requester, event_dict
+        )
+
+        return (200, {"event_id": event.event_id})
 
 
 class WatchaDisplayNameRestServlet(RestServlet):
@@ -463,5 +524,6 @@ def register_servlets(hs, http_server):
     WatchaRoomListRestServlet(hs).register(http_server)
     WatchaRoomMembershipRestServlet(hs).register(http_server)
     WatchaRoomNameRestServlet(hs).register(http_server)
+    WatchaSendNextcloudActivityToWatchaRoomServlet(hs).register(http_server)
     WatchaDisplayNameRestServlet(hs).register(http_server)
     
