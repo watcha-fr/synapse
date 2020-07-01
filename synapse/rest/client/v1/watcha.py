@@ -141,7 +141,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.event_creation_handler = hs.get_event_creation_handler()
-        self.store = hs.get_datastore()
+        self.handler = hs.get_handlers()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -158,14 +158,14 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
                 400, "'file_name', 'link' and 'directory args cannot be empty.",
             )
 
-        room_id = yield self.store.get_roomId_from_NC_folder_url(nc_directory)
+        room_id = yield self.handler.watcha_room_handler.get_roomId_from_NC_folder_url(nc_directory)
 
         if not room_id:
             raise SynapseError(
                 400, "No room has linked with this nextcloud folder url."
             )
 
-        admins = yield self.store.get_room_admins(room_id)
+        admins = yield self.handler.watcha_room_handler.get_room_admins(room_id)
 
         if not admins:
             raise SynapseError(

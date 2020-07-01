@@ -994,3 +994,17 @@ class RoomEventSource(object):
         )
 
         return (events, next_key)
+
+class WatchaRoomHandler(BaseHandler):
+    def __init__(self, hs):
+        self.store = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def get_roomId_from_NC_folder_url(self, folder_url):
+        result = yield self.store.get_roomId_from_NC_folder_url(folder_url)
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def get_room_admins(self, room_id):
+        result = yield self.store.get_room_admins(room_id)
+        defer.returnValue(result)

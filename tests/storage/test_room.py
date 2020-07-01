@@ -127,7 +127,7 @@ class WatchaRoomEventsStoreTestCase(unittest.TestCase):
         self.room = RoomID.from_string("!abc123:test")
         self.nextcloud_folder_url = "http://test.watcha.fr/nextcloud/apps/files/?dir=/test_folder"
 
-        yield self.send_room_mapping_event(self.nextcloud_folder_url)
+        yield self._send_room_mapping_event(self.nextcloud_folder_url)
 
         yield create_room(hs, self.room.to_string(), self.user.to_string())
 
@@ -163,7 +163,7 @@ class WatchaRoomEventsStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_update_room_link_with_NC(self):
         new_nextcloud_folder_url = "http://test.watcha.fr/nextcloud/apps/files/?dir=/test_folder2"
-        yield self.send_room_mapping_event(new_nextcloud_folder_url)
+        yield self._send_room_mapping_event(new_nextcloud_folder_url)
 
         result = yield self.store._simple_select_onecol(
             table="room_mapping_with_NC",
@@ -175,7 +175,7 @@ class WatchaRoomEventsStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_delete_room_link_with_NC(self):
-        yield self.send_room_mapping_event("")
+        yield self._send_room_mapping_event("")
 
         result = yield self.store._simple_select_onecol(
             table="room_mapping_with_NC",
