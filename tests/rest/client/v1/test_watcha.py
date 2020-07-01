@@ -1,5 +1,4 @@
-import json
-import logging
+import json, logging, hmac, hashlib
 
 from tests import unittest
 from tests.utils import setup_test_homeserver
@@ -40,6 +39,7 @@ class BaseHomeserverWithEmailTestCase(unittest.HomeserverTestCase):
         self.user_id = self.register_user("admin", "pass", True)
         self.user_access_token = self.login("admin", "pass")
         self.auth.add_threepid(self.user_id, "email", "example@email.com", self.time)
+        self.nextcloud_folder_url = "http://localhost/nextcloud/apps/files/?dir=/Partage"
 
     def _do_register_user(self, request_content):
         #Admin send the request with access_token :
@@ -262,3 +262,89 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
                 },
             )
         self.assertEquals(200, channel.code)
+
+class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTestCase):
+
+    def _do_hmac_with_shared_secret(self, parameters):
+        mac = hmac.new(
+            key=self.hs.get_config().registration_shared_secret.encode("utf-8"),
+            digestmod=hashlib.sha1,
+        )
+
+        for parameter_value in parameters:
+            mac.update(repr(parameter_value).encode("utf-8"))
+            mac.update(b"\x00")
+
+        return mac.hexdigest()
+
+    def _send_POST_nextcloud_notification_request(self, request_content):
+        mac = self._do_hmac_with_shared_secret(request_content)
+        request_content["mac"] = mac
+
+        request, channel = self.make_request(
+            "POST",
+            "/watcha_room_nextcloud_activity",
+            content=json.dumps(request_content),
+            access_token=self.user_access_token,
+        )
+        self.render(request)
+
+        return channel
+
+    def _do_room_mapping_with_nextcloud_folder(self):
+        room_id = self._create_room()
+        request, channel = self.make_request(
+            "PUT",
+            "/rooms/{}/state/im.vector.web.settings".format(room_id),
+            content=json.dumps({"nextcloud": self.nextcloud_folder_url}),
+            access_token=self.user_access_token,
+        )
+        self.render(request)
+
+        return channel
+
+    def test_do_room_mapping_with_same_nextcloud_folder(self):
+        self._do_room_mapping_with_nextcloud_folder()
+        channel = self._do_room_mapping_with_nextcloud_folder()
+
+        self.assertEquals(500, channel.code)
+        self.assertEquals(
+            json.loads(channel.result["body"])["error"],
+            "This Nextcloud folder is already linked.",
+        )
+
+    def test_send_nextcloud_notification_in_unlinked_room(self):
+        request_content = {
+            "file_name": "WATCHA-Brochure A4.pdf",
+            "directory": self.nextcloud_folder_url,
+            "link": "http://localhost/nextcloud/f/307",
+        }
+
+        channel = self._send_POST_nextcloud_notification_request(request_content)
+        self.assertEquals(400, channel.code)
+        self.assertEquals(
+            json.loads(channel.result["body"])["error"],
+            "No room has linked with this nextcloud folder url.",
+        )
+
+    def test_send_nextcloud_notification_in_linked_room(self):
+        self._do_room_mapping_with_nextcloud_folder()
+        request_content = {
+            "file_name": "WATCHA-Brochure A4.pdf",
+            "directory": self.nextcloud_folder_url,
+            "link": "http://localhost/nextcloud/f/307",
+        }
+
+        channel = self._send_POST_nextcloud_notification_request(request_content)
+        self.assertEquals(200, channel.code)
+
+    def test_send_nextcloud_notification_in_linked_room_with_empty_values(self):
+        self._do_room_mapping_with_nextcloud_folder()
+        request_content = {"file_name": "", "directory": "", "link": ""}
+
+        channel = self._send_POST_nextcloud_notification_request(request_content)
+        self.assertEquals(400, channel.code)
+        self.assertEquals(
+            json.loads(channel.result["body"])["error"],
+            "'file_name', 'link' and 'directory args cannot be empty.",
+        )
