@@ -437,7 +437,7 @@ class RoomStore(RoomWorkerStore, SearchStore):
             )
             txn.execute(sql, (event.event_id, event.room_id, event.content[key]))
 
-    # insertion for watcha - OP433 :
+    # insertion for watcha - OP420 :
     def _store_room_link_with_NC(self, txn, event):
         """ Store the link between Watcha room and Nextcloud folder in Sqlite.
         @TODO : With PostgreSql, the clause 'INSERT or REPLACE' doesn't works and has to be replaced by 'UPSERT'.
@@ -478,6 +478,37 @@ class RoomStore(RoomWorkerStore, SearchStore):
                     WHERE room_id like ? ;""",
                     (room_id,),
                 )
+
+    def get_roomId_from_NC_folder_url(self, folder_url):
+        """ Get the room_id of the room which is linked with the Nextcloud folder url.
+        """
+
+        return self._simple_select_one_onecol(
+            table="room_mapping_with_NC",
+            keyvalues={"link_url": folder_url},
+            retcol="room_id",
+            allow_none=True,
+        )
+
+    @defer.inlineCallbacks
+    def get_room_admins(self, room_id):
+        """ Get a list of administrators of the room.
+        """
+
+        sql = """
+            SELECT
+                state_key
+            FROM current_state_events
+            INNER JOIN users ON users.name = current_state_events.state_key
+            WHERE type = "m.room.member"
+                AND (membership = "join" OR membership = "invite")
+                AND users.admin = 1
+                AND current_state_events.room_id = ?;
+            """
+
+        result = yield self._execute("get_room_admins", None, sql, room_id)
+
+        defer.returnValue(result)
     # end of insertion
 
     def add_event_report(
