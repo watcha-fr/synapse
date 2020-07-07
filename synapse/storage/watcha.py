@@ -9,10 +9,13 @@ logger = logging.getLogger(__name__)
 def check_db_customization(db_conn, database_engine):
     # put here the list of db customizations
     # (database_engine will be used later to for postgres)
+    create_table_partner_invited_by_query = "CREATE TABLE partners_invited_by (partner TEXT, invited_by TEXT, invitation_ts BIGINT, device_id TEXT, email_sent SMALLINT NOT NULL DEFAULT 0)"
+    create_table_room_mapping_with_NC_query = "CREATE TABLE room_mapping_with_NC (room_id TEXT NOT NULL PRIMARY KEY, link_URL TEXT)"
     _drop_column_if_needed(db_conn, "users", "users_copy", "email")
     _add_column_if_needed(db_conn, "users", "is_partner", "DEFAULT 0")
     _add_column_if_needed(db_conn, "users", "is_active", "DEFAULT 1")
-    _add_table_partners_invited_by(db_conn)
+    _add_new_table_if_needed(db_conn, "partners_invited_by", create_table_partner_invited_by_query)
+    _add_new_table_if_needed(db_conn, "room_mapping_with_NC", create_table_room_mapping_with_NC_query)
 
 
 def _add_column_if_needed(db_conn, table, column, column_details):
@@ -101,19 +104,19 @@ def _drop_column_if_needed(db_conn, table, copy_table, column_to_drop):
 
 # add "partners_invited_by" table
 # this is a no-op if it is already there.
-def _add_table_partners_invited_by(db_conn):
+def _add_new_table_if_needed(db_conn, table, create_table_query):
     try:
         cur = db_conn.cursor()
-        cur.execute("PRAGMA table_info(partners_invited_by);")
+        cur.execute("PRAGMA table_info({});".format(table))
         has_table = False
         row = cur.fetchone()
         if row:
-            logger.info("check_db_customization: table partners_invited_by already exists")
+            logger.info("check_db_customization: table %s already exists" % table)
         else:
-            logger.info("check_db_customization: table partners_invited_by added")
-            cur.execute("CREATE TABLE partners_invited_by (partner TEXT, invited_by TEXT, invitation_ts BIGINT, device_id TEXT, email_sent SMALLINT NOT NULL DEFAULT 0)")
+            logger.info("check_db_customization: table %s added" % table)
+            cur.execute(create_table_query)
 
     except:
-        logger.warn("check_db_customization: table partners_invited_by could not be created")
+        logger.warn("check_db_customization: table %s could not be created" % table)
         db_conn.rollback()
         raise

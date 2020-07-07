@@ -437,6 +437,49 @@ class RoomStore(RoomWorkerStore, SearchStore):
             )
             txn.execute(sql, (event.event_id, event.room_id, event.content[key]))
 
+    # insertion for watcha - OP433 :
+    def _store_room_link_with_NC(self, txn, event):
+        """ Store the link between Watcha room and Nextcloud folder in Sqlite.
+        @TODO : With PostgreSql, the clause 'INSERT or REPLACE' doesn't works and has to be replaced by 'UPSERT'.
+        """
+
+        if hasattr(event, "content") and "nextcloud" in event.content:
+            nextcloud_folder_url = event.content["nextcloud"]
+            room_id = event.room_id
+
+            if nextcloud_folder_url:
+                txn.execute(
+                    """
+                    SELECT link_url
+                    FROM room_mapping_with_NC
+                    WHERE link_url = ?;
+                    """,
+                    (nextcloud_folder_url,),
+                )
+                row = txn.fetchone()
+
+                if row:
+                    raise StoreError(500, "This Nextcloud folder is already linked.")
+
+                txn.execute(
+                    """
+                    INSERT OR REPLACE INTO room_mapping_with_NC
+                    VALUES (
+                        ?
+                        , ?
+                    );
+                    """,
+                    (room_id, nextcloud_folder_url,),
+                )
+            else:
+                txn.execute(
+                    """
+                    DELETE FROM room_mapping_with_NC
+                    WHERE room_id like ? ;""",
+                    (room_id,),
+                )
+    # end of insertion
+
     def add_event_report(
         self, room_id, event_id, user_id, reason, content, received_ts
     ):

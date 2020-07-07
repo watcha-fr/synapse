@@ -1471,6 +1471,10 @@ class EventsStore(
             elif event.type == EventTypes.GuestAccess:
                 # Insert into the event_search table.
                 self._store_guest_access_txn(txn, event)
+            # insertion for watcha - OP433
+            elif event.type == EventTypes.VectorSetting:
+                self._store_room_link_with_NC(txn, event)
+            # end of insertion
 
             self._handle_event_relations(txn, event)
 
