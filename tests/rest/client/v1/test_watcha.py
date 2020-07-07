@@ -152,6 +152,11 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
         )
 
         request, channel = self.make_request(
+            "POST", "admin/deactivate/@user_test:test", access_token=self.user_access_token,
+        )
+        self.render(request)
+
+        request, channel = self.make_request(
             "GET", "watcha_user_list", access_token=self.user_access_token,
         )
         self.render(request)
@@ -174,7 +179,7 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
                     "email_address": "test@test.com",
                     "last_seen": None,
                     "role": "collaborator",
-                    "status": "invited",
+                    "status": "inactive",
                     "user_id": "@user_test:test",
                 },
             ],

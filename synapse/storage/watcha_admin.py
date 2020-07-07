@@ -240,8 +240,16 @@ class WatchaAdminStore(SQLBaseStore):
     @defer.inlineCallbacks
     def watcha_user_list(self):
 
-        FIELDS = ["user_id", "email_address", "display_name", "is_partner", "is_admin", "is_active",
-                  "last_seen", "creation_ts"]
+        FIELDS = [
+            "user_id",
+            "email_address",
+            "display_name",
+            "is_partner",
+            "is_admin",
+            "status",
+            "last_seen",
+            "creation_ts",
+        ]
 
         SQL_USER_LIST = """
             SELECT 
@@ -271,9 +279,20 @@ class WatchaAdminStore(SQLBaseStore):
             GROUP BY users.name
         """
 
+        users_with_pending_invitation = yield self._get_users_with_pending_invitation()
         users = yield self._execute_sql(SQL_USER_LIST)
+        users = [dict(zip(FIELDS, user)) for user in users]
 
-        defer.returnValue([dict(zip(FIELDS, user)) for user in users])
+        for user in users:
+            user["status"] = (
+                "inactive"
+                if user["status"] == 0
+                else "invited"
+                if user["user_id"] in users_with_pending_invitation
+                else "active"
+            )
+
+        defer.returnValue(users)
 
     @defer.inlineCallbacks
     def watcha_email_list(self):
@@ -432,22 +451,6 @@ class WatchaAdminStore(SQLBaseStore):
 
     def watcha_reactivate_account(self, user_id):
         return self._update_user(user_id, is_active=1)
-
-    @defer.inlineCallbacks
-    def watcha_get_user_status(self, user_id):
-        users_with_pending_invitation = yield self._get_users_with_pending_invitation()
-
-        if user_id in users_with_pending_invitation:
-            result = "invited"
-        else:
-            is_active = yield self._simple_select_onecol(
-                table="users", keyvalues={"name": user_id}, retcol="is_active",
-            )
-
-            result = "inactive" if is_active == 0 else "active"
-
-        defer.returnValue(result)
-
 
     @defer.inlineCallbacks
     def _get_users_with_pending_invitation(self):
