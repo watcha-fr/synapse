@@ -375,7 +375,7 @@ class WatchaAdminStore(SQLBaseStore):
                     "creator": creator,
                     "name": name,
                     "members": members_by_room[room_id],
-                    "type": "Personnal conversation" if room_id in direct_rooms else "Room",
+                    "type": "personnal" if room_id in direct_rooms else "multiple",
                     "status": "new" if room_id in new_rooms else "active" if room_id in active_rooms else "inactive",
                 }
                 for room_id, creator, name in rooms
