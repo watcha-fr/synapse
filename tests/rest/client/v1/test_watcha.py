@@ -39,7 +39,7 @@ class BaseHomeserverWithEmailTestCase(unittest.HomeserverTestCase):
         self.user_id = self.register_user("admin", "pass", True)
         self.user_access_token = self.login("admin", "pass")
         self.auth.add_threepid(self.user_id, "email", "example@email.com", self.time)
-        self.nextcloud_folder_url = "http://localhost/nextcloud/apps/files/?dir=/Partage"
+        self.nextcloud_folder_url = "https://test/nextcloud/apps/files/?dir=/Partage"
 
     def _do_register_user(self, request_content):
         #Admin send the request with access_token :
@@ -264,7 +264,6 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
         self.assertEquals(200, channel.code)
 
 class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTestCase):
-
     def _do_hmac_with_shared_secret(self, parameters):
         mac = hmac.new(
             key=self.hs.get_config().registration_shared_secret.encode("utf-8"),
@@ -317,10 +316,11 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTest
         request_content = {
             "file_name": "WATCHA-Brochure A4.pdf",
             "directory": self.nextcloud_folder_url,
-            "link": "http://localhost/nextcloud/f/307",
+            "link": "https://test/nextcloud/f/307",
         }
 
         channel = self._send_POST_nextcloud_notification_request(request_content)
+
         self.assertEquals(400, channel.code)
         self.assertEquals(
             json.loads(channel.result["body"])["error"],
@@ -332,10 +332,11 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTest
         request_content = {
             "file_name": "WATCHA-Brochure A4.pdf",
             "directory": self.nextcloud_folder_url,
-            "link": "http://localhost/nextcloud/f/307",
+            "link": "https://test/nextcloud/f/307",
         }
 
         channel = self._send_POST_nextcloud_notification_request(request_content)
+
         self.assertEquals(200, channel.code)
 
     def test_send_nextcloud_notification_in_linked_room_with_empty_values(self):
@@ -347,4 +348,32 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTest
         self.assertEquals(
             json.loads(channel.result["body"])["error"],
             "'file_name', 'link' and 'directory args cannot be empty.",
+        )
+
+    def test_send_nextcloud_notification_in_linked_room_with_wrong_url_scheme(self):
+        self._do_room_mapping_with_nextcloud_folder()
+        request_content = {
+            "file_name": "WATCHA-Brochure A4.pdf",
+            "directory": "http://test/nextcloud/apps/files/?dir=/Partage",
+            "link": "http://test/nextcloud/f/307",
+        }
+
+        channel = self._send_POST_nextcloud_notification_request(request_content)
+        self.assertEquals(400, channel.code)
+        self.assertEquals(
+            json.loads(channel.result["body"])["error"], "Wrong Nextcloud URL scheme.",
+        )
+
+    def test_send_nextcloud_notification_in_linked_room_with_wrong_url_netloc(self):
+        self._do_room_mapping_with_nextcloud_folder()
+        request_content = {
+            "file_name": "WATCHA-Brochure A4.pdf",
+            "directory": "https://localhost/nextcloud/apps/files/?dir=/Partage",
+            "link": "https://localhost/nextcloud/f/307",
+        }
+
+        channel = self._send_POST_nextcloud_notification_request(request_content)
+        self.assertEquals(400, channel.code)
+        self.assertEquals(
+            json.loads(channel.result["body"])["error"], "Wrong Nextcloud URL netloc.",
         )
