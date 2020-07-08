@@ -4,6 +4,7 @@ import sys
 import json
 import hmac
 from hashlib import sha1
+from urllib.parse import urlparse
 
 import logging
 
@@ -156,6 +157,21 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
         if not nc_file_name or not nc_link or not nc_directory:
             raise SynapseError(
                 400, "'file_name', 'link' and 'directory args cannot be empty.",
+            )
+
+        server_name = self.hs.get_config().server_name
+
+        nc_directory_parsed = urlparse(nc_directory)
+        nc_link_parsed = urlparse(nc_link)
+
+        if nc_directory_parsed.scheme != "https" or nc_link_parsed.scheme != "https":
+            raise SynapseError(
+                400, "Wrong Nextcloud URL scheme.",
+            )
+
+        if nc_directory_parsed.netloc != server_name or nc_link_parsed.netloc != server_name:
+            raise SynapseError(
+                400, "Wrong Nextcloud URL netloc.",
             )
 
         room_id = yield self.handler.watcha_room_handler.get_roomId_from_NC_folder_url(nc_directory)
