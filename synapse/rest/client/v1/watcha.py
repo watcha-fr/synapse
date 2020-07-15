@@ -164,7 +164,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
         nc_directory_parsed = urlparse(nc_directory)
         nc_link_parsed = urlparse(nc_link)
 
-        if nc_directory_parsed.scheme != "https" or nc_link_parsed.scheme != "https":
+        if "http" not in nc_directory_parsed.scheme or "http" not in nc_link_parsed.scheme:
             raise SynapseError(
                 400, "Wrong Nextcloud URL scheme.",
             )
@@ -181,15 +181,15 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
                 400, "No room has linked with this nextcloud folder url."
             )
 
-        admins = yield self.handler.watcha_room_handler.get_room_admins(room_id)
+        first_room_admin = yield self.handler.watcha_room_handler.get_first_room_admin(room_id)
 
-        if not admins:
+        if not first_room_admin:
             raise SynapseError(
                 400,
-                "No administrators are  in the room. The nextcloud notification cannot be posted.",
+                "No administrators are in the room. The nextcloud notification cannot be posted.",
             )
 
-        requester = create_requester(admins[0][0])
+        requester = create_requester(first_room_admin)
 
         event_dict = {
             "type": EventTypes.Message,

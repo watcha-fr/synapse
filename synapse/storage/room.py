@@ -491,7 +491,7 @@ class RoomStore(RoomWorkerStore, SearchStore):
         )
 
     @defer.inlineCallbacks
-    def get_room_admins(self, room_id):
+    def get_first_room_admin(self, room_id):
         """ Get a list of administrators of the room.
         """
 
@@ -506,9 +506,9 @@ class RoomStore(RoomWorkerStore, SearchStore):
                 AND current_state_events.room_id = ?;
             """
 
-        result = yield self._execute("get_room_admins", None, sql, room_id)
+        result = yield self._execute("get_first_room_admin", None, sql, room_id)
 
-        defer.returnValue(result)
+        defer.returnValue(result[0][0])
     # end of insertion
 
     def add_event_report(
