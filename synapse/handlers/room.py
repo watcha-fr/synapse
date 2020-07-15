@@ -1005,6 +1005,6 @@ class WatchaRoomHandler(BaseHandler):
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def get_room_admins(self, room_id):
-        result = yield self.store.get_room_admins(room_id)
+    def get_first_room_admin(self, room_id):
+        result = yield self.store.get_first_room_admin(room_id)
         defer.returnValue(result)

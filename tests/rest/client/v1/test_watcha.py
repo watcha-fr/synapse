@@ -354,8 +354,8 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTest
         self._do_room_mapping_with_nextcloud_folder()
         request_content = {
             "file_name": "WATCHA-Brochure A4.pdf",
-            "directory": "test://test/nextcloud/apps/files/?dir=/Partage",
-            "link": "test://test/nextcloud/f/307",
+            "directory": "scheme://test/nextcloud/apps/files/?dir=/Partage",
+            "link": "scheme://test/nextcloud/f/307",
         }
 
         channel = self._send_POST_nextcloud_notification_request(request_content)
