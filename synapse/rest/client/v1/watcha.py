@@ -138,7 +138,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
     PATTERNS = client_patterns("/watcha_room_nextcloud_activity", v1=True)
 
     def __init__(self, hs):
-        super(WatchaSendNextcloudActivityToWatchaRoomServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -164,12 +164,12 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
         nc_directory_parsed = urlparse(nc_directory)
         nc_link_parsed = urlparse(nc_link)
 
-        if "http" not in nc_directory_parsed.scheme or "http" not in nc_link_parsed.scheme:
+        if not {"http", "https"}.issuperset((nc_directory_parsed.scheme, nc_link_parsed.scheme)):
             raise SynapseError(
                 400, "Wrong Nextcloud URL scheme.",
             )
 
-        if nc_directory_parsed.netloc != server_name or nc_link_parsed.netloc != server_name:
+        if {server_name} != {nc_directory_parsed.netloc, nc_link_parsed.netloc}:
             raise SynapseError(
                 400, "Wrong Nextcloud URL netloc.",
             )
