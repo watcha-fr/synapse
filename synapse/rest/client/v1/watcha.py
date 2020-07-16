@@ -181,12 +181,24 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
                 400, "Wrong Nextcloud URL netloc.",
             )
 
+        if nc_activity_type not in [
+            "file_created",
+            "file_deleted",
+            "file_changed",
+            "file_restored",
+        ]:
+            raise SynapseError(
+                400, "Wrong value for nextcloud activity_type.",
+            )
+
         room_id = yield self.handler.watcha_room_handler.get_roomId_from_NC_folder_url(
             nc_directory
         )
 
         if not room_id:
-            raise SynapseError(400, "No room has linked with this nextcloud folder url.")
+            raise SynapseError(
+                400, "No room has linked with this nextcloud folder url."
+            )
 
         first_room_admin = yield self.handler.watcha_room_handler.get_first_room_admin(
             room_id
