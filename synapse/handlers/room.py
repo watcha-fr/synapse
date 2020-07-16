@@ -1026,7 +1026,7 @@ class WatchaRoomHandler(BaseHandler):
             "url": "",
         }
 
-        if nc_activity_type == "file_created" or nc_activity_type == "file_restored":
+        if nc_activity_type in ["file_created", "file_restored"]:
             content["url"] = file_info["link"]
 
         event_dict = {
