@@ -30,7 +30,7 @@ def _call_with_shared_secret(test, shared_secret, endpoint, parameters, addition
     )
 
     for _, parameter_value in parameters:
-        mac.update(repr(parameter_value).encode('utf-8'))
+        mac.update(str(parameter_value).encode('utf-8'))
         mac.update(b"\x00")
 
     mac = mac.hexdigest()
