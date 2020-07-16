@@ -271,7 +271,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTest
         )
 
         for parameter_value in parameters:
-            mac.update(repr(parameter_value).encode("utf-8"))
+            mac.update(str(parameter_value).encode("utf-8"))
             mac.update(b"\x00")
 
         return mac.hexdigest()
@@ -317,6 +317,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTest
             "file_name": "WATCHA-Brochure A4.pdf",
             "directory": self.nextcloud_folder_url,
             "link": "https://test/nextcloud/f/307",
+            "activity_type": "file_created",
         }
 
         channel = self._send_POST_nextcloud_notification_request(request_content)
@@ -327,27 +328,56 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTest
             "No room has linked with this nextcloud folder url.",
         )
 
-    def test_send_nextcloud_notification_in_linked_room(self):
+    def test_send_nextcloud_file_notification_in_linked_room(self):
         self._do_room_mapping_with_nextcloud_folder()
         request_content = {
             "file_name": "WATCHA-Brochure A4.pdf",
             "directory": self.nextcloud_folder_url,
             "link": "https://test/nextcloud/f/307",
+            "activity_type": "file_created",
         }
 
         channel = self._send_POST_nextcloud_notification_request(request_content)
-
         self.assertEquals(200, channel.code)
+
+        request_content["activity_type"] = "file_deleted"
+        channel = self._send_POST_nextcloud_notification_request(request_content)
+        self.assertEquals(200, channel.code)
+
+        request_content["activity_type"] = "file_restored"
+        channel = self._send_POST_nextcloud_notification_request(request_content)
+        self.assertEquals(200, channel.code)
+
+        request_content["activity_type"] = "file_changed"
+        channel = self._send_POST_nextcloud_notification_request(request_content)
+        self.assertEquals(400, channel.code)
+        self.assertEquals(
+            json.loads(channel.result["body"])["error"],
+            "'file_changed' Nextcloud activity is not managed.",
+        )
+
+        request_content["activity_type"] = "wrong type"
+        channel = self._send_POST_nextcloud_notification_request(request_content)
+        self.assertEquals(400, channel.code)
+        self.assertEquals(
+            json.loads(channel.result["body"])["error"],
+            "Wrong value for nextcloud activity_type.",
+        )
 
     def test_send_nextcloud_notification_in_linked_room_with_empty_values(self):
         self._do_room_mapping_with_nextcloud_folder()
-        request_content = {"file_name": "", "directory": "", "link": ""}
+        request_content = {
+            "file_name": "",
+            "directory": "",
+            "link": "",
+            "activity_type": "",
+        }
 
         channel = self._send_POST_nextcloud_notification_request(request_content)
         self.assertEquals(400, channel.code)
         self.assertEquals(
             json.loads(channel.result["body"])["error"],
-            "'file_name', 'link' and 'directory args cannot be empty.",
+            "'file_name', 'link', 'directory args and 'activity_type' cannot be empty.",
         )
 
     def test_send_nextcloud_notification_in_linked_room_with_wrong_url_scheme(self):
@@ -356,6 +386,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTest
             "file_name": "WATCHA-Brochure A4.pdf",
             "directory": "scheme://test/nextcloud/apps/files/?dir=/Partage",
             "link": "scheme://test/nextcloud/f/307",
+            "activity_type": "file_created",
         }
 
         channel = self._send_POST_nextcloud_notification_request(request_content)
@@ -370,6 +401,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTest
             "file_name": "WATCHA-Brochure A4.pdf",
             "directory": "https://localhost/nextcloud/apps/files/?dir=/Partage",
             "link": "https://localhost/nextcloud/f/307",
+            "activity_type": "file_created",
         }
 
         channel = self._send_POST_nextcloud_notification_request(request_content)
