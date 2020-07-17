@@ -242,7 +242,7 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
 
     def test_get_watcha_admin_stats_room_list(self):
         rooms_id = []
-        for i in range(3):
+        for _ in range(3):
             room_id = self._create_room()
             rooms_id.append(room_id)
             self._invite_member_in_room(room_id, self.user_id)
@@ -263,7 +263,7 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
                     "name": None,
                     "room_id": room_id,
                     "status": "inactive",
-                    "type": "multiple",
+                    "type": "room",
                 },
             )
         self.assertEquals(200, channel.code)
