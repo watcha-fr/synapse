@@ -17,6 +17,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
+from synapse.api.errors import StoreError, SynapseError  # insertion for Watcha OP491
 from synapse.api.room_versions import RoomVersions
 from synapse.types import RoomAlias, RoomID, UserID
 
@@ -125,20 +126,25 @@ class WatchaRoomEventsStoreTestCase(unittest.TestCase):
 
         self.user = UserID.from_string("@user:test")
         self.room = RoomID.from_string("!abc123:test")
-        self.nextcloud_folder_url = "http://test.watcha.fr/nextcloud/apps/files/?dir=/test_folder"
-
-        yield self._send_room_mapping_event(self.nextcloud_folder_url)
+        self.second_room = RoomID.from_string("!abc456:test")
+        self.nextcloud_folder_url = (
+            "http://test.watcha.fr/nextcloud/apps/files/?dir=/Watcha-rooms/Test_NC"
+        )
 
         yield create_room(hs, self.room.to_string(), self.user.to_string())
+        yield create_room(hs, self.second_room.to_string(), self.user.to_string())
+        yield self._send_room_mapping_event(
+            self.room.to_string(), self.nextcloud_folder_url
+        )
 
     @defer.inlineCallbacks
-    def _send_room_mapping_event(self, nextcloud_folder_url):
+    def _send_room_mapping_event(self, room_id, nextcloud_folder_url):
         builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
             {
                 "type": EventTypes.VectorSetting,
                 "sender": self.user.to_string(),
-                "room_id": self.room.to_string(),
+                "room_id": room_id,
                 "content": {"nextcloud": nextcloud_folder_url},
             },
         )
@@ -150,7 +156,7 @@ class WatchaRoomEventsStoreTestCase(unittest.TestCase):
         yield self.store.persist_event(event, context)
 
     @defer.inlineCallbacks
-    def test_insert_new_room_link_with_NC(self):
+    def test_get_room_link_with_NC(self):
 
         result = yield self.store._simple_select_onecol(
             table="room_mapping_with_NC",
@@ -162,8 +168,12 @@ class WatchaRoomEventsStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_update_room_link_with_NC(self):
-        new_nextcloud_folder_url = "http://test.watcha.fr/nextcloud/apps/files/?dir=/test_folder2"
-        yield self._send_room_mapping_event(new_nextcloud_folder_url)
+        new_nextcloud_folder_url = (
+            "http://test.watcha.fr/nextcloud/apps/files/?dir=/Watcha-rooms/Test_NC2"
+        )
+        yield self._send_room_mapping_event(
+            self.room.to_string(), new_nextcloud_folder_url
+        )
 
         result = yield self.store._simple_select_onecol(
             table="room_mapping_with_NC",
@@ -175,7 +185,7 @@ class WatchaRoomEventsStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_delete_room_link_with_NC(self):
-        yield self._send_room_mapping_event("")
+        yield self._send_room_mapping_event(self.room.to_string(), "")
 
         result = yield self.store._simple_select_onecol(
             table="room_mapping_with_NC",
@@ -184,4 +194,53 @@ class WatchaRoomEventsStoreTestCase(unittest.TestCase):
         )
 
         self.assertFalse(result)
+
+    @defer.inlineCallbacks
+    def test_set_same_link_in_another_room(self):
+        with self.assertRaises(StoreError) as e:
+            yield self._send_room_mapping_event(
+                self.second_room.to_string(), self.nextcloud_folder_url
+            )
+
+        self.assertEquals(e.exception.code, 500)
+        self.assertEquals(e.exception.msg, "This Nextcloud folder is already linked.")
+
+    @defer.inlineCallbacks
+    def test_set_link_with_wrong_url_query(self):
+        with self.assertRaises(SynapseError) as e:
+            yield self._send_room_mapping_event(
+                self.second_room.to_string(),
+                "http://test.watcha.fr/nextcloud/apps/files/?param",
+            )
+
+        self.assertEquals(e.exception.code, 400)
+        self.assertEquals(
+            e.exception.msg, "The url doesn't point to a valid directory path."
+        )
+
+    @defer.inlineCallbacks
+    def test_set_link_with_directory_out_of_right_parent_directory(self):
+        with self.assertRaises(SynapseError) as e:
+            yield self._send_room_mapping_event(
+                self.second_room.to_string(),
+                "http://test.watcha.fr/nextcloud/apps/files/?dir=/Test_NC2",
+            )
+
+        self.assertEquals(e.exception.code, 400)
+        self.assertEquals(
+            e.exception.msg, "The url doesn't point to the right Watcha rooms parent directory."
+        )
+
+    @defer.inlineCallbacks
+    def test_set_link_with_parent_directory(self):
+        with self.assertRaises(SynapseError) as e:
+            yield self._send_room_mapping_event(
+                self.second_room.to_string(),
+                "http://test.watcha.fr/nextcloud/apps/files/?dir=/Watcha-rooms",
+            )
+
+        self.assertEquals(e.exception.code, 400)
+        self.assertEquals(
+            e.exception.msg, "The url doesn't point to a room directory."
+        )
 # end of insertion
