@@ -39,7 +39,7 @@ class BaseHomeserverWithEmailTestCase(unittest.HomeserverTestCase):
         self.user_id = self.register_user("admin", "pass", True)
         self.user_access_token = self.login("admin", "pass")
         self.auth.add_threepid(self.user_id, "email", "example@email.com", self.time)
-        self.nextcloud_folder_url = "https://test/nextcloud/apps/files/?dir=/Partage"
+        self.nextcloud_folder_url = "https://test/nextcloud/apps/files/?dir=/Watcha-rooms/Test_NC"
 
     def _do_register_user(self, request_content):
         #Admin send the request with access_token :
@@ -301,16 +301,6 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTest
         self.render(request)
 
         return channel
-
-    def test_do_room_mapping_with_same_nextcloud_folder(self):
-        self._do_room_mapping_with_nextcloud_folder()
-        channel = self._do_room_mapping_with_nextcloud_folder()
-
-        self.assertEquals(500, channel.code)
-        self.assertEquals(
-            json.loads(channel.result["body"])["error"],
-            "This Nextcloud folder is already linked.",
-        )
 
     def test_send_nextcloud_notification_in_unlinked_room(self):
         request_content = {
