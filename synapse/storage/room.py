@@ -16,12 +16,13 @@
 import collections
 import logging
 import re
+from urllib.parse import parse_qs, urlparse # insertion for Watcha OP491
 
 from canonicaljson import json
 
 from twisted.internet import defer
 
-from synapse.api.errors import StoreError
+from synapse.api.errors import StoreError, SynapseError
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.search import SearchStore
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
@@ -37,6 +38,7 @@ RatelimitOverride = collections.namedtuple(
     "RatelimitOverride", ("messages_per_second", "burst_count")
 )
 
+NEXTCLOUD_PARENT_DIRECTORY_FOR_WATCHA_ROOMS = "Watcha-rooms" # insertion for Watcha OP491
 
 class RoomWorkerStore(SQLBaseStore):
     def get_room(self, room_id):
@@ -443,41 +445,72 @@ class RoomStore(RoomWorkerStore, SearchStore):
         @TODO : With PostgreSql, the clause 'INSERT or REPLACE' doesn't works and has to be replaced by 'UPSERT'.
         """
 
-        if hasattr(event, "content") and "nextcloud" in event.content:
-            nextcloud_folder_url = event.content["nextcloud"]
-            room_id = event.room_id
+        if not hasattr(event, "content") and "nextcloud" not in event.content:
+            raise SynapseError(
+                400, "The nextcloud url is needed to store room link with NC."
+            )
 
-            if nextcloud_folder_url:
-                txn.execute(
-                    """
-                    SELECT link_url
-                    FROM room_mapping_with_NC
-                    WHERE link_url = ?;
-                    """,
-                    (nextcloud_folder_url,),
+        room_id = event.room_id
+        nextcloud_folder_url = event.content["nextcloud"]
+
+        if not nextcloud_folder_url:
+            txn.execute(
+                """
+                DELETE FROM room_mapping_with_NC
+                WHERE room_id like ? ;""",
+                (room_id,),
+            )
+            return
+
+        url_query = parse_qs(urlparse(nextcloud_folder_url).query)
+
+        if "dir" in url_query:
+            nextcloud_path = url_query["dir"][0].split("/")
+
+            if NEXTCLOUD_PARENT_DIRECTORY_FOR_WATCHA_ROOMS in nextcloud_path:
+                nc_parent_directory_index = nextcloud_path.index(
+                    NEXTCLOUD_PARENT_DIRECTORY_FOR_WATCHA_ROOMS
                 )
-                row = txn.fetchone()
 
-                if row:
-                    raise StoreError(500, "This Nextcloud folder is already linked.")
-
-                txn.execute(
-                    """
-                    INSERT OR REPLACE INTO room_mapping_with_NC
-                    VALUES (
-                        ?
-                        , ?
-                    );
-                    """,
-                    (room_id, nextcloud_folder_url,),
-                )
+                if (
+                    len(nextcloud_path) > (nc_parent_directory_index + 1)
+                    and nextcloud_path[nc_parent_directory_index + 1]
+                ):
+                    nextcloud_folder = nextcloud_path[nc_parent_directory_index + 1]
+                else:
+                    raise SynapseError(
+                        400, "The url doesn't point to a room directory."
+                    )
             else:
-                txn.execute(
-                    """
-                    DELETE FROM room_mapping_with_NC
-                    WHERE room_id like ? ;""",
-                    (room_id,),
+                raise SynapseError(
+                    400, "The url doesn't point to the right Watcha rooms parent directory."
                 )
+        else:
+            raise SynapseError(400, "The url doesn't point to a valid directory path.")
+
+        txn.execute(
+            """
+            SELECT link_url
+            FROM room_mapping_with_NC
+            WHERE instr(link_url, ?) > 0;
+            """,
+            (nextcloud_folder,),
+        )
+        row = txn.fetchone()
+
+        if row:
+            raise StoreError(500, "This Nextcloud folder is already linked.")
+
+        txn.execute(
+            """
+            INSERT OR REPLACE INTO room_mapping_with_NC
+            VALUES (
+                ?
+                , ?
+            );
+            """,
+            (room_id, nextcloud_folder_url,),
+        )
 
     def get_roomId_from_NC_folder_url(self, folder_url):
         """ Get the room_id of the room which is linked with the Nextcloud folder url.
