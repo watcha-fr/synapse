@@ -50,4 +50,4 @@ class Handlers(object):
         self.search_handler = SearchHandler(hs)
         self.invite_external_handler = InviteExternalHandler(hs) #added for watcha
         self.watcha_admin_handler = WatchaAdminHandler(hs) #added for watcha
-        self.watcha_room_handler = WatchaRoomHandler(hs) #added for watcha - OP420
+        self.watcha_room_handler = WatchaRoomHandler(hs) #added for watcha - OP433

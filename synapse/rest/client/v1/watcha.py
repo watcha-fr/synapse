@@ -178,7 +178,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
 
         if not room_id:
             raise SynapseError(
-                400, "No room has linked with this nextcloud folder url."
+                400, "No room has linked with this Nextcloud folder url."
             )
 
         first_room_admin = yield self.handler.watcha_room_handler.get_first_room_admin(room_id)
@@ -186,7 +186,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
         if not first_room_admin:
             raise SynapseError(
                 400,
-                "No administrators are in the room. The nextcloud notification cannot be posted.",
+                "No administrators are in the room. The Nextcloud notification cannot be posted.",
             )
 
         requester = create_requester(first_room_admin)
