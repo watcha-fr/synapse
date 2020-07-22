@@ -448,35 +448,31 @@ class RoomStore(RoomWorkerStore, SearchStore):
             room_id = event.room_id
 
             if nextcloud_folder_url:
-                txn.execute(
-                    """
-                    SELECT link_url
-                    FROM room_mapping_with_NC
-                    WHERE link_url = ?;
-                    """,
-                    (nextcloud_folder_url,),
+                link_url = self._simple_select_one_onecol_txn(
+                    txn,
+                    table="room_mapping_with_NC",
+                    keyvalues={"link_url": nextcloud_folder_url},
+                    retcol="link_url",
+                    allow_none=True,
                 )
-                row = txn.fetchone()
 
-                if row:
-                    raise StoreError(500, "This Nextcloud folder is already linked with another room")
+                if link_url:
+                    raise StoreError(
+                        500, "This Nextcloud folder is already linked with another room."
+                    )
 
-                txn.execute(
-                    """
-                    INSERT OR REPLACE INTO room_mapping_with_NC
-                    VALUES (
-                        ?
-                        , ?
-                    );
-                    """,
-                    (room_id, nextcloud_folder_url,),
+                self._simple_upsert_txn(
+                    txn,
+                    table="room_mapping_with_NC",
+                    keyvalues={"room_id": room_id},
+                    values={"room_id": room_id, "link_url": nextcloud_folder_url},
                 )
+
             else:
-                txn.execute(
-                    """
-                    DELETE FROM room_mapping_with_NC
-                    WHERE room_id like ? ;""",
-                    (room_id,),
+                self._simple_delete_one(
+                    table="room_mapping_with_NC",
+                    keyvalues={"room_id": room_id},
+                    desc="delete_room_link_with_NC",
                 )
 
     def get_roomId_from_NC_folder_url(self, folder_url):
