@@ -263,7 +263,7 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
                     "name": None,
                     "room_id": room_id,
                     "status": "inactive",
-                    "type": "room",
+                    "type": "regular_room",
                 },
             )
         self.assertEquals(200, channel.code)
