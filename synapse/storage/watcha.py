@@ -1,4 +1,5 @@
 import logging
+from sqlite3 import DatabaseError
 
 logger = logging.getLogger(__name__)
 
@@ -105,18 +106,21 @@ def _drop_column_if_needed(db_conn, table, copy_table, column_to_drop):
 # add "partners_invited_by" table
 # this is a no-op if it is already there.
 def _add_new_table_if_needed(db_conn, table, create_table_query):
+    cur = db_conn.cursor()
     try:
-        cur = db_conn.cursor()
         cur.execute("PRAGMA table_info({});".format(table))
-        has_table = False
-        row = cur.fetchone()
-        if row:
-            logger.info("check_db_customization: table %s already exists" % table)
-        else:
-            logger.info("check_db_customization: table %s added" % table)
-            cur.execute(create_table_query)
-
-    except:
+    except DatabaseError:
         logger.warn("check_db_customization: table %s could not be created" % table)
-        db_conn.rollback()
-        raise
+
+    row = cur.fetchone()
+    if not row:
+        try:
+            cur.execute(create_table_query)
+        except DatabaseError:
+            logger.info(
+                "check_db_customization: database error during create table query."
+            )
+
+        logger.info("check_db_customization: table %s added" % table)
+    else:
+        logger.info("check_db_customization: table %s already exists" % table)
