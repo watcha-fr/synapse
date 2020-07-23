@@ -181,12 +181,12 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
                 400, "Wrong Nextcloud URL netloc.",
             )
 
-        if nc_activity_type not in [
+        if nc_activity_type not in (
             "file_created",
             "file_deleted",
             "file_changed",
             "file_restored",
-        ]:
+        ):
             raise SynapseError(
                 400, "Wrong value for nextcloud activity_type.",
             )
