@@ -73,6 +73,8 @@ class DeactivateAccountHandler(BaseHandler):
         # unbinding
         identity_server_supports_unbinding = True
 
+        # deletion for Watcha - OP416
+        """
         threepids = yield self.store.user_get_threepids(user_id)
         for threepid in threepids:
             try:
@@ -92,6 +94,8 @@ class DeactivateAccountHandler(BaseHandler):
             yield self.store.user_delete_threepid(
                 user_id, threepid["medium"], threepid["address"]
             )
+        """
+        # end of deletion
 
         # delete any devices belonging to the user, which will also
         # delete corresponding access tokens.

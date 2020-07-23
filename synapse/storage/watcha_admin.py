@@ -72,22 +72,22 @@ class WatchaAdminStore(SQLBaseStore):
         defer.returnValue(active_rooms)
 
     @defer.inlineCallbacks
-    def _get_direct_rooms(self):
+    def _get_dm_rooms(self):
         """List rooms with m.direct flag on account_data and with exactly two joinned or invited members"""
 
         members_by_room = yield self.members_by_room()
 
-        direct_rooms_by_member = yield self._simple_select_onecol(
+        dm_rooms_by_member = yield self._simple_select_onecol(
             table="account_data",
             keyvalues={"account_data_type": "m.direct"},
             retcol="content",
         )
 
-        direct_rooms = list(
+        dm_rooms = list(
             set(
                 [
                     room
-                    for row in direct_rooms_by_member
+                    for row in dm_rooms_by_member
                     for member_rooms in json.loads(row).values()
                     for room in member_rooms
                     if room in members_by_room and len(members_by_room[room]) == 2
@@ -95,14 +95,14 @@ class WatchaAdminStore(SQLBaseStore):
             )
         )
 
-        defer.returnValue(direct_rooms)
+        defer.returnValue(dm_rooms)
 
     @defer.inlineCallbacks
     def _get_room_count_per_type(self):
         """List the rooms, with two or less members, and with three or more members.
         """
         members_by_room = yield self.members_by_room()
-        direct_rooms = yield self._get_direct_rooms()
+        dm_rooms = yield self._get_dm_rooms()
         new_rooms = yield self._get_new_rooms()
         active_rooms = yield self._get_active_rooms()
 
@@ -112,18 +112,18 @@ class WatchaAdminStore(SQLBaseStore):
             table="rooms", keyvalues=None, retcol="room_id",
         )
         
-        non_direct_rooms = set(all_rooms) & set(
+        regular_rooms = set(all_rooms) & set(
             members_by_room.keys()
-        ) - set(direct_rooms)
+        ) - set(dm_rooms)
 
         result = {
-            "direct_rooms_count": len(direct_rooms),
-            "direct_active_rooms_count": len(
-                set(direct_rooms).intersection(active_rooms)
+            "dm_room_count": len(dm_rooms),
+            "active_dm_room_count": len(
+                set(dm_rooms).intersection(active_rooms)
             ),
-            "non_direct_rooms_count": len(non_direct_rooms),
-            "non_direct_active_rooms_count": len(
-                non_direct_rooms.intersection(active_rooms)
+            "regular_room_count": len(regular_rooms),
+            "active_regular_room_count": len(
+                regular_rooms.intersection(active_rooms)
             ),
         }
 
@@ -240,8 +240,16 @@ class WatchaAdminStore(SQLBaseStore):
     @defer.inlineCallbacks
     def watcha_user_list(self):
 
-        FIELDS = ["user_id", "email_address", "display_name", "is_partner", "is_admin", "is_active",
-                  "last_seen", "creation_ts"]
+        FIELDS = [
+            "user_id",
+            "email_address",
+            "display_name",
+            "is_partner",
+            "is_admin",
+            "status",
+            "last_seen",
+            "creation_ts",
+        ]
 
         SQL_USER_LIST = """
             SELECT 
@@ -271,9 +279,20 @@ class WatchaAdminStore(SQLBaseStore):
             GROUP BY users.name
         """
 
+        users_with_pending_invitation = yield self._get_users_with_pending_invitation()
         users = yield self._execute_sql(SQL_USER_LIST)
+        users = [dict(zip(FIELDS, user)) for user in users]
 
-        defer.returnValue([dict(zip(FIELDS, user)) for user in users])
+        for user in users:
+            user["status"] = (
+                "inactive"
+                if user["status"] == 0
+                else "invited"
+                if user["user_id"] in users_with_pending_invitation
+                else "active"
+            )
+
+        defer.returnValue(users)
 
     @defer.inlineCallbacks
     def watcha_email_list(self):
@@ -366,7 +385,7 @@ class WatchaAdminStore(SQLBaseStore):
         members_by_room = yield self.members_by_room()
         new_rooms = yield self._get_new_rooms()
         active_rooms = yield self._get_active_rooms()
-        direct_rooms = yield self._get_direct_rooms()
+        dm_rooms = yield self._get_dm_rooms()
 
         defer.returnValue(
             [
@@ -375,7 +394,7 @@ class WatchaAdminStore(SQLBaseStore):
                     "creator": creator,
                     "name": name,
                     "members": members_by_room[room_id],
-                    "type": "Personnal conversation" if room_id in direct_rooms else "Room",
+                    "type": "dm_room" if room_id in dm_rooms else "regular_room",
                     "status": "new" if room_id in new_rooms else "active" if room_id in active_rooms else "inactive",
                 }
                 for room_id, creator, name in rooms
@@ -432,22 +451,6 @@ class WatchaAdminStore(SQLBaseStore):
 
     def watcha_reactivate_account(self, user_id):
         return self._update_user(user_id, is_active=1)
-
-    @defer.inlineCallbacks
-    def watcha_get_user_status(self, user_id):
-        users_with_pending_invitation = yield self._get_users_with_pending_invitation()
-
-        if user_id in users_with_pending_invitation:
-            result = "invited"
-        else:
-            is_active = yield self._simple_select_onecol(
-                table="users", keyvalues={"name": user_id}, retcol="is_active",
-            )
-
-            result = "inactive" if is_active == 0 else "active"
-
-        defer.returnValue(result)
-
 
     @defer.inlineCallbacks
     def _get_users_with_pending_invitation(self):

@@ -152,6 +152,11 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
         )
 
         request, channel = self.make_request(
+            "POST", "admin/deactivate/@user_test:test", access_token=self.user_access_token,
+        )
+        self.render(request)
+
+        request, channel = self.make_request(
             "GET", "watcha_user_list", access_token=self.user_access_token,
         )
         self.render(request)
@@ -174,7 +179,7 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
                     "email_address": "test@test.com",
                     "last_seen": None,
                     "role": "collaborator",
-                    "status": "invited",
+                    "status": "inactive",
                     "user_id": "@user_test:test",
                 },
             ],
@@ -227,17 +232,17 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
         self.assertEquals(
             json.loads(channel.result["body"])["rooms"],
             {
-                "direct_active_rooms_count": 0,
-                "direct_rooms_count": 0,
-                "non_direct_active_rooms_count": 0,
-                "non_direct_rooms_count": 1,
+                "active_dm_room_count": 0,
+                "dm_room_count": 0,
+                "active_regular_room_count": 0,
+                "regular_room_count": 1,
             },
         )
         self.assertEquals(200, channel.code)
 
     def test_get_watcha_admin_stats_room_list(self):
         rooms_id = []
-        for i in range(3):
+        for _ in range(3):
             room_id = self._create_room()
             rooms_id.append(room_id)
             self._invite_member_in_room(room_id, self.user_id)
@@ -258,7 +263,7 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
                     "name": None,
                     "room_id": room_id,
                     "status": "inactive",
-                    "type": "Room",
+                    "type": "regular_room",
                 },
             )
         self.assertEquals(200, channel.code)

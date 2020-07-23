@@ -17,13 +17,13 @@ class WatchaAdminHandler(BaseHandler):
         result = []
         for user in users:
             role = yield self.watcha_get_user_role(user["user_id"])
-            status = yield self.watcha_get_user_status(user["user_id"])
+
             result.append({
                 "user_id": user["user_id"],
                 "email_address": user["email_address"],
                 "display_name": user["display_name"],
                 "role": role,
-                "status": status,
+                "status": user["status"],
                 "last_seen": user["last_seen"],
                 "creation_ts": user["creation_ts"],
             })
@@ -83,11 +83,6 @@ class WatchaAdminHandler(BaseHandler):
             role = "administrator"
 
         defer.returnValue(role)
-
-    @defer.inlineCallbacks
-    def watcha_get_user_status(self, user_id):
-        result = yield self.store.watcha_get_user_status(user_id)
-        defer.returnValue(result)
 
     @defer.inlineCallbacks
     def watchaDeactivateAccount(self, user_id):
