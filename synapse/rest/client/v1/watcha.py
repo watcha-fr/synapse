@@ -47,7 +47,7 @@ def _decode_share_secret_parameters(config, parameter_names, parameters):
         key=config.registration_shared_secret.encode("utf-8"), digestmod=sha1,
     )
     for parameter_name in parameter_names:
-        want_mac.update(repr(parameters[parameter_name]).encode("utf-8"))
+        want_mac.update(str(parameters[parameter_name]).encode("utf-8"))
         want_mac.update(b"\x00")
     if not compare_digest(want_mac.hexdigest(), got_mac):
         logger.error(
@@ -147,16 +147,21 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         params = yield _check_admin_or_secret(
-            self.hs.config, self.auth, request, ["file_name", "link", "directory"],
+            self.hs.config,
+            self.auth,
+            request,
+            ["file_name", "link", "directory", "activity_type"],
         )
 
         nc_file_name = params["file_name"]
         nc_link = params["link"]
         nc_directory = params["directory"]
+        nc_activity_type = params["activity_type"]
 
-        if not nc_file_name or not nc_link or not nc_directory:
+        if not nc_file_name or not nc_link or not nc_directory or not nc_activity_type:
             raise SynapseError(
-                400, "'file_name', 'link' and 'directory args cannot be empty.",
+                400,
+                "'file_name', 'link', 'directory args and 'activity_type' cannot be empty.",
             )
 
         server_name = self.hs.get_config().server_name
@@ -164,7 +169,9 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
         nc_directory_parsed = urlparse(nc_directory)
         nc_link_parsed = urlparse(nc_link)
 
-        if not {"http", "https"}.issuperset((nc_directory_parsed.scheme, nc_link_parsed.scheme)):
+        if not {"http", "https"}.issuperset(
+            (nc_directory_parsed.scheme, nc_link_parsed.scheme)
+        ):
             raise SynapseError(
                 400, "Wrong Nextcloud URL scheme.",
             )
@@ -174,14 +181,28 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
                 400, "Wrong Nextcloud URL netloc.",
             )
 
-        room_id = yield self.handler.watcha_room_handler.get_roomId_from_NC_folder_url(nc_directory)
+        if nc_activity_type not in [
+            "file_created",
+            "file_deleted",
+            "file_changed",
+            "file_restored",
+        ]:
+            raise SynapseError(
+                400, "Wrong value for nextcloud activity_type.",
+            )
+
+        room_id = yield self.handler.watcha_room_handler.get_roomId_from_NC_folder_url(
+            nc_directory
+        )
 
         if not room_id:
             raise SynapseError(
                 400, "No room has linked with this Nextcloud folder url."
             )
 
-        first_room_admin = yield self.handler.watcha_room_handler.get_first_room_admin(room_id)
+        first_room_admin = yield self.handler.watcha_room_handler.get_first_room_admin(
+            room_id
+        )
 
         if not first_room_admin:
             raise SynapseError(
@@ -191,20 +212,8 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
 
         requester = create_requester(first_room_admin)
 
-        event_dict = {
-            "type": EventTypes.Message,
-            "content": {
-                "body": nc_file_name,
-                "filename": nc_file_name,
-                "msgtype": "m.file",
-                "url": nc_link,
-            },
-            "room_id": room_id,
-            "sender": requester.user.to_string(),
-        }
-
-        event = yield self.event_creation_handler.create_and_send_nonmember_event(
-            requester, event_dict
+        event = yield self.handler.watcha_room_handler.send_NC_notification_in_room(
+            requester, room_id, params
         )
 
         return (200, {"event_id": event.event_id})
