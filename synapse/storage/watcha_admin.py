@@ -72,22 +72,22 @@ class WatchaAdminStore(SQLBaseStore):
         defer.returnValue(active_rooms)
 
     @defer.inlineCallbacks
-    def _get_direct_rooms(self):
+    def _get_dm_rooms(self):
         """List rooms with m.direct flag on account_data and with exactly two joinned or invited members"""
 
         members_by_room = yield self.members_by_room()
 
-        direct_rooms_by_member = yield self._simple_select_onecol(
+        dm_rooms_by_member = yield self._simple_select_onecol(
             table="account_data",
             keyvalues={"account_data_type": "m.direct"},
             retcol="content",
         )
 
-        direct_rooms = list(
+        dm_rooms = list(
             set(
                 [
                     room
-                    for row in direct_rooms_by_member
+                    for row in dm_rooms_by_member
                     for member_rooms in json.loads(row).values()
                     for room in member_rooms
                     if room in members_by_room and len(members_by_room[room]) == 2
@@ -95,14 +95,14 @@ class WatchaAdminStore(SQLBaseStore):
             )
         )
 
-        defer.returnValue(direct_rooms)
+        defer.returnValue(dm_rooms)
 
     @defer.inlineCallbacks
     def _get_room_count_per_type(self):
         """List the rooms, with two or less members, and with three or more members.
         """
         members_by_room = yield self.members_by_room()
-        direct_rooms = yield self._get_direct_rooms()
+        dm_rooms = yield self._get_dm_rooms()
         new_rooms = yield self._get_new_rooms()
         active_rooms = yield self._get_active_rooms()
 
@@ -112,18 +112,18 @@ class WatchaAdminStore(SQLBaseStore):
             table="rooms", keyvalues=None, retcol="room_id",
         )
         
-        non_direct_rooms = set(all_rooms) & set(
+        regular_rooms = set(all_rooms) & set(
             members_by_room.keys()
-        ) - set(direct_rooms)
+        ) - set(dm_rooms)
 
         result = {
-            "direct_rooms_count": len(direct_rooms),
-            "direct_active_rooms_count": len(
-                set(direct_rooms).intersection(active_rooms)
+            "dm_room_count": len(dm_rooms),
+            "active_dm_room_count": len(
+                set(dm_rooms).intersection(active_rooms)
             ),
-            "non_direct_rooms_count": len(non_direct_rooms),
-            "non_direct_active_rooms_count": len(
-                non_direct_rooms.intersection(active_rooms)
+            "regular_room_count": len(regular_rooms),
+            "active_regular_room_count": len(
+                regular_rooms.intersection(active_rooms)
             ),
         }
 
@@ -385,7 +385,7 @@ class WatchaAdminStore(SQLBaseStore):
         members_by_room = yield self.members_by_room()
         new_rooms = yield self._get_new_rooms()
         active_rooms = yield self._get_active_rooms()
-        direct_rooms = yield self._get_direct_rooms()
+        dm_rooms = yield self._get_dm_rooms()
 
         defer.returnValue(
             [
@@ -394,7 +394,7 @@ class WatchaAdminStore(SQLBaseStore):
                     "creator": creator,
                     "name": name,
                     "members": members_by_room[room_id],
-                    "type": "personnal" if room_id in direct_rooms else "multiple",
+                    "type": "dm_room" if room_id in dm_rooms else "regular_room",
                     "status": "new" if room_id in new_rooms else "active" if room_id in active_rooms else "inactive",
                 }
                 for room_id, creator, name in rooms
