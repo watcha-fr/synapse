@@ -311,9 +311,8 @@ class WatchaRegisterRestServlet(RestServlet):
                 )
             inviter_name = params["inviter"]
 
-        if 'password' in params:
-            password = params['password']
-        else:            
+        password = params['password']
+        if not password:
             password = generate_password()
 
         admin = params["admin"] == "admin"
