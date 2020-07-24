@@ -77,8 +77,8 @@ class BaseHomeserverWithEmailTestCase(unittest.HomeserverTestCase):
 class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
 
     def test_register_user(self):
-        request_content = {"user":"user_test", "full_name":"test", "email":"test@test.com", "admin":False}
         with self.assertLogs('synapse.util.watcha', level='INFO') as cm:
+            request_content = {"user":"user_test", "full_name":"test", "email":"test@test.com", "admin":False, "password": ""}
             channel = self._do_register_user(request_content)
             self.assertIn("INFO:synapse.util.watcha:NOT Sending registration email to \'test@test.com\', we are in test mode",
                             ''.join(cm.output))
@@ -87,26 +87,32 @@ class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
             self.assertEqual(channel.result['body'], b'{"display_name":"test","user_id":"@user_test:test"}')
             self.assertEqual(channel.code,200)
 
+    def test_register_user_with_password(self):
+        request_content = {"user":"user_test", "full_name":"test", "email":"test@test.com", "admin":False, "password": "password"}
+        channel = self._do_register_user(request_content)
+        self.assertEqual(channel.result['body'], b'{"display_name":"test","user_id":"@user_test:test"}')
+        self.assertEqual(channel.code,200)
+
     def test_register_user_with_upper_user_id(self):
-        request_content = {"user":"USER_TEST", "full_name":"test", "email":"test@test.com", "admin":False}
+        request_content = {"user":"USER_TEST", "full_name":"test", "email":"test@test.com", "admin":False, "password": ""}
         channel = self._do_register_user(request_content)
         self.assertEqual(channel.code,500)
 
     def test_register_user_with_empty_email(self):
-        request_content = {"user":"user_test", "full_name":"test", "email":"", "admin":False}
+        request_content = {"user":"user_test", "full_name":"test", "email":"", "admin":False, "password": ""}
         channel = self._do_register_user(request_content)
         self.assertEqual(channel.code,500)
 
     def test_register_user_with_same_email_adress(self):
-        request_content = {"user":"user_test", "full_name":"test", "email":"test@test.com", "admin":False}
+        request_content = {"user":"user_test", "full_name":"test", "email":"test@test.com", "admin":False, "password": ""}
         self._do_register_user(request_content)
-        request_content = {"user":"other_user", "full_name":"other", "email":"test@test.com", "admin":False}
+        request_content = {"user":"other_user", "full_name":"other", "email":"test@test.com", "admin":False, "password": ""}
         channel = self._do_register_user(request_content)
         self.assertEqual(channel.code,500)
 
     def test_register_user_with_plus_in_email(self):
-        request_content = {"user":"user_test", "full_name":"test", "email":"test+test@test.com", "admin":False}
         with self.assertLogs('synapse.util.watcha', level='INFO') as cm:
+            request_content = {"user":"user_test", "full_name":"test", "email":"test+test@test.com", "admin":False, "password": ""}
             channel = self._do_register_user(request_content)
             self.assertIn("INFO:synapse.util.watcha:NOT Sending registration email to \'test+test@test.com\', we are in test mode",
                             ''.join(cm.output))
@@ -122,7 +128,8 @@ class WatchaResetPasswordRestServletTestCase(BaseHomeserverWithEmailTestCase):
         self._do_register_user({"user":"user_test",
                                 "full_name":"test",
                                 "email":"test@test.com",
-                                "admin": False })
+                                "admin": False,
+                                 "password": "password"})
         with self.assertLogs('synapse.util.watcha', level='INFO') as cm:
             request, channel = self.make_request(
                 "POST",
@@ -148,6 +155,7 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
                 "full_name": "test",
                 "email": "test@test.com",
                 "admin": False,
+                "password": "",
             }
         )
 
@@ -189,7 +197,8 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
         self._do_register_user({"user":"user_test",
                                 "full_name":"test",
                                 "email":"test@test.com",
-                                "admin": False })
+                                "admin": False,
+                                "password": "" })
 
         request, channel = self.make_request(
                 "GET",
@@ -197,7 +206,6 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
                 access_token=self.user_access_token,
         )
         self.render(request)
-
         self.assertEquals(
             json.loads(channel.result["body"])["users"],
             {
