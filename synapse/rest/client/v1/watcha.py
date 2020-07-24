@@ -311,9 +311,12 @@ class WatchaRegisterRestServlet(RestServlet):
                 )
             inviter_name = params["inviter"]
 
+        send_email = False
         password = params['password']
+
         if not password:
             password = generate_password()
+            send_email = True
 
         admin = params["admin"] == "admin"
         bind_emails = [params["email"]]
@@ -330,7 +333,7 @@ class WatchaRegisterRestServlet(RestServlet):
 
         display_name = yield self.hs.profile_handler.get_displayname(user)
 
-        if 'password' not in params:
+        if send_email:
             token = compute_registration_token(user_id, email, password)
 
             send_registration_email(
