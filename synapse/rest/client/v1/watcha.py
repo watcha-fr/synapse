@@ -28,61 +28,12 @@ from synapse.api.constants import Membership
 logger = logging.getLogger(__name__)
 
 
-def _decode_share_secret_parameters(config, parameter_names, parameters):
-    for parameter_name in parameter_names:
-        if parameter_name not in parameters:
-            raise SynapseError(400, "Expected %s." % parameter_name)
-
-    if not config.registration_shared_secret:
-        raise SynapseError(400, "Shared secret registration is not enabled")
-
-    # Its important to check as we use null bytes as HMAC field separators
-    if any("\x00" in parameters[parameter_name] for parameter_name in parameter_names):
-        raise SynapseError(400, "Invalid message")
-
-    got_mac = str(parameters["mac"])
-
-    want_mac = hmac.new(
-        key=config.registration_shared_secret.encode("utf-8"), digestmod=sha1,
-    )
-    for parameter_name in parameter_names:
-        want_mac.update(repr(parameters[parameter_name]).encode("utf-8"))
-        want_mac.update(b"\x00")
-    if not compare_digest(want_mac.hexdigest(), got_mac):
-        logger.error(
-            "Failed to decode HMAC for parameters names: "
-            + repr(parameter_names)
-            + " and values: "
-            + repr(parameters)
-        )
-
-        raise SynapseError(
-            403, "HMAC incorrect",
-        )
-    return parameters
-
-
 @defer.inlineCallbacks
 def _check_admin(auth, request):
     requester = yield auth.get_user_by_req(request)
     is_admin = yield auth.is_server_admin(requester.user)
     if not is_admin:
         raise AuthError(403, "You are not a server admin")
-
-
-@defer.inlineCallbacks
-def _check_admin_or_secret(config, auth, request, parameter_names):
-    auth_headers = request.requestHeaders.getRawHeaders("Authorization")
-    parameter_json = parse_json_object_from_request(request)
-
-    if auth_headers:
-        yield _check_admin(auth, request)
-        ret = parameter_json
-    else:
-        # auth by checking that the HMAC is valid. this raises an error otherwise.
-        ret = _decode_share_secret_parameters(config, parameter_names, parameter_json)
-
-    defer.returnValue(ret)
 
 
 class WatchaUserlistRestServlet(RestServlet):
@@ -317,13 +268,11 @@ class WatchaRegisterRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        params = yield _check_admin_or_secret(
-            self.hs.config,
+        yield _check_admin(
             self.auth,
             request,
-            ["user", "full_name", "email", "admin", "inviter"],
         )
-
+        params = parse_json_object_from_request(request)
         logger.info("Adding Watcha user...")
 
         if params["user"].lower() != params["user"]:
@@ -413,10 +362,10 @@ class WatchaResetPasswordRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        params = yield _check_admin_or_secret(
-            self.hs.config, self.auth, request, ["user"]
+        yield _check_admin(
+            self.auth, request,
         )
-
+        params = parse_json_object_from_request(request)
         user_id = params["user"]
         # FIXME: when called from the 'watcha_users' script,
         # the user_id usually doesn't have the server name. add it.
