@@ -16,12 +16,13 @@
 import collections
 import logging
 import re
+from urllib.parse import parse_qs, urlparse # insertion for Watcha OP486
 
 from canonicaljson import json
 
 from twisted.internet import defer
 
-from synapse.api.errors import StoreError
+from synapse.api.errors import StoreError, SynapseError # insertion for Watcha OP486
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.search import SearchStore
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
@@ -439,50 +440,55 @@ class RoomStore(RoomWorkerStore, SearchStore):
 
     # insertion for watcha - OP433 :
     def _store_room_link_with_NC(self, txn, event):
-        """ Store the link between Watcha room and Nextcloud folder in Sqlite.
+        """ Store the link between Watcha room and Nextcloud folder.
         """
 
-        if hasattr(event, "content") and "nextcloud" in event.content:
-            nextcloud_folder_url = event.content["nextcloud"]
-            room_id = event.room_id
+        if not hasattr(event, "content") or "nextcloud" not in event.content:
+            raise SynapseError(
+                400, "The nextcloud url is needed to store room link with NC."
+            )
 
-            if nextcloud_folder_url:
-                link_url = self._simple_select_one_onecol_txn(
-                    txn,
-                    table="room_mapping_with_NC",
-                    keyvalues={"link_url": nextcloud_folder_url},
-                    retcol="link_url",
-                    allow_none=True,
-                )
+        room_id = event.room_id
+        nextcloud_folder_url = event.content["nextcloud"]
 
-                if link_url:
-                    raise StoreError(
-                        500, "This Nextcloud folder is already linked with another room."
-                    )
+        if not nextcloud_folder_url:
+            self._simple_delete_one(
+                table="room_mapping_with_NC",
+                keyvalues={"room_id": room_id},
+                desc="delete_room_link_with_NC",
+            )
+            return
 
-                self._simple_upsert_txn(
-                    txn,
-                    table="room_mapping_with_NC",
-                    keyvalues={"room_id": room_id},
-                    values={"room_id": room_id, "link_url": nextcloud_folder_url},
-                )
+        nextcloud_url_query = parse_qs(urlparse(nextcloud_folder_url).query)
 
-            else:
-                self._simple_delete_one(
-                    table="room_mapping_with_NC",
-                    keyvalues={"room_id": room_id},
-                    desc="delete_room_link_with_NC",
-                )
+        if "dir" not in nextcloud_url_query:
+            raise SynapseError(400, "The url doesn't point to a valid directory path.")
 
-    def get_roomId_from_NC_folder_url(self, folder_url):
-        """ Get the room_id of the room which is linked with the Nextcloud folder url.
-        """
+        nextcloud_directory_path = nextcloud_url_query["dir"][0]
 
-        return self._simple_select_one_onecol(
+        linked_room = self._simple_select_one_onecol_txn(
+            txn,
             table="room_mapping_with_NC",
-            keyvalues={"link_url": folder_url},
+            keyvalues={
+                "directory_path": nextcloud_directory_path,
+            },
             retcol="room_id",
             allow_none=True,
+        )
+
+        if linked_room:
+            raise StoreError(
+                500, "This Nextcloud folder is already linked with another room."
+            )
+
+        self._simple_upsert_txn(
+            txn,
+            table="room_mapping_with_NC",
+            keyvalues={"room_id": room_id},
+            values={
+                "room_id": room_id,
+                "directory_path": nextcloud_directory_path,
+            },
         )
 
     @defer.inlineCallbacks
