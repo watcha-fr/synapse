@@ -373,8 +373,17 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTest
         )
 
     def test_send_nextcloud_notification_in_linked_room_with_unrecognized_url(self):
-        urls = [{"directory": "scheme://test/nextcloud/apps/files/?dir=/Partage", "link": "scheme://test/nextcloud/f/307"}, {"directory": "https://localhost/nextcloud/apps/files/?dir=/Partage", "link": "https://localhost/nextcloud/f/307"}]
-        
+        urls = [
+            {
+                "directory": "scheme://test/nextcloud/apps/files/?dir=/Partage",
+                "link": "scheme://test/nextcloud/f/307",
+            },
+            {
+                "directory": "https://localhost/nextcloud/apps/files/?dir=/Partage",
+                "link": "https://localhost/nextcloud/f/307",
+            },
+        ]
+
         for url in urls:
             request_content = {
                 "file_name": "WATCHA-Brochure A4.pdf",
@@ -386,7 +395,8 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTest
             channel = self._send_POST_nextcloud_notification_request(request_content)
             self.assertEquals(400, channel.code)
             self.assertEquals(
-                json.loads(channel.result["body"])["error"], "The Nextcloud url is not recognized.",
+                json.loads(channel.result["body"])["error"],
+                "The Nextcloud url is not recognized.",
             )
 
     def test_send_nextcloud_notification_in_linked_room_with_wrong_url_query(self):
@@ -473,4 +483,3 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTest
                 room_id_by_case["parent_directory_case"],
             ],
         )
-

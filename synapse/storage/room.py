@@ -469,9 +469,7 @@ class RoomStore(RoomWorkerStore, SearchStore):
         linked_room = self._simple_select_one_onecol_txn(
             txn,
             table="room_mapping_with_NC",
-            keyvalues={
-                "directory_path": nextcloud_directory_path,
-            },
+            keyvalues={"directory_path": nextcloud_directory_path,},
             retcol="room_id",
             allow_none=True,
         )
@@ -485,11 +483,9 @@ class RoomStore(RoomWorkerStore, SearchStore):
             txn,
             table="room_mapping_with_NC",
             keyvalues={"room_id": room_id},
-            values={
-                "room_id": room_id,
-                "directory_path": nextcloud_directory_path,
-            },
+            values={"room_id": room_id, "directory_path": nextcloud_directory_path,},
         )
+
     @defer.inlineCallbacks
     def get_room_to_send_NC_notification(self, directory_path):
         """ Get the room_id of the room which is linked with the Nextcloud folder url.

@@ -15,8 +15,12 @@ def check_db_customization(db_conn, database_engine):
     _drop_column_if_needed(db_conn, "users", "users_copy", "email")
     _add_column_if_needed(db_conn, "users", "is_partner", "DEFAULT 0")
     _add_column_if_needed(db_conn, "users", "is_active", "DEFAULT 1")
-    _add_new_table_if_needed(db_conn, "partners_invited_by", create_table_partner_invited_by_query)
-    _add_new_table_if_needed(db_conn, "room_mapping_with_NC", create_table_room_mapping_with_NC_query)
+    _add_new_table_if_needed(
+        db_conn, "partners_invited_by", create_table_partner_invited_by_query
+    )
+    _add_new_table_if_needed(
+        db_conn, "room_mapping_with_NC", create_table_room_mapping_with_NC_query
+    )
 
 
 def _add_column_if_needed(db_conn, table, column, column_details):
@@ -40,6 +44,7 @@ def _add_column_if_needed(db_conn, table, column, column_details):
         )
         db_conn.rollback()
         raise
+
 
 def _drop_column_if_needed(db_conn, table, copy_table, column_to_drop):
     """ WARNING : if the table has default string value, PLEASE TEST as it may remove this default value."""
@@ -81,7 +86,10 @@ def _drop_column_if_needed(db_conn, table, copy_table, column_to_drop):
             DROP TABLE {old_table};
             ALTER TABLE {new_table} RENAME TO {old_table};
         """.format(
-            new_table=copy_table, columns_definition=",".join(columns.values()), columns_name=", ".join(columns.keys()), old_table=table
+            new_table=copy_table,
+            columns_definition=",".join(columns.values()),
+            columns_name=", ".join(columns.keys()),
+            old_table=table,
         )
 
         for line in sql_script.split(";"):
@@ -102,6 +110,7 @@ def _drop_column_if_needed(db_conn, table, copy_table, column_to_drop):
         )
         db_conn.rollback()
         raise
+
 
 # add "partners_invited_by" table
 # this is a no-op if it is already there.
