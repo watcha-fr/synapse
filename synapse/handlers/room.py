@@ -20,6 +20,7 @@ import logging
 import math
 import string
 from collections import OrderedDict
+from os.path import dirname # insertion for Watcha OP486
 
 from six import iteritems, string_types
 
@@ -29,7 +30,7 @@ from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
 from synapse.api.errors import AuthError, Codes, NotFoundError, StoreError, SynapseError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.storage.state import StateFilter
-from synapse.types import RoomAlias, RoomID, RoomStreamToken, StreamToken, UserID
+from synapse.types import RoomAlias, RoomID, RoomStreamToken, StreamToken, UserID, create_requester # modification for OP486
 from synapse.util import stringutils
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.response_cache import ResponseCache
@@ -1001,17 +1002,42 @@ class WatchaRoomHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
 
     @defer.inlineCallbacks
-    def get_roomId_from_NC_folder_url(self, folder_url):
-        result = yield self.store.get_roomId_from_NC_folder_url(folder_url)
-        defer.returnValue(result)
+    def get_room_list_to_send_NC_notification(self, directory_path):
+        rooms = []
+        all_parents_directories = self._get_all_parents_directories(
+            directory_path, [directory_path]
+        )
+
+        for directory in all_parents_directories:
+            room = yield self.store.get_room_to_send_NC_notification(directory)
+
+            if room:
+                rooms.append(room)
+
+        if not rooms:
+            raise SynapseError(
+                400, "No rooms are linked with this Nextcloud directory."
+            )
+
+        defer.returnValue(rooms)
+
+    def _get_all_parents_directories(self, directory, all_parents_directories=[]):
+        if directory.count("/") > 1:
+            parent_directory = dirname(directory)
+            all_parents_directories.append(parent_directory)
+            return self._get_all_parents_directories(
+                parent_directory, all_parents_directories
+            )
+        else:
+            return all_parents_directories
 
     @defer.inlineCallbacks
-    def get_first_room_admin(self, room_id):
+    def _get_first_room_admin(self, room_id):
         result = yield self.store.get_first_room_admin(room_id)
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def send_NC_notification_in_room(self, requester, room_id, file_info):
+    def send_NC_notification_in_rooms(self, rooms, file_info):
         nc_activity_type = file_info["activity_type"]
 
         if nc_activity_type == "file_changed":
@@ -1026,18 +1052,33 @@ class WatchaRoomHandler(BaseHandler):
             "url": "",
         }
 
-        if nc_activity_type in ("file_created", "file_restored"):
+        if nc_activity_type in ["file_created", "file_restored"]:
             content["url"] = file_info["link"]
 
-        event_dict = {
-            "type": EventTypes.Message,
-            "content": content,
-            "room_id": room_id,
-            "sender": requester.user.to_string(),
-        }
+        events_Id = []
 
-        event = yield self.event_creation_handler.create_and_send_nonmember_event(
-            requester, event_dict
-        )
+        for room in rooms:
+            first_room_admin = yield self._get_first_room_admin(room)
 
-        defer.returnValue(event)
+            if not first_room_admin:
+                logger.info(
+                    "No administrators are in the room. The Nextcloud notification cannot be posted.",
+                )
+                continue
+
+            requester = create_requester(first_room_admin)
+
+            event_dict = {
+                "type": EventTypes.Message,
+                "content": content,
+                "room_id": room,
+                "sender": requester.user.to_string(),
+            }
+
+            event = yield self.event_creation_handler.create_and_send_nonmember_event(
+                requester, event_dict
+            )
+
+            events_Id.append(event.event_id)
+
+        defer.returnValue(events_Id)
