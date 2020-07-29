@@ -490,6 +490,20 @@ class RoomStore(RoomWorkerStore, SearchStore):
                 "directory_path": nextcloud_directory_path,
             },
         )
+    @defer.inlineCallbacks
+    def get_room_to_send_NC_notification(self, directory_path):
+        """ Get the room_id of the room which is linked with the Nextcloud folder url.
+        """
+
+        result = yield self._simple_select_one_onecol(
+            table="room_mapping_with_NC",
+            keyvalues={"directory_path": directory_path},
+            retcol="room_id",
+            allow_none=True,
+            desc="get_room_to_send_NC_notification",
+        )
+
+        defer.returnValue(result)
 
     @defer.inlineCallbacks
     def get_first_room_admin(self, room_id):
