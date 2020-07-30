@@ -149,13 +149,13 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
             self.hs.config,
             self.auth,
             request,
-            ["file_name", "link", "activity_type", "directory",],
+            ["file_name", "file_url", "activity_type", "directory_url",],
         )
 
         nc_file_name = params["file_name"]
-        nc_file_url = params["link"]
+        nc_file_url = params["file_url"]
         nc_activity_type = params["activity_type"]
-        nc_directory_url = params["directory"]
+        nc_directory_url = params["directory_url"]
 
         if (
             not nc_file_name
