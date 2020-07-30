@@ -156,12 +156,14 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
         nc_file_url = params["file_url"]
         nc_activity_type = params["activity_type"]
         nc_directory_url = params["directory_url"]
+        directory_path_limit = params["directory_path_limit"]
 
         if (
             not nc_file_name
             or not nc_file_url
             or not nc_activity_type
             or not nc_directory_url
+            or not directory_path_limit
         ):
             raise SynapseError(
                 400, "Some data in payload have empty value.",
@@ -170,7 +172,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
         if nc_activity_type not in [
             "file_created",
             "file_deleted",
-            "file_changed",
+            "file_moved",
             "file_restored",
         ]:
             raise SynapseError(
@@ -199,7 +201,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
         nc_directory = nc_directory_url_query["dir"][0]
 
         rooms = yield self.handler.watcha_room_handler.get_room_list_to_send_NC_notification(
-            nc_directory
+            nc_directory, directory_path_limit
         )
 
         events_Id = yield self.handler.watcha_room_handler.send_NC_notification_in_rooms(

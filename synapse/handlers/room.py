@@ -1002,10 +1002,10 @@ class WatchaRoomHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
 
     @defer.inlineCallbacks
-    def get_room_list_to_send_NC_notification(self, directory_path):
+    def get_room_list_to_send_NC_notification(self, directory_path, directory_path_limit):
         rooms = []
         all_parents_directories = self._get_all_parents_directories(
-            directory_path, [directory_path]
+            directory_path, directory_path_limit, [directory_path]
         )
 
         for directory in all_parents_directories:
@@ -1021,15 +1021,15 @@ class WatchaRoomHandler(BaseHandler):
 
         defer.returnValue(rooms)
 
-    def _get_all_parents_directories(self, directory, all_parents_directories=[]):
-        if directory.count("/") > 1:
-            parent_directory = dirname(directory)
-            all_parents_directories.append(parent_directory)
-            return self._get_all_parents_directories(
-                parent_directory, all_parents_directories
-            )
-        else:
+    def _get_all_parents_directories(self, directory, directory_path_limit, all_parents_directories=[]):
+        parent_directory = dirname(directory)
+        if parent_directory == directory_path_limit:
             return all_parents_directories
+
+        all_parents_directories.append(parent_directory)
+        return self._get_all_parents_directories(
+            parent_directory, directory_path_limit, all_parents_directories
+        )
 
     @defer.inlineCallbacks
     def _get_first_room_admin(self, room_id):
