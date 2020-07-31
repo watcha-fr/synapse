@@ -1005,7 +1005,7 @@ class WatchaRoomHandler(BaseHandler):
     def get_room_list_to_send_NC_notification(self, directory_path, directory_path_limit):
         rooms = []
         all_parents_directories = self._get_all_parents_directories(
-            directory_path, directory_path_limit, [directory_path]
+            directory_path, directory_path_limit
         )
 
         for directory in all_parents_directories:
@@ -1021,15 +1021,16 @@ class WatchaRoomHandler(BaseHandler):
 
         defer.returnValue(rooms)
 
-    def _get_all_parents_directories(self, directory, directory_path_limit, all_parents_directories=[]):
-        parent_directory = dirname(directory)
-        if parent_directory == directory_path_limit:
-            return all_parents_directories
+    def _get_all_parents_directories(self, directory, directory_path_limit):
+        all_parents_directories = [directory]
+        for _ in range(directory.count("/")):
+            parent_directory = dirname(directory)
 
-        all_parents_directories.append(parent_directory)
-        return self._get_all_parents_directories(
-            parent_directory, directory_path_limit, all_parents_directories
-        )
+            if parent_directory == directory_path_limit:
+                return all_parents_directories
+
+            all_parents_directories.append(parent_directory)
+            directory = parent_directory
 
     @defer.inlineCallbacks
     def _get_first_room_admin(self, room_id):
@@ -1039,11 +1040,6 @@ class WatchaRoomHandler(BaseHandler):
     @defer.inlineCallbacks
     def send_NC_notification_in_rooms(self, rooms, file_info):
         nc_activity_type = file_info["activity_type"]
-
-        if nc_activity_type == "file_changed":
-            raise SynapseError(
-                400, "'file_changed' Nextcloud activity is not managed.",
-            )
 
         content = {
             "body": nc_activity_type,
