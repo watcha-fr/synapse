@@ -1048,8 +1048,8 @@ class WatchaRoomHandler(BaseHandler):
             "url": "",
         }
 
-        if nc_activity_type in ["file_created", "file_restored"]:
-            content["url"] = file_info["link"]
+        if nc_activity_type in ["file_created", "file_restored", "file_moved"]:
+            content["url"] = file_info["file_url"]
 
         events_Id = []
 
