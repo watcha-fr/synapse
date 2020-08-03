@@ -519,7 +519,9 @@ class RoomStore(RoomWorkerStore, SearchStore):
 
         result = yield self._execute("get_first_room_admin", None, sql, room_id)
 
-        defer.returnValue(result[0][0])
+        first_room_admin = result[0][0] if result else result
+
+        defer.returnValue(first_room_admin)
     # end of insertion
 
     def add_event_report(
