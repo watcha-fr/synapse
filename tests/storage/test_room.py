@@ -147,7 +147,7 @@ class RoomEventsStoreTestCase(unittest.TestCase):
 class WatchaRoomEventsStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        hs = yield setup_test_homeserver(self.addCleanup)
+        hs = setup_test_homeserver(self.addCleanup)
 
         self.storage = hs.get_storage()
         self.event_builder_factory = hs.get_event_builder_factory()
@@ -162,7 +162,8 @@ class WatchaRoomEventsStoreTestCase(unittest.TestCase):
 
         yield create_room(hs, self.room.to_string(), self.user.to_string())
 
-    async def _send_room_mapping_event(self, nextcloud_folder_url):
+    @defer.inlineCallbacks
+    def _send_room_mapping_event(self, nextcloud_folder_url):
         builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
             {
@@ -173,8 +174,8 @@ class WatchaRoomEventsStoreTestCase(unittest.TestCase):
             },
         )
 
-        event, context = yield self.event_creation_handler.create_new_client_event(
-            builder
+        event, context = yield defer.ensureDeferred(
+            self.event_creation_handler.create_new_client_event(builder)
         )
 
         yield self.storage.persistence.persist_event(event, context)
