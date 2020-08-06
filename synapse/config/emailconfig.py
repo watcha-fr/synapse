@@ -306,9 +306,10 @@ class EmailConfig(Config):
             self.email_notif_for_new_users = email_config.get(
                 "notif_for_new_users", True
             )
-            self.email_riot_base_url = email_config.get(
-                "client_base_url", email_config.get("riot_base_url", None)
-            )
+
+        # modification for Watcha: load this setting even if self.email_enable_notifs is not True
+        self.email_riot_base_url = email_config.get("riot_base_url", None)
+        # end for modification
 
         if account_validity_renewal_enabled:
             self.email_expiry_template_html = email_config.get(

@@ -304,7 +304,7 @@ class WatchaRegisterRestServlet(RestServlet):
         self.registration_handler = hs.get_registration_handler()
 
     async def on_POST(self, request):
-        params = yield _check_admin_or_secret(
+        params = await _check_admin_or_secret(
             self.hs.config,
             self.auth,
             request,
@@ -334,13 +334,13 @@ class WatchaRegisterRestServlet(RestServlet):
             )
 
         try:
-            requester = yield self.auth.get_user_by_req(request)
+            requester = await self.auth.get_user_by_req(request)
         except Exception:
             # no token - not logged in - inviter should be provided
             requester = None
 
         if requester:
-            inviter_name = yield create_display_inviter_name(self.hs, requester.user)
+            inviter_name = await create_display_inviter_name(self.hs, requester.user)
         else:
             if not params["inviter"]:
                 raise AuthError(
@@ -356,23 +356,25 @@ class WatchaRegisterRestServlet(RestServlet):
 
         admin = params["admin"] == "admin"
         bind_emails = [params["email"]]
-        user_id = yield self.registration_handler.register_user(
+
+        user_id = await self.registration_handler.register_user(
             localpart=params["user"],
-            password=password,
+            password_hash=password,
             admin=admin,
             bind_emails=bind_emails,
         )
+
         user = UserID.from_string(user_id)
-        yield self.hs.profile_handler.set_displayname(
+        await self.hs.profile_handler.set_displayname(
             user, create_requester(user_id), params["full_name"], by_admin=True
         )
 
-        display_name = yield self.hs.profile_handler.get_displayname(user)
+        display_name = await self.hs.profile_handler.get_displayname(user)
 
         if 'password' not in params:
             token = compute_registration_token(user_id, email, password)
 
-            send_registration_email(
+            await send_registration_email(
                 self.hs.config,
                 email,
                 template_name="invite_new_account",
@@ -382,8 +384,7 @@ class WatchaRegisterRestServlet(RestServlet):
             )
         else:
             logger.info("Not sending email for user password for user %s, password is defined by sender", user_id)
-
-        defer.returnValue( 200, {"display_name": display_name, "user_id": user_id})
+        return 200, {"display_name": display_name, "user_id": user_id}
 
 
 class WatchaResetPasswordRestServlet(RestServlet):
@@ -426,7 +427,7 @@ class WatchaResetPasswordRestServlet(RestServlet):
         except:
             display_name = None
 
-        send_registration_email(
+        await send_registration_email(
             self.hs.config,
             email,
             template_name="reset_password",

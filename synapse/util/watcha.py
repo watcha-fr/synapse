@@ -111,7 +111,7 @@ async def create_display_inviter_name(hs, inviter):
     return inviter_name
 
 
-def send_registration_email(
+async def send_registration_email(
     config, recipient, template_name, token, inviter_name, full_name
 ):
     """

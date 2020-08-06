@@ -35,13 +35,13 @@ class BaseHomeserverWithEmailTestCase(unittest.HomeserverTestCase):
 
         return self.hs
 
-    async def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor, clock, hs):
         # Admin_user register.
         self.time = self.hs.get_clock().time_msec()
         self.user_id = self.register_user("admin", "pass", True)
         self.user_access_token = self.login("admin", "pass")
         self._auth_handler = hs.get_auth_handler()
-        await self._auth_handler.add_threepid(self.user_id, "email", "example@email.com", self.time)
+        self.get_success(self._auth_handler.add_threepid(self.user_id, "email", "example@email.com", self.time))
 
     def _do_register_user(self, request_content):
         #Admin send the request with access_token :

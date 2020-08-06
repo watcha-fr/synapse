@@ -287,7 +287,7 @@ class WatchaAdminStore(SQLBaseStore ):
 
         return users
 
-    async def watcha_email_list(self):
+    def watcha_email_list(self):
 
         SQL_EMAIL_LIST = """
             SELECT

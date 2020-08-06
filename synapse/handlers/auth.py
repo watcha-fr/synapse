@@ -935,14 +935,15 @@ class AuthHandler(BaseHandler):
         # of specific types of threepid (and fixes the fact that checking
         # for the presence of an email address during password reset was
         # case sensitive).
+
         if medium == "email":
             address = canonicalise_email(address)
             # insertion for watcha OP251
-            #emails = await self.store.watcha_email_list()
-            #if address in (item[1] for item in emails):
-            #    raise SynapseError(
-            #        400, "This email is already attached to another user account."
-            #    )
+            emails = await self.store.watcha_email_list()
+            if address in (item[1] for item in emails):
+               raise SynapseError(
+                   400, "This email is already attached to another user account."
+               )
             # end of insertion
 
         await self.store.user_add_threepid(
