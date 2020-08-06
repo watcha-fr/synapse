@@ -152,42 +152,38 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
             ["file_name", "file_url", "activity_type", "directory_url",],
         )
 
-        nc_file_name = params["file_name"]
-        nc_file_url = params["file_url"]
-        nc_activity_type = params["activity_type"]
-        nc_directory_url = params["directory_url"]
-        directory_path_limit = params["directory_path_limit"]
+        file_name = params["file_name"]
+        file_url = params["file_url"]
+        notifications = params["notifications"]
 
         if (
-            not nc_file_name
-            or not nc_file_url
-            or not nc_activity_type
-            or not nc_directory_url
-            or not directory_path_limit
+            not file_name
+            or not file_url
+            or not notifications
         ):
             raise SynapseError(
                 400, "Some data in payload have empty value.",
             )
 
-        if nc_activity_type not in [
-            "file_created",
-            "file_deleted",
-            "file_moved",
-            "file_restored",
-        ]:
-            raise SynapseError(
-                400, "Wrong value for nextcloud activity_type.",
-            )
+        # if nc_activity_type not in [
+        #     "file_created",
+        #     "file_deleted",
+        #     "file_moved",
+        #     "file_restored",
+        # ]:
+        #     raise SynapseError(
+        #         400, "Wrong value for nextcloud activity_type.",
+        #     )
 
         server_name = self.hs.get_config().server_name
 
         if not server_name:
             raise SynapseError(400, "No server name in homeserver config.")
 
-        nc_file_url_parsed = urlparse(nc_file_url)
+        file_url_parsed = urlparse(file_url)
         nc_directory_url_parsed = urlparse(nc_directory_url)
 
-        for url in (nc_file_url_parsed, nc_directory_url_parsed):
+        for url in (file_url_parsed, nc_directory_url_parsed):
             if url.scheme not in ["http", "https"] or url.netloc != server_name:
                 raise SynapseError(
                     400, "The Nextcloud url is not recognized.",
