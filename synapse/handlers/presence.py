@@ -52,6 +52,8 @@ if MYPY:
 
 logger = logging.getLogger(__name__)
 
+logger.disabled = True # WATCHA disabled
+
 
 notified_presence_counter = Counter("synapse_handler_presence_notified_presence", "")
 federation_presence_out_counter = Counter(

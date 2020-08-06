@@ -30,6 +30,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Added for watcha
+logger.disabled = True 
+# end of add for watcha
 
 # A tiny object useful for storing a user's membership in a room, as a mapping
 # key

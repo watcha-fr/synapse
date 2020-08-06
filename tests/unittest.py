@@ -250,7 +250,9 @@ class HomeserverTestCase(TestCase):
                         }
                     )
 
-                def get_user_by_req(request, allow_guest=False, rights="access"):
+                # modified for watcha added allow_partner
+
+                def get_user_by_req(request, allow_guest=False, allow_partner=False, rights="access"):
                     return succeed(
                         create_requester(
                             UserID.from_string(self.helper.auth_user_id), 1, False, None
@@ -544,7 +546,7 @@ class HomeserverTestCase(TestCase):
         """
         event_creator = self.hs.get_event_creation_handler()
         secrets = self.hs.get_secrets()
-        requester = Requester(user, None, False, None, None)
+        requester = Requester(user, None, False, None, False, None) # modified for watcha
 
         event, context = self.get_success(
             event_creator.create_event(

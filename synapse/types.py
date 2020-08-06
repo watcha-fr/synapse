@@ -49,8 +49,9 @@ JsonDict = Dict[str, Any]
 
 
 class Requester(
+    #added partner for watcha we need to be able to determine if requester is partner
     namedtuple(
-        "Requester", ["user", "access_token_id", "is_guest", "device_id", "app_service"]
+        "Requester", ["user", "access_token_id", "is_guest", "device_id", "is_partner", "app_service"]
     )
 ):
     """
@@ -77,6 +78,8 @@ class Requester(
             "access_token_id": self.access_token_id,
             "is_guest": self.is_guest,
             "device_id": self.device_id,
+
+            "is_partner": self.is_partner,  # modified for watcha
             "app_server_id": self.app_service.id if self.app_service else None,
         }
 
@@ -101,12 +104,15 @@ class Requester(
             access_token_id=input["access_token_id"],
             is_guest=input["is_guest"],
             device_id=input["device_id"],
+            # added for watcha
+            is_partner=input["is_partner"], 
+            #end of add for watcha
             app_service=appservice,
         )
 
-
+# modified for watcha added is_partner in the function parameter
 def create_requester(
-    user_id, access_token_id=None, is_guest=False, device_id=None, app_service=None
+    user_id, access_token_id=None, is_guest=False, device_id=None, is_partner=False, app_service=None  # modified for watcha: added is_partner
 ):
     """
     Create a new ``Requester`` object
@@ -124,7 +130,8 @@ def create_requester(
     """
     if not isinstance(user_id, UserID):
         user_id = UserID.from_string(user_id)
-    return Requester(user_id, access_token_id, is_guest, device_id, app_service)
+        #modified for watcha added is_partner in return
+    return Requester(user_id, access_token_id, is_guest, device_id, is_partner, app_service)  # modified for watcha: added is_partner
 
 
 def get_domain_from_id(string):

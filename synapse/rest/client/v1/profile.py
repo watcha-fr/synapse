@@ -19,10 +19,23 @@ from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import UserID
+# insertion for watcha
+from synapse.api.errors import SynapseError
+import logging
 
+logger = logging.getLogger(__name__)
+# end of insertion
 
 class ProfileDisplaynameRestServlet(RestServlet):
+    # insertion for watcha
+    """ change for watcha
+    # BIG HACK for the iOS app which doesn't escape the user_id when setting the display name
+    # This means that user_ids with the pattern "<user_id>/displayname" will not work -
+    # but they can't occur - it's only domains names after the "/"
     PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/displayname", v1=True)
+    """
+    PATTERNS = client_patterns("/profile/(?P<user_id>.*)/displayname", v1=True)
+    #end of insertion
 
     def __init__(self, hs):
         super(ProfileDisplaynameRestServlet, self).__init__()
@@ -50,7 +63,8 @@ class ProfileDisplaynameRestServlet(RestServlet):
         return 200, ret
 
     async def on_PUT(self, request, user_id):
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        # modified for watcha  allow_partner
+        requester = await self.auth.get_user_by_req(request, allow_partner=True, allow_guest=True)
         user = UserID.from_string(user_id)
         is_admin = await self.auth.is_server_admin(requester.user)
 
@@ -98,7 +112,8 @@ class ProfileAvatarURLRestServlet(RestServlet):
         return 200, ret
 
     async def on_PUT(self, request, user_id):
-        requester = await self.auth.get_user_by_req(request)
+        # modified for watcha added allow_partner
+        requester = await self.auth.get_user_by_req(request, allow_partner=True)
         user = UserID.from_string(user_id)
         is_admin = await self.auth.is_server_admin(requester.user)
 
@@ -128,6 +143,9 @@ class ProfileRestServlet(RestServlet):
         self.hs = hs
         self.profile_handler = hs.get_profile_handler()
         self.auth = hs.get_auth()
+        # insertion for watcha
+        self.account_activity_handler = hs.get_account_validity_handler()
+        # end of insertion
 
     async def on_GET(self, request, user_id):
         requester_user = None
@@ -148,9 +166,17 @@ class ProfileRestServlet(RestServlet):
             ret["displayname"] = displayname
         if avatar_url is not None:
             ret["avatar_url"] = avatar_url
-
+        # insertion for watcha
+        # For personal data protection, we don't return phone number of the other users.
+        try:
+            email = await self.account_activity_handler.get_email_address_for_user(
+                user_id
+            )
+            ret["email"] = email
+        except SynapseError:
+            logger.error("Email is not defined for this user.")
+        # end of insertion
         return 200, ret
-
 
 def register_servlets(hs, http_server):
     ProfileDisplaynameRestServlet(hs).register(http_server)

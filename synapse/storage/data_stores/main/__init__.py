@@ -71,11 +71,20 @@ from .transactions import TransactionStore
 from .ui_auth import UIAuthStore
 from .user_directory import UserDirectoryStore
 from .user_erasure_store import UserErasureStore
+# added for watcha
+from .watcha_invite_external import ExternalInvitationStore
+from .watcha_admin import WatchaAdminStore
+# end of added for watcha
+
 
 logger = logging.getLogger(__name__)
 
 
 class DataStore(
+    # added for watcha
+    ExternalInvitationStore,
+    WatchaAdminStore,
+    # end of added for watcha
     EventsBackgroundUpdatesStore,
     RoomMemberStore,
     RoomStore,

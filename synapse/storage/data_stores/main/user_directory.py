@@ -462,6 +462,78 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             "update_profile_in_user_dir", _update_profile_in_user_dir_txn
         )
 
+    #added for watcha
+    def remove_from_user_dir(self, user_id):
+        def _remove_from_user_dir_txn(txn):
+            self._simple_delete_txn(
+                txn, table="user_directory", keyvalues={"user_id": user_id}
+            )
+            self._simple_delete_txn(
+                txn, table="user_directory_search", keyvalues={"user_id": user_id}
+            )
+            self._simple_delete_txn(
+                txn, table="users_in_public_rooms", keyvalues={"user_id": user_id}
+            )
+            self._simple_delete_txn(
+                txn,
+                table="users_who_share_private_rooms",
+                keyvalues={"user_id": user_id},
+            )
+            self._simple_delete_txn(
+                txn,
+                table="users_who_share_private_rooms",
+                keyvalues={"other_user_id": user_id},
+            )
+            txn.call_after(self.get_user_in_directory.invalidate, (user_id,))
+
+        return self.runInteraction("remove_from_user_dir", _remove_from_user_dir_txn)
+
+    @defer.inlineCallbacks
+    def get_users_in_dir_due_to_room(self, room_id):
+        """Get all user_ids that are in the room directory because they're
+        in the given room_id
+        """
+        user_ids_share_pub = yield self._simple_select_onecol(
+            table="users_in_public_rooms",
+            keyvalues={"room_id": room_id},
+            retcol="user_id",
+            desc="get_users_in_dir_due_to_room",
+        )
+
+        user_ids_share_priv = yield self._simple_select_onecol(
+            table="users_who_share_private_rooms",
+            keyvalues={"room_id": room_id},
+            retcol="other_user_id",
+            desc="get_users_in_dir_due_to_room",
+        )
+
+        user_ids = set(user_ids_share_pub)
+        user_ids.update(user_ids_share_priv)
+
+        return user_ids
+
+    @defer.inlineCallbacks
+    def get_all_rooms(self):
+        """Get all room_ids we've ever known about, in ascending order of "size"
+        """
+        sql = """
+            SELECT room_id FROM current_state_events
+            GROUP BY room_id
+            ORDER BY count(*) ASC
+        """
+        rows = yield self._execute("get_all_rooms", None, sql)
+        defer.returnValue([room_id for room_id, in rows])
+
+    @defer.inlineCallbacks
+    def get_all_local_users(self):
+        """Get all local users
+        """
+        sql = """
+            SELECT name FROM users
+        """
+        rows = yield self._execute("get_all_local_users", None, sql)
+        defer.returnValue([name for name, in rows])
+# end of added for watcha
     def add_users_who_share_private_room(self, room_id, user_id_tuples):
         """Insert entries into the users_who_share_private_rooms table. The first
         user should be a local user.
@@ -712,6 +784,11 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                             "user_id": <user_id>,
                             "display_name": <display_name>,
                             "avatar_url": <avatar_url>
+                            /* added for Watcha
+                            ,
+                            "is_partner": 1 or 0
+                            "presence": "invited", "offline" or "online"
+                            end of added for watcha*/
                         }
                     ]
                 }
@@ -774,6 +851,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             )
             args = join_args + (full_query, exact_query, prefix_query, limit + 1)
         elif isinstance(self.database_engine, Sqlite3Engine):
+            ''' DISABLED FOR WATCHA - replaced by the code below
             search_query = _parse_query_sqlite(search_term)
 
             sql = """
@@ -792,6 +870,69 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 where_clause,
             )
             args = join_args + (search_query, limit + 1)
+            END DISABLED FOR WATCHA '''
+            # insertion for watcha
+            # TODO: do the same for Postgres !
+            # list the internal users, as well as the partners that have
+            # received an invitation from the users doing the query.
+            # in this query, UNION and UNION ALL give the same results
+
+            logger.info("Searching with search term: %s" % repr(search_term))
+            where_clause = """ AND (display_name LIKE ? OR t.address LIKE ? )"""
+
+            sql = """
+                SELECT
+                    u.name as user_id
+                    , u.is_active
+                    , u.is_partner
+                    , d.display_name
+                    , d.avatar_url
+                    , p.state as presence
+                    , t.address as email
+                FROM users AS u
+                LEFT OUTER JOIN
+                    (SELECT
+                        t.user_id
+                        , t.address
+                    FROM user_threepids AS t
+                    WHERE t.medium = 'email') AS t
+                    ON t.user_id = u.name
+                LEFT OUTER JOIN user_directory AS d ON d.user_id = u.name
+                LEFT OUTER JOIN presence_stream AS p ON p.user_id = u.name
+                WHERE u.is_partner = 0
+                    AND u.is_active = 1
+                    %s
+
+                UNION ALL
+
+                SELECT DISTINCT
+                    u.name as user_id
+                    , u.is_active
+                    , u.is_partner
+                    , d.display_name
+                    , d.avatar_url
+                    , coalesce(p.state, "invited") as presence
+                    , t.address as email
+                FROM users AS u
+                INNER JOIN partners_invited_by AS pib
+                    ON pib.partner = u.name AND pib.invited_by = ?
+                LEFT OUTER JOIN
+                    (SELECT
+                        t.user_id
+                        , t.medium
+                        , t.address
+                    FROM user_threepids AS t
+                    WHERE t.medium = 'email') AS t
+                    ON t.user_id = u.name
+                LEFT OUTER JOIN user_directory AS d ON d.user_id = u.name
+                LEFT OUTER JOIN presence_stream AS p ON p.user_id = u.name
+                WHERE u.is_partner = 1
+                    AND u.is_active = 1
+                    %s
+            """ % (where_clause, where_clause)
+            args = [  '%' + search_term + '%' ] * 2 + [ user_id ] + [  '%' + search_term + '%' ] * 2
+            logger.debug(sql)
+            # end of insertion
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")

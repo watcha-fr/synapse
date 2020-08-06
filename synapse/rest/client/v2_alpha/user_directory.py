@@ -49,11 +49,17 @@ class UserDirectorySearchRestServlet(RestServlet):
                             "user_id": <user_id>,
                             "display_name": <display_name>,
                             "avatar_url": <avatar_url>
+                            /* added for Watcha
+                            ,
+                            "is_partner": 1 or 0
+                            "presence": "invited", "offline" or "online"
+                            end of added for watcha*/
                         }
                     ]
                 }
         """
-        requester = await self.auth.get_user_by_req(request, allow_guest=False)
+        # modified for watcha added allow_partner
+        requester = await self.auth.get_user_by_req(request, allow_guest=False, allow_partner=True)
         user_id = requester.user.to_string()
 
         if not self.hs.config.user_directory_search_enabled:

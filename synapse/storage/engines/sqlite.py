@@ -17,6 +17,10 @@ import threading
 import typing
 
 from synapse.storage.engines import BaseDatabaseEngine
+from synapse.storage.prepare_database import prepare_database
+# added for watcha
+from synapse.storage.data_stores.main.watcha import check_db_customization
+# end of added for watcha
 
 if typing.TYPE_CHECKING:
     import sqlite3  # noqa: F401
@@ -76,15 +80,15 @@ class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
 
     def on_new_connection(self, db_conn):
         # We need to import here to avoid an import loop.
-        from synapse.storage.prepare_database import prepare_database
-
         if self._is_in_memory:
             # In memory databases need to be rebuilt each time. Ideally we'd
             # reuse the same connection as we do when starting up, but that
             # would involve using adbapi before we have started the reactor.
             prepare_database(db_conn, self, config=None)
-
+            # added for watcha
+            # end of added for watcha
         db_conn.create_function("rank", 1, _rank)
+        check_db_customization(db_conn, self)
         db_conn.execute("PRAGMA foreign_keys = ON;")
 
     def is_deadlock(self, error):

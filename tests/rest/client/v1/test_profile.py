@@ -28,10 +28,12 @@ from synapse.rest.client.v1 import login, profile, room
 from tests import unittest
 
 from ....utils import MockHttpResource, setup_test_homeserver
+# added for watcha
+from urllib.parse import quote
+# end of added for watcha
 
 myid = "@1234ABCD:test"
 PATH_PREFIX = "/_matrix/client/r0"
-
 
 class MockHandlerProfileTestCase(unittest.TestCase):
     """ Tests rest layer of profile management.
@@ -70,7 +72,7 @@ class MockHandlerProfileTestCase(unittest.TestCase):
             profile_handler=self.mock_handler,
         )
 
-        def _get_user_by_req(request=None, allow_guest=False):
+        def _get_user_by_req(request=None, allow_guest=False, allow_partner=False):
             return defer.succeed(synapse.types.create_requester(myid))
 
         hs.get_auth().get_user_by_req = _get_user_by_req
@@ -182,11 +184,13 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         self.hs = self.setup_test_homeserver()
+        self.auth = self.hs.get_auth_handler()
         return self.hs
 
     def prepare(self, reactor, clock, hs):
         self.owner = self.register_user("owner", "pass")
         self.owner_tok = self.login("owner", "pass")
+        self.time = self.hs.get_clock().time_msec()
 
     def test_set_displayname(self):
         request, channel = self.make_request(
@@ -213,7 +217,11 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 400, channel.result)
 
         res = self.get_displayname()
+        """ change for watcha
+        # fixed the test to work for ExternalUserProfileTestCase
         self.assertEqual(res, "owner")
+        """
+        self.assertEqual(res, synapse.types.UserID.from_string(self.owner).localpart)
 
     def get_displayname(self):
         request, channel = self.make_request(
@@ -222,6 +230,64 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
         return channel.json_body["displayname"]
+
+# insertion for watcha
+    async def test_get_email_threepids(self):
+
+        #Addition of email as a threepids :
+        await self.auth.add_threepid(self.owner, "email", "example@email.com", self.time)
+
+        request, channel = self.make_request(
+            "GET", "/profile/%s" % (quote(self.owner, safe=''))
+        )
+
+        self.render(request)
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.json_body["email"], "example@email.com")
+
+    def test_do_not_get_phone_threepids(self):
+
+        # Addition of phone number as a threepids :
+        self.auth.add_threepid(self.owner, "msisdn", "0612345678", self.time)
+
+        with self.assertLogs('synapse.rest.client.v1.profile', level='ERROR') as cm:
+            request, channel = self.make_request(
+                "GET", "/profile/%s" % (quote(self.owner, safe=''))
+            )
+
+            self.render(request)
+
+        self.assertEqual(channel.code, 200)
+        self.assertRaises(SynapseError)
+        self.assertIn("ERROR:synapse.rest.client.v1.profile:Email is not defined for this user.",
+                          cm.output[0])
+
+    async def test_get_only_one_email_threepids(self):
+
+        #Addition of two emails as a threepids :
+        await self.auth.add_threepid(self.owner, "email", "example@email.com", self.time)
+        await self.auth.add_threepid(self.owner, "email", "second_example@email.com", self.time)
+
+        with self.assertLogs('synapse.rest.client.v1.profile', level='ERROR') as cm:
+            request, channel = self.make_request(
+                "GET", "/profile/%s" % (quote(self.owner, safe=''))
+            )
+
+            self.render(request)
+
+        self.assertEqual(channel.code, 200)
+        self.assertRaises(SynapseError)
+        self.assertIn("ERROR:synapse.rest.client.v1.profile:Email is not defined for this user.",
+                          cm.output[0])
+
+
+class ExternalUserProfileTestCase(ProfileTestCase):
+    '''Test for the iOS workaround of not escaping user id when setting profile'''
+    def prepare(self, reactor, clock, hs):
+        self.owner = self.register_user("owner/myemailadress.com", "pass")
+        self.owner_tok = self.login("owner/myemailadress.com", "pass")
+        self.time = self.hs.get_clock().time_msec()
+# end of insertion
 
 
 class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
@@ -265,6 +331,7 @@ class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
     def test_in_shared_room(self):
         self.ensure_requester_left_room()
 
+        self.helper.invite(self.room_id, src=self.owner, tok=self.owner_tok, targ=self.requester) # added for Watcha: need to be invited
         self.helper.join(room=self.room_id, user=self.requester, tok=self.requester_tok)
 
         self.try_fetch_profile(200, self.requester_tok)

@@ -31,7 +31,8 @@ class VoipRestServlet(RestServlet):
 
     async def on_GET(self, request):
         requester = await self.auth.get_user_by_req(
-            request, self.hs.config.turn_allow_guests
+            # added allow_partner for watcha
+            request, self.hs.config.turn_allow_guests, allow_partner=True
         )
 
         turnUris = self.hs.config.turn_uris

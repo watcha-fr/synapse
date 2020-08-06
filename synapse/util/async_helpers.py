@@ -34,6 +34,9 @@ from synapse.util import Clock, unwrapFirstError
 
 logger = logging.getLogger(__name__)
 
+# added for watcha
+logger.disabled = True 
+# end of add for watcha
 
 class ObservableDeferred(object):
     """Wraps a deferred object so that we can add observer deferreds. These

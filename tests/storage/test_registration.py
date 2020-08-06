@@ -37,7 +37,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_register(self):
         yield self.store.register_user(self.user_id, self.pwhash)
-
+        # modified for watcha added is_partner
         self.assertEquals(
             {
                 # TODO(paul): Surely this field should be 'user_id', not 'name'
@@ -51,6 +51,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
                 "creation_ts": 1000,
                 "user_type": None,
                 "deactivated": 0,
+                "is_partner": 0,
             },
             (yield self.store.get_user_by_id(self.user_id)),
         )

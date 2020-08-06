@@ -128,7 +128,8 @@ class PushRuleRestServlet(RestServlet):
                 raise
 
     async def on_GET(self, request, path):
-        requester = await self.auth.get_user_by_req(request)
+        # modified for watcha add allow_partner=True
+        requester = await self.auth.get_user_by_req(request, allow_partner=True)
         user_id = requester.user.to_string()
 
         # we build up the full structure and then decide which bits of it

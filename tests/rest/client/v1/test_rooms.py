@@ -332,7 +332,8 @@ class RoomPermissionsTestCase(RoomBase):
 
         other = "@burgundy:red"
         # set invited of other, expect 200
-        self.helper.invite(room=room, src=self.user_id, targ=other, expect_code=200)
+        # CHANGED IN WATCHA: "You don't have permission to invite users"
+        self.helper.invite(room=room, src=self.user_id, targ=other, expect_code=403)
 
         # set joined of other, expect 403
         self.helper.change_membership(
@@ -1018,7 +1019,9 @@ class PublicRoomsRestrictedTestCase(unittest.HomeserverTestCase):
 
         request, channel = self.make_request("GET", self.url, access_token=tok)
         self.render(request)
-        self.assertEqual(channel.code, 200, channel.result)
+        # MODIFIED BY WATCHA - directory disabled
+        #self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, 403, channel.result)
 
 
 class PerRoomProfilesForbiddenTestCase(unittest.HomeserverTestCase):

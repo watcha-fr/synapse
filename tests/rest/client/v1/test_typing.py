@@ -91,6 +91,9 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.room_id = self.helper.create_room_as(self.user_id)
         # Need another user to make notifications actually work
+        # added for watcha
+        self.helper.invite(self.room_id, src=self.user_id, targ="@jim:red") # added for Watcha: need to be invited
+        # end of added for watcha
         self.helper.join(self.room_id, user="@jim:red")
 
     def test_set_typing(self):

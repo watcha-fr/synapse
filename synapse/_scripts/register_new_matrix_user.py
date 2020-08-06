@@ -198,10 +198,10 @@ def main():
 
     parser.add_argument(
         "server_url",
-        default="https://localhost:8448",
+        default="http://localhost:8448",
         nargs="?",
         help="URL to use to talk to the homeserver. Defaults to "
-        " 'https://localhost:8448'.",
+        " 'http://localhost:8448'.",
     )
 
     args = parser.parse_args()

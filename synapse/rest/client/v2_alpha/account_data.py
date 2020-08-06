@@ -44,7 +44,8 @@ class AccountDataServlet(RestServlet):
         if self._is_worker:
             raise Exception("Cannot handle PUT /account_data on worker")
 
-        requester = await self.auth.get_user_by_req(request)
+        #add allow partner for watcha
+        requester = await self.auth.get_user_by_req(request, allow_partner=True)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
 
@@ -96,7 +97,8 @@ class RoomAccountDataServlet(RestServlet):
         if self._is_worker:
             raise Exception("Cannot handle PUT /account_data on worker")
 
-        requester = await self.auth.get_user_by_req(request)
+        # add allow partner for watcha
+        requester = await self.auth.get_user_by_req(request, allow_partner=True)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
 
@@ -109,7 +111,14 @@ class RoomAccountDataServlet(RestServlet):
                 " Use /rooms/!roomId:server.name/read_markers",
             )
 
+        # added for watcha
+        if account_data_type == "org.matrix.room.preview_urls":
+            logger.info("AccountDataPreviewUrls: original=" + str(body))
+            body["disable"] = True
+            logger.info("AccountDataPreviewUrls: new=" + str(body))
+
         max_id = await self.store.add_account_data_to_room(
+        # end of added for watch
             user_id, room_id, account_data_type, body
         )
 

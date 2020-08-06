@@ -161,10 +161,12 @@ class Auth(object):
         return event_auth.get_public_keys(invite_event)
 
     @defer.inlineCallbacks
+    #modified for watcha added allow_partner in the arguments of func
     def get_user_by_req(
         self,
         request: Request,
         allow_guest: bool = False,
+        allow_partner: bool = False,
         rights: str = "access",
         allow_expired: bool = False,
     ):
@@ -217,6 +219,9 @@ class Auth(object):
             user = user_info["user"]
             token_id = user_info["token_id"]
             is_guest = user_info["is_guest"]
+            #added for watcha
+            is_partner = user_info["is_partner"]
+            #end of added for watcha
 
             # Deny the request if the user account has expired.
             if self._account_validity.enabled and not allow_expired:
@@ -250,14 +255,21 @@ class Auth(object):
                     errcode=Codes.GUEST_ACCESS_FORBIDDEN,
                 )
 
+            if is_partner and not allow_partner:
+                raise AuthError(
+                    403, "Partner access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
+                )
+
             request.authenticated_entity = user.to_string()
             opentracing.set_tag("authenticated_entity", user.to_string())
             if device_id:
                 opentracing.set_tag("device_id", device_id)
 
+            # modified for watcha added is_partner in the return
             return synapse.types.create_requester(
-                user, token_id, is_guest, device_id, app_service=app_service
+                user, token_id, is_guest, device_id, is_partner, app_service=app_service
             )
+
         except KeyError:
             raise MissingClientTokenError()
 
@@ -496,6 +508,9 @@ class Auth(object):
             "token_id": ret.get("token_id", None),
             "is_guest": False,
             "device_id": ret.get("device_id"),
+            # added for watcha
+            "is_partner": ret.get("is_partner"),
+            # end of add for watcha
             "valid_until_ms": ret.get("valid_until_ms"),
         }
         return user_info

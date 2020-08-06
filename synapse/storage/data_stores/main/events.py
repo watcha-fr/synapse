@@ -918,6 +918,11 @@ class PersistEventsStore:
             elif event.type == EventTypes.Retention:
                 # Update the room_retention table.
                 self._store_retention_policy_for_room_txn(txn, event)
+            # insertion for watcha - OP433
+            elif event.type == EventTypes.VectorSetting:
+                self._store_room_link_with_NC(txn, event)
+            # end of insertion
+
 
             self._handle_event_relations(txn, event)
 
@@ -1250,6 +1255,49 @@ class PersistEventsStore:
             self.store._invalidate_cache_and_stream(
                 txn, self.store.get_retention_policy_for_room, (event.room_id,)
             )
+            # insertion for watcha - OP433 :
+    def _store_room_link_with_NC(self, txn, event):
+        """ Store the link between Watcha room and Nextcloud folder in Sqlite.
+        @TODO : With PostgreSql, the clause 'INSERT or REPLACE' doesn't works and has to be replaced by 'UPSERT'.
+        """
+
+        if hasattr(event, "content") and "nextcloud" in event.content:
+            nextcloud_folder_url = event.content["nextcloud"]
+            room_id = event.room_id
+
+            if nextcloud_folder_url:
+                txn.execute(
+                    """
+                    SELECT link_url
+                    FROM room_mapping_with_NC
+                    WHERE link_url = ?;
+                    """,
+                    (nextcloud_folder_url,),
+                )
+                row = txn.fetchone()
+
+                if row:
+                    raise StoreError(500, "This Nextcloud folder is already linked.")
+
+                txn.execute(
+                    """
+                    INSERT OR REPLACE INTO room_mapping_with_NC
+                    VALUES (
+                        ?
+                        , ?
+                    );
+                    """,
+                    (room_id, nextcloud_folder_url,),
+                )
+            else:
+                txn.execute(
+                    """
+                    DELETE FROM room_mapping_with_NC
+                    WHERE room_id like ? ;""",
+                    (room_id,),
+                )
+    # end of insertion
+
 
     def store_event_search_txn(self, txn, event, key, value):
         """Add event to the search table

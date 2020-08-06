@@ -203,6 +203,21 @@ class LoginRestServlet(RestServlet):
         if "type" not in identifier:
             raise SynapseError(400, "Login identifier has no type")
 
+        # added temporarly for watcha op322:
+        # the iOS app (and android also ?) sends email as user identifier
+        import re
+        if (identifier["type"] == "m.id.user" and
+            "user" in identifier and
+            re.match('[^@]+@[^@]+\.[^@]+', identifier["user"])):
+            logger.info("Converting user login into third-party for Watcha")
+            login_submission["identifier"] = {
+                "type": "m.id.thirdparty",
+                "medium": "email",
+                "address": identifier["user"],
+            }
+            identifier = login_submission["identifier"]
+        # end added temporarly for watcha
+
         # convert phone type identifiers to generic threepids
         if identifier["type"] == "m.id.phone":
             identifier = login_id_thirdparty_from_phone(identifier)
@@ -344,12 +359,15 @@ class LoginRestServlet(RestServlet):
         device_id, access_token = await self.registration_handler.register_device(
             user_id, device_id, initial_display_name
         )
-
+        # added for watcha
+        is_partner = await self.hs.get_auth_handler().is_partner(user_id)
+        # end of add for watcha
         result = {
             "user_id": user_id,
             "access_token": access_token,
             "home_server": self.hs.hostname,
             "device_id": device_id,
+            #"is_partner": is_partner,
         }
 
         if callback is not None:

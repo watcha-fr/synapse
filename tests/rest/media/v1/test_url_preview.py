@@ -688,3 +688,16 @@ class URLPreviewTests(unittest.HomeserverTestCase):
                 channel.json_body,
                 {"og:title": None, "og:description": "Content Preview"},
             )
+
+    test_cache_returns_correct_type.skip = "Disabled for Watcha because URL preview is disabled"
+    test_non_ascii_preview_httpequiv.skip = "Disabled for Watcha because URL preview is disabled"
+    test_non_ascii_preview_content_type.skip = "Disabled for Watcha because URL preview is disabled"
+    test_ipaddr.skip = "Disabled for Watcha because URL preview is disabled"
+    test_blacklisted_ip_specific.skip = "Disabled for Watcha because URL preview is disabled"
+    test_blacklisted_ip_range.skip = "Disabled for Watcha because URL preview is disabled"
+    test_blacklisted_ip_specific_direct.skip = "Disabled for Watcha because URL preview is disabled"
+    test_blacklisted_ip_range_direct.skip = "Disabled for Watcha because URL preview is disabled"
+    test_blacklisted_ip_range_whitelisted_ip.skip = "Disabled for Watcha because URL preview is disabled"
+    test_blacklisted_ip_with_external_ip.skip = "Disabled for Watcha because URL preview is disabled"
+    test_blacklisted_ipv6_specific.skip = "Disabled for Watcha because URL preview is disabled"
+    test_blacklisted_ipv6_range.skip = "Disabled for Watcha because URL preview is disabled"

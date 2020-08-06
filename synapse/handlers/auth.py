@@ -698,6 +698,9 @@ class AuthHandler(BaseHandler):
             SynapseError if there was a problem with the request
             LoginError if there was an authentication problem.
         """
+        # insertion for watcha (op189)
+        username = username.strip()
+        # end of insertion for watcha
 
         if username.startswith("@"):
             qualified_user_id = username
@@ -934,6 +937,13 @@ class AuthHandler(BaseHandler):
         # case sensitive).
         if medium == "email":
             address = canonicalise_email(address)
+            # insertion for watcha OP251
+            #emails = await self.store.watcha_email_list()
+            #if address in (item[1] for item in emails):
+            #    raise SynapseError(
+            #        400, "This email is already attached to another user account."
+            #    )
+            # end of insertion
 
         await self.store.user_add_threepid(
             user_id, medium, address, validated_at, self.hs.get_clock().time_msec()
@@ -1040,6 +1050,30 @@ class AuthHandler(BaseHandler):
         return self._sso_auth_confirm_template.render(
             description=session.description, redirect_url=redirect_url,
         )
+    #insertion for watcha
+    async def is_partner(self, user_id):
+        ret = await self.store.is_user_partner(
+            user_id,
+        )
+        return ret
+    #end of insertion
+
+    # insertion for watcha OP318
+    async def is_admin(self, user_id):
+        ret = await self.store.is_user_admin(user_id)
+        return ret
+
+    # end of insertion
+
+    # Added for Watcha...
+    async def find_user_id_by_email(self, address):
+        ret = await self.store.get_user_id_by_threepid(
+            "email",
+            address
+        )
+
+        return ret
+    # ... end added for Watcha.
 
     async def complete_sso_ui_auth(
         self, registered_user_id: str, session_id: str, request: SynapseRequest,

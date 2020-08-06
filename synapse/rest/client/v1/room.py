@@ -93,6 +93,10 @@ class RoomCreateRestServlet(TransactionRestServlet):
     async def on_POST(self, request):
         requester = await self.auth.get_user_by_req(request)
 
+        # added for watcha
+        if requester.is_partner:
+            raise AuthError(403, "Partners are not allowed to create rooms")
+        # end of insertion
         info, _ = await self._room_creation_handler.create_room(
             requester, self.get_room_config(request)
         )
@@ -159,7 +163,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         return self.on_PUT(request, room_id, event_type, "")
 
     async def on_GET(self, request, room_id, event_type, state_key):
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        requester = await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True)
         format = parse_string(
             request, "format", default="content", allowed_values=["content", "event"]
         )
@@ -171,6 +175,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
             event_type=event_type,
             state_key=state_key,
             is_guest=requester.is_guest,
+            is_partner=requester.is_partner,
         )
 
         if not data:
@@ -210,6 +215,49 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                 content=content,
             )
         else:
+# added by watcha
+            # override history visibility incoming config requests.
+            if event_type == EventTypes.RoomHistoryVisibility:
+                logger.info("RoomHistoryEvent. Original content=" + str(content))
+                if content['history_visibility'] == "world_readable":
+                    content['history_visibility'] = "shared"
+                if content['history_visibility'] == "joined":
+                    content['history_visibility'] = "invited"
+                logger.info("RoomHistoryEvent. New content=" + str(content))
+
+            # added by watcha
+            # override room permissions config requests
+            # 0 means a generic user - 50 means a moderator - 100 means an administrator
+            if event_type == EventTypes.PowerLevels:
+                logger.info("PowerLevelsEvent. Original content=" + str(content))
+                content['events'][EventTypes.RoomAvatar] = 50; # change avatar of the room
+                content['events'][EventTypes.CanonicalAlias] = 50; # change the alias of the room
+                content['events'][EventTypes.Name] = 50; # change the name of the room
+                content['events'][EventTypes.PowerLevels] = 100; # change the permissions (name, revoke moderators)
+                content['events'][EventTypes.Topic] = 50; # change topic in the room
+                content['invite'] = 50; # invite users
+                content['kick'] = 50; # kick users
+                content['ban'] = 50; # permanently kick users from the room
+                content['redact'] = 50; # TODO option to prevent people from removing their posts.
+                content['state_default'] = 50; # change config of the room
+                content['users_default'] = 0; # default permission for new users.
+                logger.info("PowerLevelsEvent. New content=" + str(content))
+
+            if event_type == "org.matrix.room.preview_urls":
+                logger.info("PreviewUrlsEvent. Original content=" + str(content))
+                content['disable'] = True;
+                logger.info("PreviewUrlsEvent. New content=" + str(content))
+
+            if event_type == EventTypes.JoinRules:
+                logger.info("JoinRulesEvent. Original content=" + str(content))
+                content['join_rule'] = "invite"
+                logger.info("JoinRulesEvent. New content=" + str(content))
+
+            if event_type == EventTypes.GuestAccess:
+                logger.info("GuestAccessEvent. Original content=" + str(content))
+                content['guest_access'] = "forbidden"
+                logger.info("GuestAccessEvent. New content=" + str(content))
+            # end of added for watcha
             (
                 event,
                 _,
@@ -236,7 +284,8 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         register_txn_path(self, PATTERNS, http_server, with_get=True)
 
     async def on_POST(self, request, room_id, event_type, txn_id=None):
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        # modified for watcha add allow_partner
+        requester = await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True)
         content = parse_json_object_from_request(request)
 
         event_dict = {
@@ -280,7 +329,8 @@ class JoinRoomAliasServlet(TransactionRestServlet):
         register_txn_path(self, PATTERNS, http_server)
 
     async def on_POST(self, request, room_identifier, txn_id=None):
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        # modified for watcha add allow_partners
+        requester = await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True)
 
         try:
             content = parse_json_object_from_request(request)
@@ -359,6 +409,10 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             else:
                 pass
 
+        # added for watcha disable pubic room
+        raise AuthError(403, "Directory is not available")
+        # end of added for watcha
+
         limit = parse_integer(request, "limit", 0)
         since_token = parse_string(request, "since", None)
 
@@ -383,6 +437,10 @@ class PublicRoomListRestServlet(TransactionRestServlet):
 
     async def on_POST(self, request):
         await self.auth.get_user_by_req(request, allow_guest=True)
+
+        # added for watcha disable public rooms 
+        raise AuthError(403, "Directory is not available")
+        # end of added for watcha disable public rooms 
 
         server = parse_string(request, "server", default=None)
         content = parse_json_object_from_request(request)
@@ -513,7 +571,8 @@ class RoomMessageListRestServlet(RestServlet):
         self.auth = hs.get_auth()
 
     async def on_GET(self, request, room_id):
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        # modified for watcha add allow_partners
+        requester = await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True)
         pagination_config = PaginationConfig.from_request(request, default_limit=10)
         as_client_event = b"raw" not in request.args
         filter_str = parse_string(request, b"filter", encoding="utf-8")
@@ -550,12 +609,13 @@ class RoomStateRestServlet(RestServlet):
         self.auth = hs.get_auth()
 
     async def on_GET(self, request, room_id):
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        requester = await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True)
         # Get all the current state for this room
         events = await self.message_handler.get_state_events(
             room_id=room_id,
             user_id=requester.user.to_string(),
             is_guest=requester.is_guest,
+            is_partner=requester.is_partner,
         )
         return 200, events
 
@@ -570,7 +630,7 @@ class RoomInitialSyncRestServlet(RestServlet):
         self.auth = hs.get_auth()
 
     async def on_GET(self, request, room_id):
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        requester = await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True)
         pagination_config = PaginationConfig.from_request(request)
         content = await self.initial_sync_handler.room_initial_sync(
             room_id=room_id, requester=requester, pagin_config=pagination_config
@@ -623,7 +683,7 @@ class RoomEventContextServlet(RestServlet):
         self.auth = hs.get_auth()
 
     async def on_GET(self, request, room_id, event_id):
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        requester = await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True)
 
         limit = parse_integer(request, "limit", default=10)
 
@@ -690,6 +750,9 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         super(RoomMembershipRestServlet, self).__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
+        # added for watcha
+        self.handlers = hs.get_handlers()
+        # end of added for watcha
 
     def register(self, http_server):
         # /rooms/$roomid/[invite|join|leave]
@@ -700,13 +763,22 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         register_txn_path(self, PATTERNS, http_server)
 
     async def on_POST(self, request, room_id, membership_action, txn_id=None):
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        # modified for watcha add allow_partner
+        requester = await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True)
 
-        if requester.is_guest and membership_action not in {
+        # modified for watcha add requester.is.partner
+        if (requester.is_guest or requester.is_partner) and membership_action not in {
             Membership.JOIN,
             Membership.LEAVE,
         }:
-            raise AuthError(403, "Guest access not allowed")
+        # added for watcha
+            if requester.is_guest:
+        # end of added for watcha
+                raise AuthError(403, "Guest access not allowed")
+            # added for watcha handle partners
+            else:
+                raise AuthError(403, "Partners can only join and leave rooms")
+            # end of add for watcha
 
         try:
             content = parse_json_object_from_request(request)
@@ -716,16 +788,31 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             content = {}
 
         if membership_action == "invite" and self._has_3pid_invite_keys(content):
-            await self.room_member_handler.do_3pid_invite(
-                room_id,
-                requester.user,
-                content["medium"],
-                content["address"],
-                content["id_server"],
-                requester,
-                txn_id,
-                content.get("id_access_token"),
+            # added for watcha
+            logger.info("invitation: inviter id=%s, device_id=%s",
+                        requester.user, requester.device_id)
+
+            content["user_id"] = await self.handlers.invite_external_handler.invite(
+                room_id=room_id,
+                inviter=requester.user,
+                inviter_device_id=str(requester.device_id),
+                invitee=content["address"]
             )
+            logger.info("invitee email=%s has been invited as %s in room_id=%s",
+                        content["address"], content["user_id"], room_id)
+            # end of added for watcha
+
+           #removed for watcha 
+        #    await self.room_member_handler.do_3pid_invite(
+        #         room_id,
+        #         requester.user,
+        #         content["medium"],
+        #         content["address"],
+        #         content["id_server"],
+        #         requester,
+        #         txn_id,
+        #         content.get("id_access_token"),
+        #     )
             return 200, {}
 
         target = requester.user
@@ -824,7 +911,8 @@ class RoomTypingRestServlet(RestServlet):
         )
 
     async def on_PUT(self, request, room_id, user_id):
-        requester = await self.auth.get_user_by_req(request)
+        # added allow_partner for watcha
+        requester = await self.auth.get_user_by_req(request, allow_partner=True)
 
         if not self._is_typing_writer:
             raise Exception("Got /typing request on instance that is not typing writer")
@@ -907,7 +995,7 @@ class JoinedRoomsRestServlet(RestServlet):
         self.auth = hs.get_auth()
 
     async def on_GET(self, request):
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        requester = await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True)
 
         room_ids = await self.store.get_rooms_for_user(requester.user.to_string())
         return 200, {"joined_rooms": list(room_ids)}

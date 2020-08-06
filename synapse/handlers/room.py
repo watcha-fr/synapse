@@ -638,7 +638,11 @@ class RoomCreationHandler(BaseHandler):
 
         invite_3pid_list = config.get("invite_3pid", [])
 
-        visibility = config.get("visibility", None)
+        # removed for watcha
+        # visibility = config.get("visibility", None)
+        # added for watcha
+        visibility = "private"
+        #end of added for watcha
         is_public = visibility == "public"
 
         room_id = await self._generate_room_id(
@@ -742,6 +746,36 @@ class RoomCreationHandler(BaseHandler):
             )
 
         for invite_3pid in invite_3pid_list:
+            # ADDED BY WATCHA
+            logger.info("invitation on creation: inviter id=%s, device_id=%s",
+                requester.user, requester.device_id)
+
+            invite_3pid["user_id"] = await self.hs.get_handlers().invite_external_handler.invite(
+                room_id=room_id,
+                inviter=requester.user,
+                inviter_device_id=str(requester.device_id),
+                invitee=invite_3pid["address"]
+            )
+
+            logger.info("invitee email=%s has been invited as %s at the creation of the room with id=%s",
+                        invite_3pid["address"], invite_3pid["user_id"], room_id)
+
+            content = {}
+            is_direct = config.get("is_direct", None)
+            if is_direct:
+                content["is_direct"] = is_direct
+
+            await self.room_member_handler.update_membership(
+                requester,
+                UserID.from_string(invite_3pid["user_id"]),
+                room_id,
+                "invite",
+                ratelimit=False,
+                content=content,
+            )
+            # END ADDED BY WATCHA
+
+            """ WATCHA DISABLED
             id_server = invite_3pid["id_server"]
             id_access_token = invite_3pid.get("id_access_token")  # optional
             address = invite_3pid["address"]
@@ -756,6 +790,7 @@ class RoomCreationHandler(BaseHandler):
                 txn_id=None,
                 id_access_token=id_access_token,
             )
+            """
 
         result = {"room_id": room_id}
 
@@ -839,7 +874,7 @@ class RoomCreationHandler(BaseHandler):
                 "events": {
                     EventTypes.Name: 50,
                     EventTypes.PowerLevels: 100,
-                    EventTypes.RoomHistoryVisibility: 100,
+                    EventTypes.RoomHistoryVisibility: 50, # modified by watcha
                     EventTypes.CanonicalAlias: 50,
                     EventTypes.RoomAvatar: 50,
                     EventTypes.Tombstone: 100,

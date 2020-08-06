@@ -129,6 +129,7 @@ class RegistrationHandler(BaseHandler):
             except ValueError:
                 pass
 
+        # modified for watcha add make_partner=False
     async def register_user(
         self,
         localpart=None,
@@ -142,6 +143,7 @@ class RegistrationHandler(BaseHandler):
         address=None,
         bind_emails=[],
         by_admin=False,
+        make_partner=False
     ):
         """Registers a new client on the server.
 
@@ -185,12 +187,14 @@ class RegistrationHandler(BaseHandler):
             elif default_display_name is None:
                 default_display_name = localpart
 
+            # modified for watcha add make_partner=make_partner,
             await self.register_with_store(
                 user_id=user_id,
                 password_hash=password_hash,
                 was_guest=was_guest,
                 make_guest=make_guest,
                 create_profile_with_displayname=default_display_name,
+                make_partner=make_partner,
                 admin=admin,
                 user_type=user_type,
                 address=address,
@@ -218,12 +222,14 @@ class RegistrationHandler(BaseHandler):
                 if default_display_name is None:
                     default_display_name = localpart
                 try:
+                 # modified for watcha add make_partner
                     await self.register_with_store(
                         user_id=user_id,
                         password_hash=password_hash,
                         make_guest=make_guest,
                         create_profile_with_displayname=default_display_name,
                         address=address,
+                        make_partner=make_partner,
                     )
 
                     # Successfully registered
@@ -529,6 +535,7 @@ class RegistrationHandler(BaseHandler):
         admin=False,
         user_type=None,
         address=None,
+        make_partner=False,
     ):
         """Register user in the datastore.
 
@@ -561,6 +568,8 @@ class RegistrationHandler(BaseHandler):
                 admin=admin,
                 user_type=user_type,
                 address=address,
+                # Watcha: this probably doesn't work, but is probably not used anyway
+                make_partner=make_partner,
             )
         else:
             return self.store.register_user(
@@ -572,6 +581,9 @@ class RegistrationHandler(BaseHandler):
                 create_profile_with_displayname=create_profile_with_displayname,
                 admin=admin,
                 user_type=user_type,
+                # Added for watcha
+                make_partner=make_partner,
+                #end of add for watcha
             )
 
     async def register_device(

@@ -74,9 +74,10 @@ class DeactivateAccountHandler(BaseHandler):
         # unbinding
         identity_server_supports_unbinding = True
 
+        #deletion for Watcha - op416
+        """"
         # Retrieve the 3PIDs this user has bound to an identity server
         threepids = await self.store.user_get_bound_threepids(user_id)
-
         for threepid in threepids:
             try:
                 result = await self._identity_handler.try_unbind_threepid(
@@ -95,6 +96,8 @@ class DeactivateAccountHandler(BaseHandler):
             await self.store.user_delete_threepid(
                 user_id, threepid["medium"], threepid["address"]
             )
+        """
+        # end of deletion
 
         # Remove all 3PIDs this user has bound to the homeserver
         await self.store.user_delete_threepids(user_id)
@@ -107,6 +110,10 @@ class DeactivateAccountHandler(BaseHandler):
         await self._auth_handler.delete_access_tokens_for_user(user_id)
 
         await self.store.user_set_password_hash(user_id, None)
+
+        # insertion for watcha
+        await self.store.watcha_deactivate_account(user_id)#added for watcha
+        # end of insertion
 
         # Add the user to a table of users pending deactivation (ie.
         # removal from all the rooms they're a member of)

@@ -27,7 +27,7 @@ class ExtremStatisticsTestCase(HomeserverTestCase):
         room_creator = self.hs.get_room_creation_handler()
 
         user = UserID("alice", "test")
-        requester = Requester(user, None, False, None, None)
+        requester = Requester(user, None, False, None, False, None)   # modified for watcha
 
         # Real events, forward extremities
         events = [(3, 2), (6, 2), (4, 6)]

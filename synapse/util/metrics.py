@@ -28,6 +28,10 @@ logger = logging.getLogger(__name__)
 
 block_counter = Counter("synapse_util_metrics_block_count", "", ["block_name"])
 
+# added for watcha
+logger.disabled = True 
+# end of added for watcha
+
 block_timer = Counter("synapse_util_metrics_block_time_seconds", "", ["block_name"])
 
 block_ru_utime = Counter(
