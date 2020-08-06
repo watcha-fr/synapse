@@ -153,6 +153,7 @@ class WatchaRoomEventsStoreTestCase(unittest.TestCase):
         self.event_builder_factory = hs.get_event_builder_factory()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.store = hs.get_datastore()
+        self.d = hs.get_datastore()
         self.user = UserID.from_string("@user:test")
         self.room = RoomID.from_string("!abc123:test")
         self.nextcloud_folder_url = "http://test.watcha.fr/nextcloud/apps/files/?dir=/test_folder"
@@ -161,8 +162,7 @@ class WatchaRoomEventsStoreTestCase(unittest.TestCase):
 
         yield create_room(hs, self.room.to_string(), self.user.to_string())
 
-    @defer.inlineCallbacks
-    def _send_room_mapping_event(self, nextcloud_folder_url):
+    async def _send_room_mapping_event(self, nextcloud_folder_url):
         builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
             {

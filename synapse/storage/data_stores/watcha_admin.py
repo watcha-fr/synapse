@@ -1,3 +1,4 @@
+# TODO this class should be moved to data_stores
 # -*- coding: utf-8 -*-
 
 import time, json, calendar, logging
@@ -8,8 +9,8 @@ import inspect
 
 from twisted.internet import defer
 
-from ._base import SQLBaseStore
-
+from synapse.storage._base import SQLBaseStore
+from synapse.storage.database import Database
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
@@ -28,21 +29,17 @@ def _caller_name():
         return "<unknown function>"
 
 class WatchaAdminStore(SQLBaseStore):
-    def __init__(self, db_conn, hs):
-        super(WatchaAdminStore, self).__init__(db_conn, hs)
+    def __init__(self, database: Database, db_conn, hs):
+        super(WatchaAdminStore, self).__init__(database, db_conn, hs)
 
         self.clock = hs.get_clock()
 
-    def _execute_sql(self, sql, *args):
-        return self._execute(
-            _caller_name(),
-            None, sql, *args)
-
+    
     @defer.inlineCallbacks
     def _get_new_rooms(self):
         """List rooms where are recevied m.room.create event before a week ago"""
 
-        new_rooms = yield self._execute_sql(
+        new_rooms = yield self.db.execute_sql(
             """
             SELECT DISTINCT room_id
             FROM events
@@ -58,7 +55,7 @@ class WatchaAdminStore(SQLBaseStore):
     def _get_active_rooms(self):
         """List rooms where the last message was sent than less a week ago"""
 
-       active_rooms = yield self._execute_sql(
+        active_rooms = yield self.db.execute_sql(
          """
             SELECT DISTINCT room_id 
             FROM events
@@ -77,7 +74,7 @@ class WatchaAdminStore(SQLBaseStore):
 
         members_by_room = yield self.members_by_room()
 
-        dm_rooms_by_member = yield self._simple_select_onecol(
+        dm_rooms_by_member = yield self.db.simple_select_onecol(
             table="account_data",
             keyvalues={"account_data_type": "m.direct"},
             retcol="content",
@@ -108,7 +105,7 @@ class WatchaAdminStore(SQLBaseStore):
 
         active_rooms = set(active_rooms).union(new_rooms)
 
-        all_rooms = yield self._simple_select_onecol(
+        all_rooms = yield self.db.simple_select_onecol(
             table="rooms", keyvalues=None, retcol="room_id",
         )
         
@@ -135,7 +132,7 @@ class WatchaAdminStore(SQLBaseStore):
 
         administrators_users = yield self._get_user_admin()
 
-        collaborators_users = yield self._execute_sql(
+        collaborators_users = yield self.db.execute_sql(
         """
             SELECT COUNT(*) as count
             FROM users
@@ -144,7 +141,7 @@ class WatchaAdminStore(SQLBaseStore):
         """
         )
 
-        partner_users = yield self._execute_sql(
+        partner_users = yield self.db.execute_sql(
         """
             SELECT COUNT(*) as count
             FROM users
@@ -153,7 +150,7 @@ class WatchaAdminStore(SQLBaseStore):
         """
         )
 
-        last_seen_ts_per_users = yield self._execute_sql(
+        last_seen_ts_per_users = yield self.db.execute_sql(
         """
             SELECT
                 user_id
@@ -280,7 +277,7 @@ class WatchaAdminStore(SQLBaseStore):
         """
 
         users_with_pending_invitation = yield self._get_users_with_pending_invitation()
-        users = yield self._execute_sql(SQL_USER_LIST)
+        users = yield self.db.execute_sql(SQL_USER_LIST)
         users = [dict(zip(FIELDS, user)) for user in users]
 
         for user in users:
@@ -294,7 +291,8 @@ class WatchaAdminStore(SQLBaseStore):
 
         defer.returnValue(users)
 
-    async def watcha_email_list(self):
+    @defer.inlineCallbacks
+    def watcha_email_list(self):
 
         SQL_EMAIL_LIST = """
             SELECT
@@ -304,14 +302,14 @@ class WatchaAdminStore(SQLBaseStore):
             WHERE medium = "email"
             """
 
-        emails = await self._execute_sql(SQL_EMAIL_LIST)
+        emails = yield self.db.execute_sql(SQL_EMAIL_LIST)
 
-        return emails
+        defer.returnValue(emails)
 
     @defer.inlineCallbacks
     def watcha_user_ip(self, user_id):
 
-        user_ip = yield self._execute_sql("""
+        user_ip = yield self.db.execute_sql("""
         SELECT ip, user_agent, last_seen FROM user_ips
         WHERE user_id = ?
         ORDER BY last_seen DESC
@@ -322,7 +320,7 @@ class WatchaAdminStore(SQLBaseStore):
     @defer.inlineCallbacks
     def members_by_room(self):
         # (Does not return empty rooms)
-        room_memberships = yield self._execute_sql(
+        room_memberships = yield self.db.execute_sql(
             """
             SELECT
                 room_id
@@ -361,7 +359,7 @@ class WatchaAdminStore(SQLBaseStore):
     def watcha_room_list(self):
         """ List the rooms their state and their users """
 
-        rooms = yield self._execute_sql(
+        rooms = yield self.db.execute_sql(
             """
             SELECT
                 rooms.room_id
@@ -404,7 +402,7 @@ class WatchaAdminStore(SQLBaseStore):
 
 
     def watcha_room_membership(self):
-        return self._simple_select_list(
+        return self.db.simple_select_list(
             table = "room_memberships",
             keyvalues = {},
             retcols = [
@@ -416,7 +414,7 @@ class WatchaAdminStore(SQLBaseStore):
         )
 
     def watcha_room_name(self):
-        return self._simple_select_list(
+        return self.db.simple_select_list(
             table="room_names",
             keyvalues={},
             retcols=[
@@ -427,7 +425,7 @@ class WatchaAdminStore(SQLBaseStore):
         )
 
     def _update_user(self, user_id, **updatevalues):
-        return self._simple_update(
+        return self.db.simple_update(
             table="users",
             keyvalues={ 'name': user_id },
             updatevalues=updatevalues,
@@ -453,7 +451,7 @@ class WatchaAdminStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def _get_users_with_pending_invitation(self):
-        never_logged_users = yield self._execute_sql(
+        never_logged_users = yield self.db.execute_sql(
         """
             SELECT
                 users.name
@@ -471,7 +469,7 @@ class WatchaAdminStore(SQLBaseStore):
         )
         never_logged_users = [user[0] for user in never_logged_users]
 
-        never_logged_users_with_defined_password = yield self._execute_sql(
+        never_logged_users_with_defined_password = yield self.db.execute_sql(
         """
             SELECT distinct
                 devices.user_id
@@ -493,7 +491,7 @@ class WatchaAdminStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def _get_user_admin(self):
-        admins = yield self._execute_sql(
+        admins = yield self.db.execute_sql(
             """
             SELECT
                 users.name
@@ -521,7 +519,7 @@ class WatchaAdminStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def _get_range_count(self, where_clause, time_range):
-        value = yield self._execute_sql('SELECT count(*) FROM events WHERE ' +
+        value = yield self.db.execute_sql('SELECT count(*) FROM events WHERE ' +
                                         where_clause +
                                         ' AND received_ts BETWEEN %d AND %d' %
                                         (int(time_range[1])*1000, int(time_range[2])*1000))

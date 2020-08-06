@@ -531,45 +531,42 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
 # Insertion for watcha
 class WatchaRegistrationTestCase(unittest.HomeserverTestCase):
-    @defer.inlineCallbacks
-    def setUp(self):
-        hs = yield setup_test_homeserver(self.addCleanup)
+    async def setUp(self):
+        hs = await setup_test_homeserver(self.addCleanup)
         self.store = hs.get_datastore()
         self.handler = hs.get_auth_handler()
         self.time = int(hs.get_clock().time_msec())
-        yield self.register_user_with_email("@owner:test", "example@example.com")
+        await self.register_user_with_email("@owner:test", "example@example.com")
 
-     @defer.inlineCallbacks
-     def register_user_with_email(self, user_id, email):
+    async def register_user_with_email(self, user_id, email):
         # register a user and add email as threepids
-        yield self.store.register_user(user_id, "pass")
-        yield self.handler.add_threepid(
+        await self.store.register_user(user_id, "pass")
+        await self.handler.add_threepid(
             user_id, "email", email, self.time,
         )
 
-     @defer.inlineCallbacks
-     def test_email_is_correctly_insert_on_DB(self):
-        email = yield self.store.db.simple_select_one_onecol(
-            "user_threepids", {"user_id": "@owner:test"}, "address"
+    async def test_email_is_correctly_insert_on_DB(self):
+        email = await self.store.db.simple_select_one_onecol(
+            table="user_threepids",
+            keyvalues={"user_id": "owner:test"},
+            retcol="address"
         )
-        self.assertEqual(email, "example@example.com")
+        self.get_success(self.assertEqual(email, "example@example.com"))
 
-     @defer.inlineCallbacks
-     def test_email_is_correctly_insert_on_DB_after_two_same_registration(self):
+    async def test_email_is_correctly_insert_on_DB_after_two_same_registration(self):
         with self.assertRaises(SynapseError):
-            yield self.register_user_with_email("@owner:test", "example2@example.com")
+            await self.register_user_with_email("@owner:test", "example2@example.com")
 
-        email = yield self.store._simple_select_one_onecol(
+        email = await self.store.db.simple_select_one_onecol(
             "user_threepids", {"user_id": "@owner:test"}, "address"
         )
-        self.assertEqual(email, "example@example.com")
+        self.get_success(self.get_success(self.assertEqual(email, "example@example.com")))
 
-     @defer.inlineCallbacks
-     def test_email_cannot_used_two_times_with_same_value(self):
+    async def test_email_cannot_used_two_times_with_same_value(self):
         with self.assertRaises(SynapseError) as cm:
-            yield self.register_user_with_email("@user:test", "example@example.com")
+            await self.register_user_with_email("@user:test", "example@example.com")
 
-        self.assertEqual(cm.exception.code, 400)
+        self.get_success(self.assertEqual(cm.exception.code, 400))
         self.assertEqual(
             cm.exception.msg, "This email is already attached to another user account."
         )

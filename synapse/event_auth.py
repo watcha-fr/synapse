@@ -284,7 +284,7 @@ def _is_membership_change_allowed(
 
     if Membership.INVITE == membership and "third_party_invite" in event.content:
         if not _verify_third_party_invite(event, auth_events):
-            raise AuthError(403, "You are not invited to this room.")
+            raise AuthError(403, "You are not invited to this room2.")
         if target_banned:
             raise AuthError(403, "%s is banned from the room" % (target_user_id,))
         return
@@ -326,7 +326,7 @@ def _is_membership_change_allowed(
             pass
         elif join_rule == JoinRules.INVITE:
             if not caller_in_room and not caller_invited:
-                raise AuthError(403, "You are not invited to this room.")
+                raise AuthError(403, "You are not invited to this room3.")
         else:
             # TODO (erikj): may_join list
             # TODO (erikj): private rooms

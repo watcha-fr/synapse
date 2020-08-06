@@ -35,7 +35,7 @@ class BaseHomeserverWithEmailTestCase(unittest.HomeserverTestCase):
 
         return self.hs
 
-    def prepare(self, reactor, clock, hs):
+    async def prepare(self, reactor, clock, hs):
         # Admin_user register.
         self.time = self.hs.get_clock().time_msec()
         self.user_id = self.register_user("admin", "pass", True)

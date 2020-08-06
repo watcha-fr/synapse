@@ -245,10 +245,10 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body["email"], "example@email.com")
 
-    def test_do_not_get_phone_threepids(self):
+    async def test_do_not_get_phone_threepids(self):
 
         # Addition of phone number as a threepids :
-        self.auth.add_threepid(self.owner, "msisdn", "0612345678", self.time)
+        await self.auth.add_threepid(self.owner, "msisdn", "0612345678", self.time)
 
         with self.assertLogs('synapse.rest.client.v1.profile', level='ERROR') as cm:
             request, channel = self.make_request(
