@@ -1571,31 +1571,28 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
         )
 
     # insertion for watcha OP318
-    @defer.inlineCallbacks
-    def is_user_partner(self, user_id):
+    async def is_user_partner(self, user_id):
 
-        is_partner = yield self.db.simple_select_one_onecol(
+        is_partner = await self.db.simple_select_one_onecol(
             "users",
             keyvalues={"name": user_id},
             retcol="is_partner",
             desc="isUserPartner",
         )
         logger.info("login from user %s. is_partner=%s", user_id, is_partner)
-        defer.returnValue(is_partner)
-
+        return is_partner
     # end of insertion
 
     # insertion for watcha OP318
-    @defer.inlineCallbacks
-    def is_user_admin(self, user_id):
+    async def is_user_admin(self, user_id):
 
-        is_admin = yield self.db.simple_select_one_onecol(
+        is_admin = await self.db.simple_select_one_onecol(
             "users",
             keyvalues={"name": user_id},
             retcol="admin",
             desc="isUserAdmin",
         )
-        defer.returnValue(is_admin)
+        return is_admin
     # end of insertion
 
 def find_max_generated_user_id_localpart(cur: Cursor) -> int:
