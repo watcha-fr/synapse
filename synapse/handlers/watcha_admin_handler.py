@@ -27,7 +27,7 @@ class WatchaAdminHandler(BaseHandler):
                 "creation_ts": user["creation_ts"],
             })
 
-        return 'result'
+        return result
 
     async def watcha_room_membership(self):
         result = await self.store.watcha_room_membership()
