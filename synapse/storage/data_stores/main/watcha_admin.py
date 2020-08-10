@@ -443,17 +443,10 @@ class WatchaAdminStore(SQLBaseStore):
                 SELECT
                     rooms.room_id
                     , rooms.creator
-                    , room_names.name
+                    , room_stats_state.name
                 FROM rooms
-                    LEFT JOIN (
-                        SELECT
-                            room_id
-                            , event_id
-                        FROM current_state_events
-                        WHERE type = "m.room.name") as last_room_names
-                        ON last_room_names.room_id = rooms.room_id
-                    LEFT JOIN room_names
-                        ON room_names.event_id = last_room_names.event_id
+                    LEFT JOIN room_stats_state
+                        ON room_stats_state.room_id = rooms.room_id
                 ORDER BY rooms.room_id ASC;
             """
             )
@@ -463,7 +456,7 @@ class WatchaAdminStore(SQLBaseStore):
         rooms = await self.db.runInteraction("watcha_room_list", watcha_room_list_txn)
         members_by_room = await self.members_by_room()
         new_rooms = await self._get_new_rooms()
-        active_rooms = self._get_active_rooms()
+        active_rooms = await self._get_active_rooms()
         dm_rooms = await self._get_dm_rooms()
 
         return [
