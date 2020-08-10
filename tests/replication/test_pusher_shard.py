@@ -77,6 +77,9 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         room = self.helper.create_room_as(user_id, tok=access_token)
 
         # The other user joins
+        # watcha+
+        self.helper.invite(room, user_id, self.other_user_id, tok=access_token)
+        # +watcha
         self.helper.join(
             room=room, user=self.other_user_id, tok=self.other_access_token
         )
@@ -107,10 +110,18 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         self.pump()
 
         http_client_mock.post_json_get_json.assert_called_once()
+        ''' !watcha
         self.assertEqual(
             http_client_mock.post_json_get_json.call_args[0][0],
             "https://push.example.com/push",
         )
+        '''
+        # wathca+
+        self.assertEqual(
+            http_client_mock.post_json_get_json.call_args[0][0],
+            "http://127.0.0.1:5000/_matrix/push/v1/notify"
+        )
+        # +watcha
         self.assertEqual(
             event_id,
             http_client_mock.post_json_get_json.call_args[0][1]["notification"][
@@ -159,10 +170,19 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
 
         http_client_mock1.post_json_get_json.assert_called_once()
         http_client_mock2.post_json_get_json.assert_not_called()
+        '''! watcha
         self.assertEqual(
             http_client_mock1.post_json_get_json.call_args[0][0],
             "https://push.example.com/push",
         )
+        '''
+        # watcha+
+        self.assertEqual(
+            http_client_mock1.post_json_get_json.call_args[0][0],
+            "http://127.0.0.1:5000/_matrix/push/v1/notify",
+
+        )
+        # +watcha
         self.assertEqual(
             event_id,
             http_client_mock1.post_json_get_json.call_args[0][1]["notification"][
@@ -181,10 +201,18 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
 
         http_client_mock1.post_json_get_json.assert_not_called()
         http_client_mock2.post_json_get_json.assert_called_once()
+        ''' !watcha
         self.assertEqual(
             http_client_mock2.post_json_get_json.call_args[0][0],
             "https://push.example.com/push",
         )
+        '''
+        # watcha+
+        self.assertEqual(
+            http_client_mock2.post_json_get_json.call_args[0][0],
+            "http://127.0.0.1:5000/_matrix/push/v1/notify"
+        )
+        # +watcha
         self.assertEqual(
             event_id,
             http_client_mock2.post_json_get_json.call_args[0][1]["notification"][
