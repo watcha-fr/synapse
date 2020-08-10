@@ -301,6 +301,7 @@ class WatchaRegisterRestServlet(RestServlet):
         super(WatchaRegisterRestServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
+        self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
 
     async def on_POST(self, request):
@@ -326,7 +327,7 @@ class WatchaRegisterRestServlet(RestServlet):
                 500, "Email address cannot be empty",
             )
 
-        full_user_id = await self.hs.auth_handler.find_user_id_by_email(email)
+        full_user_id = await self.auth_handler.find_user_id_by_email(email)
         if full_user_id:
             raise SynapseError(
                 500,
@@ -349,17 +350,14 @@ class WatchaRegisterRestServlet(RestServlet):
                 )
             inviter_name = params["inviter"]
 
-        if 'password' in params:
-            password = params['password']
-        else:
-            password = generate_password()
-
+        password = params['password'] if 'password' in params else generate_password()
+        password_hash = await self.auth_handler.hash(password)
         admin = params["admin"] == "admin"
         bind_emails = [params["email"]]
 
         user_id = await self.registration_handler.register_user(
             localpart=params["user"],
-            password_hash=password,
+            password_hash=password_hash,
             admin=admin,
             bind_emails=bind_emails,
         )
