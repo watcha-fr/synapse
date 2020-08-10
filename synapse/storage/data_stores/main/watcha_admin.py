@@ -42,7 +42,7 @@ class WatchaAdminStore(SQLBaseStore):
             A list of room_id
         """
 
-        def _get_new_rooms_txn(self):
+        def _get_new_rooms_txn(txn):
             txn.execute(
                 """
                 SELECT DISTINCT room_id
@@ -63,7 +63,7 @@ class WatchaAdminStore(SQLBaseStore):
             A list of room_id
         """
 
-        def _get_active_rooms_txn(self):
+        def _get_active_rooms_txn(txn):
             txn.execute(
                 """
                 SELECT DISTINCT room_id
@@ -112,7 +112,6 @@ class WatchaAdminStore(SQLBaseStore):
         Returns:
             A dict of integers
         """
-
         members_by_room = await self.members_by_room()
         dm_rooms = await self._get_dm_rooms()
         new_rooms = await self._get_new_rooms()
@@ -120,7 +119,7 @@ class WatchaAdminStore(SQLBaseStore):
 
         active_rooms = set(active_rooms).union(new_rooms)
 
-        all_rooms = await self._simple_select_onecol(
+        all_rooms = await self.db.simple_select_onecol(
             table="rooms", keyvalues=None, retcol="room_id",
         )
 
@@ -233,7 +232,7 @@ class WatchaAdminStore(SQLBaseStore):
             },
         }
 
-    def _get_server_state(self):
+    async def _get_server_state(self):
         """Retrieve informations about server (disk usage, install and upgrade date, version)
         
         Used for Watcha admin console.
@@ -327,7 +326,7 @@ class WatchaAdminStore(SQLBaseStore):
             txn.execute(SQL_USER_LIST)
             result = txn.fetchall()
 
-            return [dict(zip(FIELDS, user)) for user in txn.fetchall()]
+            return [dict(zip(FIELDS, user)) for user in result]
 
         users = await self.db.runInteraction("watcha_user_list", watcha_user_list_txn)
 
@@ -444,17 +443,10 @@ class WatchaAdminStore(SQLBaseStore):
                 SELECT
                     rooms.room_id
                     , rooms.creator
-                    , room_names.name
+                    , room_stats_state.name
                 FROM rooms
-                    LEFT JOIN (
-                        SELECT
-                            room_id
-                            , event_id
-                        FROM current_state_events
-                        WHERE type = "m.room.name") as last_room_names
-                        ON last_room_names.room_id = rooms.room_id
-                    LEFT JOIN room_names
-                        ON room_names.event_id = last_room_names.event_id
+                    LEFT JOIN room_stats_state
+                        ON room_stats_state.room_id = rooms.room_id
                 ORDER BY rooms.room_id ASC;
             """
             )
@@ -464,7 +456,7 @@ class WatchaAdminStore(SQLBaseStore):
         rooms = await self.db.runInteraction("watcha_room_list", watcha_room_list_txn)
         members_by_room = await self.members_by_room()
         new_rooms = await self._get_new_rooms()
-        active_rooms = self._get_active_rooms()
+        active_rooms = await self._get_active_rooms()
         dm_rooms = await self._get_dm_rooms()
 
         return [
@@ -579,7 +571,7 @@ class WatchaAdminStore(SQLBaseStore):
             )
 
         return await self.db.runInteraction(
-            "_get_users_with_pending_invitation_txn",
+            "_get_users_with_pending_invitation",
             _get_users_with_pending_invitation_txn,
         )
 
@@ -615,15 +607,12 @@ class WatchaAdminStore(SQLBaseStore):
         return admins
 
     async def watcha_admin_stats(self):
-        # ranges must be a list of arrays with three elements: label, start seconds since epoch, end seconds since epoch
         user_stats = await self._get_users_stats()
         room_stats = await self._get_room_count_per_type()
         server_stats = await self._get_server_state()
 
-        result = {
+        return {
             "users": user_stats,
             "rooms": room_stats,
             "server": server_stats,
         }
-
-        return result
