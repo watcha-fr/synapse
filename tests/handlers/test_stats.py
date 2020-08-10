@@ -298,6 +298,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertIsNotNone(r2stats)
 
         # contains the default things you'd expect in a fresh room
+        ''' !watcha
         self.assertEqual(
             r1stats["total_events"],
             EXPT_NUM_STATE_EVTS_IN_FRESH_PUBLIC_ROOM,
@@ -305,6 +306,14 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             " You may need to update this if more state events are added to"
             " the room creation process.",
         )
+        '''
+        # watcha+
+        self.assertEqual(
+            r1stats["total_events"]-1,
+            EXPT_NUM_STATE_EVTS_IN_FRESH_PUBLIC_ROOM,
+        )
+        # +watcha
+
         self.assertEqual(
             r2stats["total_events"],
             EXPT_NUM_STATE_EVTS_IN_FRESH_PRIVATE_ROOM,
@@ -313,9 +322,16 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             " the room creation process.",
         )
 
+        ''' !watcha 
         self.assertEqual(
             r1stats["current_state_events"], EXPT_NUM_STATE_EVTS_IN_FRESH_PUBLIC_ROOM
         )
+        '''
+        # watcha+
+        self.assertEqual(
+            r1stats["current_state_events"]-1, EXPT_NUM_STATE_EVTS_IN_FRESH_PUBLIC_ROOM
+        )    
+        # +watcha
         self.assertEqual(
             r2stats["current_state_events"], EXPT_NUM_STATE_EVTS_IN_FRESH_PRIVATE_ROOM
         )
@@ -420,11 +436,13 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         u2token = self.login("u2", "pass")
 
         r1stats_ante = self._get_current_stats("room", r1)
-
+        # +watcha
+        self.helper.invite(r1, u1, u2, tok=u1token)
+        # watcha+
         self.helper.join(r1, u2, tok=u2token)
 
         r1stats_post = self._get_current_stats("room", r1)
-
+        ''' !watcha
         self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
         self.assertEqual(
             r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
@@ -433,6 +451,17 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertEqual(
             r1stats_post["joined_members"] - r1stats_ante["joined_members"], 1
         )
+        '''
+        # watcha+
+        self.assertEqual(r1stats_post["total_events"]-1 - r1stats_ante["total_events"], 1)
+        self.assertEqual(
+            r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
+            1,
+        )
+        self.assertEqual(
+            r1stats_post["joined_members"] - r1stats_ante["joined_members"], 1
+        )
+        # + watcha
 
     def test_join_after_leave(self):
         """
@@ -450,17 +479,28 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         u2 = self.register_user("u2", "pass")
         u2token = self.login("u2", "pass")
+        # watcha+
+        self.helper.invite(r1, u1, u2, tok=u1token)
+        # +watcha
 
         self.helper.join(r1, u2, tok=u2token)
         self.helper.leave(r1, u2, tok=u2token)
 
         r1stats_ante = self._get_current_stats("room", r1)
+        # watcha+
+        self.helper.invite(r1, u1, u2, tok=u1token)
+        # +watcha
 
         self.helper.join(r1, u2, tok=u2token)
 
         r1stats_post = self._get_current_stats("room", r1)
 
+        ''' !watcha
         self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
+        '''
+        # watcha+
+        self.assertEqual(r1stats_post["total_events"]-1 - r1stats_ante["total_events"], 1)
+        # +watcha
         self.assertEqual(
             r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
             0,
@@ -554,7 +594,9 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         u2 = self.register_user("u2", "pass")
         u2token = self.login("u2", "pass")
-
+         # watcha+
+        self.helper.invite(r1, u1, u2, tok=u1token)
+        # +watcha
         self.helper.join(r1, u2, tok=u2token)
 
         r1stats_ante = self._get_current_stats("room", r1)
@@ -646,10 +688,16 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         u1stats = self._get_current_stats("user", u1)
 
         self.assertEqual(r1stats["joined_members"], 1)
+        ''' !watcha
         self.assertEqual(
             r1stats["current_state_events"], EXPT_NUM_STATE_EVTS_IN_FRESH_PUBLIC_ROOM
         )
-
+        '''
+       #watcha +
+        self.assertEqual(
+            r1stats["current_state_events"]-1, EXPT_NUM_STATE_EVTS_IN_FRESH_PUBLIC_ROOM
+        )
+        # +watcha
         self.assertEqual(u1stats["joined_rooms"], 1)
 
     def test_incomplete_stats(self):
