@@ -592,6 +592,9 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         u2 = self.register_user("u2", "pass")
         u2token = self.login("u2", "pass")
 
+        # watcha+
+        self.helper.invite(r1, u1, u2, tok=u1token)
+        # +watcha
         self.helper.join(r1, u2, tok=u2token)
 
         r1stats_ante = self._get_current_stats("room", r1)
