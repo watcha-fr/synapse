@@ -257,47 +257,43 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
         self.assertEqual(json.loads(channel.result["body"]), expected_result)
 
     def test_get_watcha_admin_user_stats(self):
-        with self.assertLogs(
-            "synapse.storage.data_stores.main.watcha_admin", level="INFO"
-        ) as statsinfo:
-            self._do_register_user(
-                {
-                    "user": "user_test",
-                    "full_name": "test",
-                    "email": "test@test.com",
-                    "admin": False,
-                }
-            )
+        self._do_register_user(
+            {
+                "user": "user_test",
+                "full_name": "test",
+                "email": "test@test.com",
+                "admin": False,
+            }
+        )
 
-            request, channel = self.make_request(
-                "GET", "/watcha_admin_stats", access_token=self.user_access_token,
-            )
-            self.render(request)
-            print(statsinfo.output[0])
+        request, channel = self.make_request(
+            "GET", "/watcha_admin_stats", access_token=self.user_access_token,
+        )
+        self.render(request)
 
-            self.assertEquals(
-                json.loads(channel.result["body"])["users"],
-                {
-                    "administrators_users": [
-                        {
-                            "displayname": None,
-                            "email": "example@email.com",
-                            "user_id": "@admin:test",
-                        }
-                    ],
-                    "users_per_role": {
-                        "administrators": 1,
-                        "collaborators": 1,
-                        "partners": 0,
-                    },
-                    "connected_users": {
-                        "number_of_users_logged_at_least_once": 0,
-                        "number_of_last_month_logged_users": 0,
-                        "number_of_last_week_logged_users": 0,
-                    },
-                    "other_statistics": {"number_of_users_with_pending_invitation": 2,},
+        self.assertEquals(
+            json.loads(channel.result["body"])["users"],
+            {
+                "administrators_users": [
+                    {
+                        "displayname": None,
+                        "email": "example@email.com",
+                        "user_id": "@admin:test",
+                    }
+                ],
+                "users_per_role": {
+                    "administrators": 1,
+                    "collaborators": 1,
+                    "partners": 0,
                 },
-            )
+                "connected_users": {
+                    "number_of_users_logged_at_least_once": 0,
+                    "number_of_last_month_logged_users": 0,
+                    "number_of_last_week_logged_users": 0,
+                },
+                "other_statistics": {"number_of_users_with_pending_invitation": 2,},
+            },
+        )
 
     def test_get_watcha_admin_stats_room_type(self):
         room_id = self._create_room()

@@ -42,7 +42,7 @@ class WatchaAdminStore(SQLBaseStore):
             A list of room_id
         """
 
-        def _get_new_rooms_txn(self):
+        def _get_new_rooms_txn(txn):
             txn.execute(
                 """
                 SELECT DISTINCT room_id
@@ -63,7 +63,7 @@ class WatchaAdminStore(SQLBaseStore):
             A list of room_id
         """
 
-        def _get_active_rooms_txn(self):
+        def _get_active_rooms_txn(txn):
             txn.execute(
                 """
                 SELECT DISTINCT room_id
@@ -112,7 +112,6 @@ class WatchaAdminStore(SQLBaseStore):
         Returns:
             A dict of integers
         """
-
         members_by_room = await self.members_by_room()
         dm_rooms = await self._get_dm_rooms()
         new_rooms = await self._get_new_rooms()
@@ -120,7 +119,7 @@ class WatchaAdminStore(SQLBaseStore):
 
         active_rooms = set(active_rooms).union(new_rooms)
 
-        all_rooms = await self._simple_select_onecol(
+        all_rooms = await self.db.simple_select_onecol(
             table="rooms", keyvalues=None, retcol="room_id",
         )
 
@@ -233,7 +232,7 @@ class WatchaAdminStore(SQLBaseStore):
             },
         }
 
-    def _get_server_state(self):
+    async def _get_server_state(self):
         """Retrieve informations about server (disk usage, install and upgrade date, version)
         
         Used for Watcha admin console.
@@ -615,15 +614,12 @@ class WatchaAdminStore(SQLBaseStore):
         return admins
 
     async def watcha_admin_stats(self):
-        # ranges must be a list of arrays with three elements: label, start seconds since epoch, end seconds since epoch
         user_stats = await self._get_users_stats()
         room_stats = await self._get_room_count_per_type()
         server_stats = await self._get_server_state()
 
-        result = {
+        return {
             "users": user_stats,
             "rooms": room_stats,
             "server": server_stats,
         }
-
-        return result
