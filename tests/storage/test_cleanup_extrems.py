@@ -258,7 +258,13 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         self.event_creator_handler = homeserver.get_event_creation_handler()
 
         # Create a test user and room
+        ''' watcha!
         self.user = UserID.from_string(self.register_user("user1", "password"))
+        '''
+        # watcha+
+        self.user1 = self.register_user("user1", "password")
+        self.user = UserID.from_string(self.user1)
+        # +watcha
         self.token1 = self.login("user1", "password")
         self.requester = Requester(self.user, None, False, None, False, None)  # modified for watcha
         info, _ = self.get_success(self.room_creator.create_room(self.requester, {}))
@@ -303,6 +309,9 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
             # New user with regular levels
             user2 = self.register_user("user2", "password")
             token2 = self.login("user2", "password")
+            # watcha+
+            self.helper.invite(self.room_id, user2, self.user, tok=self.token1)
+            # +watcha
             self.helper.join(self.room_id, user2, tok=token2)
             self.pump(10 * 60)
 
@@ -331,6 +340,12 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         self.get_success(
             self.store.user_set_consent_version(user2, self.CONSENT_VERSION)
         )
+        # watcha+
+        self.get_success(
+            self.store.user_set_consent_version(self.user1, self.CONSENT_VERSION)
+        )
+        self.helper.invite(self.room_id, self.user1, user2, tok=self.token1)
+        # +watcha
         self.helper.join(self.room_id, user2, tok=token2)
 
         # Background updates should now cause a dummy event to be added to the graph
