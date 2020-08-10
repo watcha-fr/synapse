@@ -319,7 +319,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         non_admin_user = self.register_user("room_nonadmin", "pass", admin=False)
         non_admin_user_tok = self.login("room_nonadmin", "pass")
 
-        room_id = self.helper.create_room_as(non_admin_user, tok=admin_user_tok)
+        room_id = self.helper.create_room_as(non_admin_user, tok=non_admin_user_tok)
         self.helper.join(room_id, non_admin_user, tok=non_admin_user_tok)
 
         # Upload some media
