@@ -307,10 +307,10 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
         self.assertEquals(
             json.loads(channel.result["body"])["rooms"],
             {
-                "direct_active_rooms_count": 0,
-                "direct_rooms_count": 0,
-                "non_direct_active_rooms_count": 0,
-                "non_direct_rooms_count": 1,
+                "active_dm_room_count": 0,
+                "dm_room_count": 0,
+                "active_regular_room_count": 0,
+                "regular_room_count": 1,
             },
         )
         self.assertEquals(200, channel.code)
