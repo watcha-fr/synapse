@@ -327,7 +327,7 @@ class WatchaAdminStore(SQLBaseStore):
             txn.execute(SQL_USER_LIST)
             result = txn.fetchall()
 
-            return [dict(zip(FIELDS, user)) for user in txn.fetchall()]
+            return [dict(zip(FIELDS, user)) for user in result]
 
         users = await self.db.runInteraction("watcha_user_list", watcha_user_list_txn)
 
@@ -579,7 +579,7 @@ class WatchaAdminStore(SQLBaseStore):
             )
 
         return await self.db.runInteraction(
-            "_get_users_with_pending_invitation_txn",
+            "_get_users_with_pending_invitation",
             _get_users_with_pending_invitation_txn,
         )
 

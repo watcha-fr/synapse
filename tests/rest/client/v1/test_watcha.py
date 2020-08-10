@@ -144,17 +144,29 @@ class WatchaResetPasswordRestServletTestCase(BaseHomeserverWithEmailTestCase):
 class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
 
     def test_watcha_user_list(self):
-        self._do_register_user(
+
+        users_to_register = [
             {
-                "user": "user_test",
-                "full_name": "test",
-                "email": "test@test.com",
+                "user": "user_test1",
+                "full_name": "test1",
+                "email": "test1@test.com",
                 "admin": False,
-            }
-        )
+            },
+            {
+                "user": "user_test2",
+                "full_name": "test2",
+                "email": "test2@test.com",
+                "admin": False,
+            },
+        ]
+
+        for user in users_to_register:
+            self._do_register_user(user)
 
         request, channel = self.make_request(
-            "POST", "admin/deactivate/@user_test:test", access_token=self.user_access_token,
+            "POST",
+            "admin/deactivate/@user_test2:test",
+            access_token=self.user_access_token,
         )
         self.render(request)
 
@@ -163,29 +175,37 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
         )
         self.render(request)
 
-        self.assertEqual(
-            json.loads(channel.result["body"]),
-            [
-                {
-                    "creation_ts": 0,
-                    "display_name": "admin",
-                    "email_address": "example@email.com",
-                    "last_seen": None,
-                    "role": "administrator",
-                    "status": "invited",
-                    "user_id": "@admin:test",
-                },
-                {
-                    "creation_ts": 0,
-                    "display_name": "test",
-                    "email_address": "test@test.com",
-                    "last_seen": None,
-                    "role": "collaborator",
-                    "status": "inactive",
-                    "user_id": "@user_test:test",
-                },
-            ],
-        )
+        expected_result = [
+            {
+                "creation_ts": 0,
+                "display_name": "admin",
+                "email_address": "example@email.com",
+                "last_seen": None,
+                "role": "administrator",
+                "status": "invited",
+                "user_id": "@admin:test",
+            },
+            {
+                "creation_ts": 0,
+                "display_name": "test1",
+                "email_address": "test1@test.com",
+                "last_seen": None,
+                "role": "collaborator",
+                "status": "invited",
+                "user_id": "@user_test1:test",
+            },
+            {
+                "creation_ts": 0,
+                "display_name": "test2",
+                "email_address": None,
+                "last_seen": None,
+                "role": "collaborator",
+                "status": "inactive",
+                "user_id": "@user_test2:test",
+            },
+        ]
+
+        self.assertEqual(json.loads(channel.result["body"]), expected_result)
 
     def test_get_watcha_admin_user_stats(self):
         with self.assertLogs ("synapse.storage.data_stores.main.watcha_admin", level="INFO" ) as statsinfo:
