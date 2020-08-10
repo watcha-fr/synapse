@@ -1090,7 +1090,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
     that they get correctly added to the generated events and propagated.
     """
 
-    servlets = [
+    servlets = [ 
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
         login.register_servlets,
@@ -1106,6 +1106,9 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         self.room_id = self.helper.create_room_as(self.creator, tok=self.creator_tok)
 
     def test_join_reason(self):
+        # watcha+
+        self.helper.invite(self.room_id,self.creator,self.second_user_id, tok=self.creator_tok)
+        # +watcha
         reason = "hello"
         request, channel = self.make_request(
             "POST",
