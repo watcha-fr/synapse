@@ -230,6 +230,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
             # 0 means a generic user - 50 means a moderator - 100 means an administrator
             if event_type == EventTypes.PowerLevels:
                 logger.info("PowerLevelsEvent. Original content=" + str(content))
+                content['events']={}
                 content['events'][EventTypes.RoomAvatar] = 50; # change avatar of the room
                 content['events'][EventTypes.CanonicalAlias] = 50; # change the alias of the room
                 content['events'][EventTypes.Name] = 50; # change the name of the room

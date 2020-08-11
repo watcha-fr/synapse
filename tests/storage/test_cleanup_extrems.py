@@ -283,42 +283,38 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
             self.store.get_latest_event_ids_in_room(self.room_id)
         )
         self.assertTrue(len(latest_event_ids) < 10, len(latest_event_ids))
-
+    ''' !watcha disabled work only with public room
     @patch("synapse.handlers.message._DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY", new=0)
     def test_send_dummy_events_when_insufficient_power(self):
-        with self.assertLogs('synapse.rest.client.v1.room', level='ERROR') as cm:
-            self._create_extremity_rich_graph()
-            # Criple power levels
-            self.helper.send_state(
-                self.room_id,
-                EventTypes.PowerLevels,
-                body={"users": {str(self.user): -1}},
-                tok=self.token1,
-            )
-            print(cm.output[0])
-            # Pump the reactor repeatedly so that the background updates have a
-            # chance to run.
-            self.pump(10 * 60)
+        self._create_extremity_rich_graph()
+        # Criple power levels
+        self.helper.send_state(
+            self.room_id,
+            EventTypes.PowerLevels,
+            body={"users": {str(self.user): -1}},
+            tok=self.token1,
+        )
+        # Pump the reactor repeatedly so that the background updates have a
+        # chance to run.
+        self.pump(10 * 60)
 
-            latest_event_ids = self.get_success(
-                self.store.get_latest_event_ids_in_room(self.room_id)
-            )
-            # Check that the room has not been pruned
-            self.assertTrue(len(latest_event_ids) > 10)
+        latest_event_ids = self.get_success(
+            self.store.get_latest_event_ids_in_room(self.room_id)
+        )
+        # Check that the room has not been pruned
+        self.assertTrue(len(latest_event_ids) > 10)
 
-            # New user with regular levels
-            user2 = self.register_user("user2", "password")
-            token2 = self.login("user2", "password")
-            # watcha+
-            self.helper.invite(self.room_id, user2, self.user, tok=self.token1)
-            # +watcha
-            self.helper.join(self.room_id, user2, tok=token2)
-            self.pump(10 * 60)
+        # New user with regular levels
+        user2 = self.register_user("user2", "password")
+        token2 = self.login("user2", "password")
+        self.helper.join(self.room_id, user2, tok=token2)
+        self.pump(10 * 60)
 
-            latest_event_ids = self.get_success(
-                self.store.get_latest_event_ids_in_room(self.room_id)
-            )
-            self.assertTrue(len(latest_event_ids) < 10, len(latest_event_ids))
+        latest_event_ids = self.get_success(
+            self.store.get_latest_event_ids_in_room(self.room_id)
+        )
+        self.assertTrue(len(latest_event_ids) < 10, len(latest_event_ids))
+        '''
 
     @patch("synapse.handlers.message._DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY", new=0)
     def test_send_dummy_event_without_consent(self):
