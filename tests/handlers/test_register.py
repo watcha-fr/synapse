@@ -531,43 +531,68 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
 # Insertion for watcha
 class WatchaRegistrationTestCase(unittest.HomeserverTestCase):
-    async def setUp(self):
-        hs = await setup_test_homeserver(self.addCleanup)
+    def make_homeserver(self, reactor, clock):
+        hs_config = self.default_config()
+        return self.setup_test_homeserver(config=hs_config)
+
+    def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
-        self.handler = hs.get_auth_handler()
+        self.auth_handler = hs.get_auth_handler()
+        self.registration_handler = hs.get_registration_handler()
         self.time = int(hs.get_clock().time_msec())
-        await self.register_user_with_email("@owner:test", "example@example.com")
-
-    async def register_user_with_email(self, user_id, email):
-        # register a user and add email as threepids
-        await self.store.register_user(user_id, "pass")
-        await self.handler.add_threepid(
-            user_id, "email", email, self.time,
+        self.user_locapart = "owner"
+        self.user_threepid = "example@example.com"
+        self.user_id = self.get_success(
+            self.registration_handler.register_user(localpart=self.user_locapart)
+        )
+        self.get_success(
+            self.auth_handler.add_threepid(
+                self.user_id, "email", self.user_threepid, self.time,
+            )
         )
 
-    async def test_email_is_correctly_insert_on_DB(self):
-        email = await self.store.db.simple_select_one_onecol(
-            table="user_threepids",
-            keyvalues={"user_id": "owner:test"},
-            retcol="address"
+    def test_email_is_correctly_insert_on_DB(self):
+        email = self.get_success(
+            self.store.db.simple_select_one_onecol(
+                table="user_threepids",
+                keyvalues={"user_id": self.user_id},
+                retcol="address",
+            )
         )
-        self.get_success(self.assertEqual(email, "example@example.com"))
+        self.assertEqual(email, self.user_threepid)
 
-    async def test_email_is_correctly_insert_on_DB_after_two_same_registration(self):
-        with self.assertRaises(SynapseError):
-            await self.register_user_with_email("@owner:test", "example2@example.com")
-
-        email = await self.store.db.simple_select_one_onecol(
-            "user_threepids", {"user_id": "@owner:test"}, "address"
+    def test_email_is_correctly_insert_on_DB_after_two_same_registration(self):
+        user_id = self.get_failure(
+            self.registration_handler.register_user(localpart=self.user_locapart),
+            SynapseError,
         )
-        self.get_success(self.get_success(self.assertEqual(email, "example@example.com")))
+        self.get_failure(
+            self.auth_handler.add_threepid(
+                user_id, "email", self.user_threepid, self.time,
+            ),
+            SynapseError,
+        )
 
-    async def test_email_cannot_used_two_times_with_same_value(self):
-        with self.assertRaises(SynapseError) as cm:
-            await self.register_user_with_email("@user:test", "example@example.com")
+        email = self.get_success(
+            self.store.db.simple_select_one_onecol(
+                "user_threepids", {"user_id": self.user_id}, "address"
+            )
+        )
+        self.assertEqual(email, "example@example.com")
 
-        self.get_success(self.assertEqual(cm.exception.code, 400))
+    def test_email_cannot_used_two_times_with_same_value(self):
+        user_id = self.get_success(
+            self.registration_handler.register_user(localpart="user")
+        )
+        error = self.get_failure(
+            self.auth_handler.add_threepid(
+                user_id, "email", self.user_threepid, self.time,
+            ),
+            SynapseError,
+        ).value
+
+        self.assertEqual(error.code, 400)
         self.assertEqual(
-            cm.exception.msg, "This email is already attached to another user account."
+            error.msg, "This email is already attached to another user account."
         )
 # End insertion for watcha
