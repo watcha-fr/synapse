@@ -139,7 +139,7 @@ class InviteExternalHandler(BaseHandler):
             token = compute_registration_token(user_id, invitee)
             template_name = "invite_existing_account"
 
-        send_registration_email(
+        await send_registration_email(
             self.hs.config,
             invitee,
             template_name=template_name,
