@@ -65,6 +65,6 @@ class IdentityTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
         # MODIFIED FOR WATCHA: this tests the external invitation, in fact !
-        self.assertEquals(channel.result["code"], b"403", channel.result)
+        #self.assertEquals(channel.result["code"], b"403", channel.result)
         # and it succeeeds:
         self.assertEquals(channel.result["code"], b"200", channel.result)
