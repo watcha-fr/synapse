@@ -108,12 +108,12 @@ class WatchaUserDirectoryStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_search_user_dir_with_user_id(self):
-        with self.assertLogs("synapse.storage.user_directory", level="INFO") as cm:
+        with self.assertLogs("synapse.storage.data_stores.main.user_directory", level="INFO") as cm:
             sqlResult = yield self.store.search_user_dir(
                 self.user_id, self.searched_user, 1
             )
             self.assertIn(
-                "INFO:synapse.storage.user_directory:Searching with search term: %s"
+                "INFO:synapse.storage.data_stores.main.user_directory:Searching with search term: %s"
                 % repr(self.searched_user),
                 "".join(cm.output),
             )
