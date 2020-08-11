@@ -701,3 +701,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
     test_blacklisted_ip_with_external_ip.skip = "Disabled for Watcha because URL preview is disabled"
     test_blacklisted_ipv6_specific.skip = "Disabled for Watcha because URL preview is disabled"
     test_blacklisted_ipv6_range.skip = "Disabled for Watcha because URL preview is disabled"
+    test_accept_language_config_option = "Disabled for Watcha because URL preview is disabled"
+    test_oembed_photo = "Disabled for Watcha because URL preview is disabled"
+    test_oembed_rich = "Disabled for Watcha because URL preview is disabled"
+    test_overlong_title = "Disabled for Watcha because URL preview is disabled"
