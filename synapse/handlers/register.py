@@ -194,10 +194,10 @@ class RegistrationHandler(BaseHandler):
                 was_guest=was_guest,
                 make_guest=make_guest,
                 create_profile_with_displayname=default_display_name,
-                make_partner=make_partner,
                 admin=admin,
                 user_type=user_type,
                 address=address,
+                make_partner=make_partner,
             )
 
             if self.hs.config.user_directory_search_all_users:
