@@ -156,21 +156,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         }
     )
 
-# insertion for Watcha (op189)
-    def test_LOGIN_with_trim(self):
-       self.register_user("kermit", "monkey")
-
-       params = {
-           "type": "m.login.password",
-           "identifier": {"type": "m.id.user", "user": "kermit "},
-           "password": "monkey",
-       }
-       request_data = json.dumps(params)
-       request, channel = self.make_request(b"POST", LOGIN_URL, params)
-       self.render(request)
-       self.assertEquals(channel.code, 200, channel.result)
-    # end of insertion for watcha
-
+    
     def test_POST_ratelimiting_per_account_failed_attempts(self):
         self.register_user("kermit", "monkey")
 
@@ -206,6 +192,21 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
+
+    # watcha+ (op189)
+    def test_LOGIN_with_trim(self):
+       self.register_user("kermit", "monkey")
+
+       params = {
+           "type": "m.login.password",
+           "identifier": {"type": "m.id.user", "user": "kermit "},
+           "password": "monkey",
+       }
+       request_data = json.dumps(params)
+       request, channel = self.make_request(b"POST", LOGIN_URL, params)
+       self.render(request)
+       self.assertEquals(channel.code, 200, channel.result)
+    # +watcha
 
     @override_config({"session_lifetime": "24h"})
     def test_soft_logout(self):
