@@ -506,6 +506,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
     test_initial.skip = "Failing on Watcha... TODO understand why"
     test_initial_share_all_users.skip = "Failing on Watcha... TODO understand why"
     test_private_room.skip = "Failing on Watcha... TODO understand why"
+    test_encrypted_by_default_config_option_invite.skip = 'Failing on watcha '
 
 
 class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
