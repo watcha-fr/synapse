@@ -21,8 +21,6 @@ class WatchaUtilTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.owner = self.register_user("owner", "pass", True)
-        self.owner_access_token = self.login("owner", "pass")
-        self._auth_handler = hs.get_auth_handler()
         self.requester = create_requester(self.owner)
         self.inviter_display_name = self.get_success(self.profile_handler.get_displayname(self.requester.user))
 
@@ -37,8 +35,9 @@ class WatchaUtilTestCase(unittest.HomeserverTestCase):
     def test_compute_registration_token(self):
         token = compute_registration_token("user_test", "test@email.com", "password")
         self.assertEquals(base64.b64decode(token).decode('ascii'),'{"user":"user_test", "email":"test@email.com", "pw":"password"}')
-    async def test_create_display_inviter_name_with_email(self):
-        await self.auth_handler.add_threepid(self.owner, "email", "example@email.com", self.time)
+
+    def test_create_display_inviter_name_with_email(self):
+        self.get_success(self.hs.get_auth_handler().add_threepid(self.owner, "email", "example@email.com", self.time))
         inviter_name = self.get_success(create_display_inviter_name(self.hs, self.requester.user))
         self.assertEquals(inviter_name, self.inviter_display_name + " (example@email.com)")
 
