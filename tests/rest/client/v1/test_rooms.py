@@ -1785,6 +1785,7 @@ class RoomAliasListTestCase(unittest.HomeserverTestCase):
         res = self._get_aliases(self.room_owner_tok)
         self.assertEqual(set(res["aliases"]), {alias1, alias2})
 
+    ''' !watcha 
     def test_peekable_room(self):
         alias1 = self._random_alias()
         self._set_alias_via_directory(alias1)
@@ -1801,6 +1802,7 @@ class RoomAliasListTestCase(unittest.HomeserverTestCase):
 
         res = self._get_aliases(user_tok)
         self.assertEqual(res["aliases"], [alias1])
+    '''
 
     def _get_aliases(self, access_token: str, expected_code: int = 200) -> JsonDict:
         """Calls the endpoint under test. returns the json response object."""
