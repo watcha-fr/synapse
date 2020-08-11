@@ -33,6 +33,9 @@ from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import UserID, map_username_to_mxid_localpart
 from synapse.util.msisdn import phone_number_to_msisdn
+# watcha+ op479
+from synapse.http.server import set_cors_headers
+# +watcha
 
 logger = logging.getLogger(__name__)
 
@@ -347,6 +350,9 @@ class BaseSSORedirectServlet(RestServlet):
     PATTERNS = client_patterns("/login/(cas|sso)/redirect", v1=True)
 
     def on_GET(self, request):
+        # watcha+ op479
+        set_cors_headers(request)
+        # +watcha
         args = request.args
         if b"redirectUrl" not in args:
             return 400, "Redirect URL not specified for SSO auth"
