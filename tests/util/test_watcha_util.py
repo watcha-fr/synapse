@@ -6,6 +6,7 @@ from synapse.rest.client.v1 import login
 from synapse.types import create_requester
 import base64
 
+
 class WatchaUtilTestCase(unittest.HomeserverTestCase):
 
     servlets = [
@@ -22,25 +23,45 @@ class WatchaUtilTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.owner = self.register_user("owner", "pass", True)
         self.requester = create_requester(self.owner)
-        self.inviter_display_name = self.get_success(self.profile_handler.get_displayname(self.requester.user))
+        self.inviter_display_name = self.get_success(
+            self.profile_handler.get_displayname(self.requester.user)
+        )
 
     def test_compute_registration_token_without_email_and_password(self):
         token = compute_registration_token("user_test")
-        self.assertEquals(base64.b64decode(token).decode('ascii'),'{"user":"user_test"}')
+        self.assertEquals(
+            base64.b64decode(token).decode("ascii"), '{"user":"user_test"}'
+        )
 
     def test_compute_registration_token_without_password(self):
         token = compute_registration_token("user_test", "test@email.com")
-        self.assertEquals(base64.b64decode(token).decode('ascii'),'{"user":"user_test", "email":"test@email.com"}')
+        self.assertEquals(
+            base64.b64decode(token).decode("ascii"),
+            '{"user":"user_test", "email":"test@email.com"}',
+        )
 
     def test_compute_registration_token(self):
         token = compute_registration_token("user_test", "test@email.com", "password")
-        self.assertEquals(base64.b64decode(token).decode('ascii'),'{"user":"user_test", "email":"test@email.com", "pw":"password"}')
+        self.assertEquals(
+            base64.b64decode(token).decode("ascii"),
+            '{"user":"user_test", "email":"test@email.com", "pw":"password"}',
+        )
 
     def test_create_display_inviter_name_with_email(self):
-        self.get_success(self.hs.get_auth_handler().add_threepid(self.owner, "email", "example@email.com", self.time))
-        inviter_name = self.get_success(create_display_inviter_name(self.hs, self.requester.user))
-        self.assertEquals(inviter_name, self.inviter_display_name + " (example@email.com)")
+        self.get_success(
+            self.hs.get_auth_handler().add_threepid(
+                self.owner, "email", "example@email.com", self.time
+            )
+        )
+        inviter_name = self.get_success(
+            create_display_inviter_name(self.hs, self.requester.user)
+        )
+        self.assertEquals(
+            inviter_name, self.inviter_display_name + " (example@email.com)"
+        )
 
     def test_create_display_inviter_name_without_email(self):
-        inviter_name = self.get_success(create_display_inviter_name(self.hs, self.requester.user))
+        inviter_name = self.get_success(
+            create_display_inviter_name(self.hs, self.requester.user)
+        )
         self.assertEquals(inviter_name, self.inviter_display_name)
