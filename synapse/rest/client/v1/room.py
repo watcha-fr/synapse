@@ -230,12 +230,13 @@ class RoomStateEventRestServlet(TransactionRestServlet):
             # 0 means a generic user - 50 means a moderator - 100 means an administrator
             if event_type == EventTypes.PowerLevels:
                 logger.info("PowerLevelsEvent. Original content=" + str(content))
-                content['events']={}
-                content['events'][EventTypes.RoomAvatar] = 50; # change avatar of the room
-                content['events'][EventTypes.CanonicalAlias] = 50; # change the alias of the room
-                content['events'][EventTypes.Name] = 50; # change the name of the room
-                content['events'][EventTypes.PowerLevels] = 100; # change the permissions (name, revoke moderators)
-                content['events'][EventTypes.Topic] = 50; # change topic in the room
+                content['events'] = {
+                    EventTypes.RoomAvatar : 50, # change avatar of the room
+                    EventTypes.CanonicalAlias : 50, # change the alias of the room
+                    EventTypes.Name : 50, # change the name of the room
+                    EventTypes.PowerLevels : 100, # change the permissions (name, revoke moderators)
+                    EventTypes.Topic : 50, # change topic in the room
+                }
                 content['invite'] = 50; # invite users
                 content['kick'] = 50; # kick users
                 content['ban'] = 50; # permanently kick users from the room
@@ -439,9 +440,9 @@ class PublicRoomListRestServlet(TransactionRestServlet):
     async def on_POST(self, request):
         await self.auth.get_user_by_req(request, allow_guest=True)
 
-        # added for watcha disable public rooms 
+        # added for watcha disable public rooms
         raise AuthError(403, "Directory is not available")
-        # end of added for watcha disable public rooms 
+        # end of added for watcha disable public rooms
 
         server = parse_string(request, "server", default=None)
         content = parse_json_object_from_request(request)
@@ -803,7 +804,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                         content["address"], content["user_id"], room_id)
             # end of added for watcha
 
-           #removed for watcha 
+           #removed for watcha
         #    await self.room_member_handler.do_3pid_invite(
         #         room_id,
         #         requester.user,

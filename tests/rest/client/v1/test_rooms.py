@@ -332,8 +332,7 @@ class RoomPermissionsTestCase(RoomBase):
 
         other = "@burgundy:red"
         # set invited of other, expect 200
-        # CHANGED IN WATCHA: "You don't have permission to invite users"
-        self.helper.invite(room=room, src=self.user_id, targ=other, expect_code=403)
+        self.helper.invite(room=room, src=self.user_id, targ=other, expect_code=200)
 
         # set joined of other, expect 403
         self.helper.change_membership(
