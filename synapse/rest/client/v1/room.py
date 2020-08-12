@@ -444,9 +444,6 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         raise AuthError(403, "Directory is not available")
         # end of added for watcha disable public rooms
 
-        # disabled for watcha
-        raise AuthError(403, "Directory is not available")
-
         server = parse_string(request, "server", default=None)
         content = parse_json_object_from_request(request)
 
