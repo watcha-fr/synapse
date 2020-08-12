@@ -332,9 +332,7 @@ class RoomPermissionsTestCase(RoomBase):
 
         other = "@burgundy:red"
         # set invited of other, expect 200
-        # CHANGED IN WATCHA: "You don't have permission to invite users"
-        #self.helper.invite(room=room, src=self.user_id, targ=other, expect_code=200)
-        self.helper.invite(room=room, src=self.user_id, targ=other, expect_code=403)
+        self.helper.invite(room=room, src=self.user_id, targ=other, expect_code=200)
 
         # set joined of other, expect 403
         self.helper.change_membership(
@@ -1091,7 +1089,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
     that they get correctly added to the generated events and propagated.
     """
 
-    servlets = [ 
+    servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
         login.register_servlets,
@@ -1786,7 +1784,7 @@ class RoomAliasListTestCase(unittest.HomeserverTestCase):
         res = self._get_aliases(self.room_owner_tok)
         self.assertEqual(set(res["aliases"]), {alias1, alias2})
 
-    ''' !watcha 
+    ''' !watcha
     def test_peekable_room(self):
         alias1 = self._random_alias()
         self._set_alias_via_directory(alias1)
