@@ -14,15 +14,16 @@
 # limitations under the License.
 
 import itertools
-
-from six.moves import zip
+from typing import List
 
 import attr
+
+from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.room_versions import RoomVersions
 from synapse.event_auth import auth_types_for_event
-from synapse.events import FrozenEvent
+from synapse.events import make_event_from_dict
 from synapse.state.v2 import lexicographical_topological_sort, resolve_events_with_store
 from synapse.types import EventID
 
@@ -43,6 +44,11 @@ MEMBERSHIP_CONTENT_BAN = {"membership": Membership.BAN}
 ORIGIN_SERVER_TS = 0
 
 
+class FakeClock:
+    def sleep(self, msec):
+        return defer.succeed(None)
+
+
 class FakeEvent(object):
     """A fake event we use as a convenience.
 
@@ -58,6 +64,7 @@ class FakeEvent(object):
         self.type = type
         self.state_key = state_key
         self.content = content
+        self.room_id = ROOM_ID
 
     def to_event(self, auth_events, prev_events):
         """Given the auth_events and prev_events, convert to a Frozen Event
@@ -88,7 +95,7 @@ class FakeEvent(object):
         if self.state_key is not None:
             event_dict["state_key"] = self.state_key
 
-        return FrozenEvent(event_dict)
+        return make_event_from_dict(event_dict)
 
 
 # All graphs start with this set of events
@@ -418,13 +425,15 @@ class StateTestCase(unittest.TestCase):
                 state_before = dict(state_at_event[prev_events[0]])
             else:
                 state_d = resolve_events_with_store(
+                    FakeClock(),
+                    ROOM_ID,
                     RoomVersions.V2.identifier,
                     [state_at_event[n] for n in prev_events],
                     event_map=event_map,
                     state_res_store=TestStateResolutionStore(event_map),
                 )
 
-                state_before = self.successResultOf(state_d)
+                state_before = self.successResultOf(defer.ensureDeferred(state_d))
 
             state_after = dict(state_before)
             if fake_event.state_key is not None:
@@ -565,13 +574,15 @@ class SimpleParamStateTestCase(unittest.TestCase):
         # Test that we correctly handle passing `None` as the event_map
 
         state_d = resolve_events_with_store(
+            FakeClock(),
+            ROOM_ID,
             RoomVersions.V2.identifier,
             [self.state_at_bob, self.state_at_charlie],
             event_map=None,
             state_res_store=TestStateResolutionStore(self.event_map),
         )
 
-        state = self.successResultOf(state_d)
+        state = self.successResultOf(defer.ensureDeferred(state_d))
 
         self.assert_dict(self.expected_combined_state, state)
 
@@ -598,9 +609,11 @@ class TestStateResolutionStore(object):
             Deferred[dict[str, FrozenEvent]]: Dict from event_id to event.
         """
 
-        return {eid: self.event_map[eid] for eid in event_ids if eid in self.event_map}
+        return defer.succeed(
+            {eid: self.event_map[eid] for eid in event_ids if eid in self.event_map}
+        )
 
-    def get_auth_chain(self, event_ids):
+    def _get_auth_chain(self, event_ids: List[str]) -> List[str]:
         """Gets the full auth chain for a set of events (including rejected
         events).
 
@@ -612,11 +625,10 @@ class TestStateResolutionStore(object):
                presence of rejected events
 
         Args:
-            event_ids (list): The event IDs of the events to fetch the auth
+            event_ids: The event IDs of the events to fetch the auth
                 chain for. Must be state events.
-
         Returns:
-            Deferred[list[str]]: List of event IDs of the auth chain.
+            List of event IDs of the auth chain.
         """
 
         # Simple DFS for auth chain
@@ -634,3 +646,9 @@ class TestStateResolutionStore(object):
                 stack.append(aid)
 
         return list(result)
+
+    def get_auth_chain_difference(self, auth_sets):
+        chains = [frozenset(self._get_auth_chain(a)) for a in auth_sets]
+
+        common = set(chains[0]).intersection(*chains[1:])
+        return defer.succeed(set(chains[0]).union(*chains[1:]) - common)

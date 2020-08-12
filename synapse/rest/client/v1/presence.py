@@ -17,10 +17,6 @@
 """
 import logging
 
-from six import string_types
-
-from twisted.internet import defer
-
 from synapse.api.errors import AuthError, SynapseError
 from synapse.handlers.presence import format_user_presence_state
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
@@ -40,27 +36,28 @@ class PresenceStatusRestServlet(RestServlet):
         self.clock = hs.get_clock()
         self.auth = hs.get_auth()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, user_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_GET(self, request, user_id):
+        requester = await self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
 
         if requester.user != user:
-            allowed = yield self.presence_handler.is_visible(
+            allowed = await self.presence_handler.is_visible(
                 observed_user=user, observer_user=requester.user
             )
 
             if not allowed:
                 raise AuthError(403, "You are not allowed to see their presence.")
 
-        state = yield self.presence_handler.get_state(target_user=user)
-        state = format_user_presence_state(state, self.clock.time_msec())
+        state = await self.presence_handler.get_state(target_user=user)
+        state = format_user_presence_state(
+            state, self.clock.time_msec(), include_user_id=False
+        )
 
-        return (200, state)
+        return 200, state
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, user_id):
-        requester = yield self.auth.get_user_by_req(request, allow_partner=True)
+    async def on_PUT(self, request, user_id):
+        # modified for watcha add allow_partner
+        requester = await self.auth.get_user_by_req(request, allow_partner=True)
         user = UserID.from_string(user_id)
 
         if requester.user != user:
@@ -75,7 +72,7 @@ class PresenceStatusRestServlet(RestServlet):
 
             if "status_msg" in content:
                 state["status_msg"] = content.pop("status_msg")
-                if not isinstance(state["status_msg"], string_types):
+                if not isinstance(state["status_msg"], str):
                     raise SynapseError(400, "status_msg must be a string.")
 
             if content:
@@ -86,12 +83,12 @@ class PresenceStatusRestServlet(RestServlet):
             raise SynapseError(400, "Unable to parse state")
 
         if self.hs.config.use_presence:
-            yield self.presence_handler.set_state(user, state)
+            await self.presence_handler.set_state(user, state)
 
-        return (200, {})
+        return 200, {}
 
     def on_OPTIONS(self, request):
-        return (200, {})
+        return 200, {}
 
 
 def register_servlets(hs, http_server):

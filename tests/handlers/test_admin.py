@@ -50,7 +50,9 @@ class ExfiltrateData(unittest.HomeserverTestCase):
             self.user1, tok=self.token1, is_public=True
         )
         self.helper.send(room_id, body="Hello!", tok=self.token1)
+        # added for watcha
         self.helper.invite(room_id, self.user1, self.user2, tok=self.token1) # added for watcha, needed since rooms are private
+        # end of added for watcha
         self.helper.join(room_id, self.user2, tok=self.token2)
         self.helper.send(room_id, body="Hello again!", tok=self.token1)
 

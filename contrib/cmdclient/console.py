@@ -17,9 +17,6 @@
 """ Starts a synapse client console. """
 from __future__ import print_function
 
-from twisted.internet import reactor, defer, threads
-from http import TwistedHttpClient
-
 import argparse
 import cmd
 import getpass
@@ -28,15 +25,19 @@ import shlex
 import sys
 import time
 import urllib
-import urlparse
+from http import TwistedHttpClient
 
-import nacl.signing
 import nacl.encoding
+import nacl.signing
+import urlparse
+from signedjson.sign import SignatureVerifyException, verify_signed_json
 
-from signedjson.sign import verify_signed_json, SignatureVerifyException
+from twisted.internet import defer, reactor, threads
 
 CONFIG_JSON = "cmdclient_config.json"
 
+# TODO: The concept of trusted identity servers has been deprecated. This option and checks
+#  should be removed
 TRUSTED_ID_SERVERS = ["localhost:8001"]
 
 
@@ -268,6 +269,7 @@ class SynapseCmd(cmd.Cmd):
 
     @defer.inlineCallbacks
     def _do_emailrequest(self, args):
+        # TODO: Update to use v2 Identity Service API endpoint
         url = (
             self._identityServerUrl()
             + "/_matrix/identity/api/v1/validate/email/requestToken"
@@ -302,6 +304,7 @@ class SynapseCmd(cmd.Cmd):
 
     @defer.inlineCallbacks
     def _do_emailvalidate(self, args):
+        # TODO: Update to use v2 Identity Service API endpoint
         url = (
             self._identityServerUrl()
             + "/_matrix/identity/api/v1/validate/email/submitToken"
@@ -330,6 +333,7 @@ class SynapseCmd(cmd.Cmd):
 
     @defer.inlineCallbacks
     def _do_3pidbind(self, args):
+        # TODO: Update to use v2 Identity Service API endpoint
         url = self._identityServerUrl() + "/_matrix/identity/api/v1/3pid/bind"
 
         json_res = yield self.http_client.do_request(
@@ -398,6 +402,7 @@ class SynapseCmd(cmd.Cmd):
     @defer.inlineCallbacks
     def _do_invite(self, roomid, userstring):
         if not userstring.startswith("@") and self._is_on("complete_usernames"):
+            # TODO: Update to use v2 Identity Service API endpoint
             url = self._identityServerUrl() + "/_matrix/identity/api/v1/lookup"
 
             json_res = yield self.http_client.do_request(
@@ -407,6 +412,7 @@ class SynapseCmd(cmd.Cmd):
             mxid = None
 
             if "mxid" in json_res and "signatures" in json_res:
+                # TODO: Update to use v2 Identity Service API endpoint
                 url = (
                     self._identityServerUrl()
                     + "/_matrix/identity/api/v1/pubkey/ed25519"
@@ -486,7 +492,7 @@ class SynapseCmd(cmd.Cmd):
         "list messages <roomid> from=END&to=START&limit=3"
         """
         args = self._parse(line, ["type", "roomid", "qp"])
-        if not "type" in args or not "roomid" in args:
+        if "type" not in args or "roomid" not in args:
             print("Must specify type and room ID.")
             return
         if args["type"] not in ["members", "messages"]:
@@ -501,7 +507,7 @@ class SynapseCmd(cmd.Cmd):
                 try:
                     key_value = key_value_str.split("=")
                     qp[key_value[0]] = key_value[1]
-                except:
+                except Exception:
                     print("Bad query param: %s" % key_value)
                     return
 
@@ -578,7 +584,7 @@ class SynapseCmd(cmd.Cmd):
                 parsed_url = urlparse.urlparse(args["path"])
                 qp.update(urlparse.parse_qs(parsed_url.query))
                 args["path"] = parsed_url.path
-            except:
+            except Exception:
                 pass
 
         reactor.callFromThread(
@@ -765,10 +771,10 @@ def main(server_url, identity_server_url, username, token, config_path):
             syn_cmd.config = json.load(config)
             try:
                 http_client.verbose = "on" == syn_cmd.config["verbose"]
-            except:
+            except Exception:
                 pass
             print("Loaded config from %s" % config_path)
-    except:
+    except Exception:
         pass
 
     # Twisted-specific: Runs the command processor in Twisted's event loop

@@ -47,5 +47,6 @@ class Handlers(object):
         self.admin_handler = AdminHandler(hs)
         self.identity_handler = IdentityHandler(hs)
         self.search_handler = SearchHandler(hs)
-        self.invite_external_handler = InviteExternalHandler(hs) #added for watcha
-        self.watcha_admin_handler = WatchaAdminHandler(hs) #added for watcha
+        # added for watcha
+        self.invite_external_handler = InviteExternalHandler(hs) 
+        self.watcha_admin_handler = WatchaAdminHandler(hs) 

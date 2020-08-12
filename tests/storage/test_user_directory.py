@@ -15,8 +15,6 @@
 
 from twisted.internet import defer
 
-from synapse.storage import UserDirectoryStore
-
 from tests import unittest
 from tests.utils import setup_test_homeserver
 
@@ -29,7 +27,7 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         self.hs = yield setup_test_homeserver(self.addCleanup)
-        self.store = UserDirectoryStore(self.hs.get_db_conn(), self.hs)
+        self.store = self.hs.get_datastore()
 
         # alice and bob are both in !room_id. bobby is not but shares
         # a homeserver with alice.
@@ -70,6 +68,7 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
     test_search_user_dir.skip = "Not working because of Watcha modification"
     test_search_user_dir_all_users.skip = "Not working because of Watcha modification"
 
+# Insertion for watcha
     @defer.inlineCallbacks
     def test_search_user_dir_for_watcha(self):
         # This only tests that it's not crashing :) after our motifs.
@@ -78,8 +77,8 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
         self.assertFalse(r["limited"])
         self.assertEqual(0, len(r["results"]))
 
-# Insertion for watcha
 class WatchaUserDirectoryStoreTestCase(unittest.TestCase):
+# Insertion for watcha
     @defer.inlineCallbacks
     def setUp(self):
         hs = yield setup_test_homeserver(self.addCleanup)
@@ -109,12 +108,12 @@ class WatchaUserDirectoryStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_search_user_dir_with_user_id(self):
-        with self.assertLogs("synapse.storage.user_directory", level="INFO") as cm:
+        with self.assertLogs("synapse.storage.data_stores.main.user_directory", level="INFO") as cm:
             sqlResult = yield self.store.search_user_dir(
                 self.user_id, self.searched_user, 1
             )
             self.assertIn(
-                "INFO:synapse.storage.user_directory:Searching with search term: %s"
+                "INFO:synapse.storage.data_stores.main.user_directory:Searching with search term: %s"
                 % repr(self.searched_user),
                 "".join(cm.output),
             )

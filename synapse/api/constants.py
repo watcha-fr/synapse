@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright 2018-2019 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -60,11 +61,8 @@ class LoginType(object):
     MSISDN = "m.login.msisdn"
     RECAPTCHA = "m.login.recaptcha"
     TERMS = "m.login.terms"
+    SSO = "m.login.sso"
     DUMMY = "m.login.dummy"
-
-    # Only for C/S API v1
-    APPLICATION_SERVICE = "m.login.application_service"
-    SHARED_SECRET = "org.matrix.login.shared_secret"
 
 
 class EventTypes(object):
@@ -76,12 +74,11 @@ class EventTypes(object):
     Aliases = "m.room.aliases"
     Redaction = "m.room.redaction"
     ThirdPartyInvite = "m.room.third_party_invite"
-    Encryption = "m.room.encryption"
     RelatedGroups = "m.room.related_groups"
 
     RoomHistoryVisibility = "m.room.history_visibility"
     CanonicalAlias = "m.room.canonical_alias"
-    Encryption = "m.room.encryption"
+    Encrypted = "m.room.encrypted"
     RoomAvatar = "m.room.avatar"
     RoomEncryption = "m.room.encryption"
     GuestAccess = "m.room.guest_access"
@@ -98,11 +95,13 @@ class EventTypes(object):
     VectorSetting = "im.vector.web.settings"
     # end of insertion
 
+    Retention = "m.room.retention"
+
+    Presence = "m.presence"
+
 
 class RejectedReason(object):
     AUTH_ERROR = "auth_error"
-    REPLACED = "replaced"
-    NOT_ANCESTOR = "not_ancestor"
 
 
 class RoomCreationPreset(object):
@@ -126,7 +125,8 @@ class UserTypes(object):
     """
 
     SUPPORT = "support"
-    ALL_USER_TYPES = (SUPPORT,)
+    BOT = "bot"
+    ALL_USER_TYPES = (SUPPORT, BOT)
 
 
 class RelationTypes(object):
@@ -136,3 +136,26 @@ class RelationTypes(object):
     ANNOTATION = "m.annotation"
     REPLACE = "m.replace"
     REFERENCE = "m.reference"
+
+
+class LimitBlockingTypes(object):
+    """Reasons that a server may be blocked"""
+
+    MONTHLY_ACTIVE_USER = "monthly_active_user"
+    HS_DISABLED = "hs_disabled"
+
+
+class EventContentFields(object):
+    """Fields found in events' content, regardless of type."""
+
+    # Labels for the event, cf https://github.com/matrix-org/matrix-doc/pull/2326
+    LABELS = "org.matrix.labels"
+
+    # Timestamp to delete the event after
+    # cf https://github.com/matrix-org/matrix-doc/pull/2228
+    SELF_DESTRUCT_AFTER = "org.matrix.self_destruct_after"
+
+
+class RoomEncryptionAlgorithms(object):
+    MEGOLM_V1_AES_SHA2 = "m.megolm.v1.aes-sha2"
+    DEFAULT = MEGOLM_V1_AES_SHA2

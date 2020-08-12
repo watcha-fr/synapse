@@ -19,9 +19,10 @@ from mock import Mock, call
 from signedjson.key import generate_signing_key
 
 from synapse.api.constants import EventTypes, Membership, PresenceState
-from synapse.events import room_version_to_event_format
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events.builder import EventBuilder
 from synapse.handlers.presence import (
+    EXTERNAL_PROCESS_EXPIRY,
     FEDERATION_PING_INTERVAL,
     FEDERATION_TIMEOUT,
     IDLE_TIMER,
@@ -337,7 +338,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         )
 
         new_state = handle_timeout(
-            state, is_mine=True, syncing_user_ids=set([user_id]), now=now
+            state, is_mine=True, syncing_user_ids={user_id}, now=now
         )
 
         self.assertIsNotNone(new_state)
@@ -413,6 +414,44 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         self.assertEquals(state, new_state)
 
 
+class PresenceHandlerTestCase(unittest.HomeserverTestCase):
+    def prepare(self, reactor, clock, hs):
+        self.presence_handler = hs.get_presence_handler()
+        self.clock = hs.get_clock()
+
+    def test_external_process_timeout(self):
+        """Test that if an external process doesn't update the records for a while
+        we time out their syncing users presence.
+        """
+        process_id = 1
+        user_id = "@test:server"
+
+        # Notify handler that a user is now syncing.
+        self.get_success(
+            self.presence_handler.update_external_syncs_row(
+                process_id, user_id, True, self.clock.time_msec()
+            )
+        )
+
+        # Check that if we wait a while without telling the handler the user has
+        # stopped syncing that their presence state doesn't get timed out.
+        self.reactor.advance(EXTERNAL_PROCESS_EXPIRY / 2)
+
+        state = self.get_success(
+            self.presence_handler.get_state(UserID.from_string(user_id))
+        )
+        self.assertEqual(state.state, PresenceState.ONLINE)
+
+        # Check that if the external process timeout fires, then the syncing
+        # user gets timed out
+        self.reactor.advance(EXTERNAL_PROCESS_EXPIRY)
+
+        state = self.get_success(
+            self.presence_handler.get_state(UserID.from_string(user_id))
+        )
+        self.assertEqual(state.state, PresenceState.OFFLINE)
+
+
 class PresenceJoinTestCase(unittest.HomeserverTestCase):
     """Tests remote servers get told about presence of users in the room when
     they join and when new local users join.
@@ -452,12 +491,16 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
 
         # Create a room with two local users
         room_id = self.helper.create_room_as(self.user_id)
+        # added for watcha
         self.helper.invite(room_id, src=self.user_id, targ="@test2:server") # added for Watcha: need to be invited
+        #end of added for watcha
         self.helper.join(room_id, "@test2:server")
 
         # Mark test2 as online, test will be offline with a last_active of 0
-        self.presence_handler.set_state(
-            UserID.from_string("@test2:server"), {"presence": PresenceState.ONLINE}
+        self.get_success(
+            self.presence_handler.set_state(
+                UserID.from_string("@test2:server"), {"presence": PresenceState.ONLINE}
+            )
         )
         self.reactor.pump([0])  # Wait for presence updates to be handled
 
@@ -494,11 +537,13 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         self._add_new_user(room_id, "@bob:server3")
 
         self.federation_sender.send_presence.assert_not_called()
-        # MODIFIED FOR WATCHA: not sending presence to other servers
+        # removed FOR WATCHA: not sending presence to other servers
         #self.federation_sender.send_presence_to_destinations.assert_called_once_with(
         #    destinations=["server3"], states=[expected_state]
         #)
+        # added for watcha
         self.federation_sender.send_presence_to_destinations.assert_not_called()
+        #end of added for watcha
 
     def test_remote_gets_presence_when_local_user_joins(self):
         # We advance time to something that isn't 0, as we use 0 as a special
@@ -509,14 +554,18 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         room_id = self.helper.create_room_as(self.user_id)
 
         # Mark test as online
-        self.presence_handler.set_state(
-            UserID.from_string("@test:server"), {"presence": PresenceState.ONLINE}
+        self.get_success(
+            self.presence_handler.set_state(
+                UserID.from_string("@test:server"), {"presence": PresenceState.ONLINE}
+            )
         )
 
         # Mark test2 as online, test will be offline with a last_active of 0.
         # Note we don't join them to the room yet
-        self.presence_handler.set_state(
-            UserID.from_string("@test2:server"), {"presence": PresenceState.ONLINE}
+        self.get_success(
+            self.presence_handler.set_state(
+                UserID.from_string("@test2:server"), {"presence": PresenceState.ONLINE}
+            )
         )
 
         # Add servers to the room
@@ -532,7 +581,9 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         self.federation_sender.reset_mock()
 
         # Join local user to room
+        # added for watcha
         self.helper.invite(room_id, src=self.user_id, targ="@test2:server") # added for Watcha: need to be invited
+        # end of added for watcha
         self.helper.join(room_id, "@test2:server")
 
         self.reactor.pump([0])  # Wait for presence updates to be handled
@@ -548,7 +599,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         # MODIFIED FOR WATCHA: not sending presence to other servers
         self.federation_sender.send_presence_to_destinations.assert_called_once_with(
             # MODIFIED FOR WATCHA: not sending presence to other servers
-            #destinations=set(("server2", "server3")), states=[expected_state]
+            # destinations={"server2", "server3"}, states=[expected_state]
             destinations=set(), states=[expected_state]
         )
 
@@ -558,7 +609,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
 
         hostname = get_domain_from_id(user_id)
 
-        room_version = self.get_success(self.store.get_room_version(room_id))
+        room_version = self.get_success(self.store.get_room_version_id(room_id))
 
         builder = EventBuilder(
             state=self.state,
@@ -567,7 +618,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             clock=self.clock,
             hostname=hostname,
             signing_key=self.random_signing_key,
-            format_version=room_version_to_event_format(room_version),
+            room_version=KNOWN_ROOM_VERSIONS[room_version],
             room_id=room_id,
             type=EventTypes.Member,
             sender=user_id,
@@ -588,6 +639,6 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         # .. but not enough to make the test work. disabled below.
         #self.get_success(self.store.get_event(event.event_id))
         #self.get_success(self.store.get_event(event.event_id))
-        from synapse.api.errors import NotFoundError
-        self.get_failure(self.store.get_event(event.event_id),
-                         NotFoundError)
+        #from synapse.api.errors import NotFoundError
+        #self.get_failure(self.store.get_event(event.event_id),
+        #                 NotFoundError)

@@ -15,15 +15,29 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING, Dict, Union
+
+from prometheus_client import Gauge
 
 from twisted.internet import defer
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import PusherConfigException
+from synapse.push.emailpusher import EmailPusher
+from synapse.push.httppusher import HttpPusher
 from synapse.push.pusher import PusherFactory
 from synapse.util.async_helpers import concurrently_execute
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
+
 logger = logging.getLogger(__name__)
+
+
+synapse_pushers = Gauge(
+    "synapse_pushers", "Number of active synapse pushers", ["kind", "app_id"]
+)
 
 
 class PusherPool:
@@ -41,13 +55,19 @@ class PusherPool:
     Pusher.on_new_receipts are not expected to return deferreds.
     """
 
-    def __init__(self, _hs):
-        self.hs = _hs
-        self.pusher_factory = PusherFactory(_hs)
-        self._should_start_pushers = _hs.config.start_pushers
+    def __init__(self, hs: "HomeServer"):
+        self.hs = hs
+        self.pusher_factory = PusherFactory(hs)
+        self._should_start_pushers = hs.config.start_pushers
         self.store = self.hs.get_datastore()
         self.clock = self.hs.get_clock()
-        self.pushers = {}
+
+        # We shard the handling of push notifications by user ID.
+        self._pusher_shard_config = hs.config.push.pusher_shard_config
+        self._instance_name = hs.get_instance_name()
+
+        # map from user id to app_id:pushkey to pusher
+        self.pushers = {}  # type: Dict[str, Dict[str, Union[HttpPusher, EmailPusher]]]
 
     def start(self):
         """Starts the pushers off in a background process.
@@ -76,6 +96,7 @@ class PusherPool:
         Returns:
             Deferred[EmailPusher|HttpPusher]
         """
+
         time_now_msec = self.clock.time_msec()
 
         # inserted for watcha: we override url for iOS
@@ -115,9 +136,7 @@ class PusherPool:
         # create the pusher setting last_stream_ordering to the current maximum
         # stream ordering in event_push_actions, so it will process
         # pushes from this point onwards.
-        last_stream_ordering = (
-            yield self.store.get_latest_push_action_stream_ordering()
-        )
+        last_stream_ordering = yield self.store.get_latest_push_action_stream_ordering()
 
         yield self.store.add_pusher(
             user_id=user_id,
@@ -162,6 +181,9 @@ class PusherPool:
             access_tokens (Iterable[int]): access token *ids* to remove pushers
                 for
         """
+        if not self._pusher_shard_config.should_handle(self._instance_name, user_id):
+            return
+
         tokens = set(access_tokens)
         for p in (yield self.store.get_pushers_by_user_id(user_id)):
             if p["access_token"] in tokens:
@@ -201,11 +223,9 @@ class PusherPool:
         try:
             # Need to subtract 1 from the minimum because the lower bound here
             # is not inclusive
-            updated_receipts = yield self.store.get_all_updated_receipts(
+            users_affected = yield self.store.get_users_sent_receipts_between(
                 min_stream_id - 1, max_stream_id
             )
-            # This returns a tuple, user_id is at index 3
-            users_affected = set([r[3] for r in updated_receipts])
 
             for u in users_affected:
                 if u in self.pushers:
@@ -223,6 +243,9 @@ class PusherPool:
             Deferred[EmailPusher|HttpPusher|None]: The pusher started, if any
         """
         if not self._should_start_pushers:
+            return
+
+        if not self._pusher_shard_config.should_handle(self._instance_name, user_id):
             return
 
         resultlist = yield self.store.get_pushers_by_app_id_and_pushkey(app_id, pushkey)
@@ -246,7 +269,6 @@ class PusherPool:
             Deferred
         """
         pushers = yield self.store.get_all_pushers()
-        logger.info("Starting %d pushers", len(pushers))
 
         # Stagger starting up the pushers so we don't completely drown the
         # process on start up.
@@ -259,16 +281,22 @@ class PusherPool:
         """Start the given pusher
 
         Args:
-            pusherdict (dict):
+            pusherdict (dict): dict with the values pulled from the db table
 
         Returns:
             Deferred[EmailPusher|HttpPusher]
         """
+        if not self._pusher_shard_config.should_handle(
+            self._instance_name, pusherdict["user_name"]
+        ):
+            return
+
         try:
             p = self.pusher_factory.create_pusher(pusherdict)
         except PusherConfigException as e:
             logger.warning(
-                "Pusher incorrectly configured user=%s, appid=%s, pushkey=%s: %s",
+                "Pusher incorrectly configured id=%i, user=%s, appid=%s, pushkey=%s: %s",
+                pusherdict["id"],
                 pusherdict.get("user_name"),
                 pusherdict.get("app_id"),
                 pusherdict.get("pushkey"),
@@ -276,18 +304,22 @@ class PusherPool:
             )
             return
         except Exception:
-            logger.exception("Couldn't start a pusher: caught Exception")
+            logger.exception(
+                "Couldn't start pusher id %i: caught Exception", pusherdict["id"],
+            )
             return
 
         if not p:
             return
 
         appid_pushkey = "%s:%s" % (pusherdict["app_id"], pusherdict["pushkey"])
-        byuser = self.pushers.setdefault(pusherdict["user_name"], {})
 
+        byuser = self.pushers.setdefault(pusherdict["user_name"], {})
         if appid_pushkey in byuser:
             byuser[appid_pushkey].on_stop()
         byuser[appid_pushkey] = p
+
+        synapse_pushers.labels(type(p).__name__, p.app_id).inc()
 
         # Check if there *may* be push to process. We do this as this check is a
         # lot cheaper to do than actually fetching the exact rows we need to
@@ -315,8 +347,11 @@ class PusherPool:
 
         if appid_pushkey in byuser:
             logger.info("Stopping pusher %s / %s", user_id, appid_pushkey)
-            byuser[appid_pushkey].on_stop()
-            del byuser[appid_pushkey]
+            pusher = byuser.pop(appid_pushkey)
+            pusher.on_stop()
+
+            synapse_pushers.labels(type(pusher).__name__, pusher.app_id).dec()
+
         yield self.store.delete_pusher_by_app_id_pushkey_user_id(
             app_id, pushkey, user_id
         )

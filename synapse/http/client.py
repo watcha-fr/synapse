@@ -15,10 +15,8 @@
 # limitations under the License.
 
 import logging
+import urllib
 from io import BytesIO
-
-from six import raise_from, text_type
-from six.moves import urllib
 
 import treq
 from canonicaljson import encode_canonical_json, json
@@ -33,9 +31,10 @@ from twisted.internet.interfaces import (
     IReactorPluggableNameResolver,
     IResolutionReceiver,
 )
+from twisted.internet.task import Cooperator
 from twisted.python.failure import Failure
 from twisted.web._newclient import ResponseDone
-from twisted.web.client import Agent, HTTPConnectionPool, PartialDownloadError, readBody
+from twisted.web.client import Agent, HTTPConnectionPool, readBody
 from twisted.web.http import PotentialDataLoss
 from twisted.web.http_headers import Headers
 
@@ -45,9 +44,10 @@ from synapse.http import (
     cancelled_to_request_timed_out_error,
     redact_uri,
 )
+from synapse.http.proxyagent import ProxyAgent
 from synapse.logging.context import make_deferred_yieldable
+from synapse.logging.opentracing import set_tag, start_active_span, tags
 from synapse.util.async_helpers import timeout_deferred
-from synapse.util.caches import CACHE_SIZE_FACTOR
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +68,21 @@ def check_against_blacklist(ip_address, ip_whitelist, ip_blacklist):
         if ip_whitelist is None or ip_address not in ip_whitelist:
             return True
     return False
+
+
+_EPSILON = 0.00000001
+
+
+def _make_scheduler(reactor):
+    """Makes a schedular suitable for a Cooperator using the given reactor.
+
+    (This is effectively just a copy from `twisted.internet.task`)
+    """
+
+    def _scheduler(x):
+        return reactor.callLater(_EPSILON, x)
+
+    return _scheduler
 
 
 class IPBlacklistingResolver(object):
@@ -182,7 +197,15 @@ class SimpleHttpClient(object):
     using HTTP in Matrix
     """
 
-    def __init__(self, hs, treq_args={}, ip_whitelist=None, ip_blacklist=None):
+    def __init__(
+        self,
+        hs,
+        treq_args={},
+        ip_whitelist=None,
+        ip_blacklist=None,
+        http_proxy=None,
+        https_proxy=None,
+    ):
         """
         Args:
             hs (synapse.server.HomeServer)
@@ -191,6 +214,8 @@ class SimpleHttpClient(object):
                 we may not request.
             ip_whitelist (netaddr.IPSet): The whitelisted IP addresses, that we can
                request if it were otherwise caught in a blacklist.
+            http_proxy (bytes): proxy server to use for http connections. host[:port]
+            https_proxy (bytes): proxy server to use for https connections. host[:port]
         """
         self.hs = hs
 
@@ -202,6 +227,10 @@ class SimpleHttpClient(object):
         self.clock = hs.get_clock()
         if hs.config.user_agent_suffix:
             self.user_agent = "%s %s" % (self.user_agent, hs.config.user_agent_suffix)
+
+        # We use this for our body producers to ensure that they use the correct
+        # reactor.
+        self._cooperator = Cooperator(scheduler=_make_scheduler(hs.get_reactor()))
 
         self.user_agent = self.user_agent.encode("ascii")
 
@@ -229,17 +258,19 @@ class SimpleHttpClient(object):
         # tends to do so in batches, so we need to allow the pool to keep
         # lots of idle connections around.
         pool = HTTPConnectionPool(self.reactor)
-        pool.maxPersistentPerHost = max((100 * CACHE_SIZE_FACTOR, 5))
+        # XXX: The justification for using the cache factor here is that larger instances
+        # will need both more cache and more connections.
+        # Still, this should probably be a separate dial
+        pool.maxPersistentPerHost = max((100 * hs.config.caches.global_factor, 5))
         pool.cachedConnectionTimeout = 2 * 60
 
-        # The default context factory in Twisted 14.0.0 (which we require) is
-        # BrowserLikePolicyForHTTPS which will do regular cert validation
-        # 'like a browser'
-        self.agent = Agent(
+        self.agent = ProxyAgent(
             self.reactor,
             connectTimeout=15,
             contextFactory=self.hs.get_http_client_context_factory(),
             pool=pool,
+            http_proxy=http_proxy,
+            https_proxy=https_proxy,
         )
 
         if self._ip_blacklist:
@@ -269,42 +300,58 @@ class SimpleHttpClient(object):
         # log request but strip `access_token` (AS requests for example include this)
         logger.info("Sending request %s %s", method, redact_uri(uri))
 
-        try:
-            body_producer = None
-            if data is not None:
-                body_producer = QuieterFileBodyProducer(BytesIO(data))
+        with start_active_span(
+            "outgoing-client-request",
+            tags={
+                tags.SPAN_KIND: tags.SPAN_KIND_RPC_CLIENT,
+                tags.HTTP_METHOD: method,
+                tags.HTTP_URL: uri,
+            },
+            finish_on_close=True,
+        ):
+            try:
+                body_producer = None
+                if data is not None:
+                    body_producer = QuieterFileBodyProducer(
+                        BytesIO(data), cooperator=self._cooperator,
+                    )
 
-            request_deferred = treq.request(
-                method,
-                uri,
-                agent=self.agent,
-                data=body_producer,
-                headers=headers,
-                **self._extra_treq_args
-            )
-            request_deferred = timeout_deferred(
-                request_deferred,
-                60,
-                self.hs.get_reactor(),
-                cancelled_to_request_timed_out_error,
-            )
-            response = yield make_deferred_yieldable(request_deferred)
+                request_deferred = treq.request(
+                    method,
+                    uri,
+                    agent=self.agent,
+                    data=body_producer,
+                    headers=headers,
+                    **self._extra_treq_args
+                )
+                request_deferred = timeout_deferred(
+                    request_deferred,
+                    60,
+                    self.hs.get_reactor(),
+                    cancelled_to_request_timed_out_error,
+                )
+                response = yield make_deferred_yieldable(request_deferred)
 
-            incoming_responses_counter.labels(method, response.code).inc()
-            logger.info(
-                "Received response to %s %s: %s", method, redact_uri(uri), response.code
-            )
-            return response
-        except Exception as e:
-            incoming_responses_counter.labels(method, "ERR").inc()
-            logger.info(
-                "Error sending request to  %s %s: %s %s",
-                method,
-                redact_uri(uri),
-                type(e).__name__,
-                e.args[0],
-            )
-            raise
+                incoming_responses_counter.labels(method, response.code).inc()
+                logger.info(
+                    "Received response to %s %s: %s",
+                    method,
+                    redact_uri(uri),
+                    response.code,
+                )
+                return response
+            except Exception as e:
+                incoming_responses_counter.labels(method, "ERR").inc()
+                logger.info(
+                    "Error sending request to  %s %s: %s %s",
+                    method,
+                    redact_uri(uri),
+                    type(e).__name__,
+                    e.args[0],
+                )
+                set_tag(tags.ERROR, True)
+                set_tag("error_reason", e.args[0])
+                raise
 
     @defer.inlineCallbacks
     def post_urlencoded_get_json(self, uri, args={}, headers=None):
@@ -312,7 +359,7 @@ class SimpleHttpClient(object):
         Args:
             uri (str):
             args (dict[str, str|List[str]]): query params
-            headers (dict[str, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str|bytes]]|None): If not None, a map from
                header name to a list of values for that header
 
         Returns:
@@ -334,6 +381,7 @@ class SimpleHttpClient(object):
         actual_headers = {
             b"Content-Type": [b"application/x-www-form-urlencoded"],
             b"User-Agent": [self.user_agent],
+            b"Accept": [b"application/json"],
         }
         if headers:
             actual_headers.update(headers)
@@ -345,7 +393,7 @@ class SimpleHttpClient(object):
         body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            return json.loads(body)
+            return json.loads(body.decode("utf-8"))
         else:
             raise HttpResponseException(response.code, response.phrase, body)
 
@@ -356,7 +404,7 @@ class SimpleHttpClient(object):
         Args:
             uri (str):
             post_json (object):
-            headers (dict[str, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str|bytes]]|None): If not None, a map from
                header name to a list of values for that header
 
         Returns:
@@ -374,6 +422,7 @@ class SimpleHttpClient(object):
         actual_headers = {
             b"Content-Type": [b"application/json"],
             b"User-Agent": [self.user_agent],
+            b"Accept": [b"application/json"],
         }
         if headers:
             actual_headers.update(headers)
@@ -385,7 +434,7 @@ class SimpleHttpClient(object):
         body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            return json.loads(body)
+            return json.loads(body.decode("utf-8"))
         else:
             raise HttpResponseException(response.code, response.phrase, body)
 
@@ -399,7 +448,7 @@ class SimpleHttpClient(object):
                 None.
                 **Note**: The value of each key is assumed to be an iterable
                 and *not* a string.
-            headers (dict[str, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str|bytes]]|None): If not None, a map from
                header name to a list of values for that header
         Returns:
             Deferred: Succeeds when we get *any* 2xx HTTP response, with the
@@ -409,8 +458,12 @@ class SimpleHttpClient(object):
 
             ValueError: if the response was not JSON
         """
+        actual_headers = {b"Accept": [b"application/json"]}
+        if headers:
+            actual_headers.update(headers)
+
         body = yield self.get_raw(uri, args, headers=headers)
-        return json.loads(body)
+        return json.loads(body.decode("utf-8"))
 
     @defer.inlineCallbacks
     def put_json(self, uri, json_body, args={}, headers=None):
@@ -423,7 +476,7 @@ class SimpleHttpClient(object):
                 None.
                 **Note**: The value of each key is assumed to be an iterable
                 and *not* a string.
-            headers (dict[str, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str|bytes]]|None): If not None, a map from
                header name to a list of values for that header
         Returns:
             Deferred: Succeeds when we get *any* 2xx HTTP response, with the
@@ -442,6 +495,7 @@ class SimpleHttpClient(object):
         actual_headers = {
             b"Content-Type": [b"application/json"],
             b"User-Agent": [self.user_agent],
+            b"Accept": [b"application/json"],
         }
         if headers:
             actual_headers.update(headers)
@@ -453,7 +507,7 @@ class SimpleHttpClient(object):
         body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            return json.loads(body)
+            return json.loads(body.decode("utf-8"))
         else:
             raise HttpResponseException(response.code, response.phrase, body)
 
@@ -467,11 +521,11 @@ class SimpleHttpClient(object):
                 None.
                 **Note**: The value of each key is assumed to be an iterable
                 and *not* a string.
-            headers (dict[str, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str|bytes]]|None): If not None, a map from
                header name to a list of values for that header
         Returns:
             Deferred: Succeeds when we get *any* 2xx HTTP response, with the
-            HTTP body at text.
+            HTTP body as bytes.
         Raises:
             HttpResponseException on a non-2xx HTTP response.
         """
@@ -501,7 +555,7 @@ class SimpleHttpClient(object):
         Args:
             url (str): The URL to GET
             output_stream (file): File to write the response body to.
-            headers (dict[str, List[str]]|None): If not None, a map from
+            headers (dict[str|bytes, List[str|bytes]]|None): If not None, a map from
                header name to a list of values for that header
         Returns:
             A (int,dict,string,int) tuple of the file length, dict of the response
@@ -520,7 +574,7 @@ class SimpleHttpClient(object):
             b"Content-Length" in resp_headers
             and int(resp_headers[b"Content-Length"][0]) > max_size
         ):
-            logger.warn("Requested URL is too large > %r bytes" % (self.max_size,))
+            logger.warning("Requested URL is too large > %r bytes" % (self.max_size,))
             raise SynapseError(
                 502,
                 "Requested file is too large > %r bytes" % (self.max_size,),
@@ -528,7 +582,7 @@ class SimpleHttpClient(object):
             )
 
         if response.code > 299:
-            logger.warn("Got %d when downloading %s" % (response.code, url))
+            logger.warning("Got %d when downloading %s" % (response.code, url))
             raise SynapseError(502, "Got error %d" % (response.code,), Codes.UNKNOWN)
 
         # TODO: if our Content-Type is HTML or something, just read the first
@@ -543,7 +597,7 @@ class SimpleHttpClient(object):
             # This can happen e.g. because the body is too large.
             raise
         except Exception as e:
-            raise_from(SynapseError(502, ("Failed to download remote body: %s" % e)), e)
+            raise SynapseError(502, ("Failed to download remote body: %s" % e)) from e
 
         return (
             length,
@@ -599,44 +653,12 @@ def _readBodyToFile(response, stream, max_size):
     return d
 
 
-class CaptchaServerHttpClient(SimpleHttpClient):
-    """
-    Separate HTTP client for talking to google's captcha servers
-    Only slightly special because accepts partial download responses
-
-    used only by c/s api v1
-    """
-
-    @defer.inlineCallbacks
-    def post_urlencoded_get_raw(self, url, args={}):
-        query_bytes = urllib.parse.urlencode(encode_urlencode_args(args), True)
-
-        response = yield self.request(
-            "POST",
-            url,
-            data=query_bytes,
-            headers=Headers(
-                {
-                    b"Content-Type": [b"application/x-www-form-urlencoded"],
-                    b"User-Agent": [self.user_agent],
-                }
-            ),
-        )
-
-        try:
-            body = yield make_deferred_yieldable(readBody(response))
-            return body
-        except PartialDownloadError as e:
-            # twisted dislikes google's response, no content length.
-            return e.response
-
-
 def encode_urlencode_args(args):
     return {k: encode_urlencode_arg(v) for k, v in args.items()}
 
 
 def encode_urlencode_arg(arg):
-    if isinstance(arg, text_type):
+    if isinstance(arg, str):
         return arg.encode("utf-8")
     elif isinstance(arg, list):
         return [encode_urlencode_arg(i) for i in arg]

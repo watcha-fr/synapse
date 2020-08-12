@@ -20,7 +20,6 @@ import logging
 from canonicaljson import json
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.logging.opentracing import trace_servlet
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +96,7 @@ def parse_boolean_from_args(args, name, default=None, required=False):
             return {b"true": True, b"false": False}[args[name][0]]
         except Exception:
             message = (
-                "Boolean query parameter %r must be one of" " ['true', 'false']"
+                "Boolean query parameter %r must be one of ['true', 'false']"
             ) % (name,)
             raise SynapseError(400, message)
     else:
@@ -215,18 +214,10 @@ def parse_json_value_from_request(request, allow_empty_body=False):
     if not content_bytes and allow_empty_body:
         return None
 
-    # Decode to Unicode so that simplejson will return Unicode strings on
-    # Python 2
     try:
-        content_unicode = content_bytes.decode("utf8")
-    except UnicodeDecodeError:
-        logger.warn("Unable to decode UTF-8")
-        raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
-
-    try:
-        content = json.loads(content_unicode)
+        content = json.loads(content_bytes.decode("utf-8"))
     except Exception as e:
-        logger.warn("Unable to parse JSON: %s", e)
+        logger.warning("Unable to parse JSON: %s", e)
         raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
 
     return content
@@ -298,10 +289,7 @@ class RestServlet(object):
                     servlet_classname = self.__class__.__name__
                     method_handler = getattr(self, "on_%s" % (method,))
                     http_server.register_paths(
-                        method,
-                        patterns,
-                        trace_servlet(servlet_classname, method_handler),
-                        servlet_classname,
+                        method, patterns, method_handler, servlet_classname
                     )
 
         else:

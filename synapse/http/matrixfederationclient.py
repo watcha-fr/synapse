@@ -17,10 +17,8 @@ import cgi
 import logging
 import random
 import sys
+import urllib
 from io import BytesIO
-
-from six import PY3, raise_from, string_types
-from six.moves import urllib
 
 import attr
 import treq
@@ -36,7 +34,6 @@ from twisted.internet.task import _EPSILON, Cooperator
 from twisted.web._newclient import ResponseDone
 from twisted.web.http_headers import Headers
 
-import synapse.logging.opentracing as opentracing
 import synapse.metrics
 import synapse.util.retryutils
 from synapse.api.errors import (
@@ -50,6 +47,12 @@ from synapse.http import QuieterFileBodyProducer
 from synapse.http.client import BlacklistingAgentWrapper, IPBlacklistingResolver
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.logging.context import make_deferred_yieldable
+from synapse.logging.opentracing import (
+    inject_active_span_byte_dict,
+    set_tag,
+    start_active_span,
+    tags,
+)
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.metrics import Measure
 
@@ -65,11 +68,7 @@ incoming_responses_counter = Counter(
 
 MAX_LONG_RETRIES = 10
 MAX_SHORT_RETRIES = 3
-
-if PY3:
-    MAXINT = sys.maxsize
-else:
-    MAXINT = sys.maxint
+MAXINT = sys.maxsize
 
 
 _next_id = 1
@@ -143,8 +142,13 @@ def _handle_json_response(reactor, timeout_sec, request, response):
         d = timeout_deferred(d, timeout=timeout_sec, reactor=reactor)
 
         body = yield make_deferred_yieldable(d)
+    except TimeoutError as e:
+        logger.warning(
+            "{%s} [%s] Timed out reading response", request.txn_id, request.destination,
+        )
+        raise RequestSendFailed(e, can_retry=True) from e
     except Exception as e:
-        logger.warn(
+        logger.warning(
             "{%s} [%s] Error reading response: %s",
             request.txn_id,
             request.destination,
@@ -172,7 +176,7 @@ class MatrixFederationHttpClient(object):
 
     def __init__(self, hs, tls_client_options_factory):
         self.hs = hs
-        self.signing_key = hs.config.signing_key[0]
+        self.signing_key = hs.signing_key
         self.server_name = hs.hostname
 
         real_reactor = hs.get_reactor()
@@ -193,7 +197,14 @@ class MatrixFederationHttpClient(object):
 
         self.reactor = Reactor()
 
-        self.agent = MatrixFederationAgent(self.reactor, tls_client_options_factory)
+        user_agent = hs.version_string
+        if hs.config.user_agent_suffix:
+            user_agent = "%s %s" % (user_agent, hs.config.user_agent_suffix)
+        user_agent = user_agent.encode("ascii")
+
+        self.agent = MatrixFederationAgent(
+            self.reactor, tls_client_options_factory, user_agent
+        )
 
         # Use a BlacklistingAgentWrapper to prevent circumventing the IP
         # blacklist via IP literals in server names
@@ -340,21 +351,20 @@ class MatrixFederationHttpClient(object):
         else:
             query_bytes = b""
 
-        # Retreive current span
-        scope = opentracing.start_active_span(
+        scope = start_active_span(
             "outgoing-federation-request",
             tags={
-                opentracing.tags.SPAN_KIND: opentracing.tags.SPAN_KIND_RPC_CLIENT,
-                opentracing.tags.PEER_ADDRESS: request.destination,
-                opentracing.tags.HTTP_METHOD: request.method,
-                opentracing.tags.HTTP_URL: request.path,
+                tags.SPAN_KIND: tags.SPAN_KIND_RPC_CLIENT,
+                tags.PEER_ADDRESS: request.destination,
+                tags.HTTP_METHOD: request.method,
+                tags.HTTP_URL: request.path,
             },
             finish_on_close=True,
         )
 
         # Inject the span into the headers
         headers_dict = {}
-        opentracing.inject_active_span_byte_dict(headers_dict, request.destination)
+        inject_active_span_byte_dict(headers_dict, request.destination)
 
         headers_dict[b"User-Agent"] = [self.version_string_bytes]
 
@@ -404,6 +414,8 @@ class MatrixFederationHttpClient(object):
                         _sec_timeout,
                     )
 
+                    outgoing_requests_counter.labels(request.method).inc()
+
                     try:
                         with Measure(self.clock, "outbound_request"):
                             # we don't want all the fancy cookie and redirect handling
@@ -422,27 +434,37 @@ class MatrixFederationHttpClient(object):
                             )
 
                             response = yield request_deferred
+                    except TimeoutError as e:
+                        raise RequestSendFailed(e, can_retry=True) from e
                     except DNSLookupError as e:
-                        raise_from(RequestSendFailed(e, can_retry=retry_on_dns_fail), e)
+                        raise RequestSendFailed(e, can_retry=retry_on_dns_fail) from e
                     except Exception as e:
                         logger.info("Failed to send request: %s", e)
-                        raise_from(RequestSendFailed(e, can_retry=True), e)
+                        raise RequestSendFailed(e, can_retry=True) from e
 
-                    logger.info(
-                        "{%s} [%s] Got response headers: %d %s",
-                        request.txn_id,
-                        request.destination,
-                        response.code,
-                        response.phrase.decode("ascii", errors="replace"),
-                    )
+                    incoming_responses_counter.labels(
+                        request.method, response.code
+                    ).inc()
 
-                    opentracing.set_tag(
-                        opentracing.tags.HTTP_STATUS_CODE, response.code
-                    )
+                    set_tag(tags.HTTP_STATUS_CODE, response.code)
 
                     if 200 <= response.code < 300:
+                        logger.debug(
+                            "{%s} [%s] Got response headers: %d %s",
+                            request.txn_id,
+                            request.destination,
+                            response.code,
+                            response.phrase.decode("ascii", errors="replace"),
+                        )
                         pass
                     else:
+                        logger.info(
+                            "{%s} [%s] Got response headers: %d %s",
+                            request.txn_id,
+                            request.destination,
+                            response.code,
+                            response.phrase.decode("ascii", errors="replace"),
+                        )
                         # :'(
                         # Update transactions table?
                         d = treq.content(response)
@@ -455,7 +477,7 @@ class MatrixFederationHttpClient(object):
                         except Exception as e:
                             # Eh, we're already going to raise an exception so lets
                             # ignore if this fails.
-                            logger.warn(
+                            logger.warning(
                                 "{%s} [%s] Failed to get error response: %s %s: %s",
                                 request.txn_id,
                                 request.destination,
@@ -470,13 +492,13 @@ class MatrixFederationHttpClient(object):
                         # Retry if the error is a 429 (Too Many Requests),
                         # otherwise just raise a standard HttpResponseException
                         if response.code == 429:
-                            raise_from(RequestSendFailed(e, can_retry=True), e)
+                            raise RequestSendFailed(e, can_retry=True) from e
                         else:
                             raise e
 
                     break
                 except RequestSendFailed as e:
-                    logger.warn(
+                    logger.warning(
                         "{%s} [%s] Request failed: %s %s: %s",
                         request.txn_id,
                         request.destination,
@@ -511,7 +533,7 @@ class MatrixFederationHttpClient(object):
                         raise
 
                 except Exception as e:
-                    logger.warn(
+                    logger.warning(
                         "{%s} [%s] Request failed: %s %s: %s",
                         request.txn_id,
                         request.destination,
@@ -528,7 +550,7 @@ class MatrixFederationHttpClient(object):
         """
         Builds the Authorization headers for a federation request
         Args:
-            destination (bytes|None): The desination home server of the request.
+            destination (bytes|None): The desination homeserver of the request.
                 May be None if the destination is an identity server, in which case
                 destination_is must be non-None.
             method (bytes): The HTTP method of the request
@@ -540,13 +562,17 @@ class MatrixFederationHttpClient(object):
         Returns:
             list[bytes]: a list of headers to be added as "Authorization:" headers
         """
-        request = {"method": method, "uri": url_bytes, "origin": self.server_name}
+        request = {
+            "method": method.decode("ascii"),
+            "uri": url_bytes.decode("ascii"),
+            "origin": self.server_name,
+        }
 
         if destination is not None:
-            request["destination"] = destination
+            request["destination"] = destination.decode("ascii")
 
         if destination_is is not None:
-            request["destination_is"] = destination_is
+            request["destination_is"] = destination_is.decode("ascii")
 
         if content is not None:
             request["content"] = content
@@ -887,7 +913,7 @@ class MatrixFederationHttpClient(object):
             d.addTimeout(self.default_timeout, self.reactor)
             length = yield make_deferred_yieldable(d)
         except Exception as e:
-            logger.warn(
+            logger.warning(
                 "{%s} [%s] Error reading response: %s",
                 request.txn_id,
                 request.destination,
@@ -981,7 +1007,7 @@ def encode_query_args(args):
 
     encoded_args = {}
     for k, vs in args.items():
-        if isinstance(vs, string_types):
+        if isinstance(vs, str):
             vs = [vs]
         encoded_args[k] = [v.encode("UTF-8") for v in vs]
 

@@ -15,6 +15,8 @@
 
 from mock import Mock
 
+from twisted.internet import defer
+
 from synapse.rest.client.v1 import presence
 from synapse.types import UserID
 
@@ -36,6 +38,7 @@ class PresenceTestCase(unittest.HomeserverTestCase):
         )
 
         hs.presence_handler = Mock()
+        hs.presence_handler.set_state.return_value = defer.succeed(None)
 
         return hs
 
@@ -57,7 +60,7 @@ class PresenceTestCase(unittest.HomeserverTestCase):
 
     def test_put_presence_disabled(self):
         """
-        PUT to the status endpoint with use_presence disbled will NOT call
+        PUT to the status endpoint with use_presence disabled will NOT call
         set_state on the presence handler.
         """
         self.hs.config.use_presence = False

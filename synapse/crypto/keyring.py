@@ -15,11 +15,8 @@
 # limitations under the License.
 
 import logging
+import urllib
 from collections import defaultdict
-
-import six
-from six import raise_from
-from six.moves import urllib
 
 import attr
 from signedjson.key import (
@@ -30,7 +27,6 @@ from signedjson.key import (
 from signedjson.sign import (
     SignatureVerifyException,
     encode_canonical_json,
-    sign_json,
     signature_ids,
     verify_signed_json,
 )
@@ -45,8 +41,8 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.logging.context import (
-    LoggingContext,
     PreserveLoggingContext,
+    current_context,
     make_deferred_yieldable,
     preserve_fn,
     run_in_background,
@@ -238,7 +234,7 @@ class Keyring(object):
         """
 
         try:
-            ctx = LoggingContext.current_context()
+            ctx = current_context()
 
             # map from server name to a set of outstanding request ids
             server_to_request_ids = {}
@@ -328,9 +324,7 @@ class Keyring(object):
             verify_requests (list[VerifyJsonRequest]): list of verify requests
         """
 
-        remaining_requests = set(
-            (rq for rq in verify_requests if not rq.key_ready.called)
-        )
+        remaining_requests = {rq for rq in verify_requests if not rq.key_ready.called}
 
         @defer.inlineCallbacks
         def do_iterations():
@@ -398,7 +392,7 @@ class Keyring(object):
 
         results = yield fetcher.get_keys(missing_keys)
 
-        completed = list()
+        completed = []
         for verify_request in remaining_requests:
             server_name = verify_request.server_name
 
@@ -513,17 +507,18 @@ class BaseV2KeyFetcher(object):
         server_name = response_json["server_name"]
         verified = False
         for key_id in response_json["signatures"].get(server_name, {}):
-            # each of the keys used for the signature must be present in the response
-            # json.
             key = verify_keys.get(key_id)
             if not key:
-                raise KeyLookupError(
-                    "Key response is signed by key id %s:%s but that key is not "
-                    "present in the response" % (server_name, key_id)
-                )
+                # the key may not be present in verify_keys if:
+                #  * we got the key from the notary server, and:
+                #  * the key belongs to the notary server, and:
+                #  * the notary server is using a different key to sign notary
+                #    responses.
+                continue
 
             verify_signed_json(response_json, server_name, key.verify_key)
             verified = True
+            break
 
         if not verified:
             raise KeyLookupError(
@@ -540,13 +535,7 @@ class BaseV2KeyFetcher(object):
                     verify_key=verify_key, valid_until_ts=key_data["expired_ts"]
                 )
 
-        # re-sign the json with our own key, so that it is ready if we are asked to
-        # give it out as a notary server
-        signed_key_json = sign_json(
-            response_json, self.config.server_name, self.config.signing_key[0]
-        )
-
-        signed_key_json_bytes = encode_canonical_json(signed_key_json)
+        key_json_bytes = encode_canonical_json(response_json)
 
         yield make_deferred_yieldable(
             defer.gatherResults(
@@ -558,7 +547,7 @@ class BaseV2KeyFetcher(object):
                         from_server=from_server,
                         ts_now_ms=time_added_ms,
                         ts_expires_ms=ts_valid_until_ms,
-                        key_json_bytes=signed_key_json_bytes,
+                        key_json_bytes=key_json_bytes,
                     )
                     for key_id in verify_keys
                 ],
@@ -657,9 +646,10 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
                 },
             )
         except (NotRetryingDestination, RequestSendFailed) as e:
-            raise_from(KeyLookupError("Failed to connect to remote server"), e)
+            # these both have str() representations which we can't really improve upon
+            raise KeyLookupError(str(e))
         except HttpResponseException as e:
-            raise_from(KeyLookupError("Remote server returned an error"), e)
+            raise KeyLookupError("Remote server returned an error: %s" % (e,))
 
         keys = {}
         added_keys = []
@@ -669,7 +659,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
         for response in query_response["server_keys"]:
             # do this first, so that we can give useful errors thereafter
             server_name = response.get("server_name")
-            if not isinstance(server_name, six.string_types):
+            if not isinstance(server_name, str):
                 raise KeyLookupError(
                     "Malformed response from key notary server %s: invalid server_name"
                     % (perspective_name,)
@@ -821,9 +811,11 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
                     timeout=10000,
                 )
             except (NotRetryingDestination, RequestSendFailed) as e:
-                raise_from(KeyLookupError("Failed to connect to remote server"), e)
+                # these both have str() representations which we can't really improve
+                # upon
+                raise KeyLookupError(str(e))
             except HttpResponseException as e:
-                raise_from(KeyLookupError("Remote server returned an error"), e)
+                raise KeyLookupError("Remote server returned an error: %s" % (e,))
 
             if response["server_name"] != server_name:
                 raise KeyLookupError(

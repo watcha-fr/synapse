@@ -23,8 +23,6 @@ import hmac
 import logging
 import sys
 
-from six.moves import input
-
 import requests as _requests
 import yaml
 
@@ -144,8 +142,8 @@ def main():
     logging.captureWarnings(True)
 
     parser = argparse.ArgumentParser(
-        description="Used to register new users with a given home server when"
-        " registration has been disabled. The home server must be"
+        description="Used to register new users with a given homeserver when"
+        " registration has been disabled. The homeserver must be"
         " configured with the 'registration_shared_secret' option"
         " set."
     )
@@ -200,10 +198,10 @@ def main():
 
     parser.add_argument(
         "server_url",
-        default="https://localhost:8448",
+        default="http://localhost:8448",
         nargs="?",
-        help="URL to use to talk to the home server. Defaults to "
-        " 'https://localhost:8448'.",
+        help="URL to use to talk to the homeserver. Defaults to "
+        " 'http://localhost:8448'.",
     )
 
     args = parser.parse_args()

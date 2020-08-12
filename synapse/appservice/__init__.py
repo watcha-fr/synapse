@@ -15,8 +15,6 @@
 import logging
 import re
 
-from six import string_types
-
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
@@ -94,7 +92,9 @@ class ApplicationService(object):
         ip_range_whitelist=None,
     ):
         self.token = token
-        self.url = url
+        self.url = (
+            url.rstrip("/") if isinstance(url, str) else None
+        )  # url must not end with a slash
         self.hs_token = hs_token
         self.sender = sender
         self.server_name = hostname
@@ -154,7 +154,7 @@ class ApplicationService(object):
                         )
 
                 regex = regex_obj.get("regex")
-                if isinstance(regex, string_types):
+                if isinstance(regex, str):
                     regex_obj["regex"] = re.compile(regex)  # Pre-compile regex
                 else:
                     raise ValueError("Expected string for 'regex' in ns '%s'" % ns)
@@ -268,7 +268,7 @@ class ApplicationService(object):
     def is_exclusive_room(self, room_id):
         return self._is_exclusive(ApplicationService.NS_ROOMS, room_id)
 
-    def get_exlusive_user_regexes(self):
+    def get_exclusive_user_regexes(self):
         """Get the list of regexes used to determine if a user is exclusively
         registered by the AS
         """

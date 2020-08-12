@@ -16,7 +16,7 @@
 
 """Tests REST events for /rooms paths."""
 
-from mock import Mock, NonCallableMock
+from mock import Mock
 
 from twisted.internet import defer
 
@@ -39,16 +39,10 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         hs = self.setup_test_homeserver(
-            "red",
-            http_client=None,
-            federation_client=Mock(),
-            ratelimiter=NonCallableMock(spec_set=["can_do_action"]),
+            "red", http_client=None, federation_client=Mock(),
         )
 
         self.event_source = hs.get_event_sources().sources["typing"]
-
-        self.ratelimiter = hs.get_ratelimiter()
-        self.ratelimiter.can_do_action.return_value = (True, 0)
 
         hs.get_handlers().federation_handler = Mock()
 
@@ -97,7 +91,9 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.room_id = self.helper.create_room_as(self.user_id)
         # Need another user to make notifications actually work
+        # added for watcha
         self.helper.invite(self.room_id, src=self.user_id, targ="@jim:red") # added for Watcha: need to be invited
+        # end of added for watcha
         self.helper.join(self.room_id, user="@jim:red")
 
     def test_set_typing(self):
@@ -110,7 +106,9 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code)
 
         self.assertEquals(self.event_source.get_current_key(), 1)
-        events = self.event_source.get_new_events(from_key=0, room_ids=[self.room_id])
+        events = self.get_success(
+            self.event_source.get_new_events(from_key=0, room_ids=[self.room_id])
+        )
         self.assertEquals(
             events[0],
             [

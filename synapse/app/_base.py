@@ -20,14 +20,17 @@ import signal
 import socket
 import sys
 import traceback
+from typing import Iterable
 
 from daemonize import Daemonize
+from typing_extensions import NoReturn
 
 from twisted.internet import defer, error, reactor
 from twisted.protocols.tls import TLSMemoryBIOFactory
 
 import synapse
 from synapse.app import check_bind_error
+from synapse.config.server import ListenerConfig
 from synapse.crypto import context_factory
 from synapse.logging.context import PreserveLoggingContext
 from synapse.util.async_helpers import Linearizer
@@ -36,18 +39,20 @@ from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger(__name__)
 
+# list of tuples of function, args list, kwargs dict
 _sighup_callbacks = []
 
 
-def register_sighup(func):
+def register_sighup(func, *args, **kwargs):
     """
     Register a function to be called when a SIGHUP occurs.
 
     Args:
         func (function): Function to be called when sent a SIGHUP signal.
-            Will be called with a single argument, the homeserver.
+            Will be called with a single default argument, the homeserver.
+        *args, **kwargs: args and kwargs to be passed to the target function.
     """
-    _sighup_callbacks.append(func)
+    _sighup_callbacks.append((func, args, kwargs))
 
 
 def start_worker_reactor(appname, config, run_command=reactor.run):
@@ -137,9 +142,9 @@ def start_reactor(
             run()
 
 
-def quit_with_error(error_string):
+def quit_with_error(error_string: str) -> NoReturn:
     message_lines = error_string.split("\n")
-    line_length = max([len(l) for l in message_lines if len(l) < 80]) + 2
+    line_length = max(len(line) for line in message_lines if len(line) < 80) + 2
     sys.stderr.write("*" * line_length + "\n")
     for line in message_lines:
         sys.stderr.write(" %s\n" % (line.rstrip(),))
@@ -231,13 +236,19 @@ def refresh_certificate(hs):
         logger.info("Context factories updated.")
 
 
-def start(hs, listeners=None):
+def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerConfig]):
     """
     Start a Synapse server or worker.
 
+    Should be called once the reactor is running and (if we're using ACME) the
+    TLS certificates are in place.
+
+    Will start the main HTTP listeners and do some other startup tasks, and then
+    notify systemd.
+
     Args:
-        hs (synapse.server.HomeServer)
-        listeners (list[dict]): Listener configuration ('listeners' in homeserver.yaml)
+        hs: homeserver instance
+        listeners: Listener configuration ('listeners' in homeserver.yaml)
     """
     try:
         # Set up the SIGHUP machinery.
@@ -248,8 +259,8 @@ def start(hs, listeners=None):
                 # we're not using systemd.
                 sdnotify(b"RELOADING=1")
 
-                for i in _sighup_callbacks:
-                    i(hs)
+                for i, args, kwargs in _sighup_callbacks:
+                    i(hs, *args, **kwargs)
 
                 sdnotify(b"READY=1")
 
@@ -261,14 +272,26 @@ def start(hs, listeners=None):
         refresh_certificate(hs)
 
         # Start the tracer
-        synapse.logging.opentracing.init_tracer(hs.config)
+        synapse.logging.opentracing.init_tracer(  # type: ignore[attr-defined] # noqa
+            hs
+        )
 
         # It is now safe to start your Synapse.
         hs.start_listening(listeners)
-        hs.get_datastore().start_profiling()
+        hs.get_datastore().db.start_profiling()
+        hs.get_pusherpool().start()
 
         setup_sentry(hs)
         setup_sdnotify(hs)
+
+        # We now freeze all allocated objects in the hopes that (almost)
+        # everything currently allocated are things that will be used for the
+        # rest of time. Doing so means less work each GC (hopefully).
+        #
+        # This only works on Python 3.7
+        if sys.version_info >= (3, 7):
+            gc.collect()
+            gc.freeze()
     except Exception:
         traceback.print_exc(file=sys.stderr)
         reactor = hs.get_reactor()
@@ -296,7 +319,7 @@ def setup_sentry(hs):
         scope.set_tag("matrix_server_name", hs.config.server_name)
 
         app = hs.config.worker_app if hs.config.worker_app else "synapse.app.homeserver"
-        name = hs.config.worker_name if hs.config.worker_name else "master"
+        name = hs.get_instance_name()
         scope.set_tag("worker_app", app)
         scope.set_tag("worker_name", name)
 
@@ -307,9 +330,7 @@ def setup_sdnotify(hs):
 
     # Tell systemd our state, if we're using it. This will silently fail if
     # we're not using systemd.
-    hs.get_reactor().addSystemEventTrigger(
-        "after", "startup", sdnotify, b"READY=1\nMAINPID=%i" % (os.getpid(),)
-    )
+    sdnotify(b"READY=1\nMAINPID=%i" % (os.getpid(),))
 
     hs.get_reactor().addSystemEventTrigger(
         "before", "shutdown", sdnotify, b"STOPPING=1"

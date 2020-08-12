@@ -21,7 +21,7 @@ from synapse.api.room_versions import RoomVersions
 from synapse.types import RoomAlias, RoomID, UserID
 
 from tests import unittest
-from tests.utils import create_room, setup_test_homeserver
+from tests.utils import create_room, setup_test_homeserver # modified for watcha add create_room 
 
 
 class RoomStoreTestCase(unittest.TestCase):
@@ -41,6 +41,7 @@ class RoomStoreTestCase(unittest.TestCase):
             self.room.to_string(),
             room_creator_user_id=self.u_creator.to_string(),
             is_public=True,
+            room_version=RoomVersions.V1,
         )
 
     @defer.inlineCallbacks
@@ -54,6 +55,25 @@ class RoomStoreTestCase(unittest.TestCase):
             (yield self.store.get_room(self.room.to_string())),
         )
 
+    @defer.inlineCallbacks
+    def test_get_room_unknown_room(self):
+        self.assertIsNone((yield self.store.get_room("!uknown:test")),)
+
+    @defer.inlineCallbacks
+    def test_get_room_with_stats(self):
+        self.assertDictContainsSubset(
+            {
+                "room_id": self.room.to_string(),
+                "creator": self.u_creator.to_string(),
+                "public": True,
+            },
+            (yield self.store.get_room_with_stats(self.room.to_string())),
+        )
+
+    @defer.inlineCallbacks
+    def test_get_room_with_stats_unknown_room(self):
+        self.assertIsNone((yield self.store.get_room_with_stats("!uknown:test")),)
+
 
 class RoomEventsStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
@@ -63,17 +83,23 @@ class RoomEventsStoreTestCase(unittest.TestCase):
         # Room events need the full datastore, for persist_event() and
         # get_room_state()
         self.store = hs.get_datastore()
+        self.storage = hs.get_storage()
         self.event_factory = hs.get_event_factory()
 
         self.room = RoomID.from_string("!abcde:test")
 
-        yield self.store.store_room(
-            self.room.to_string(), room_creator_user_id="@creator:text", is_public=True
+        yield defer.ensureDeferred(
+            self.store.store_room(
+                self.room.to_string(),
+                room_creator_user_id="@creator:text",
+                is_public=True,
+                room_version=RoomVersions.V1,
+            )
         )
-
+  
     @defer.inlineCallbacks
     def inject_room_event(self, **kwargs):
-        yield self.store.persist_event(
+        yield self.storage.persistence.persist_event(
             self.event_factory.create_event(room_id=self.room.to_string(), **kwargs)
         )
 
@@ -85,7 +111,9 @@ class RoomEventsStoreTestCase(unittest.TestCase):
             etype=EventTypes.Name, name=name, content={"name": name}, depth=1
         )
 
-        state = yield self.store.get_current_state(room_id=self.room.to_string())
+        state = yield defer.ensureDeferred(
+            self.store.get_current_state(room_id=self.room.to_string())
+        )
 
         self.assertEquals(1, len(state))
         self.assertObjectHasAttributes(
@@ -101,7 +129,9 @@ class RoomEventsStoreTestCase(unittest.TestCase):
             etype=EventTypes.Topic, topic=topic, content={"topic": topic}, depth=1
         )
 
-        state = yield self.store.get_current_state(room_id=self.room.to_string())
+        state = yield defer.ensureDeferred(
+            self.store.get_current_state(room_id=self.room.to_string())
+        )
 
         self.assertEquals(1, len(state))
         self.assertObjectHasAttributes(
@@ -117,12 +147,13 @@ class RoomEventsStoreTestCase(unittest.TestCase):
 class WatchaRoomEventsStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        hs = yield setup_test_homeserver(self.addCleanup)
+        hs = setup_test_homeserver(self.addCleanup)
 
-        self.store = hs.get_datastore()
+        self.storage = hs.get_storage()
         self.event_builder_factory = hs.get_event_builder_factory()
         self.event_creation_handler = hs.get_event_creation_handler()
-
+        self.store = hs.get_datastore()
+        self.d = hs.get_datastore()
         self.user = UserID.from_string("@user:test")
         self.room = RoomID.from_string("!abc123:test")
         self.nextcloud_folder_url = "http://test.watcha.fr/nextcloud/apps/files/?dir=/test_folder"
@@ -143,16 +174,16 @@ class WatchaRoomEventsStoreTestCase(unittest.TestCase):
             },
         )
 
-        event, context = yield self.event_creation_handler.create_new_client_event(
-            builder
+        event, context = yield defer.ensureDeferred(
+            self.event_creation_handler.create_new_client_event(builder)
         )
 
-        yield self.store.persist_event(event, context)
+        yield self.storage.persistence.persist_event(event, context)
 
     @defer.inlineCallbacks
     def test_insert_new_room_link_with_NC(self):
 
-        result = yield self.store._simple_select_onecol(
+        result = yield self.store.db.simple_select_onecol(
             table="room_mapping_with_NC",
             keyvalues={"room_id": self.room.to_string()},
             retcol="link_url",
@@ -165,7 +196,7 @@ class WatchaRoomEventsStoreTestCase(unittest.TestCase):
         new_nextcloud_folder_url = "http://test.watcha.fr/nextcloud/apps/files/?dir=/test_folder2"
         yield self._send_room_mapping_event(new_nextcloud_folder_url)
 
-        result = yield self.store._simple_select_onecol(
+        result = yield self.store.db.simple_select_onecol(
             table="room_mapping_with_NC",
             keyvalues={"room_id": self.room.to_string()},
             retcol="link_url",
@@ -177,7 +208,7 @@ class WatchaRoomEventsStoreTestCase(unittest.TestCase):
     def test_delete_room_link_with_NC(self):
         yield self._send_room_mapping_event("")
 
-        result = yield self.store._simple_select_onecol(
+        result = yield self.store.db.simple_select_onecol(
             table="room_mapping_with_NC",
             keyvalues={"room_id": self.room.to_string()},
             retcol="link_url",

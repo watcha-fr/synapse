@@ -17,8 +17,6 @@
 import logging
 from collections import namedtuple
 
-from six import iteritems, itervalues
-
 from prometheus_client import Counter
 
 from twisted.internet import defer
@@ -51,6 +49,7 @@ push_rules_delta_state_cache_metric = register_cache(
     "cache",
     "push_rules_delta_state_cache_metric",
     cache=[],  # Meaningless size, as this isn't a cache that stores values
+    resizable=False,
 )
 
 
@@ -67,7 +66,8 @@ class BulkPushRuleEvaluator(object):
         self.room_push_rule_cache_metrics = register_cache(
             "cache",
             "room_push_rule_cache",
-            cache=[],  # Meaningless size, as this isn't a cache that stores values
+            cache=[],  # Meaningless size, as this isn't a cache that stores values,
+            resizable=False,
         )
 
     @defer.inlineCallbacks
@@ -79,7 +79,7 @@ class BulkPushRuleEvaluator(object):
             dict of user_id -> push_rules
         """
         room_id = event.room_id
-        rules_for_room = self._get_rules_for_room(room_id)
+        rules_for_room = yield self._get_rules_for_room(room_id)
 
         rules_by_user = yield rules_for_room.get_rules(event, context)
 
@@ -116,7 +116,7 @@ class BulkPushRuleEvaluator(object):
 
     @defer.inlineCallbacks
     def _get_power_levels_and_sender_level(self, event, context):
-        prev_state_ids = yield context.get_prev_state_ids(self.store)
+        prev_state_ids = yield context.get_prev_state_ids()
         pl_event_id = prev_state_ids.get(POWER_KEY)
         if pl_event_id:
             # fastpath: if there's a power level event, that's all we need, and
@@ -128,13 +128,13 @@ class BulkPushRuleEvaluator(object):
                 event, prev_state_ids, for_verification=False
             )
             auth_events = yield self.store.get_events(auth_events_ids)
-            auth_events = {(e.type, e.state_key): e for e in itervalues(auth_events)}
+            auth_events = {(e.type, e.state_key): e for e in auth_events.values()}
 
         sender_level = get_user_power_level(event.sender, auth_events)
 
         pl_event = auth_events.get(POWER_KEY)
 
-        return (pl_event.content if pl_event else {}, sender_level)
+        return pl_event.content if pl_event else {}, sender_level
 
     @defer.inlineCallbacks
     def action_for_event_by_user(self, event, context):
@@ -149,9 +149,10 @@ class BulkPushRuleEvaluator(object):
 
         room_members = yield self.store.get_joined_users_from_context(event, context)
 
-        (power_levels, sender_power_level) = (
-            yield self._get_power_levels_and_sender_level(event, context)
-        )
+        (
+            power_levels,
+            sender_power_level,
+        ) = yield self._get_power_levels_and_sender_level(event, context)
 
         evaluator = PushRuleEvaluatorForEvent(
             event, len(room_members), sender_power_level, power_levels
@@ -159,7 +160,7 @@ class BulkPushRuleEvaluator(object):
 
         condition_cache = {}
 
-        for uid, rules in iteritems(rules_by_user):
+        for uid, rules in rules_by_user.items():
             if event.sender == uid:
                 continue
 
@@ -303,7 +304,9 @@ class RulesForRoom(object):
 
                 push_rules_delta_state_cache_metric.inc_hits()
             else:
-                current_state_ids = yield context.get_current_state_ids(self.store)
+                current_state_ids = yield defer.ensureDeferred(
+                    context.get_current_state_ids()
+                )
                 push_rules_delta_state_cache_metric.inc_misses()
 
             push_rules_state_size_counter.inc(len(current_state_ids))
@@ -385,33 +388,25 @@ class RulesForRoom(object):
         """
         sequence = self.sequence
 
-        rows = yield self.store._simple_select_many_batch(
-            table="room_memberships",
-            column="event_id",
-            iterable=member_event_ids.values(),
-            retcols=("user_id", "membership", "event_id"),
-            keyvalues={},
-            batch_size=500,
-            desc="_get_rules_for_member_event_ids",
-        )
+        rows = yield self.store.get_membership_from_event_ids(member_event_ids.values())
 
         members = {row["event_id"]: (row["user_id"], row["membership"]) for row in rows}
 
         # If the event is a join event then it will be in current state evnts
         # map but not in the DB, so we have to explicitly insert it.
         if event.type == EventTypes.Member:
-            for event_id in itervalues(member_event_ids):
+            for event_id in member_event_ids.values():
                 if event_id == event.event_id:
                     members[event_id] = (event.state_key, event.membership)
 
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug("Found members %r: %r", self.room_id, members.values())
 
-        interested_in_user_ids = set(
+        interested_in_user_ids = {
             user_id
-            for user_id, membership in itervalues(members)
+            for user_id, membership in members.values()
             if membership == Membership.JOIN
-        )
+        }
 
         logger.debug("Joined: %r", interested_in_user_ids)
 
@@ -419,9 +414,9 @@ class RulesForRoom(object):
             interested_in_user_ids, on_invalidate=self.invalidate_all_cb
         )
 
-        user_ids = set(
-            uid for uid, have_pusher in iteritems(if_users_with_pushers) if have_pusher
-        )
+        user_ids = {
+            uid for uid, have_pusher in if_users_with_pushers.items() if have_pusher
+        }
 
         logger.debug("With pushers: %r", user_ids)
 
@@ -441,7 +436,7 @@ class RulesForRoom(object):
         )
 
         ret_rules_by_user.update(
-            item for item in iteritems(rules_by_user) if item[0] is not None
+            item for item in rules_by_user.items() if item[0] is not None
         )
 
         self.update_cache(sequence, members, ret_rules_by_user, state_group)

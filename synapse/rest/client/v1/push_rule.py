@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
 
 from synapse.api.errors import (
     NotFoundError,
@@ -46,18 +45,17 @@ class PushRuleRestServlet(RestServlet):
         self.notifier = hs.get_notifier()
         self._is_worker = hs.config.worker_app is not None
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, path):
+    async def on_PUT(self, request, path):
         if self._is_worker:
             raise Exception("Cannot handle PUT /push_rules on worker")
 
-        spec = _rule_spec_from_path([x for x in path.split("/")])
+        spec = _rule_spec_from_path(path.split("/"))
         try:
             priority_class = _priority_class_from_spec(spec)
         except InvalidRuleException as e:
             raise SynapseError(400, str(e))
 
-        requester = yield self.auth.get_user_by_req(request)
+        requester = await self.auth.get_user_by_req(request)
 
         if "/" in spec["rule_id"] or "\\" in spec["rule_id"]:
             raise SynapseError(400, "rule_id may not contain slashes")
@@ -67,9 +65,9 @@ class PushRuleRestServlet(RestServlet):
         user_id = requester.user.to_string()
 
         if "attr" in spec:
-            yield self.set_rule_attr(user_id, spec, content)
+            await self.set_rule_attr(user_id, spec, content)
             self.notify_user(user_id)
-            return (200, {})
+            return 200, {}
 
         if spec["rule_id"].startswith("."):
             # Rule ids starting with '.' are reserved for server default rules.
@@ -91,7 +89,7 @@ class PushRuleRestServlet(RestServlet):
             after = _namespaced_rule_id(spec, after)
 
         try:
-            yield self.store.add_push_rule(
+            await self.store.add_push_rule(
                 user_id=user_id,
                 rule_id=_namespaced_rule_id_from_spec(spec),
                 priority_class=priority_class,
@@ -106,43 +104,42 @@ class PushRuleRestServlet(RestServlet):
         except RuleNotFoundException as e:
             raise SynapseError(400, str(e))
 
-        return (200, {})
+        return 200, {}
 
-    @defer.inlineCallbacks
-    def on_DELETE(self, request, path):
+    async def on_DELETE(self, request, path):
         if self._is_worker:
             raise Exception("Cannot handle DELETE /push_rules on worker")
 
-        spec = _rule_spec_from_path([x for x in path.split("/")])
+        spec = _rule_spec_from_path(path.split("/"))
 
-        requester = yield self.auth.get_user_by_req(request)
+        requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
         namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
 
         try:
-            yield self.store.delete_push_rule(user_id, namespaced_rule_id)
+            await self.store.delete_push_rule(user_id, namespaced_rule_id)
             self.notify_user(user_id)
-            return (200, {})
+            return 200, {}
         except StoreError as e:
             if e.code == 404:
                 raise NotFoundError()
             else:
                 raise
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, path):
-        requester = yield self.auth.get_user_by_req(request, allow_partner=True)
+    async def on_GET(self, request, path):
+        # modified for watcha add allow_partner=True
+        requester = await self.auth.get_user_by_req(request, allow_partner=True)
         user_id = requester.user.to_string()
 
         # we build up the full structure and then decide which bits of it
         # to send which means doing unnecessary work sometimes but is
         # is probably not going to make a whole lot of difference
-        rules = yield self.store.get_push_rules_for_user(user_id)
+        rules = await self.store.get_push_rules_for_user(user_id)
 
         rules = format_push_rules_for_user(requester.user, rules)
 
-        path = [x for x in path.split("/")][1:]
+        path = path.split("/")[1:]
 
         if path == []:
             # we're a reference impl: pedantry is our job.
@@ -151,10 +148,10 @@ class PushRuleRestServlet(RestServlet):
             )
 
         if path[0] == "":
-            return (200, rules)
+            return 200, rules
         elif path[0] == "global":
             result = _filter_ruleset_with_path(rules["global"], path[1:])
-            return (200, result)
+            return 200, result
         else:
             raise UnrecognizedRequestError()
 
