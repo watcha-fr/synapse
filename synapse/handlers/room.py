@@ -994,3 +994,50 @@ class RoomEventSource(object):
         )
 
         return (events, next_key)
+
+class WatchaRoomHandler(BaseHandler):
+    def __init__(self, hs):
+        self.store = hs.get_datastore()
+        self.event_creation_handler = hs.get_event_creation_handler()
+
+    @defer.inlineCallbacks
+    def get_roomId_from_NC_folder_url(self, folder_url):
+        result = yield self.store.get_roomId_from_NC_folder_url(folder_url)
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def get_first_room_admin(self, room_id):
+        result = yield self.store.get_first_room_admin(room_id)
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def send_NC_notification_in_room(self, requester, room_id, file_info):
+        nc_activity_type = file_info["activity_type"]
+
+        if nc_activity_type == "file_changed":
+            raise SynapseError(
+                400, "'file_changed' Nextcloud activity is not managed.",
+            )
+
+        content = {
+            "body": nc_activity_type,
+            "filename": file_info["file_name"],
+            "msgtype": "m.file",
+            "url": "",
+        }
+
+        if nc_activity_type in ("file_created", "file_restored"):
+            content["url"] = file_info["link"]
+
+        event_dict = {
+            "type": EventTypes.Message,
+            "content": content,
+            "room_id": room_id,
+            "sender": requester.user.to_string(),
+        }
+
+        event = yield self.event_creation_handler.create_and_send_nonmember_event(
+            requester, event_dict
+        )
+
+        defer.returnValue(event)

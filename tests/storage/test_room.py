@@ -21,7 +21,7 @@ from synapse.api.room_versions import RoomVersions
 from synapse.types import RoomAlias, RoomID, UserID
 
 from tests import unittest
-from tests.utils import create_room, setup_test_homeserver
+from tests.utils import create_room, setup_test_homeserver # modification for Watcha OP433
 
 
 class RoomStoreTestCase(unittest.TestCase):

@@ -440,7 +440,6 @@ class RoomStore(RoomWorkerStore, SearchStore):
     # insertion for watcha - OP433 :
     def _store_room_link_with_NC(self, txn, event):
         """ Store the link between Watcha room and Nextcloud folder in Sqlite.
-        @TODO : With PostgreSql, the clause 'INSERT or REPLACE' doesn't works and has to be replaced by 'UPSERT'.
         """
 
         if hasattr(event, "content") and "nextcloud" in event.content:
@@ -448,36 +447,63 @@ class RoomStore(RoomWorkerStore, SearchStore):
             room_id = event.room_id
 
             if nextcloud_folder_url:
-                txn.execute(
-                    """
-                    SELECT link_url
-                    FROM room_mapping_with_NC
-                    WHERE link_url = ?;
-                    """,
-                    (nextcloud_folder_url,),
+                link_url = self._simple_select_one_onecol_txn(
+                    txn,
+                    table="room_mapping_with_NC",
+                    keyvalues={"link_url": nextcloud_folder_url},
+                    retcol="link_url",
+                    allow_none=True,
                 )
-                row = txn.fetchone()
 
-                if row:
-                    raise StoreError(500, "This Nextcloud folder is already linked.")
+                if link_url:
+                    raise StoreError(
+                        500, "This Nextcloud folder is already linked with another room."
+                    )
 
-                txn.execute(
-                    """
-                    INSERT OR REPLACE INTO room_mapping_with_NC
-                    VALUES (
-                        ?
-                        , ?
-                    );
-                    """,
-                    (room_id, nextcloud_folder_url,),
+                self._simple_upsert_txn(
+                    txn,
+                    table="room_mapping_with_NC",
+                    keyvalues={"room_id": room_id},
+                    values={"room_id": room_id, "link_url": nextcloud_folder_url},
                 )
+
             else:
-                txn.execute(
-                    """
-                    DELETE FROM room_mapping_with_NC
-                    WHERE room_id like ? ;""",
-                    (room_id,),
+                self._simple_delete_one(
+                    table="room_mapping_with_NC",
+                    keyvalues={"room_id": room_id},
+                    desc="delete_room_link_with_NC",
                 )
+
+    def get_roomId_from_NC_folder_url(self, folder_url):
+        """ Get the room_id of the room which is linked with the Nextcloud folder url.
+        """
+
+        return self._simple_select_one_onecol(
+            table="room_mapping_with_NC",
+            keyvalues={"link_url": folder_url},
+            retcol="room_id",
+            allow_none=True,
+        )
+
+    @defer.inlineCallbacks
+    def get_first_room_admin(self, room_id):
+        """ Get a list of administrators of the room.
+        """
+
+        sql = """
+            SELECT
+                state_key
+            FROM current_state_events
+            INNER JOIN users ON users.name = current_state_events.state_key
+            WHERE type = "m.room.member"
+                AND (membership = "join" OR membership = "invite")
+                AND users.admin = 1
+                AND current_state_events.room_id = ?;
+            """
+
+        result = yield self._execute("get_first_room_admin", None, sql, room_id)
+
+        defer.returnValue(result[0][0])
     # end of insertion
 
     def add_event_report(
