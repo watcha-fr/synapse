@@ -330,7 +330,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTest
         self.assertEquals(400, channel.code)
         self.assertEquals(
             json.loads(channel.result["body"])["error"],
-            "No room has linked with this Nextcloud folder url.",
+            "No room has been linked with this Nextcloud folder url.",
         )
 
     def test_send_nextcloud_file_notification_in_linked_room(self):
