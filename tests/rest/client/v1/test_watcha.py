@@ -271,12 +271,12 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
 class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTestCase):
     def _do_hmac_with_shared_secret(self, parameters):
         mac = hmac.new(
-            key=self.hs.get_config().registration_shared_secret.encode("utf-8"),
+            key=self.hs.get_config().registration_shared_secret.encode(),
             digestmod=hashlib.sha1,
         )
 
         for parameter_value in parameters:
-            mac.update(str(parameter_value).encode("utf-8"))
+            mac.update(parameter_value.encode())
             mac.update(b"\x00")
 
         return mac.hexdigest()
