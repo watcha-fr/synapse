@@ -4,6 +4,7 @@ import sys
 import json
 import hmac
 from hashlib import sha1
+from urllib.parse import urlparse
 
 import logging
 
@@ -23,7 +24,7 @@ from synapse.util.watcha import (
     create_display_inviter_name,
 )
 from synapse.types import UserID, create_requester
-from synapse.api.constants import Membership
+from synapse.api.constants import Membership, EventTypes
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ def _decode_share_secret_parameters(config, parameter_names, parameters):
         key=config.registration_shared_secret.encode("utf-8"), digestmod=sha1,
     )
     for parameter_name in parameter_names:
-        want_mac.update(repr(parameters[parameter_name]).encode("utf-8"))
+        want_mac.update(str(parameters[parameter_name]).encode("utf-8"))
         want_mac.update(b"\x00")
     if not compare_digest(want_mac.hexdigest(), got_mac):
         logger.error(
@@ -74,7 +75,6 @@ def _check_admin(auth, request):
 def _check_admin_or_secret(config, auth, request, parameter_names):
     auth_headers = request.requestHeaders.getRawHeaders("Authorization")
     parameter_json = parse_json_object_from_request(request)
-
     if auth_headers:
         yield _check_admin(auth, request)
         ret = parameter_json
@@ -131,6 +131,92 @@ class WatchaRoomNameRestServlet(RestServlet):
         yield _check_admin(self.auth, request)
         ret = yield self.handlers.watcha_admin_handler.watcha_room_name()
         defer.returnValue((200, ret))
+
+
+class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
+
+    PATTERNS = client_patterns("/watcha_room_nextcloud_activity", v1=True)
+
+    def __init__(self, hs):
+        super().__init__()
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.event_creation_handler = hs.get_event_creation_handler()
+        self.handler = hs.get_handlers()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        params = yield _check_admin_or_secret(
+            self.hs.config,
+            self.auth,
+            request,
+            ["file_name", "link", "directory", "activity_type"],
+        )
+
+        nc_file_name = params["file_name"]
+        nc_link = params["link"]
+        nc_directory = params["directory"]
+        nc_activity_type = params["activity_type"]
+
+        if not nc_file_name or not nc_link or not nc_directory or not nc_activity_type:
+            raise SynapseError(
+                400,
+                "'file_name', 'link', 'directory args and 'activity_type' cannot be empty.",
+            )
+
+        server_name = self.hs.get_config().server_name
+
+        nc_directory_parsed = urlparse(nc_directory)
+        nc_link_parsed = urlparse(nc_link)
+
+        if not {"http", "https"}.issuperset(
+            (nc_directory_parsed.scheme, nc_link_parsed.scheme)
+        ):
+            raise SynapseError(
+                400, "Wrong Nextcloud URL scheme.",
+            )
+
+        if {server_name} != {nc_directory_parsed.netloc, nc_link_parsed.netloc}:
+            raise SynapseError(
+                400, "Wrong Nextcloud URL netloc.",
+            )
+
+        if nc_activity_type not in (
+            "file_created",
+            "file_deleted",
+            "file_changed",
+            "file_restored",
+        ):
+            raise SynapseError(
+                400, "Wrong value for nextcloud activity_type.",
+            )
+
+        room_id = yield self.handler.watcha_room_handler.get_roomId_from_NC_folder_url(
+            nc_directory
+        )
+
+        if not room_id:
+            raise SynapseError(
+                400, "No room has been linked with this Nextcloud folder url."
+            )
+
+        first_room_admin = yield self.handler.watcha_room_handler.get_first_room_admin(
+            room_id
+        )
+
+        if not first_room_admin:
+            raise SynapseError(
+                400,
+                "No administrators are in the room. The Nextcloud notification cannot be posted.",
+            )
+
+        requester = create_requester(first_room_admin)
+
+        event = yield self.handler.watcha_room_handler.send_NC_notification_in_room(
+            requester, room_id, params
+        )
+
+        return (200, {"event_id": event.event_id})
 
 
 class WatchaDisplayNameRestServlet(RestServlet):
@@ -463,5 +549,6 @@ def register_servlets(hs, http_server):
     WatchaRoomListRestServlet(hs).register(http_server)
     WatchaRoomMembershipRestServlet(hs).register(http_server)
     WatchaRoomNameRestServlet(hs).register(http_server)
+    WatchaSendNextcloudActivityToWatchaRoomServlet(hs).register(http_server)
     WatchaDisplayNameRestServlet(hs).register(http_server)
     
