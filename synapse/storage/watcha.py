@@ -125,11 +125,10 @@ def _add_new_table_if_needed(db_conn, table, create_table_query):
     if not row:
         try:
             cur.execute(create_table_query)
+            logger.info("check_db_customization: table %s added" % table)
         except DatabaseError:
-            logger.info(
+            logger.warn(
                 "check_db_customization: database error during create table query."
             )
-
-        logger.info("check_db_customization: table %s added" % table)
     else:
         logger.info("check_db_customization: table %s already exists" % table)

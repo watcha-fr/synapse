@@ -1016,7 +1016,7 @@ class WatchaRoomHandler(BaseHandler):
 
         if not rooms:
             raise SynapseError(
-                400, "No rooms are linked with this Nextcloud directory."
+                400, "No rooms has been linked with this Nextcloud directory."
             )
 
         defer.returnValue(rooms)
