@@ -902,7 +902,7 @@ class OidcHandler:
         registered_user_id = await self._registration_handler.register_user(
             localpart=localpart,
             default_display_name=attributes["display_name"],
-            # watcha+
+            # watcha+ op524
             bind_emails=attributes["emails"],
             admin=attributes["is_admin"],
             make_partner=attributes["is_partner"],
@@ -915,11 +915,11 @@ class OidcHandler:
         return registered_user_id
 
 
+""" watcha~ op524
 UserAttribute = TypedDict(
-    """ watcha!
     "UserAttribute", {"localpart": str, "display_name": Optional[str]}
-    """
-    # watcha+
+"""
+UserAttribute = TypedDict(
     "UserAttribute",
     {
         "localpart": str,
@@ -928,7 +928,7 @@ UserAttribute = TypedDict(
         "is_admin": Optional[bool],
         "is_partner": Optional[bool],
     }
-    # +watcha
+# ~watcha
 )
 C = TypeVar("C")
 
@@ -1059,10 +1059,9 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             if display_name == "":
                 display_name = None
 
-        """ watcha!
+        """ watcha~ op524
         return UserAttribute(localpart=localpart, display_name=display_name)
         """
-        # watcha+
         email = userinfo.get("email")
         emails = [email] if email else []  # type: Optional[List[str]]
 
@@ -1077,4 +1076,4 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             is_admin=is_admin,
             is_partner=is_partner,
         )
-        # +watcha
+        # ~watcha
