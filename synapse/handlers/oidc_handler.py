@@ -900,8 +900,7 @@ class OidcHandler:
         # It's the first time this user is logging in and the mapped mxid was
         # not taken, register the user
         registered_user_id = await self._registration_handler.register_user(
-            localpart=localpart,
-            default_display_name=attributes["display_name"],
+            localpart=localpart, default_display_name=attributes["display_name"],
             # watcha+ op524
             bind_emails=attributes["emails"],
             admin=attributes["is_admin"],
