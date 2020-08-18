@@ -1002,7 +1002,9 @@ class WatchaRoomHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
 
     @defer.inlineCallbacks
-    def get_room_list_to_send_NC_notification(self, directory, limit_of_notification_propagation):
+    def get_room_list_to_send_NC_notification(
+        self, directory, limit_of_notification_propagation
+    ):
         rooms = []
         all_parents_directories = self._get_all_parents_directories(
             directory, limit_of_notification_propagation
@@ -1021,7 +1023,9 @@ class WatchaRoomHandler(BaseHandler):
 
         defer.returnValue(rooms)
 
-    def _get_all_parents_directories(self, directory, limit_of_notification_propagation):
+    def _get_all_parents_directories(
+        self, directory, limit_of_notification_propagation
+    ):
         all_parents_directories = [directory]
         for _ in range(directory.count("/")):
             parent_directory = dirname(directory)
@@ -1050,8 +1054,6 @@ class WatchaRoomHandler(BaseHandler):
         if file_operation in ["file_created", "file_restored", "file_moved"]:
             content["url"] = file_url
 
-        events_Id = []
-
         for room in rooms:
             first_room_admin = yield self._get_first_room_admin(room)
 
@@ -1070,10 +1072,6 @@ class WatchaRoomHandler(BaseHandler):
                 "sender": requester.user.to_string(),
             }
 
-            event = yield self.event_creation_handler.create_and_send_nonmember_event(
+            yield self.event_creation_handler.create_and_send_nonmember_event(
                 requester, event_dict
             )
-
-            events_Id.append(event.event_id)
-
-        defer.returnValue(events_Id)
