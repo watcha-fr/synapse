@@ -279,7 +279,7 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
             )
         self.assertEquals(200, channel.code)
 
-class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTestCase):
+class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(BaseHomeserverWithEmailTestCase):
     def _do_hmac_with_shared_secret(self, parameters):
         mac = hmac.new(
             key=self.hs.get_config().registration_shared_secret.encode("utf-8"),
@@ -306,63 +306,89 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTest
 
         return channel
 
-    def test_send_nextcloud_notification_in_unlinked_nextcloud_directory(self):
-        request_content = {
-            "file_name": "WATCHA-Brochure A4.pdf",
-            "directory": "https://test/nextcloud/apps/files/?dir=/unlinked_directory",
-            "link": "https://test/nextcloud/f/307",
-            "activity_type": "file_created",
-        }
+    # def test_send_nextcloud_notification_in_unlinked_nextcloud_directory(self):
+    #     request_content = {
+    #         "file_name": "WATCHA-Brochure A4.pdf",
+    #         "directory": "https://test/nextcloud/apps/files/?dir=/unlinked_directory",
+    #         "notifications": []"https://test/nextcloud/f/307",
+    #         "activity_type": "file_created",
+    #     }
 
-        channel = self._send_POST_nextcloud_notification_request(request_content)
+    #     channel = self._send_POST_nextcloud_notification_request(request_content)
 
-        self.assertEquals(400, channel.code)
-        self.assertEquals(
-            json.loads(channel.result["body"])["error"],
-            "No rooms are linked with this Nextcloud directory.",
-        )
+    #     self.assertEquals(400, channel.code)
+    #     self.assertEquals(
+    #         json.loads(channel.result["body"])["error"],
+    #         "No rooms are linked with this Nextcloud directory.",
+    #     )
 
     def test_send_nextcloud_file_notification_in_linked_room(self):
+        with self.assertLogs("synapse.rest.client.v1.watcha", level="INFO") as log:
+            request_content = {
+                "file_name": "WATCHA-Brochure A4.pdf",
+                "file_url": "https://test/nextcloud/f/307",
+                "notifications": [
+                    {
+                        "activity_type": "file_created",
+                        "directory": "/parent_directory/Test_NC",
+                        "limit_of_notification_propagation": "/",
+                    },
+                    {
+                        "activity_type": "file_deleted",
+                        "directory": "/parent_directory/Test_NC",
+                        "limit_of_notification_propagation": "/",
+                    },
+                    {
+                        "activity_type": "file_restored",
+                        "directory": "/parent_directory/Test_NC",
+                        "limit_of_notification_propagation": "/",
+                    },
+                    {
+                        "activity_type": "wrong_activity_type",
+                        "directory": "/parent_directory/Test_NC",
+                        "limit_of_notification_propagation": "/",
+                    },
+                    {
+                        "activity_type": "wrong_activity_type",
+                    },
+                ],
+            }
+
+            exepected_result = [
+                {
+                    "file_name": "WATCHA-Brochure A4.pdf",
+                    "file_operation": "file_created",
+                    "rooms": [self.room_id],
+                },
+                {
+                    "file_name": "WATCHA-Brochure A4.pdf",
+                    "file_operation": "file_deleted",
+                    "rooms": [self.room_id],
+                },
+                {
+                    "file_name": "WATCHA-Brochure A4.pdf",
+                    "file_operation": "file_restored",
+                    "rooms": [self.room_id],
+                },
+            ]
+            channel = self._send_POST_nextcloud_notification_request(request_content)
+            print(log.output)
+            self.assertEquals(200, channel.code)
+            self.assertIn(
+                "WARNING:synapse.rest.client.v1.watcha:This nextcloud file operation is not handled",
+                log.output,
+            )
+            self.assertIn(
+                "WARNING:synapse.rest.client.v1.watcha:It missing some parameters to notify file operation",
+                log.output,
+            )
+            self.assertEquals(json.loads(channel.result["body"]),exepected_result)
+            print(channel.result["body"])
+
+    def test_send_nextcloud_notification_in_linked_room_with_missing_parameter_in_payload(self):
         request_content = {
             "file_name": "WATCHA-Brochure A4.pdf",
-            "directory": self.nextcloud_folder_url,
-            "link": "https://test/nextcloud/f/307",
-            "activity_type": "file_created",
-        }
-
-        channel = self._send_POST_nextcloud_notification_request(request_content)
-        self.assertEquals(200, channel.code)
-
-        request_content["activity_type"] = "file_deleted"
-        channel = self._send_POST_nextcloud_notification_request(request_content)
-        self.assertEquals(200, channel.code)
-
-        request_content["activity_type"] = "file_restored"
-        channel = self._send_POST_nextcloud_notification_request(request_content)
-        self.assertEquals(200, channel.code)
-
-        request_content["activity_type"] = "file_changed"
-        channel = self._send_POST_nextcloud_notification_request(request_content)
-        self.assertEquals(400, channel.code)
-        self.assertEquals(
-            json.loads(channel.result["body"])["error"],
-            "'file_changed' Nextcloud activity is not managed.",
-        )
-
-        request_content["activity_type"] = "wrong type"
-        channel = self._send_POST_nextcloud_notification_request(request_content)
-        self.assertEquals(400, channel.code)
-        self.assertEquals(
-            json.loads(channel.result["body"])["error"],
-            "Wrong value for nextcloud activity_type.",
-        )
-
-    def test_send_nextcloud_notification_in_linked_room_with_empty_values(self):
-        request_content = {
-            "file_name": "",
-            "directory": "",
-            "link": "",
-            "activity_type": "",
+            "file_url": "https://test/nextcloud/f/307",
         }
 
         channel = self._send_POST_nextcloud_notification_request(request_content)
@@ -372,24 +398,20 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTest
             "Some data in payload have empty value.",
         )
 
-    def test_send_nextcloud_notification_in_linked_room_with_unrecognized_url(self):
-        urls = [
-            {
-                "directory": "scheme://test/nextcloud/apps/files/?dir=/Partage",
-                "link": "scheme://test/nextcloud/f/307",
-            },
-            {
-                "directory": "https://localhost/nextcloud/apps/files/?dir=/Partage",
-                "link": "https://localhost/nextcloud/f/307",
-            },
-        ]
+    def test_send_nextcloud_notification_in_linked_room_with_file_url(self):
+        urls = ["scheme://test/nextcloud/f/307", "https://localhost/nextcloud/f/307"]
 
         for url in urls:
             request_content = {
                 "file_name": "WATCHA-Brochure A4.pdf",
-                "directory": url["directory"],
-                "link": url["link"],
-                "activity_type": "file_created",
+                "file_url": url["directory"],
+                "notifications": [
+                    {
+                        "activity_type": "file_created",
+                        "directory": "/parent_directory/Test_NC",
+                        "limit_of_notification_propagation": "/",
+                    },
+                ]
             }
 
             channel = self._send_POST_nextcloud_notification_request(request_content)
@@ -399,87 +421,87 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTest
                 "The Nextcloud url is not recognized.",
             )
 
-    def test_send_nextcloud_notification_in_linked_room_with_wrong_url_query(self):
-        request_content = {
-            "file_name": "WATCHA-Brochure A4.pdf",
-            "directory": "https://test/nextcloud/apps/files/?file=/Partage",
-            "link": "https://test/nextcloud/f/307",
-            "activity_type": "file_created",
-        }
+    # def test_send_nextcloud_notification_in_linked_room_with_wrong_url_query(self):
+    #     request_content = {
+    #         "file_name": "WATCHA-Brochure A4.pdf",
+    #         "directory": "https://test/nextcloud/apps/files/?file=/Partage",
+    #         "link": "https://test/nextcloud/f/307",
+    #         "activity_type": "file_created",
+    #     }
 
-        channel = self._send_POST_nextcloud_notification_request(request_content)
-        self.assertEquals(400, channel.code)
-        self.assertEquals(
-            json.loads(channel.result["body"])["error"],
-            "The url doesn't point to a valid directory path.",
-        )
+    #     channel = self._send_POST_nextcloud_notification_request(request_content)
+    #     self.assertEquals(400, channel.code)
+    #     self.assertEquals(
+    #         json.loads(channel.result["body"])["error"],
+    #         "The url doesn't point to a valid directory path.",
+    #     )
 
-    def test_send_nextcloud_notification_in_rooms_linked_with_other_directories(self):
-        nextcloud_urls_by_case = {
-            "subdirectory_case": "https://test/nextcloud/apps/files/?dir=/parent_directory/Test_NC/sub_directory",
-            "sub_subdirectory_case": "https://test/nextcloud/apps/files/?dir=/parent_directory/Test_NC/sub_directory/sub_directory",
-            "parent_directory_case": "https://test/nextcloud/apps/files/?dir=/parent_directory",
-            "cross_directory_case": "https://test/nextcloud/apps/files/?dir=/parent_directory/cross_directory",
-        }
-        room_id_by_case = {}
-        for url in nextcloud_urls_by_case:
-            room_id = self._create_room()
-            room_id_by_case[url] = room_id
+    # def test_send_nextcloud_notification_in_rooms_linked_with_other_directories(self):
+    #     nextcloud_urls_by_case = {
+    #         "subdirectory_case": "https://test/nextcloud/apps/files/?dir=/parent_directory/Test_NC/sub_directory",
+    #         "sub_subdirectory_case": "https://test/nextcloud/apps/files/?dir=/parent_directory/Test_NC/sub_directory/sub_directory",
+    #         "parent_directory_case": "https://test/nextcloud/apps/files/?dir=/parent_directory",
+    #         "cross_directory_case": "https://test/nextcloud/apps/files/?dir=/parent_directory/cross_directory",
+    #     }
+    #     room_id_by_case = {}
+    #     for url in nextcloud_urls_by_case:
+    #         room_id = self._create_room()
+    #         room_id_by_case[url] = room_id
 
-            self._do_room_mapping_with_nextcloud_folder(
-                nextcloud_urls_by_case[url], room_id
-            )
+    #         self._do_room_mapping_with_nextcloud_folder(
+    #             nextcloud_urls_by_case[url], room_id
+    #         )
 
-        request_content = {
-            "file_name": "WATCHA-Brochure A4.pdf",
-            "link": "https://test/nextcloud/f/307",
-            "activity_type": "file_created",
-        }
+    #     request_content = {
+    #         "file_name": "WATCHA-Brochure A4.pdf",
+    #         "link": "https://test/nextcloud/f/307",
+    #         "activity_type": "file_created",
+    #     }
 
-        # in subdirectory case :
-        request_content["directory"] = nextcloud_urls_by_case["subdirectory_case"]
-        channel = self._send_POST_nextcloud_notification_request(request_content)
-        self.assertEquals(200, channel.code)
-        self.assertEquals(
-            json.loads(channel.result["body"])["rooms_id"],
-            [
-                room_id_by_case["subdirectory_case"],
-                self.room_id,
-                room_id_by_case["parent_directory_case"],
-            ],
-        )
+    #     # in subdirectory case :
+    #     request_content["directory"] = nextcloud_urls_by_case["subdirectory_case"]
+    #     channel = self._send_POST_nextcloud_notification_request(request_content)
+    #     self.assertEquals(200, channel.code)
+    #     self.assertEquals(
+    #         json.loads(channel.result["body"])["rooms_id"],
+    #         [
+    #             room_id_by_case["subdirectory_case"],
+    #             self.room_id,
+    #             room_id_by_case["parent_directory_case"],
+    #         ],
+    #     )
 
-        # in sub subdirectory case :
-        request_content["directory"] = nextcloud_urls_by_case["sub_subdirectory_case"]
-        channel = self._send_POST_nextcloud_notification_request(request_content)
-        self.assertEquals(200, channel.code)
-        self.assertEquals(
-            json.loads(channel.result["body"])["rooms_id"],
-            [
-                room_id_by_case["sub_subdirectory_case"],
-                room_id_by_case["subdirectory_case"],
-                self.room_id,
-                room_id_by_case["parent_directory_case"],
-            ],
-        )
+    #     # in sub subdirectory case :
+    #     request_content["directory"] = nextcloud_urls_by_case["sub_subdirectory_case"]
+    #     channel = self._send_POST_nextcloud_notification_request(request_content)
+    #     self.assertEquals(200, channel.code)
+    #     self.assertEquals(
+    #         json.loads(channel.result["body"])["rooms_id"],
+    #         [
+    #             room_id_by_case["sub_subdirectory_case"],
+    #             room_id_by_case["subdirectory_case"],
+    #             self.room_id,
+    #             room_id_by_case["parent_directory_case"],
+    #         ],
+    #     )
 
-        # # in parent directory case :
-        request_content["directory"] = nextcloud_urls_by_case["parent_directory_case"]
-        channel = self._send_POST_nextcloud_notification_request(request_content)
-        self.assertEquals(200, channel.code)
-        self.assertEquals(
-            json.loads(channel.result["body"])["rooms_id"],
-            [room_id_by_case["parent_directory_case"]],
-        )
+    #     # # in parent directory case :
+    #     request_content["directory"] = nextcloud_urls_by_case["parent_directory_case"]
+    #     channel = self._send_POST_nextcloud_notification_request(request_content)
+    #     self.assertEquals(200, channel.code)
+    #     self.assertEquals(
+    #         json.loads(channel.result["body"])["rooms_id"],
+    #         [room_id_by_case["parent_directory_case"]],
+    #     )
 
-        # # cross directory case :
-        request_content["directory"] = nextcloud_urls_by_case["cross_directory_case"]
-        channel = self._send_POST_nextcloud_notification_request(request_content)
-        self.assertEquals(200, channel.code)
-        self.assertEquals(
-            json.loads(channel.result["body"])["rooms_id"],
-            [
-                room_id_by_case["cross_directory_case"],
-                room_id_by_case["parent_directory_case"],
-            ],
-        )
+    #     # # cross directory case :
+    #     request_content["directory"] = nextcloud_urls_by_case["cross_directory_case"]
+    #     channel = self._send_POST_nextcloud_notification_request(request_content)
+    #     self.assertEquals(200, channel.code)
+    #     self.assertEquals(
+    #         json.loads(channel.result["body"])["rooms_id"],
+    #         [
+    #             room_id_by_case["cross_directory_case"],
+    #             room_id_by_case["parent_directory_case"],
+    #         ],
+    #     )
