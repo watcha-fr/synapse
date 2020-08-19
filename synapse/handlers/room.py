@@ -1010,6 +1010,11 @@ class WatchaRoomHandler(BaseHandler):
             directory, limit_of_notification_propagation
         )
 
+        if not all_parents_directories:
+            raise SynapseError(
+                400, "The directory path is not valid"
+            )
+
         for directory in all_parents_directories:
             room = yield self.store.get_room_to_send_NC_notification(directory)
 
