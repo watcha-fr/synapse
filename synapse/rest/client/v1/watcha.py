@@ -4,7 +4,7 @@ import sys
 import json
 import hmac
 from hashlib import sha1
-from urllib.parse import urlparse, parse_qs # insertion for Watcha OP486
+from urllib.parse import urlparse, parse_qs
 
 import logging
 
@@ -180,14 +180,13 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
 
         for notification in notifications:
 
-            for key in notification.keys():
-                if key not in [
-                    "activity_type",
-                    "directory",
-                    "limit_of_notification_propagation",
-                ]:
-                    logger.warn("It missing some parameters to notify file operation")
-                    continue
+            if list(notification.keys()) != [
+                "activity_type",
+                "directory",
+                "limit_of_notification_propagation",
+            ]:
+                logger.warn("It missing some parameters to notify file operation")
+                continue
 
             file_operation = notification["activity_type"]
             if file_operation not in [
