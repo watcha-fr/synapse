@@ -198,11 +198,17 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
                 logger.warn("This nextcloud file operation is not handled")
                 continue
 
+            notification_sent = {
+                "file_name": file_name,
+                "file_operation": file_operation,
+            }
+
             try:
                 rooms = yield self.handler.watcha_room_handler.get_room_list_to_send_NC_notification(
                     notification["directory"],
                     notification["limit_of_notification_propagation"],
                 )
+                notification_sent["rooms"] = rooms
             except SynapseError as e:
                 logger.error("Error during getting rooms to send notifications : %s", e)
                 continue
@@ -215,13 +221,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
                 logger.error("Error during sending notification to room : %s", e)
                 continue
 
-            notifications_sent.append(
-                {
-                    "file_name": file_name,
-                    "file_operation": file_operation,
-                    "rooms": rooms,
-                }
-            )
+            notifications_sent.append(notification_sent)
 
         return (200, notifications_sent)
 
