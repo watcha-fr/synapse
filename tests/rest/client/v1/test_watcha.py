@@ -289,6 +289,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
         self.nextcloud_directory_url = "https://test/nextcloud/apps/files/?dir="
         self.nextcloud_root_directory = "/"
         self.nextcloud_file_name = "WATCHA-Brochure A4.pdf"
+        self.nextcloud_file_url = "https://test/nextcloud/f/307"
 
         self.rooms_mapping = self._do_rooms_mapping_with_nextcloud_directories()
 
@@ -337,7 +338,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
         room_id = self.rooms_mapping["parent_directory"]["room_id"]
         request_content = {
             "file_name": self.nextcloud_file_name,
-            "file_url": "https://test/nextcloud/f/307",
+            "file_url": self.nextcloud_file_url,
             "notifications": [
                 {
                     "activity_type": "file_created",
@@ -395,7 +396,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
         with self.assertLogs("synapse.rest.client.v1.watcha", level="INFO") as log:
             request_content = {
                 "file_name": self.nextcloud_file_name,
-                "file_url": "https://test/nextcloud/f/307",
+                "file_url": self.nextcloud_file_url,
                 "notifications": [
                     {
                         "activity_type": "unrecognized_operation",
@@ -415,7 +416,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
         with self.assertLogs("synapse.rest.client.v1.watcha", level="INFO") as log:
             request_content = {
                 "file_name": self.nextcloud_file_name,
-                "file_url": "https://test/nextcloud/f/307",
+                "file_url": self.nextcloud_file_url,
                 "notifications": [
                     {
                         "activity_type": "file_created",
@@ -435,7 +436,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
         with self.assertLogs("synapse.rest.client.v1.watcha", level="INFO") as log:
             request_content = {
                 "file_name": self.nextcloud_file_name,
-                "file_url": "https://test/nextcloud/f/307",
+                "file_url": self.nextcloud_file_url,
                 "notifications": [
                     {
                         "activity_type": "file_created",
@@ -455,7 +456,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
         with self.assertLogs("synapse.rest.client.v1.watcha", level="INFO") as log:
             request_content = {
                 "file_name": self.nextcloud_file_name,
-                "file_url": "https://test/nextcloud/f/307",
+                "file_url": self.nextcloud_file_url,
                 "notifications": [{"activity_type": "file_created",}],
             }
 
@@ -511,7 +512,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
 
         request_content = {
             "file_name": self.nextcloud_file_name,
-            "file_url": "https://test/nextcloud/f/307",
+            "file_url": self.nextcloud_file_url,
             "notifications": [
                 {
                     "activity_type": "file_created",
