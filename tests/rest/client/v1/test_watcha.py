@@ -303,7 +303,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
             "parent_directory": {"path": "/a",},
             "main_directory": {"path": "/a/b",},
             "sub_directory": {"path": "/a/b/c",},
-            "cross_directory": {"path": "/a/c",},
+            "cross_directory": {"path": "/a/d",},
         }
 
         for directory_name, mapping_value in rooms_mapping.items():
@@ -333,7 +333,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
 
         return channel
 
-    def test_send_notification_for_basic_file_operation_in_parent_directory(self):
+    def test_send_notification_for_basic_file_operations_in_parent_directory(self):
         room_id = self.rooms_mapping["parent_directory"]["room_id"]
         request_content = {
             "file_name": self.nextcloud_file_name,
@@ -503,7 +503,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
                 "The Nextcloud url is not recognized.",
             )
 
-    def test_propagate_notification_in_rooms_for_basic_file_operation(self):
+    def test_propagate_notification_in_rooms(self):
         parent_room_id = self.rooms_mapping["parent_directory"]["room_id"]
         main_room_id = self.rooms_mapping["main_directory"]["room_id"]
         sub_room_id = self.rooms_mapping["sub_directory"]["room_id"]
@@ -586,5 +586,55 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
                     "file_operation": "file_created",
                     "rooms": [cross_room_id, parent_room_id,],
                 }
+            ],
+        )
+
+        # case of cross moved (/a/b/c to /a/d) :
+        # In Watcha rooms, it's like :
+        # - Deletion notification in source directory and all parents directories between source directory and root directory (/a in our example).
+        # - Creation notification in target directory and all parents directories between target directory and root directory (/a in our example).
+        # - Movement notification in root directory and all parents directories of root directory (/a in our example).
+        request_content["notifications"] = [
+            {
+                "activity_type": "file_deleted",
+                "directory": self.rooms_mapping["sub_directory"]["path"],
+                "limit_of_notification_propagation": self.rooms_mapping[
+                    "parent_directory"
+                ]["path"],
+            },
+            {
+                "activity_type": "file_created",
+                "directory": self.rooms_mapping["cross_directory"]["path"],
+                "limit_of_notification_propagation": self.rooms_mapping[
+                    "parent_directory"
+                ]["path"],
+            },
+            {
+                "activity_type": "file_moved",
+                "directory": self.rooms_mapping["parent_directory"]["path"],
+                "limit_of_notification_propagation": self.nextcloud_root_directory,
+            },
+        ]
+
+        channel = self._send_POST_nextcloud_notification_request(request_content)
+        self.assertEquals(200, channel.code)
+        self.assertEquals(
+            json.loads(channel.result["body"]),
+            [
+                {
+                    "file_name": self.nextcloud_file_name,
+                    "file_operation": "file_deleted",
+                    "rooms": [sub_room_id, main_room_id],
+                },
+                {
+                    "file_name": self.nextcloud_file_name,
+                    "file_operation": "file_created",
+                    "rooms": [cross_room_id],
+                },
+                {
+                    "file_name": self.nextcloud_file_name,
+                    "file_operation": "file_moved",
+                    "rooms": [parent_room_id],
+                },
             ],
         )
