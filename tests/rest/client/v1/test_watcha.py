@@ -298,6 +298,8 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
             self.nextcloud_folder_url, self.room_id
         )
 
+        self.nextcloud_file_name = "WATCHA-Brochure A4.pdf"
+
     def _create_room(self):
         user = UserID("admin", "test")
         requester = Requester(user, None, False, None, False, None)
@@ -326,7 +328,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
 
     def test_send_notification_for_basic_file_operation(self):
         request_content = {
-            "file_name": "WATCHA-Brochure A4.pdf",
+            "file_name": self.nextcloud_file_name,
             "file_url": "https://test/nextcloud/f/307",
             "notifications": [
                 {
@@ -344,7 +346,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
             json.loads(channel.result["body"]),
             [
                 {
-                    "file_name": "WATCHA-Brochure A4.pdf",
+                    "file_name": self.nextcloud_file_name,
                     "file_operation": "file_created",
                     "rooms": [self.room_id],
                 },
@@ -359,7 +361,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
             json.loads(channel.result["body"]),
             [
                 {
-                    "file_name": "WATCHA-Brochure A4.pdf",
+                    "file_name": self.nextcloud_file_name,
                     "file_operation": "file_deleted",
                     "rooms": [self.room_id],
                 },
@@ -374,7 +376,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
             json.loads(channel.result["body"]),
             [
                 {
-                    "file_name": "WATCHA-Brochure A4.pdf",
+                    "file_name": self.nextcloud_file_name,
                     "file_operation": "file_restored",
                     "rooms": [self.room_id],
                 },
@@ -439,7 +441,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
 
         for url in urls:
             request_content = {
-                "file_name": "WATCHA-Brochure A4.pdf",
+                "file_name": self.nextcloud_file_name,
                 "file_url": url,
                 "notifications": [
                     {
@@ -477,7 +479,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
             )
 
         request_content = {
-            "file_name": "WATCHA-Brochure A4.pdf",
+            "file_name": self.nextcloud_file_name,
             "file_url": "https://test/nextcloud/f/307",
             "notifications": [
                 {
@@ -498,7 +500,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
             json.loads(channel.result["body"]),
             [
                 {
-                    "file_name": "WATCHA-Brochure A4.pdf",
+                    "file_name": self.nextcloud_file_name,
                     "file_operation": "file_created",
                     "rooms": [
                         room_id_by_case["subdirectory_case"],
@@ -519,7 +521,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
             json.loads(channel.result["body"]),
             [
                 {
-                    "file_name": "WATCHA-Brochure A4.pdf",
+                    "file_name": self.nextcloud_file_name,
                     "file_operation": "file_created",
                     "rooms": [
                         room_id_by_case["sub_subdirectory_case"],
@@ -541,7 +543,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
             json.loads(channel.result["body"]),
             [
                 {
-                    "file_name": "WATCHA-Brochure A4.pdf",
+                    "file_name": self.nextcloud_file_name,
                     "file_operation": "file_created",
                     "rooms": [room_id_by_case["parent_directory_case"],],
                 }
@@ -558,7 +560,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
             json.loads(channel.result["body"]),
             [
                 {
-                    "file_name": "WATCHA-Brochure A4.pdf",
+                    "file_name": self.nextcloud_file_name,
                     "file_operation": "file_created",
                     "rooms": [
                         room_id_by_case["cross_directory_case"],
