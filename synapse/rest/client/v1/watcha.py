@@ -4,7 +4,7 @@ import sys
 import json
 import hmac
 from hashlib import sha1
-from urllib.parse import urlparse, parse_qs # insertion for Watcha OP486
+from urllib.parse import urlparse, parse_qs
 
 import logging
 
@@ -149,7 +149,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
             self.hs.config,
             self.auth,
             request,
-            ["file_name", "file_url", "activity_type", "directory_url",],
+            ["file_name", "file_url", "notifications",],
         )
 
         file_name = params["file_name"]
@@ -165,46 +165,69 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
                 400, "Some data in payload have empty value.",
             )
 
-        # if nc_activity_type not in [
-        #     "file_created",
-        #     "file_deleted",
-        #     "file_moved",
-        #     "file_restored",
-        # ]:
-        #     raise SynapseError(
-        #         400, "Wrong value for nextcloud activity_type.",
-        #     )
-
         server_name = self.hs.get_config().server_name
 
         if not server_name:
             raise SynapseError(400, "No server name in homeserver config.")
 
         file_url_parsed = urlparse(file_url)
-        nc_directory_url_parsed = urlparse(nc_directory_url)
 
-        for url in (file_url_parsed, nc_directory_url_parsed):
-            if url.scheme not in ["http", "https"] or url.netloc != server_name:
-                raise SynapseError(
-                    400, "The Nextcloud url is not recognized.",
+        if (
+            file_url_parsed.scheme not in ["http", "https"]
+            or file_url_parsed.netloc != server_name
+        ):
+            raise SynapseError(
+                400, "The Nextcloud url is not recognized.",
+            )
+
+        notifications_sent = []
+
+        for notification in notifications:
+
+            if list(notification.keys()) != [
+                "activity_type",
+                "directory",
+                "limit_of_notification_propagation",
+            ]:
+                logger.warn("It missing some parameters to notify file operation")
+                continue
+
+            file_operation = notification["activity_type"]
+            if file_operation not in [
+                "file_created",
+                "file_deleted",
+                "file_moved",
+                "file_restored",
+            ]:
+                logger.warn("This nextcloud file operation is not handled")
+                continue
+
+            notification_sent = {
+                "file_name": file_name,
+                "file_operation": file_operation,
+            }
+
+            try:
+                rooms = yield self.handler.watcha_room_handler.get_room_list_to_send_NC_notification(
+                    notification["directory"],
+                    notification["limit_of_notification_propagation"],
                 )
+                notification_sent["rooms"] = rooms
+            except SynapseError as e:
+                logger.error("Error during getting rooms to send notifications : %s", e)
+                continue
 
-        nc_directory_url_query = parse_qs(nc_directory_url_parsed.query)
+            try:
+                yield self.handler.watcha_room_handler.send_NC_notification_to_rooms(
+                    rooms, file_name, file_url, file_operation
+                )
+            except SynapseError as e:
+                logger.error("Error during sending notification to room : %s", e)
+                continue
 
-        if "dir" not in nc_directory_url_query:
-            raise SynapseError(400, "The url doesn't point to a valid directory path.")
+            notifications_sent.append(notification_sent)
 
-        nc_directory = nc_directory_url_query["dir"][0]
-
-        rooms = yield self.handler.watcha_room_handler.get_room_list_to_send_NC_notification(
-            nc_directory, directory_path_limit
-        )
-
-        events_Id = yield self.handler.watcha_room_handler.send_NC_notification_in_rooms(
-            rooms, params
-        )
-
-        return (200, {"events_id": events_Id, "rooms_id": rooms})
+        return (200, notifications_sent)
 
 
 class WatchaDisplayNameRestServlet(RestServlet):

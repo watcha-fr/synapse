@@ -1002,11 +1002,18 @@ class WatchaRoomHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
 
     @defer.inlineCallbacks
-    def get_room_list_to_send_NC_notification(self, directory_path, directory_path_limit):
+    def get_room_list_to_send_NC_notification(
+        self, directory, limit_of_notification_propagation
+    ):
         rooms = []
         all_parents_directories = self._get_all_parents_directories(
-            directory_path, directory_path_limit
+            directory, limit_of_notification_propagation
         )
+
+        if not all_parents_directories:
+            raise SynapseError(
+                400, "The directory path is not valid"
+            )
 
         for directory in all_parents_directories:
             room = yield self.store.get_room_to_send_NC_notification(directory)
@@ -1021,12 +1028,14 @@ class WatchaRoomHandler(BaseHandler):
 
         defer.returnValue(rooms)
 
-    def _get_all_parents_directories(self, directory, directory_path_limit):
+    def _get_all_parents_directories(
+        self, directory, limit_of_notification_propagation
+    ):
         all_parents_directories = [directory]
         for _ in range(directory.count("/")):
             parent_directory = dirname(directory)
 
-            if parent_directory == directory_path_limit:
+            if parent_directory == limit_of_notification_propagation:
                 return all_parents_directories
 
             all_parents_directories.append(parent_directory)
@@ -1038,26 +1047,23 @@ class WatchaRoomHandler(BaseHandler):
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def send_NC_notification_in_rooms(self, rooms, file_info):
-        nc_activity_type = file_info["activity_type"]
+    def send_NC_notification_to_rooms(self, rooms, file_name, file_url, file_operation):
 
         content = {
-            "body": nc_activity_type,
-            "filename": file_info["file_name"],
+            "body": file_operation,
+            "filename": file_name,
             "msgtype": "m.file",
             "url": "",
         }
 
-        if nc_activity_type in ["file_created", "file_restored", "file_moved"]:
-            content["url"] = file_info["file_url"]
-
-        events_Id = []
+        if file_operation in ["file_created", "file_restored", "file_moved"]:
+            content["url"] = file_url
 
         for room in rooms:
             first_room_admin = yield self._get_first_room_admin(room)
 
             if not first_room_admin:
-                logger.info(
+                logger.warn(
                     "No administrators are in the room. The Nextcloud notification cannot be posted.",
                 )
                 continue
@@ -1071,10 +1077,6 @@ class WatchaRoomHandler(BaseHandler):
                 "sender": requester.user.to_string(),
             }
 
-            event = yield self.event_creation_handler.create_and_send_nonmember_event(
+            yield self.event_creation_handler.create_and_send_nonmember_event(
                 requester, event_dict
             )
-
-            events_Id.append(event.event_id)
-
-        defer.returnValue(events_Id)
