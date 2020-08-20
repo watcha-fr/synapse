@@ -324,7 +324,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
 
         return channel
 
-    def test_send_nextcloud_file_notifications_in_one_room(self):
+    def test_send_notification_for_basic_file_operation(self):
         request_content = {
             "file_name": "WATCHA-Brochure A4.pdf",
             "file_url": "https://test/nextcloud/f/307",
@@ -418,7 +418,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
                 log.output,
             )
 
-    def test_send_nextcloud_notification_in_linked_room_with_empty_values_in_payload(
+    def test_send_notification_with_empty_values_in_payload(
         self,
     ):
         request_content = {
@@ -434,7 +434,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
             "Some data in payload have empty value.",
         )
 
-    def test_send_nextcloud_notification_in_linked_room_with_wrong_file_url(self):
+    def test_send_notification_with_wrong_file_url(self):
         urls = ["scheme://test/nextcloud/f/307", "https://localhost/nextcloud/f/307"]
 
         for url in urls:
@@ -457,7 +457,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
                 "The Nextcloud url is not recognized.",
             )
 
-    def test_notifications_propagation_in_rooms(self):
+    def test_propagate_notification_in_rooms_for_basic_file_operation(self):
 
         directory_path_by_case = {
             "subdirectory_case": "/parent_directory/Test_NC/sub_directory",
