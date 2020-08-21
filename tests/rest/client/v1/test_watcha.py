@@ -1,5 +1,4 @@
-import json
-import logging
+import json, logging, hmac, hashlib
 
 from tests import unittest
 from tests.utils import setup_test_homeserver
@@ -49,6 +48,7 @@ class BaseHomeserverWithEmailTestCase(unittest.HomeserverTestCase):
                 self.user_id, "email", "example@email.com", self.time
             )
         )
+        self.nextcloud_folder_url = "https://test/nextcloud/apps/files/?dir=/Partage"
 
     def _do_register_user(self, request_content):
         # Admin send the request with access_token :
@@ -342,3 +342,150 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
                 },
             )
         self.assertEquals(200, channel.code)
+
+class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(BaseHomeserverWithEmailTestCase):
+    def _do_hmac_with_shared_secret(self, parameters):
+        mac = hmac.new(
+            key=self.hs.get_config().registration_shared_secret.encode(),
+            digestmod=hashlib.sha1,
+        )
+
+        for parameter_value in parameters:
+            mac.update(parameter_value.encode())
+            mac.update(b"\x00")
+
+        return mac.hexdigest()
+
+    def _send_POST_nextcloud_notification_request(self, request_content):
+        mac = self._do_hmac_with_shared_secret(request_content)
+        request_content["mac"] = mac
+
+        request, channel = self.make_request(
+            "POST",
+            "/watcha_room_nextcloud_activity",
+            content=json.dumps(request_content),
+            access_token=self.user_access_token,
+        )
+        self.render(request)
+
+        return channel
+
+    def _do_room_mapping_with_nextcloud_folder(self):
+        room_id = self._create_room()
+        request, channel = self.make_request(
+            "PUT",
+            "/rooms/{}/state/im.vector.web.settings".format(room_id),
+            content=json.dumps({"nextcloud": self.nextcloud_folder_url}),
+            access_token=self.user_access_token,
+        )
+        self.render(request)
+
+        return channel
+
+    def test_do_room_mapping_with_same_nextcloud_folder(self):
+        self._do_room_mapping_with_nextcloud_folder()
+        channel = self._do_room_mapping_with_nextcloud_folder()
+
+        self.assertEquals(500, channel.code)
+        self.assertEquals(
+            json.loads(channel.result["body"])["error"],
+            "This Nextcloud folder is already linked with another room.",
+        )
+
+    def test_send_nextcloud_notification_in_unlinked_room(self):
+        request_content = {
+            "file_name": "WATCHA-Brochure A4.pdf",
+            "directory": self.nextcloud_folder_url,
+            "link": "https://test/nextcloud/f/307",
+            "activity_type": "file_created",
+        }
+
+        channel = self._send_POST_nextcloud_notification_request(request_content)
+
+        self.assertEquals(400, channel.code)
+        self.assertEquals(
+            json.loads(channel.result["body"])["error"],
+            "No room has linked with this Nextcloud folder url.",
+        )
+
+    def test_send_nextcloud_file_notification_in_linked_room(self):
+        self._do_room_mapping_with_nextcloud_folder()
+        request_content = {
+            "file_name": "WATCHA-Brochure A4.pdf",
+            "directory": self.nextcloud_folder_url,
+            "link": "https://test/nextcloud/f/307",
+            "activity_type": "file_created",
+        }
+
+        channel = self._send_POST_nextcloud_notification_request(request_content)
+        self.assertEquals(200, channel.code)
+
+        request_content["activity_type"] = "file_deleted"
+        channel = self._send_POST_nextcloud_notification_request(request_content)
+        self.assertEquals(200, channel.code)
+
+        request_content["activity_type"] = "file_restored"
+        channel = self._send_POST_nextcloud_notification_request(request_content)
+        self.assertEquals(200, channel.code)
+
+        request_content["activity_type"] = "file_changed"
+        channel = self._send_POST_nextcloud_notification_request(request_content)
+        self.assertEquals(400, channel.code)
+        self.assertEquals(
+            json.loads(channel.result["body"])["error"],
+            "'file_changed' Nextcloud activity is not managed.",
+        )
+
+        request_content["activity_type"] = "wrong type"
+        channel = self._send_POST_nextcloud_notification_request(request_content)
+        self.assertEquals(400, channel.code)
+        self.assertEquals(
+            json.loads(channel.result["body"])["error"],
+            "Wrong value for nextcloud activity_type.",
+        )
+
+    def test_send_nextcloud_notification_in_linked_room_with_empty_values(self):
+        self._do_room_mapping_with_nextcloud_folder()
+        request_content = {
+            "file_name": "",
+            "directory": "",
+            "link": "",
+            "activity_type": "",
+        }
+
+        channel = self._send_POST_nextcloud_notification_request(request_content)
+        self.assertEquals(400, channel.code)
+        self.assertEquals(
+            json.loads(channel.result["body"])["error"],
+            "'file_name', 'link', 'directory args and 'activity_type' cannot be empty.",
+        )
+
+    def test_send_nextcloud_notification_in_linked_room_with_wrong_url_scheme(self):
+        self._do_room_mapping_with_nextcloud_folder()
+        request_content = {
+            "file_name": "WATCHA-Brochure A4.pdf",
+            "directory": "scheme://test/nextcloud/apps/files/?dir=/Partage",
+            "link": "scheme://test/nextcloud/f/307",
+            "activity_type": "file_created",
+        }
+
+        channel = self._send_POST_nextcloud_notification_request(request_content)
+        self.assertEquals(400, channel.code)
+        self.assertEquals(
+            json.loads(channel.result["body"])["error"], "Wrong Nextcloud URL scheme.",
+        )
+
+    def test_send_nextcloud_notification_in_linked_room_with_wrong_url_netloc(self):
+        self._do_room_mapping_with_nextcloud_folder()
+        request_content = {
+            "file_name": "WATCHA-Brochure A4.pdf",
+            "directory": "https://localhost/nextcloud/apps/files/?dir=/Partage",
+            "link": "https://localhost/nextcloud/f/307",
+            "activity_type": "file_created",
+        }
+
+        channel = self._send_POST_nextcloud_notification_request(request_content)
+        self.assertEquals(400, channel.code)
+        self.assertEquals(
+            json.loads(channel.result["body"])["error"], "Wrong Nextcloud URL netloc.",
+        )

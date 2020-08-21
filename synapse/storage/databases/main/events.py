@@ -26,6 +26,7 @@ from twisted.internet import defer
 
 import synapse.metrics
 from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
+from synapse.api.errors import SynapseError # watcha+
 from synapse.api.room_versions import RoomVersions
 from synapse.crypto.event_signing import compute_event_reference_hash
 from synapse.events import EventBase  # noqa: F401
@@ -1260,6 +1261,7 @@ class PersistEventsStore:
             self.store._invalidate_cache_and_stream(
                 txn, self.store.get_retention_policy_for_room, (event.room_id,)
             )
+
     # watcha+ - OP433
     def _store_room_link_with_NC(self, txn, event):
         """ Store the link between Watcha room and Nextcloud folder in Sqlite.
@@ -1282,7 +1284,7 @@ class PersistEventsStore:
                 row = txn.fetchone()
 
                 if row:
-                    raise StoreError(500, "This Nextcloud folder is already linked.")
+                    raise SynapseError(500, "This Nextcloud folder is already linked with another room.")
 
                 txn.execute(
                     """

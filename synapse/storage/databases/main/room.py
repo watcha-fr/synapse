@@ -1427,3 +1427,40 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         )
 
         return rooms
+
+    # watcha+
+    async def get_roomId_from_NC_folder_url(self, folder_url):
+        """ Get the room_id of the room which is linked with the Nextcloud folder url.
+        """
+
+        return self.db_pool.simple_select_one_onecol(
+            table="room_mapping_with_NC",
+            keyvalues={"link_url": folder_url},
+            retcol="room_id",
+            allow_none=True,
+        )
+
+    async def get_first_room_admin(self, room_id):
+        """ Get a list of administrators of the room.
+        """
+
+        def get_first_room_admin_txn(txn):
+            sql = """
+                SELECT
+                    state_key
+                FROM current_state_events
+                INNER JOIN users ON users.name = current_state_events.state_key
+                WHERE type = "m.room.member"
+                    AND (membership = "join" OR membership = "invite")
+                    AND users.admin = 1
+                    AND current_state_events.room_id = ?;
+                """
+            txn.execute(sql, (room_id))
+            return txn.fetchone()
+
+        first_room_admin = await self.db_pool.runInteraction(
+            "get_first_room_admin", get_first_room_admin_txn
+        )
+
+        return first_room_admin[0]
+    # +watcha        
