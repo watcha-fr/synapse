@@ -93,7 +93,10 @@ class SyncRestServlet(RestServlet):
                 400, "'from' is not a valid query parameter. Did you mean 'since'?"
             )
 
+        """ !watcha
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        """
+        requester = await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True) # watcha+
         user = requester.user
         device_id = requester.device_id
 

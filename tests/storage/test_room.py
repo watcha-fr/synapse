@@ -21,7 +21,10 @@ from synapse.api.room_versions import RoomVersions
 from synapse.types import RoomAlias, RoomID, UserID
 
 from tests import unittest
+""" !watcha
 from tests.utils import setup_test_homeserver
+"""
+from tests.utils import create_room, setup_test_homeserver # watcha+
 
 
 class RoomStoreTestCase(unittest.TestCase):
@@ -98,7 +101,7 @@ class RoomEventsStoreTestCase(unittest.TestCase):
                 room_version=RoomVersions.V1,
             )
         )
-
+  
     @defer.inlineCallbacks
     def inject_room_event(self, **kwargs):
         yield defer.ensureDeferred(
@@ -145,3 +148,69 @@ class RoomEventsStoreTestCase(unittest.TestCase):
 
     # Not testing the various 'level' methods for now because there's lots
     # of them and need coalescing; see JIRA SPEC-11
+
+# watcha+ - OP433
+class WatchaRoomEventsStoreTestCase(unittest.HomeserverTestCase):
+    def prepare(self, reactor, clock, hs):
+        self.event_builder_factory = hs.get_event_builder_factory()
+        self.event_creation_handler = hs.get_event_creation_handler()
+        self.store = hs.get_datastore()
+        self.storage = hs.get_storage()
+        self.user = UserID.from_string("@user:test")
+        self.room = RoomID.from_string("!abc123:test")
+        self.nextcloud_folder_url = "http://test.watcha.fr/nextcloud/apps/files/?dir=/test_folder"
+
+        self.get_success(create_room(hs, self.room.to_string(), self.user.to_string()))
+
+        self.get_success(self._send_room_mapping_event(self.nextcloud_folder_url))
+
+    def _send_room_mapping_event(self, nextcloud_folder_url):
+        builder = self.event_builder_factory.for_room_version(
+            RoomVersions.V1,
+            {
+                "type": EventTypes.VectorSetting,
+                "sender": self.user.to_string(),
+                "room_id": self.room.to_string(),
+                "content": {"nextcloud": nextcloud_folder_url},
+            },
+        )
+
+        event, context = self.get_success(
+            self.event_creation_handler.create_new_client_event(builder)
+        )
+
+        self.get_success(self.storage.persistence.persist_event(event, context))
+
+    def test_insert_new_room_link_with_NC(self):
+
+        result = self.get_success(self.store.db_pool.simple_select_onecol(
+            table="room_mapping_with_NC",
+            keyvalues={"room_id": self.room.to_string()},
+            retcol="link_url",
+        ))
+
+        self.assertEquals(result[0], self.nextcloud_folder_url)
+
+    def test_update_room_link_with_NC(self):
+        new_nextcloud_folder_url = "http://test.watcha.fr/nextcloud/apps/files/?dir=/test_folder2"
+        self._send_room_mapping_event(new_nextcloud_folder_url)
+
+        result = self.get_success(self.store.db_pool.simple_select_onecol(
+            table="room_mapping_with_NC",
+            keyvalues={"room_id": self.room.to_string()},
+            retcol="link_url",
+        ))
+
+        self.assertEquals(result[0], new_nextcloud_folder_url)
+
+    def test_delete_room_link_with_NC(self):
+        self._send_room_mapping_event("")
+
+        result = self.get_success(self.store.db_pool.simple_select_onecol(
+            table="room_mapping_with_NC",
+            keyvalues={"room_id": self.room.to_string()},
+            retcol="link_url",
+        ))
+
+        self.assertFalse(result)
+# +watcha

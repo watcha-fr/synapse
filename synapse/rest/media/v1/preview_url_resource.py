@@ -172,6 +172,12 @@ class PreviewUrlResource(DirectServeJsonResource):
 
     async def _async_render_GET(self, request):
 
+        # watcha+
+        raise SynapseError(
+            403, "URL preview disabled on this server",
+            Codes.UNKNOWN
+        )
+        # +watcha
         # XXX: if get_user_by_req fails, what should we do in an async render?
         requester = await self.auth.get_user_by_req(request)
         url = parse_string(request, "url")

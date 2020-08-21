@@ -142,6 +142,7 @@ class RegistrationHandler(BaseHandler):
         address=None,
         bind_emails=[],
         by_admin=False,
+        make_partner=False # watcha+
     ):
         """Registers a new client on the server.
 
@@ -194,6 +195,7 @@ class RegistrationHandler(BaseHandler):
                 admin=admin,
                 user_type=user_type,
                 address=address,
+                make_partner=make_partner, # watcha+
             )
 
             if self.hs.config.user_directory_search_all_users:
@@ -224,6 +226,7 @@ class RegistrationHandler(BaseHandler):
                         make_guest=make_guest,
                         create_profile_with_displayname=default_display_name,
                         address=address,
+                        make_partner=make_partner, # watcha+
                     )
 
                     # Successfully registered
@@ -529,6 +532,7 @@ class RegistrationHandler(BaseHandler):
         admin=False,
         user_type=None,
         address=None,
+        make_partner=False, # watcha+
     ):
         """Register user in the datastore.
 
@@ -561,6 +565,7 @@ class RegistrationHandler(BaseHandler):
                 admin=admin,
                 user_type=user_type,
                 address=address,
+                make_partner=make_partner, # watcha+
             )
         else:
             return self.store.register_user(
@@ -572,6 +577,7 @@ class RegistrationHandler(BaseHandler):
                 create_profile_with_displayname=create_profile_with_displayname,
                 admin=admin,
                 user_type=user_type,
+                make_partner=make_partner, # watcha+
             )
 
     async def register_device(

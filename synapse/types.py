@@ -49,11 +49,20 @@ StateMap = Dict[Tuple[str, str], T]
 JsonDict = Dict[str, Any]
 
 
+""" !watcha
 class Requester(
     namedtuple(
         "Requester", ["user", "access_token_id", "is_guest", "device_id", "app_service"]
     )
 ):
+"""
+# watcha+
+class Requester(
+    namedtuple(
+        "Requester", ["user", "access_token_id", "is_guest", "device_id", "is_partner", "app_service"]
+    )
+):
+# +watcha
     """
     Represents the user making a request
 
@@ -78,6 +87,7 @@ class Requester(
             "access_token_id": self.access_token_id,
             "is_guest": self.is_guest,
             "device_id": self.device_id,
+            "is_partner": self.is_partner,  # watcha+
             "app_server_id": self.app_service.id if self.app_service else None,
         }
 
@@ -102,13 +112,21 @@ class Requester(
             access_token_id=input["access_token_id"],
             is_guest=input["is_guest"],
             device_id=input["device_id"],
+            is_partner=input["is_partner"], # watcha+
             app_service=appservice,
         )
 
 
+""" !watcha
 def create_requester(
     user_id, access_token_id=None, is_guest=False, device_id=None, app_service=None
 ):
+"""
+# watcha+
+def create_requester(
+    user_id, access_token_id=None, is_guest=False, device_id=None, is_partner=False, app_service=None  # modified for watcha: added is_partner
+):
+# +watcha
     """
     Create a new ``Requester`` object
 
@@ -125,7 +143,10 @@ def create_requester(
     """
     if not isinstance(user_id, UserID):
         user_id = UserID.from_string(user_id)
+    """ !watcha
     return Requester(user_id, access_token_id, is_guest, device_id, app_service)
+    """
+    return Requester(user_id, access_token_id, is_guest, device_id, is_partner, app_service)  # watcha+
 
 
 def get_domain_from_id(string):

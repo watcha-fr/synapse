@@ -91,6 +91,7 @@ class EventTypes(object):
     ServerACL = "m.room.server_acl"
     Pinned = "m.room.pinned_events"
 
+    VectorSetting = "im.vector.web.settings" # watcha+ - OP433
     Retention = "m.room.retention"
 
     Presence = "m.presence"

@@ -38,7 +38,10 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
 
         # Create a test user and room
         self.user = UserID("alice", "test")
+        """ !watcha
         self.requester = Requester(self.user, None, False, None, None)
+        """
+        self.requester = Requester(self.user, None, False, None, False, None) # watcha+
         info, _ = self.get_success(self.room_creator.create_room(self.requester, {}))
         self.room_id = info["room_id"]
 
@@ -258,9 +261,18 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         self.event_creator_handler = homeserver.get_event_creation_handler()
 
         # Create a test user and room
+        ''' watcha!
         self.user = UserID.from_string(self.register_user("user1", "password"))
+        '''
+        # watcha+
+        self.user1 = self.register_user("user1", "password")
+        self.user = UserID.from_string(self.user1)
+        # +watcha
         self.token1 = self.login("user1", "password")
+        """ !watcha
         self.requester = Requester(self.user, None, False, None, None)
+        """
+        self.requester = Requester(self.user, None, False, None, False, None)  # watcha+
         info, _ = self.get_success(self.room_creator.create_room(self.requester, {}))
         self.room_id = info["room_id"]
         self.event_creator = homeserver.get_event_creation_handler()
@@ -329,6 +341,12 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         self.get_success(
             self.store.user_set_consent_version(user2, self.CONSENT_VERSION)
         )
+        # watcha+
+        self.get_success(
+            self.store.user_set_consent_version(self.user1, self.CONSENT_VERSION)
+        )
+        self.helper.invite(self.room_id, self.user1, user2, tok=self.token1)
+        # +watcha
         self.helper.join(self.room_id, user2, tok=token2)
 
         # Background updates should now cause a dummy event to be added to the graph
@@ -400,3 +418,5 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         consent_uri_builder = Mock()
         consent_uri_builder.build_user_consent_uri.return_value = "http://example.com"
         self.event_creator._consent_uri_builder = consent_uri_builder
+
+    test_send_dummy_events_when_insufficient_power.skip = "Disable for Watcha"

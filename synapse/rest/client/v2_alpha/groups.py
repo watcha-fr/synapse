@@ -658,7 +658,10 @@ class PublicisedGroupsForUserServlet(RestServlet):
         self.groups_handler = hs.get_groups_local_handler()
 
     async def on_GET(self, request, user_id):
+        """ !watcha
         await self.auth.get_user_by_req(request, allow_guest=True)
+        """
+        await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True) # watcha+
 
         result = await self.groups_handler.get_publicised_groups_for_user(user_id)
 
