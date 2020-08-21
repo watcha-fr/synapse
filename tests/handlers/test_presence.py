@@ -538,7 +538,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         self.federation_sender.send_presence.assert_not_called()
         """ !watcha
         self.federation_sender.send_presence_to_destinations.assert_called_once_with(
-           destinations=["server3"], states=[expected_state]
+            destinations=["server3"], states=[expected_state]
         )
         """
         self.federation_sender.send_presence_to_destinations.assert_not_called() # watcha+

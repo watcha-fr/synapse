@@ -1088,7 +1088,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
     that they get correctly added to the generated events and propagated.
     """
 
-    servlets = [ 
+    servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
         login.register_servlets,

@@ -150,7 +150,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
                 "failed_attempts": {"per_second": 0.17, "burst_count": 5},
             }
         }
-    )    
+    )
     def test_POST_ratelimiting_per_account_failed_attempts(self):
         self.register_user("kermit", "monkey")
 

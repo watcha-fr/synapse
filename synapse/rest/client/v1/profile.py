@@ -177,8 +177,8 @@ class ProfileRestServlet(RestServlet):
             logger.error("Email is not defined for this user.")
         # watcha+
         return 200, ret
-        
-        
+  
+
 def register_servlets(hs, http_server):
     ProfileDisplaynameRestServlet(hs).register(http_server)
     ProfileAvatarURLRestServlet(hs).register(http_server)

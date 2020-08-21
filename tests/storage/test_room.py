@@ -101,7 +101,7 @@ class RoomEventsStoreTestCase(unittest.TestCase):
                 room_version=RoomVersions.V1,
             )
         )
-  
+
     @defer.inlineCallbacks
     def inject_room_event(self, **kwargs):
         yield defer.ensureDeferred(
