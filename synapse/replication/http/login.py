@@ -15,8 +15,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
 
@@ -38,7 +36,7 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
         self.registration_handler = hs.get_registration_handler()
 
     @staticmethod
-    def _serialize_payload(user_id, device_id, initial_display_name, is_guest):
+    async def _serialize_payload(user_id, device_id, initial_display_name, is_guest):
         """
         Args:
             device_id (str|None): Device ID to use, if None a new one is
@@ -52,19 +50,18 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
             "is_guest": is_guest,
         }
 
-    @defer.inlineCallbacks
-    def _handle_request(self, request, user_id):
+    async def _handle_request(self, request, user_id):
         content = parse_json_object_from_request(request)
 
         device_id = content["device_id"]
         initial_display_name = content["initial_display_name"]
         is_guest = content["is_guest"]
 
-        device_id, access_token = yield self.registration_handler.register_device(
+        device_id, access_token = await self.registration_handler.register_device(
             user_id, device_id, initial_display_name, is_guest
         )
 
-        return (200, {"device_id": device_id, "access_token": access_token})
+        return 200, {"device_id": device_id, "access_token": access_token}
 
 
 def register_servlets(hs, http_server):

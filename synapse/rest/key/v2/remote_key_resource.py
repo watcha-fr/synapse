@@ -13,23 +13,20 @@
 # limitations under the License.
 
 import logging
-from io import BytesIO
+from typing import Dict, Set
 
-from twisted.internet import defer
+from canonicaljson import encode_canonical_json, json
+from signedjson.sign import sign_json
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.crypto.keyring import ServerKeyFetcher
-from synapse.http.server import (
-    DirectServeResource,
-    respond_with_json_bytes,
-    wrap_json_request_handler,
-)
+from synapse.http.server import DirectServeJsonResource, respond_with_json_bytes
 from synapse.http.servlet import parse_integer, parse_json_object_from_request
 
 logger = logging.getLogger(__name__)
 
 
-class RemoteKey(DirectServeResource):
+class RemoteKey(DirectServeJsonResource):
     """HTTP resource for retreiving the TLS certificate and NACL signature
     verification keys for a collection of servers. Checks that the reported
     X.509 TLS certificate matches the one used in the HTTPS connection. Checks
@@ -91,16 +88,18 @@ class RemoteKey(DirectServeResource):
     isLeaf = True
 
     def __init__(self, hs):
+        super().__init__()
+
         self.fetcher = ServerKeyFetcher(hs)
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
         self.federation_domain_whitelist = hs.config.federation_domain_whitelist
+        self.config = hs.config
 
-    @wrap_json_request_handler
     async def _async_render_GET(self, request):
         if len(request.postpath) == 1:
-            server, = request.postpath
-            query = {server.decode("ascii"): {}}
+            (server,) = request.postpath
+            query = {server.decode("ascii"): {}}  # type: dict
         elif len(request.postpath) == 2:
             server, key_id = request.postpath
             minimum_valid_until_ts = parse_integer(request, "minimum_valid_until_ts")
@@ -113,7 +112,6 @@ class RemoteKey(DirectServeResource):
 
         await self.query_keys(request, query, query_remote_on_cache_miss=True)
 
-    @wrap_json_request_handler
     async def _async_render_POST(self, request):
         content = parse_json_object_from_request(request)
 
@@ -121,8 +119,7 @@ class RemoteKey(DirectServeResource):
 
         await self.query_keys(request, query, query_remote_on_cache_miss=True)
 
-    @defer.inlineCallbacks
-    def query_keys(self, request, query, query_remote_on_cache_miss=False):
+    async def query_keys(self, request, query, query_remote_on_cache_miss=False):
         logger.info("Handling query for keys %r", query)
 
         store_queries = []
@@ -139,13 +136,13 @@ class RemoteKey(DirectServeResource):
             for key_id in key_ids:
                 store_queries.append((server_name, key_id, None))
 
-        cached = yield self.store.get_server_keys_json(store_queries)
+        cached = await self.store.get_server_keys_json(store_queries)
 
         json_results = set()
 
         time_now_ms = self.clock.time_msec()
 
-        cache_misses = dict()
+        cache_misses = {}  # type: Dict[str, Set[str]]
         for (server_name, key_id, from_server), results in cached.items():
             results = [(result["ts_added_ms"], result) for result in results]
 
@@ -205,24 +202,25 @@ class RemoteKey(DirectServeResource):
 
                 if miss:
                     cache_misses.setdefault(server_name, set()).add(key_id)
+                # Cast to bytes since postgresql returns a memoryview.
                 json_results.add(bytes(most_recent_result["key_json"]))
             else:
                 for ts_added, result in results:
+                    # Cast to bytes since postgresql returns a memoryview.
                     json_results.add(bytes(result["key_json"]))
 
         if cache_misses and query_remote_on_cache_miss:
-            yield self.fetcher.get_keys(cache_misses)
-            yield self.query_keys(request, query, query_remote_on_cache_miss=False)
+            await self.fetcher.get_keys(cache_misses)
+            await self.query_keys(request, query, query_remote_on_cache_miss=False)
         else:
-            result_io = BytesIO()
-            result_io.write(b'{"server_keys":')
-            sep = b"["
-            for json_bytes in json_results:
-                result_io.write(sep)
-                result_io.write(json_bytes)
-                sep = b","
-            if sep == b"[":
-                result_io.write(sep)
-            result_io.write(b"]}")
+            signed_keys = []
+            for key_json in json_results:
+                key_json = json.loads(key_json.decode("utf-8"))
+                for signing_key in self.config.key_server_signing_keys:
+                    key_json = sign_json(key_json, self.config.server_name, signing_key)
 
-            respond_with_json_bytes(request, 200, result_io.getvalue())
+                signed_keys.append(key_json)
+
+            results = {"server_keys": signed_keys}
+
+            respond_with_json_bytes(request, 200, encode_canonical_json(results))

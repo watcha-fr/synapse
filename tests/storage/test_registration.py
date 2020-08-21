@@ -26,7 +26,6 @@ class RegistrationStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         hs = yield setup_test_homeserver(self.addCleanup)
-        self.db_pool = hs.get_db_pool()
 
         self.store = hs.get_datastore()
 
@@ -44,12 +43,15 @@ class RegistrationStoreTestCase(unittest.TestCase):
                 # TODO(paul): Surely this field should be 'user_id', not 'name'
                 "name": self.user_id,
                 "password_hash": self.pwhash,
+                "admin": 0,
                 "is_guest": 0,
                 "consent_version": None,
                 "consent_server_notice_sent": None,
                 "appservice_id": None,
                 "creation_ts": 1000,
-                "is_partner": 0,
+                "user_type": None,
+                "deactivated": 0,
+                "is_partner": 0, # watcha+
             },
             (yield self.store.get_user_by_id(self.user_id)),
         )
@@ -57,8 +59,10 @@ class RegistrationStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_add_tokens(self):
         yield self.store.register_user(self.user_id, self.pwhash)
-        yield self.store.add_access_token_to_user(
-            self.user_id, self.tokens[1], self.device_id, valid_until_ms=None
+        yield defer.ensureDeferred(
+            self.store.add_access_token_to_user(
+                self.user_id, self.tokens[1], self.device_id, valid_until_ms=None
+            )
         )
 
         result = yield self.store.get_user_by_access_token(self.tokens[1])
@@ -73,11 +77,15 @@ class RegistrationStoreTestCase(unittest.TestCase):
     def test_user_delete_access_tokens(self):
         # add some tokens
         yield self.store.register_user(self.user_id, self.pwhash)
-        yield self.store.add_access_token_to_user(
-            self.user_id, self.tokens[0], device_id=None, valid_until_ms=None
+        yield defer.ensureDeferred(
+            self.store.add_access_token_to_user(
+                self.user_id, self.tokens[0], device_id=None, valid_until_ms=None
+            )
         )
-        yield self.store.add_access_token_to_user(
-            self.user_id, self.tokens[1], self.device_id, valid_until_ms=None
+        yield defer.ensureDeferred(
+            self.store.add_access_token_to_user(
+                self.user_id, self.tokens[1], self.device_id, valid_until_ms=None
+            )
         )
 
         # now delete some

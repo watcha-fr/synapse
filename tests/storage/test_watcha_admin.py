@@ -11,14 +11,12 @@ from twisted.internet import defer
 from tests.utils import setup_test_homeserver
 
 class WatchaAdminTestCase(unittest.TestCase):
-    @defer.inlineCallbacks
-    def setUp(self):
-        hs = yield setup_test_homeserver(self.addCleanup)
+    async def setUp(self):
+        hs =  yield setup_test_homeserver(self.addCleanup)
         self.store = hs.get_datastore()
         self.time = int(hs.get_clock().time_msec())
 
-    @defer.inlineCallbacks
-    def test_watcha_user_list(self):
+    async def test_watcha_user_list(self):
 
         register_users_list = [
             {
@@ -71,7 +69,7 @@ class WatchaAdminTestCase(unittest.TestCase):
                     self.time,
                 )
 
-        users_informations = yield self.store.watcha_user_list()
+        users_informations =  yield self.store.watcha_user_list()
 
         # Sorted the register_users_list like the function watcha_user_list do it :
         register_users_list_sorted = sorted(
@@ -93,8 +91,7 @@ class WatchaAdminTestCase(unittest.TestCase):
             self.assertEquals(None, users_informations[user_index]["last_seen"])
             self.assertEquals(self.time, users_informations[user_index]["creation_ts"])
 
-    @defer.inlineCallbacks
-    def test_watcha_update_user_role(self):
+    async def test_watcha_update_user_role(self):
         user_id = "@admin:test"
         yield self.store.register_user(user_id, admin=True)
 
@@ -111,8 +108,7 @@ class WatchaAdminTestCase(unittest.TestCase):
             self.assertEquals(is_partner, element["values"]["is_partner"])
             self.assertEquals(is_admin, element["values"]["is_admin"])
 
-    @defer.inlineCallbacks
-    def test_get_users_with_pending_invitation(self):
+    async def test_get_users_with_pending_invitation(self):
 
         register_users_list = [
             {
@@ -139,7 +135,7 @@ class WatchaAdminTestCase(unittest.TestCase):
             yield self.store.register_user(user["user_id"], "pass")
 
             if user["logged_user"]:
-                yield self.store._execute_sql(
+                 yield self.store._execute_sql(
                     """
                         INSERT INTO user_ips(
                             user_id
@@ -161,22 +157,22 @@ class WatchaAdminTestCase(unittest.TestCase):
                 )
 
             if user["defined_password"]:
-                yield self.store.store_device(
+                 yield self.store.store_device(
                     user["user_id"], "device_id", "Web setup account"
                 )
 
             if user["logged_with_defined_password"]:
-                yield self.store.update_device(
+                 yield self.store.update_device(
                     user["user_id"], "device_id", new_display_name="display_name"
                 )
 
         users_with_pending_invitation = (
-            yield self.store._get_users_with_pending_invitation()
+              yield self.store._get_users_with_pending_invitation()
         )
 
         self.assertEquals(users_with_pending_invitation, {"@user1:test", "@user2:test"})
 
-    def test_get_server_state(self):
+    async def test_get_server_state(self):
 
         with tempfile.TemporaryDirectory() as temp_dirname:
             test_configfile = join(temp_dirname, "watcha.conf")
@@ -190,10 +186,12 @@ WATCHA_ADMIN_RELEASE=20200615-1157-dev-3bcb74c-a9e324aa
 INSTALL_DATE=
 UPGRADE_DATE=2020-06-16T22:43:29
 ''')
-            from synapse.storage import watcha_admin
+            from synapse.storage.data_stores.main import watcha_admin
             initial_WATCHA_CONF_FILE_PATH = watcha_admin.WATCHA_CONF_FILE_PATH
             try:
                 watcha_admin.WATCHA_CONF_FILE_PATH = test_configfile
+                hs = yield setup_test_homeserver(self.addCleanup)
+                self.store = hs.get_datastore()
                 server_state = self.store._get_server_state()
             finally:
                 watcha_admin.WATCHA_CONF_FILE_PATH = initial_WATCHA_CONF_FILE_PATH

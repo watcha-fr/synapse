@@ -24,7 +24,8 @@ from twisted.internet import defer
 
 from synapse.appservice import ApplicationService, ApplicationServiceState
 from synapse.config._base import ConfigError
-from synapse.storage.appservice import (
+from synapse.storage.database import DatabasePool, make_conn
+from synapse.storage.databases.main.appservice import (
     ApplicationServiceStore,
     ApplicationServiceTransactionStore,
 )
@@ -42,7 +43,7 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
         )
 
         hs.config.app_service_config_files = self.as_yaml_files
-        hs.config.event_cache_size = 1
+        hs.config.caches.event_cache_size = 1
         hs.config.password_providers = []
 
         self.as_token = "token1"
@@ -54,7 +55,10 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
         self._add_appservice("token2", "as2", "some_url", "some_hs_token", "bob")
         self._add_appservice("token3", "as3", "some_url", "some_hs_token", "bob")
         # must be done after inserts
-        self.store = ApplicationServiceStore(hs.get_db_conn(), hs)
+        database = hs.get_datastores().databases[0]
+        self.store = ApplicationServiceStore(
+            database, make_conn(database._database_config, database.engine), hs
+        )
 
     def tearDown(self):
         # TODO: suboptimal that we need to create files for tests!
@@ -65,14 +69,14 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
                 pass
 
     def _add_appservice(self, as_token, id, url, hs_token, sender):
-        as_yaml = dict(
-            url=url,
-            as_token=as_token,
-            hs_token=hs_token,
-            id=id,
-            sender_localpart=sender,
-            namespaces={},
-        )
+        as_yaml = {
+            "url": url,
+            "as_token": as_token,
+            "hs_token": hs_token,
+            "id": id,
+            "sender_localpart": sender,
+            "namespaces": {},
+        }
         # use the token as the filename
         with open(as_token, "w") as outfile:
             outfile.write(yaml.dump(as_yaml))
@@ -106,11 +110,8 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         )
 
         hs.config.app_service_config_files = self.as_yaml_files
-        hs.config.event_cache_size = 1
+        hs.config.caches.event_cache_size = 1
         hs.config.password_providers = []
-
-        self.db_pool = hs.get_db_pool()
-        self.engine = hs.database_engine
 
         self.as_list = [
             {"token": "token1", "url": "https://matrix-as.org", "id": "id_1"},
@@ -123,17 +124,25 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
 
         self.as_yaml_files = []
 
-        self.store = TestTransactionStore(hs.get_db_conn(), hs)
+        # We assume there is only one database in these tests
+        database = hs.get_datastores().databases[0]
+        self.db_pool = database._db_pool
+        self.engine = database.engine
+
+        db_config = hs.config.get_single_database()
+        self.store = TestTransactionStore(
+            database, make_conn(db_config, self.engine), hs
+        )
 
     def _add_service(self, url, as_token, id):
-        as_yaml = dict(
-            url=url,
-            as_token=as_token,
-            hs_token="something",
-            id=id,
-            sender_localpart="a_sender",
-            namespaces={},
-        )
+        as_yaml = {
+            "url": url,
+            "as_token": as_token,
+            "hs_token": "something",
+            "id": id,
+            "sender_localpart": "a_sender",
+            "namespaces": {},
+        }
         # use the token as the filename
         with open(as_token, "w") as outfile:
             outfile.write(yaml.dump(as_yaml))
@@ -169,14 +178,14 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_get_appservice_state_none(self):
         service = Mock(id="999")
-        state = yield self.store.get_appservice_state(service)
+        state = yield defer.ensureDeferred(self.store.get_appservice_state(service))
         self.assertEquals(None, state)
 
     @defer.inlineCallbacks
     def test_get_appservice_state_up(self):
         yield self._set_state(self.as_list[0]["id"], ApplicationServiceState.UP)
         service = Mock(id=self.as_list[0]["id"])
-        state = yield self.store.get_appservice_state(service)
+        state = yield defer.ensureDeferred(self.store.get_appservice_state(service))
         self.assertEquals(ApplicationServiceState.UP, state)
 
     @defer.inlineCallbacks
@@ -185,13 +194,13 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         yield self._set_state(self.as_list[1]["id"], ApplicationServiceState.DOWN)
         yield self._set_state(self.as_list[2]["id"], ApplicationServiceState.DOWN)
         service = Mock(id=self.as_list[1]["id"])
-        state = yield self.store.get_appservice_state(service)
+        state = yield defer.ensureDeferred(self.store.get_appservice_state(service))
         self.assertEquals(ApplicationServiceState.DOWN, state)
 
     @defer.inlineCallbacks
     def test_get_appservices_by_state_none(self):
-        services = yield self.store.get_appservices_by_state(
-            ApplicationServiceState.DOWN
+        services = yield defer.ensureDeferred(
+            self.store.get_appservices_by_state(ApplicationServiceState.DOWN)
         )
         self.assertEquals(0, len(services))
 
@@ -330,7 +339,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
     def test_get_oldest_unsent_txn_none(self):
         service = Mock(id=self.as_list[0]["id"])
 
-        txn = yield self.store.get_oldest_unsent_txn(service)
+        txn = yield defer.ensureDeferred(self.store.get_oldest_unsent_txn(service))
         self.assertEquals(None, txn)
 
     @defer.inlineCallbacks
@@ -340,14 +349,14 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         other_events = [Mock(event_id="e5"), Mock(event_id="e6")]
 
         # we aren't testing store._base stuff here, so mock this out
-        self.store.get_events_as_list = Mock(return_value=events)
+        self.store.get_events_as_list = Mock(return_value=defer.succeed(events))
 
         yield self._insert_txn(self.as_list[1]["id"], 9, other_events)
         yield self._insert_txn(service.id, 10, events)
         yield self._insert_txn(service.id, 11, other_events)
         yield self._insert_txn(service.id, 12, other_events)
 
-        txn = yield self.store.get_oldest_unsent_txn(service)
+        txn = yield defer.ensureDeferred(self.store.get_oldest_unsent_txn(service))
         self.assertEquals(service, txn.service)
         self.assertEquals(10, txn.id)
         self.assertEquals(events, txn.events)
@@ -357,8 +366,8 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         yield self._set_state(self.as_list[0]["id"], ApplicationServiceState.DOWN)
         yield self._set_state(self.as_list[1]["id"], ApplicationServiceState.UP)
 
-        services = yield self.store.get_appservices_by_state(
-            ApplicationServiceState.DOWN
+        services = yield defer.ensureDeferred(
+            self.store.get_appservices_by_state(ApplicationServiceState.DOWN)
         )
         self.assertEquals(1, len(services))
         self.assertEquals(self.as_list[0]["id"], services[0].id)
@@ -370,20 +379,20 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         yield self._set_state(self.as_list[2]["id"], ApplicationServiceState.DOWN)
         yield self._set_state(self.as_list[3]["id"], ApplicationServiceState.UP)
 
-        services = yield self.store.get_appservices_by_state(
-            ApplicationServiceState.DOWN
+        services = yield defer.ensureDeferred(
+            self.store.get_appservices_by_state(ApplicationServiceState.DOWN)
         )
         self.assertEquals(2, len(services))
         self.assertEquals(
-            set([self.as_list[2]["id"], self.as_list[0]["id"]]),
-            set([services[0].id, services[1].id]),
+            {self.as_list[2]["id"], self.as_list[0]["id"]},
+            {services[0].id, services[1].id},
         )
 
 
 # required for ApplicationServiceTransactionStoreTestCase tests
 class TestTransactionStore(ApplicationServiceTransactionStore, ApplicationServiceStore):
-    def __init__(self, db_conn, hs):
-        super(TestTransactionStore, self).__init__(db_conn, hs)
+    def __init__(self, database: DatabasePool, db_conn, hs):
+        super(TestTransactionStore, self).__init__(database, db_conn, hs)
 
 
 class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
@@ -413,10 +422,13 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         )
 
         hs.config.app_service_config_files = [f1, f2]
-        hs.config.event_cache_size = 1
+        hs.config.caches.event_cache_size = 1
         hs.config.password_providers = []
 
-        ApplicationServiceStore(hs.get_db_conn(), hs)
+        database = hs.get_datastores().databases[0]
+        ApplicationServiceStore(
+            database, make_conn(database._database_config, database.engine), hs
+        )
 
     @defer.inlineCallbacks
     def test_duplicate_ids(self):
@@ -428,11 +440,14 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         )
 
         hs.config.app_service_config_files = [f1, f2]
-        hs.config.event_cache_size = 1
+        hs.config.caches.event_cache_size = 1
         hs.config.password_providers = []
 
         with self.assertRaises(ConfigError) as cm:
-            ApplicationServiceStore(hs.get_db_conn(), hs)
+            database = hs.get_datastores().databases[0]
+            ApplicationServiceStore(
+                database, make_conn(database._database_config, database.engine), hs
+            )
 
         e = cm.exception
         self.assertIn(f1, str(e))
@@ -449,11 +464,14 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         )
 
         hs.config.app_service_config_files = [f1, f2]
-        hs.config.event_cache_size = 1
+        hs.config.caches.event_cache_size = 1
         hs.config.password_providers = []
 
         with self.assertRaises(ConfigError) as cm:
-            ApplicationServiceStore(hs.get_db_conn(), hs)
+            database = hs.get_datastores().databases[0]
+            ApplicationServiceStore(
+                database, make_conn(database._database_config, database.engine), hs
+            )
 
         e = cm.exception
         self.assertIn(f1, str(e))

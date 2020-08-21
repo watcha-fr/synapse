@@ -15,20 +15,14 @@
 
 import logging
 
-from twisted.web.server import NOT_DONE_YET
-
-from synapse.api.errors import SynapseError
-from synapse.http.server import (
-    DirectServeResource,
-    respond_with_json,
-    wrap_json_request_handler,
-)
+from synapse.api.errors import Codes, SynapseError
+from synapse.http.server import DirectServeJsonResource, respond_with_json
 from synapse.http.servlet import parse_string
 
 logger = logging.getLogger(__name__)
 
 
-class UploadResource(DirectServeResource):
+class UploadResource(DirectServeJsonResource):
     isLeaf = True
 
     def __init__(self, hs, media_repo):
@@ -43,20 +37,25 @@ class UploadResource(DirectServeResource):
         self.max_upload_size = hs.config.max_upload_size
         self.clock = hs.get_clock()
 
-    def render_OPTIONS(self, request):
+    async def _async_render_OPTIONS(self, request):
         respond_with_json(request, 200, {}, send_cors=True)
-        return NOT_DONE_YET
 
-    @wrap_json_request_handler
     async def _async_render_POST(self, request):
-        requester = await self.auth.get_user_by_req(request, allow_partner=True)
+        """ !watcha
+        requester = await self.auth.get_user_by_req(request)
+        """
+        requester = await self.auth.get_user_by_req(request, allow_partner=True) # watcha+
         # TODO: The checks here are a bit late. The content will have
         # already been uploaded to a tmp file at this point
         content_length = request.getHeader(b"Content-Length").decode("ascii")
         if content_length is None:
             raise SynapseError(msg="Request must specify a Content-Length", code=400)
         if int(content_length) > self.max_upload_size:
-            raise SynapseError(msg="Upload request body is too large", code=413)
+            raise SynapseError(
+                msg="Upload request body is too large",
+                code=413,
+                errcode=Codes.TOO_LARGE,
+            )
 
         upload_name = parse_string(request, b"filename", encoding=None)
         if upload_name:

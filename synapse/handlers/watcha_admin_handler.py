@@ -10,13 +10,12 @@ class WatchaAdminHandler(BaseHandler):
     def __init__(self, hs):
         super(WatchaAdminHandler, self).__init__(hs)
 
-    @defer.inlineCallbacks
-    def watcha_user_list(self):
-        users = yield self.store.watcha_user_list()
+    async def watcha_user_list(self):
+        users = await self.store.watcha_user_list()
 
         result = []
         for user in users:
-            role = yield self.watcha_get_user_role(user["user_id"])
+            role = await self.watcha_get_user_role(user["user_id"])
 
             result.append({
                 "user_id": user["user_id"],
@@ -28,50 +27,43 @@ class WatchaAdminHandler(BaseHandler):
                 "creation_ts": user["creation_ts"],
             })
 
-        defer.returnValue(result)
+        return result
 
-    @defer.inlineCallbacks
-    def watcha_room_membership(self):
-        result = yield self.store.watcha_room_membership()
-        defer.returnValue(result)
+    async def watcha_room_membership(self):
+        result = await self.store.watcha_room_membership()
+        return result
 
-    @defer.inlineCallbacks
-    def watcha_room_name(self):
-        result = yield self.store.watcha_room_name()
-        defer.returnValue(result)
+    async def watcha_room_name(self):
+        result = await self.store.watcha_room_name()
+        return result
 
-    @defer.inlineCallbacks
-    def watcha_display_name(self):
+    async def watcha_display_name(self):
         # TODO this cannot work - there is no store.watchauser_display_name method
         # Fortunately it doesn't seem to be called :)
-        result = yield self.store.watchauser_display_name()
-        defer.returnValue(result)
+        result = await self.store.watchauser_display_name()
+        return result
 
-    @defer.inlineCallbacks
-    def watcha_room_list(self):
-        result = yield self.store.watcha_room_list()
-        defer.returnValue(result)
+    async def watcha_room_list(self):
+        result = await self.store.watcha_room_list()
+        return result
 
-    @defer.inlineCallbacks
-    def watcha_update_mail(self, user_id, email):
-        result = yield self.store.watcha_update_mail(user_id, email)
-        defer.returnValue(result)
+    async def watcha_update_mail(self, user_id, email):
+        result = await self.store.watcha_update_mail(user_id, email)
+        return result
 
-    @defer.inlineCallbacks
-    def watcha_update_user_role(self, user_id, role):
-        user_role = yield self.watcha_get_user_role(user_id)
+    async def watcha_update_user_role(self, user_id, role):
+        user_role =  await self.watcha_get_user_role(user_id)
 
         if user_role == role:
             raise SynapseError(400, "This user has already the %s role" % role)
 
-        yield self.store.watcha_update_user_role(user_id, role)
+        await self.store.watcha_update_user_role(user_id, role)
 
-        defer.returnValue(role)
+        return role
 
-    @defer.inlineCallbacks
-    def watcha_get_user_role(self, user_id):
-        is_partner = yield self.hs.get_auth_handler().is_partner(user_id)
-        is_admin = yield self.hs.get_auth_handler().is_admin(user_id)
+    async def watcha_get_user_role(self, user_id):
+        is_partner =  await self.hs.get_auth_handler().is_partner(user_id)
+        is_admin =  await self.hs.get_auth_handler().is_admin(user_id)
 
         role = "collaborator"
 
@@ -82,24 +74,20 @@ class WatchaAdminHandler(BaseHandler):
         elif is_admin:
             role = "administrator"
 
-        defer.returnValue(role)
+        return role
 
-    @defer.inlineCallbacks
-    def watchaDeactivateAccount(self, user_id):
-        result = yield self.store.watcha_deactivate_account(user_id)
-        defer.returnValue(result)
+    async def watchaDeactivateAccount(self, user_id):
+        result =  await self.store.watcha_deactivate_account(user_id)
+        return result
 
-    @defer.inlineCallbacks
-    def watcha_admin_stat(self):
-        result = yield self.store.watcha_admin_stats()
-        defer.returnValue(result)
+    async def watcha_admin_stat(self):
+        result =  await self.store.watcha_admin_stats()
+        return result
 
-    @defer.inlineCallbacks
-    def watcha_user_ip(self, user_id):
-        result = yield self.store.watcha_user_ip(user_id)
-        defer.returnValue(result)
+    async def watcha_user_ip(self, user_id):
+        result =  await self.store.watcha_user_ip(user_id)
+        return result
 
-    @defer.inlineCallbacks
-    def watcha_reactivate_account(self, user_id):
-        result = yield self.store.watcha_reactivate_account(user_id)
-        defer.returnValue(result)
+    async def watcha_reactivate_account(self, user_id):
+        result =  await self.store.watcha_reactivate_account(user_id)
+        return result

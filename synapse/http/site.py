@@ -14,9 +14,12 @@
 import contextlib
 import logging
 import time
+from typing import Optional
 
+from twisted.python.failure import Failure
 from twisted.web.server import Request, Site
 
+from synapse.config.server import ListenerConfig
 from synapse.http import redact_uri
 from synapse.http.request_metrics import RequestMetrics, requests_counter
 from synapse.logging.context import LoggingContext, PreserveLoggingContext
@@ -44,18 +47,18 @@ class SynapseRequest(Request):
     request even after the client has disconnected.
 
     Attributes:
-        logcontext(LoggingContext) : the log context for this request
+        logcontext: the log context for this request
     """
 
-    def __init__(self, site, channel, *args, **kw):
+    def __init__(self, channel, *args, **kw):
         Request.__init__(self, channel, *args, **kw)
-        self.site = site
+        self.site = channel.site
         self._channel = channel  # this is used by the tests
         self.authenticated_entity = None
-        self.start_time = 0
+        self.start_time = 0.0
 
         # we can't yet create the logcontext, as we don't know the method.
-        self.logcontext = None
+        self.logcontext = None  # type: Optional[LoggingContext]
 
         global _next_request_seq
         self.request_seq = _next_request_seq
@@ -88,7 +91,7 @@ class SynapseRequest(Request):
     def get_redacted_uri(self):
         uri = self.uri
         if isinstance(uri, bytes):
-            uri = self.uri.decode("ascii")
+            uri = self.uri.decode("ascii", errors="replace")
         return redact_uri(uri)
 
     def get_method(self):
@@ -143,10 +146,9 @@ class SynapseRequest(Request):
 
         Returns a context manager; the correct way to use this is:
 
-        @defer.inlineCallbacks
-        def handle_request(request):
+        async def handle_request(request):
             with request.processing("FooServlet"):
-                yield really_handle_the_request()
+                await really_handle_the_request()
 
         Once the context manager is closed, the completion of the request will be logged,
         and the various metrics will be updated.
@@ -181,6 +183,7 @@ class SynapseRequest(Request):
         self.finish_time = time.time()
         Request.finish(self)
         if not self._is_processing:
+            assert self.logcontext is not None
             with PreserveLoggingContext(self.logcontext):
                 self._finished_processing()
 
@@ -190,8 +193,20 @@ class SynapseRequest(Request):
         Overrides twisted.web.server.Request.connectionLost to record the finish time and
         do logging.
         """
+        # There is a bug in Twisted where reason is not wrapped in a Failure object
+        # Detect this and wrap it manually as a workaround
+        # More information: https://github.com/matrix-org/synapse/issues/7441
+        if not isinstance(reason, Failure):
+            reason = Failure(reason)
+
         self.finish_time = time.time()
         Request.connectionLost(self, reason)
+
+        if self.logcontext is None:
+            logger.info(
+                "Connection from %s lost before request headers were read", self.client
+            )
+            return
 
         # we only get here if the connection to the client drops before we send
         # the response.
@@ -199,9 +214,7 @@ class SynapseRequest(Request):
         # It's useful to log it here so that we can get an idea of when
         # the client disconnects.
         with PreserveLoggingContext(self.logcontext):
-            logger.warn(
-                "Error processing request %r: %s %s", self, reason.type, reason.value
-            )
+            logger.info("Connection from client lost before response was sent")
 
             if not self._is_processing:
                 self._finished_processing()
@@ -219,14 +232,13 @@ class SynapseRequest(Request):
                 It is possible to update this afterwards by updating
                 self.request_metrics.name.
         """
-
         self.start_time = time.time()
         self.request_metrics = RequestMetrics()
         self.request_metrics.start(
             self.start_time, name=servlet_name, method=self.get_method()
         )
 
-        self.site.access_logger.info(
+        self.site.access_logger.debug(
             "%s - %s - Received request: %s %s",
             self.getClientIP(),
             self.site.site_tag,
@@ -237,13 +249,7 @@ class SynapseRequest(Request):
     def _finished_processing(self):
         """Log the completion of this request and update the metrics
         """
-
-        if self.logcontext is None:
-            # this can happen if the connection closed before we read the
-            # headers (so render was never called). In that case we'll already
-            # have logged a warning, so just bail out.
-            return
-
+        assert self.logcontext is not None
         usage = self.logcontext.get_resource_usage()
 
         if self._processing_finished_time is None:
@@ -280,7 +286,9 @@ class SynapseRequest(Request):
             # the connection dropped)
             code += "!"
 
-        self.site.access_logger.info(
+        log_level = logging.INFO if self._should_log_request() else logging.DEBUG
+        self.site.access_logger.log(
+            log_level,
             "%s - %s - {%s}"
             " Processed request: %.3fsec/%.3fsec (%.3fsec, %.3fsec) (%.3fsec/%.3fsec/%d)"
             ' %sB %s "%s %s %s" "%s" [%d dbevts]',
@@ -306,7 +314,18 @@ class SynapseRequest(Request):
         try:
             self.request_metrics.stop(self.finish_time, self.code, self.sentLength)
         except Exception as e:
-            logger.warn("Failed to stop metrics: %r", e)
+            logger.warning("Failed to stop metrics: %r", e)
+
+    def _should_log_request(self) -> bool:
+        """Whether we should log at INFO that we processed the request.
+        """
+        if self.path == b"/health":
+            return False
+
+        if self.method == b"OPTIONS":
+            return False
+
+        return True
 
 
 class XForwardedForRequest(SynapseRequest):
@@ -332,18 +351,6 @@ class XForwardedForRequest(SynapseRequest):
         )
 
 
-class SynapseRequestFactory(object):
-    def __init__(self, site, x_forwarded_for):
-        self.site = site
-        self.x_forwarded_for = x_forwarded_for
-
-    def __call__(self, *args, **kwargs):
-        if self.x_forwarded_for:
-            return XForwardedForRequest(self.site, *args, **kwargs)
-        else:
-            return SynapseRequest(self.site, *args, **kwargs)
-
-
 class SynapseSite(Site):
     """
     Subclass of a twisted http Site that does access logging with python's
@@ -354,7 +361,7 @@ class SynapseSite(Site):
         self,
         logger_name,
         site_tag,
-        config,
+        config: ListenerConfig,
         resource,
         server_version_string,
         *args,
@@ -364,8 +371,9 @@ class SynapseSite(Site):
 
         self.site_tag = site_tag
 
-        proxied = config.get("x_forwarded", False)
-        self.requestFactory = SynapseRequestFactory(self, proxied)
+        assert config.http_options is not None
+        proxied = config.http_options.x_forwarded
+        self.requestFactory = XForwardedForRequest if proxied else SynapseRequest
         self.access_logger = logging.getLogger(logger_name)
         self.server_version_string = server_version_string.encode("ascii")
 

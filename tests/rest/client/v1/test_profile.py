@@ -28,10 +28,11 @@ from synapse.rest.client.v1 import login, profile, room
 from tests import unittest
 
 from ....utils import MockHttpResource, setup_test_homeserver
-from urllib.parse import quote
+from urllib.parse import quote # watcha+
 
 myid = "@1234ABCD:test"
 PATH_PREFIX = "/_matrix/client/r0"
+
 
 class MockHandlerProfileTestCase(unittest.TestCase):
     """ Tests rest layer of profile management.
@@ -52,6 +53,14 @@ class MockHandlerProfileTestCase(unittest.TestCase):
             ]
         )
 
+        self.mock_handler.get_displayname.return_value = defer.succeed(Mock())
+        self.mock_handler.set_displayname.return_value = defer.succeed(Mock())
+        self.mock_handler.get_avatar_url.return_value = defer.succeed(Mock())
+        self.mock_handler.set_avatar_url.return_value = defer.succeed(Mock())
+        self.mock_handler.check_profile_query_allowed.return_value = defer.succeed(
+            Mock()
+        )
+
         hs = yield setup_test_homeserver(
             self.addCleanup,
             "test",
@@ -62,7 +71,10 @@ class MockHandlerProfileTestCase(unittest.TestCase):
             profile_handler=self.mock_handler,
         )
 
-        def _get_user_by_req(request=None, allow_guest=False, allow_partner=False): # modified for watcha
+        """ !watcha
+        async def _get_user_by_req(request=None, allow_guest=False):
+        """
+        async def _get_user_by_req(request=None, allow_guest=False, allow_partner=False): # watcha+
             return synapse.types.create_requester(myid)
 
         hs.get_auth().get_user_by_req = _get_user_by_req
@@ -174,13 +186,13 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         self.hs = self.setup_test_homeserver()
-        self.auth = self.hs.get_auth_handler()
+        self.auth = self.hs.get_auth_handler() # watcha+
         return self.hs
 
     def prepare(self, reactor, clock, hs):
         self.owner = self.register_user("owner", "pass")
         self.owner_tok = self.login("owner", "pass")
-        self.time = self.hs.get_clock().time_msec()
+        self.time = self.hs.get_clock().time_msec() # watcha+
 
     def test_set_displayname(self):
         request, channel = self.make_request(
@@ -207,11 +219,10 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 400, channel.result)
 
         res = self.get_displayname()
-        """ change for watcha
-        # fixed the test to work for ExternalUserProfileTestCase
+        """ !watcha - fixed the test to work for ExternalUserProfileTestCase
         self.assertEqual(res, "owner")
         """
-        self.assertEqual(res, synapse.types.UserID.from_string(self.owner).localpart)
+        self.assertEqual(res, synapse.types.UserID.from_string(self.owner).localpart) # watcha+
 
     def get_displayname(self):
         request, channel = self.make_request(
@@ -221,14 +232,16 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.result)
         return channel.json_body["displayname"]
 
-# insertion for watcha
+    # watcha+
     def test_get_email_threepids(self):
-               
-        #Addition of email as a threepids :
-        self.auth.add_threepid(self.owner, "email", "example@email.com", self.time)
-        
+
+        # Addition of email as a threepids :
+        self.get_success(
+            self.auth.add_threepid(self.owner, "email", "example@email.com", self.time)
+        )
+
         request, channel = self.make_request(
-            "GET", "/profile/%s" % (quote(self.owner, safe=''))
+            "GET", "/profile/%s" % (quote(self.owner, safe=""))
         )
 
         self.render(request)
@@ -237,47 +250,60 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
     def test_do_not_get_phone_threepids(self):
 
-        # Addition of phone number as a threepids : 
-        self.auth.add_threepid(self.owner, "msisdn", "0612345678", self.time)
-        
-        with self.assertLogs('synapse.rest.client.v1.profile', level='ERROR') as cm:
+        # Addition of phone number as a threepids :
+        self.get_success(
+            self.auth.add_threepid(self.owner, "msisdn", "0612345678", self.time)
+        )
+
+        with self.assertLogs("synapse.rest.client.v1.profile", level="ERROR") as cm:
             request, channel = self.make_request(
-                "GET", "/profile/%s" % (quote(self.owner, safe=''))
+                "GET", "/profile/%s" % (quote(self.owner, safe=""))
             )
 
             self.render(request)
 
         self.assertEqual(channel.code, 200)
         self.assertRaises(SynapseError)
-        self.assertIn("ERROR:synapse.rest.client.v1.profile:Email is not defined for this user.",
-                          cm.output[0])
+        self.assertIn(
+            "ERROR:synapse.rest.client.v1.profile:Email is not defined for this user.",
+            cm.output[0],
+        )
 
     def test_get_only_one_email_threepids(self):
 
-        #Addition of two emails as a threepids :
-        self.auth.add_threepid(self.owner, "email", "example@email.com", self.time)
-        self.auth.add_threepid(self.owner, "email", "second_example@email.com", self.time)
+        # Addition of two emails as a threepids :
+        self.get_success(
+            self.auth.add_threepid(self.owner, "email", "example@email.com", self.time)
+        )
+        self.get_success(
+            self.auth.add_threepid(
+                self.owner, "email", "second_example@email.com", self.time
+            )
+        )
 
-        with self.assertLogs('synapse.rest.client.v1.profile', level='ERROR') as cm:
+        with self.assertLogs("synapse.rest.client.v1.profile", level="ERROR") as cm:
             request, channel = self.make_request(
-                "GET", "/profile/%s" % (quote(self.owner, safe=''))
+                "GET", "/profile/%s" % (quote(self.owner, safe=""))
             )
 
             self.render(request)
 
         self.assertEqual(channel.code, 200)
         self.assertRaises(SynapseError)
-        self.assertIn("ERROR:synapse.rest.client.v1.profile:Email is not defined for this user.",
-                          cm.output[0])
+        self.assertIn(
+            "ERROR:synapse.rest.client.v1.profile:Email is not defined for this user.",
+            cm.output[0],
+        )
+    # +watcha
 
-
+# watcha+
 class ExternalUserProfileTestCase(ProfileTestCase):
     '''Test for the iOS workaround of not escaping user id when setting profile'''
     def prepare(self, reactor, clock, hs):
         self.owner = self.register_user("owner/myemailadress.com", "pass")
         self.owner_tok = self.login("owner/myemailadress.com", "pass")
         self.time = self.hs.get_clock().time_msec()
-# end of insertion
+# +watcha
 
 
 class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
@@ -293,6 +319,7 @@ class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
 
         config = self.default_config()
         config["require_auth_for_profile_requests"] = True
+        config["limit_profile_requests_to_users_who_share_rooms"] = True
         self.hs = self.setup_test_homeserver(config=config)
 
         return self.hs
@@ -320,7 +347,7 @@ class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
     def test_in_shared_room(self):
         self.ensure_requester_left_room()
 
-        self.helper.invite(self.room_id, src=self.owner, tok=self.owner_tok, targ=self.requester) # added for Watcha: need to be invited
+        self.helper.invite(self.room_id, src=self.owner, tok=self.owner_tok, targ=self.requester) # watcha+ - need to be invited
         self.helper.join(room=self.room_id, user=self.requester, tok=self.requester_tok)
 
         self.try_fetch_profile(200, self.requester_tok)
@@ -366,6 +393,7 @@ class OwnProfileUnrestrictedTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         config = self.default_config()
         config["require_auth_for_profile_requests"] = True
+        config["limit_profile_requests_to_users_who_share_rooms"] = True
         self.hs = self.setup_test_homeserver(config=config)
 
         return self.hs

@@ -18,13 +18,19 @@ from distutils.util import strtobool
 
 import pkg_resources
 
+from synapse.api.constants import RoomCreationPreset
 from synapse.config._base import Config, ConfigError
-from synapse.types import RoomAlias
+from synapse.types import RoomAlias, UserID
 from synapse.util.stringutils import random_string_with_symbols
 
 
 class AccountValidityConfig(Config):
+    section = "accountvalidity"
+
     def __init__(self, config, synapse_config):
+        if config is None:
+            return
+        super(AccountValidityConfig, self).__init__()
         self.enabled = config.get("enabled", False)
         self.renew_by_email_enabled = "renew_at" in config
 
@@ -77,6 +83,8 @@ class AccountValidityConfig(Config):
 
 
 class RegistrationConfig(Config):
+    section = "registration"
+
     def read_config(self, config, **kwargs):
         self.enable_registration = bool(
             strtobool(str(config.get("enable_registration", False)))
@@ -87,7 +95,7 @@ class RegistrationConfig(Config):
             )
 
         self.account_validity = AccountValidityConfig(
-            config.get("account_validity", {}), config
+            config.get("account_validity") or {}, config
         )
 
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
@@ -99,6 +107,17 @@ class RegistrationConfig(Config):
         self.trusted_third_party_id_servers = config.get(
             "trusted_third_party_id_servers", ["matrix.org", "vector.im"]
         )
+        account_threepid_delegates = config.get("account_threepid_delegates") or {}
+        self.account_threepid_delegate_email = account_threepid_delegates.get("email")
+        self.account_threepid_delegate_msisdn = account_threepid_delegates.get("msisdn")
+        if self.account_threepid_delegate_msisdn and not self.public_baseurl:
+            raise ConfigError(
+                "The configuration option `public_baseurl` is required if "
+                "`account_threepid_delegate.msisdn` is set, such that "
+                "clients know where to submit validation tokens to. Please "
+                "configure `public_baseurl`."
+            )
+
         self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
 
@@ -109,7 +128,55 @@ class RegistrationConfig(Config):
         for room_alias in self.auto_join_rooms:
             if not RoomAlias.is_valid(room_alias):
                 raise ConfigError("Invalid auto_join_rooms entry %s" % (room_alias,))
+
+        # Options for creating auto-join rooms if they do not exist yet.
         self.autocreate_auto_join_rooms = config.get("autocreate_auto_join_rooms", True)
+        self.autocreate_auto_join_rooms_federated = config.get(
+            "autocreate_auto_join_rooms_federated", True
+        )
+        self.autocreate_auto_join_room_preset = (
+            config.get("autocreate_auto_join_room_preset")
+            or RoomCreationPreset.PUBLIC_CHAT
+        )
+        self.auto_join_room_requires_invite = self.autocreate_auto_join_room_preset in {
+            RoomCreationPreset.PRIVATE_CHAT,
+            RoomCreationPreset.TRUSTED_PRIVATE_CHAT,
+        }
+
+        # Pull the creater/inviter from the configuration, this gets used to
+        # send invites for invite-only rooms.
+        mxid_localpart = config.get("auto_join_mxid_localpart")
+        self.auto_join_user_id = None
+        if mxid_localpart:
+            # Convert the localpart to a full mxid.
+            self.auto_join_user_id = UserID(
+                mxid_localpart, self.server_name
+            ).to_string()
+
+        if self.autocreate_auto_join_rooms:
+            # Ensure the preset is a known value.
+            if self.autocreate_auto_join_room_preset not in {
+                RoomCreationPreset.PUBLIC_CHAT,
+                RoomCreationPreset.PRIVATE_CHAT,
+                RoomCreationPreset.TRUSTED_PRIVATE_CHAT,
+            }:
+                raise ConfigError("Invalid value for autocreate_auto_join_room_preset")
+            # If the preset requires invitations to be sent, ensure there's a
+            # configured user to send them from.
+            if self.auto_join_room_requires_invite:
+                if not mxid_localpart:
+                    raise ConfigError(
+                        "The configuration option `auto_join_mxid_localpart` is required if "
+                        "`autocreate_auto_join_room_preset` is set to private_chat or trusted_private_chat, such that "
+                        "Synapse knows who to send invitations from. Please "
+                        "configure `auto_join_mxid_localpart`."
+                    )
+
+        self.auto_join_rooms_for_guests = config.get("auto_join_rooms_for_guests", True)
+
+        self.enable_set_displayname = config.get("enable_set_displayname", True)
+        self.enable_set_avatar_url = config.get("enable_set_avatar_url", True)
+        self.enable_3pid_changes = config.get("enable_3pid_changes", True)
 
         self.disable_msisdn_registration = config.get(
             "disable_msisdn_registration", False
@@ -126,9 +193,7 @@ class RegistrationConfig(Config):
                 random_string_with_symbols(50),
             )
         else:
-            registration_shared_secret = (
-                "# registration_shared_secret: <PRIVATE STRING>"
-            )
+            registration_shared_secret = "#registration_shared_secret: <PRIVATE STRING>"
 
         return (
             """\
@@ -144,23 +209,6 @@ class RegistrationConfig(Config):
         # Optional account validity configuration. This allows for accounts to be denied
         # any request after a given period.
         #
-        # ``enabled`` defines whether the account validity feature is enabled. Defaults
-        # to False.
-        #
-        # ``period`` allows setting the period after which an account is valid
-        # after its registration. When renewing the account, its validity period
-        # will be extended by this amount of time. This parameter is required when using
-        # the account validity feature.
-        #
-        # ``renew_at`` is the amount of time before an account's expiry date at which
-        # Synapse will send an email to the account's email address with a renewal link.
-        # This needs the ``email`` and ``public_baseurl`` configuration sections to be
-        # filled.
-        #
-        # ``renew_email_subject`` is the subject of the email sent out with the renewal
-        # link. ``%%(app)s`` can be used as a placeholder for the ``app_name`` parameter
-        # from the ``email`` section.
-        #
         # Once this feature is enabled, Synapse will look for registered users without an
         # expiration date at startup and will add one to every account it found using the
         # current settings at that time.
@@ -171,21 +219,55 @@ class RegistrationConfig(Config):
         # date will be randomly selected within a range [now + period - d ; now + period],
         # where d is equal to 10%% of the validity period.
         #
-        #account_validity:
-        #  enabled: True
-        #  period: 6w
-        #  renew_at: 1w
-        #  renew_email_subject: "Renew your %%(app)s account"
-        #  # Directory in which Synapse will try to find the HTML files to serve to the
-        #  # user when trying to renew an account. Optional, defaults to
-        #  # synapse/res/templates.
-        #  template_dir: "res/templates"
-        #  # HTML to be displayed to the user after they successfully renewed their
-        #  # account. Optional.
-        #  account_renewed_html_path: "account_renewed.html"
-        #  # HTML to be displayed when the user tries to renew an account with an invalid
-        #  # renewal token. Optional.
-        #  invalid_token_html_path: "invalid_token.html"
+        account_validity:
+          # The account validity feature is disabled by default. Uncomment the
+          # following line to enable it.
+          #
+          #enabled: true
+
+          # The period after which an account is valid after its registration. When
+          # renewing the account, its validity period will be extended by this amount
+          # of time. This parameter is required when using the account validity
+          # feature.
+          #
+          #period: 6w
+
+          # The amount of time before an account's expiry date at which Synapse will
+          # send an email to the account's email address with a renewal link. By
+          # default, no such emails are sent.
+          #
+          # If you enable this setting, you will also need to fill out the 'email' and
+          # 'public_baseurl' configuration sections.
+          #
+          #renew_at: 1w
+
+          # The subject of the email sent out with the renewal link. '%%(app)s' can be
+          # used as a placeholder for the 'app_name' parameter from the 'email'
+          # section.
+          #
+          # Note that the placeholder must be written '%%(app)s', including the
+          # trailing 's'.
+          #
+          # If this is not set, a default value is used.
+          #
+          #renew_email_subject: "Renew your %%(app)s account"
+
+          # Directory in which Synapse will try to find templates for the HTML files to
+          # serve to the user when trying to renew an account. If not set, default
+          # templates from within the Synapse package will be used.
+          #
+          #template_dir: "res/templates"
+
+          # File within 'template_dir' giving the HTML to be displayed to the user after
+          # they successfully renewed their account. If not set, default text is used.
+          #
+          #account_renewed_html_path: "account_renewed.html"
+
+          # File within 'template_dir' giving the HTML to be displayed when the user
+          # tries to renew an account with an invalid renewal token. If not set,
+          # default text is used.
+          #
+          #invalid_token_html_path: "invalid_token.html"
 
         # Time that a user's session remains valid for, after they log in.
         #
@@ -251,18 +333,61 @@ class RegistrationConfig(Config):
         #
         #default_identity_server: https://matrix.org
 
-        # The list of identity servers trusted to verify third party
-        # identifiers by this server.
+        # Handle threepid (email/phone etc) registration and password resets through a set of
+        # *trusted* identity servers. Note that this allows the configured identity server to
+        # reset passwords for accounts!
         #
-        # Also defines the ID server which will be called when an account is
-        # deactivated (one will be picked arbitrarily).
+        # Be aware that if `email` is not set, and SMTP options have not been
+        # configured in the email config block, registration and user password resets via
+        # email will be globally disabled.
         #
-        #trusted_third_party_id_servers:
-        #  - matrix.org
-        #  - vector.im
+        # Additionally, if `msisdn` is not set, registration and password resets via msisdn
+        # will be disabled regardless. This is due to Synapse currently not supporting any
+        # method of sending SMS messages on its own.
+        #
+        # To enable using an identity server for operations regarding a particular third-party
+        # identifier type, set the value to the URL of that identity server as shown in the
+        # examples below.
+        #
+        # Servers handling the these requests must answer the `/requestToken` endpoints defined
+        # by the Matrix Identity Service API specification:
+        # https://matrix.org/docs/spec/identity_service/latest
+        #
+        # If a delegate is specified, the config option public_baseurl must also be filled out.
+        #
+        account_threepid_delegates:
+            #email: https://example.com     # Delegate email sending to example.com
+            #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
+
+        # Whether users are allowed to change their displayname after it has
+        # been initially set. Useful when provisioning users based on the
+        # contents of a third-party directory.
+        #
+        # Does not apply to server administrators. Defaults to 'true'
+        #
+        #enable_set_displayname: false
+
+        # Whether users are allowed to change their avatar after it has been
+        # initially set. Useful when provisioning users based on the contents
+        # of a third-party directory.
+        #
+        # Does not apply to server administrators. Defaults to 'true'
+        #
+        #enable_set_avatar_url: false
+
+        # Whether users can change the 3PIDs associated with their accounts
+        # (email address and msisdn).
+        #
+        # Defaults to 'true'
+        #
+        #enable_3pid_changes: false
 
         # Users who register on this homeserver will automatically be joined
-        # to these rooms
+        # to these rooms.
+        #
+        # By default, any room aliases included in this list will be created
+        # as a publicly joinable room when the first user registers for the
+        # homeserver. This behaviour can be customised with the settings below.
         #
         #auto_join_rooms:
         #  - "#example:example.com"
@@ -270,10 +395,69 @@ class RegistrationConfig(Config):
         # Where auto_join_rooms are specified, setting this flag ensures that the
         # the rooms exist by creating them when the first user on the
         # homeserver registers.
+        #
+        # By default the auto-created rooms are publicly joinable from any federated
+        # server. Use the autocreate_auto_join_rooms_federated and
+        # autocreate_auto_join_room_preset settings below to customise this behaviour.
+        #
         # Setting to false means that if the rooms are not manually created,
         # users cannot be auto-joined since they do not exist.
         #
-        #autocreate_auto_join_rooms: true
+        # Defaults to true. Uncomment the following line to disable automatically
+        # creating auto-join rooms.
+        #
+        #autocreate_auto_join_rooms: false
+
+        # Whether the auto_join_rooms that are auto-created are available via
+        # federation. Only has an effect if autocreate_auto_join_rooms is true.
+        #
+        # Note that whether a room is federated cannot be modified after
+        # creation.
+        #
+        # Defaults to true: the room will be joinable from other servers.
+        # Uncomment the following to prevent users from other homeservers from
+        # joining these rooms.
+        #
+        #autocreate_auto_join_rooms_federated: false
+
+        # The room preset to use when auto-creating one of auto_join_rooms. Only has an
+        # effect if autocreate_auto_join_rooms is true.
+        #
+        # This can be one of "public_chat", "private_chat", or "trusted_private_chat".
+        # If a value of "private_chat" or "trusted_private_chat" is used then
+        # auto_join_mxid_localpart must also be configured.
+        #
+        # Defaults to "public_chat", meaning that the room is joinable by anyone, including
+        # federated servers if autocreate_auto_join_rooms_federated is true (the default).
+        # Uncomment the following to require an invitation to join these rooms.
+        #
+        #autocreate_auto_join_room_preset: private_chat
+
+        # The local part of the user id which is used to create auto_join_rooms if
+        # autocreate_auto_join_rooms is true. If this is not provided then the
+        # initial user account that registers will be used to create the rooms.
+        #
+        # The user id is also used to invite new users to any auto-join rooms which
+        # are set to invite-only.
+        #
+        # It *must* be configured if autocreate_auto_join_room_preset is set to
+        # "private_chat" or "trusted_private_chat".
+        #
+        # Note that this must be specified in order for new users to be correctly
+        # invited to any auto-join rooms which have been set to invite-only (either
+        # at the time of creation or subsequently).
+        #
+        # Note that, if the room already exists, this user must be joined and
+        # have the appropriate permissions to invite new members.
+        #
+        #auto_join_mxid_localpart: system
+
+        # When auto_join_rooms is specified, setting this flag to false prevents
+        # guest accounts from being automatically joined to the rooms.
+        #
+        # Defaults to true.
+        #
+        #auto_join_rooms_for_guests: false
         """
             % locals()
         )

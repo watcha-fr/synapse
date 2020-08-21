@@ -18,9 +18,10 @@ from .directory import DirectoryHandler
 from .federation import FederationHandler
 from .identity import IdentityHandler
 from .search import SearchHandler
+# watcha+
 from .watcha_invite_external import InviteExternalHandler
 from .watcha_admin_handler import WatchaAdminHandler
-from .room import WatchaRoomHandler
+# +watcha
 
 
 class Handlers(object):
@@ -48,6 +49,7 @@ class Handlers(object):
         self.admin_handler = AdminHandler(hs)
         self.identity_handler = IdentityHandler(hs)
         self.search_handler = SearchHandler(hs)
-        self.invite_external_handler = InviteExternalHandler(hs) #added for watcha
-        self.watcha_admin_handler = WatchaAdminHandler(hs) #added for watcha
-        self.watcha_room_handler = WatchaRoomHandler(hs) #added for watcha - OP433
+        # watcha+
+        self.invite_external_handler = InviteExternalHandler(hs) 
+        self.watcha_admin_handler = WatchaAdminHandler(hs) 
+        # +watcha

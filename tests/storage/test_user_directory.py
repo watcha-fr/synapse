@@ -15,8 +15,6 @@
 
 from twisted.internet import defer
 
-from synapse.storage import UserDirectoryStore
-
 from tests import unittest
 from tests.utils import setup_test_homeserver
 
@@ -29,7 +27,7 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         self.hs = yield setup_test_homeserver(self.addCleanup)
-        self.store = UserDirectoryStore(self.hs.get_db_conn(), self.hs)
+        self.store = self.hs.get_datastore()
 
         # alice and bob are both in !room_id. bobby is not but shares
         # a homeserver with alice.
@@ -42,7 +40,7 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
     def test_search_user_dir(self):
         # normally when alice searches the directory she should just find
         # bob because bobby doesn't share a room with her.
-        r = yield self.store.search_user_dir(ALICE, "bob", 10)
+        r = yield defer.ensureDeferred(self.store.search_user_dir(ALICE, "bob", 10))
         self.assertFalse(r["limited"])
         self.assertEqual(1, len(r["results"]))
         self.assertDictEqual(
@@ -53,7 +51,7 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
     def test_search_user_dir_all_users(self):
         self.hs.config.user_directory_search_all_users = True
         try:
-            r = yield self.store.search_user_dir(ALICE, "bob", 10)
+            r = yield defer.ensureDeferred(self.store.search_user_dir(ALICE, "bob", 10))
             self.assertFalse(r["limited"])
             self.assertEqual(2, len(r["results"]))
             self.assertDictEqual(
@@ -67,18 +65,22 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
         finally:
             self.hs.config.user_directory_search_all_users = False
 
+    # watcha+
     test_search_user_dir.skip = "Not working because of Watcha modification"
     test_search_user_dir_all_users.skip = "Not working because of Watcha modification"
+    # +watcha
 
+    # watcha+
     @defer.inlineCallbacks
     def test_search_user_dir_for_watcha(self):
         # This only tests that it's not crashing :) after our motifs.
         # There should be more tests !
-        r = yield self.store.search_user_dir(ALICE, "bob", 10)
+        r = yield defer.ensureDeferred(self.store.search_user_dir(ALICE, "bob", 10))
         self.assertFalse(r["limited"])
         self.assertEqual(0, len(r["results"]))
+    # +watcha
 
-# Insertion for watcha
+# watcha+
 class WatchaUserDirectoryStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
@@ -109,12 +111,12 @@ class WatchaUserDirectoryStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_search_user_dir_with_user_id(self):
-        with self.assertLogs("synapse.storage.user_directory", level="INFO") as cm:
-            sqlResult = yield self.store.search_user_dir(
+        with self.assertLogs("synapse.storage.databases.main.user_directory", level="INFO") as cm:
+            sqlResult = yield defer.ensureDeferred(self.store.search_user_dir(
                 self.user_id, self.searched_user, 1
-            )
+            ))
             self.assertIn(
-                "INFO:synapse.storage.user_directory:Searching with search term: %s"
+                "INFO:synapse.storage.databases.main.user_directory:Searching with search term: %s"
                 % repr(self.searched_user),
                 "".join(cm.output),
             )
@@ -127,12 +129,13 @@ class WatchaUserDirectoryStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_search_user_dir_with_email(self):
-        yield self.store.user_add_threepid(
+        yield defer.ensureDeferred(self.store.user_add_threepid(
             self.searched_user, "email", "example@example.com", self.time, self.time
-        )
-        sqlResult = yield self.store.search_user_dir(
+        ))
+        sqlResult = yield defer.ensureDeferred(self.store.search_user_dir(
             self.user_id, "example@example.com", 1
-        )
+        ))
+
         self.assertEquals(
             sqlResult["results"],
             [
@@ -151,9 +154,9 @@ class WatchaUserDirectoryStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_search_user_dir_with_displayname(self):
         yield self.store.update_profile_in_user_dir(self.searched_user, "user", None)
-        sqlResult = yield self.store.search_user_dir(
+        sqlResult = yield defer.ensureDeferred(self.store.search_user_dir(
             self.user_id, "user", 1
-        )
+        ))
         self.assertEquals(
             sqlResult["results"],
             [
@@ -172,14 +175,14 @@ class WatchaUserDirectoryStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_search_user_dir_with_user_invite_partner(self):
         # User invite partner :
-        yield self.store.insert_partner_invitation(self.partner_id, self.user_id, 0, 0)
-        yield self.store.user_add_threepid(
+        yield defer.ensureDeferred(self.store.insert_partner_invitation(self.partner_id, self.user_id, 0, 0))
+        yield defer.ensureDeferred(self.store.user_add_threepid(
             self.partner_id, "email", "partner@example.com", self.time, self.time
-        )
+        ))
 
-        sqlResult = yield self.store.search_user_dir(
+        sqlResult = yield defer.ensureDeferred(self.store.search_user_dir(
             self.user_id, "partner@example.com", 1
-        )
+        ))
 
         self.assertEquals(
             sqlResult["results"],
@@ -200,6 +203,6 @@ class WatchaUserDirectoryStoreTestCase(unittest.TestCase):
     def test_search_user_dir_with_user_dont_invite_partner(self):
         # User doesn't invite partner but want to see it on the user directory :
 
-        sqlResult = yield self.store.search_user_dir(self.user_id, self.partner_id, 1)
+        sqlResult = yield defer.ensureDeferred(self.store.search_user_dir(self.user_id, self.partner_id, 1))
         self.assertEquals(sqlResult["results"], [])
-# end of insertion
+# +watcha

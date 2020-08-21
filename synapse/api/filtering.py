@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2017 Vector Creations Ltd
+# Copyright 2018-2019 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,14 +15,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from six import text_type
+from typing import List
 
 import jsonschema
 from canonicaljson import json
 from jsonschema import FormatChecker
 
-from twisted.internet import defer
-
+from synapse.api.constants import EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.storage.presence import UserPresenceState
 from synapse.types import RoomID, UserID
@@ -66,6 +68,10 @@ ROOM_EVENT_FILTER_SCHEMA = {
         "contains_url": {"type": "boolean"},
         "lazy_load_members": {"type": "boolean"},
         "include_redundant_members": {"type": "boolean"},
+        # Include or exclude events with the provided labels.
+        # cf https://github.com/matrix-org/matrix-doc/pull/2326
+        "org.matrix.labels": {"type": "array", "items": {"type": "string"}},
+        "org.matrix.not_labels": {"type": "array", "items": {"type": "string"}},
     },
 }
 
@@ -129,9 +135,8 @@ class Filtering(object):
         super(Filtering, self).__init__()
         self.store = hs.get_datastore()
 
-    @defer.inlineCallbacks
-    def get_user_filter(self, user_localpart, filter_id):
-        result = yield self.store.get_user_filter(user_localpart, filter_id)
+    async def get_user_filter(self, user_localpart, filter_id):
+        result = await self.store.get_user_filter(user_localpart, filter_id)
         return FilterCollection(result)
 
     def add_user_filter(self, user_localpart, user_filter):
@@ -259,6 +264,9 @@ class Filter(object):
 
         self.contains_url = self.filter_json.get("contains_url", None)
 
+        self.labels = self.filter_json.get("org.matrix.labels", None)
+        self.not_labels = self.filter_json.get("org.matrix.not_labels", [])
+
     def filters_all_types(self):
         return "*" in self.not_types
 
@@ -282,6 +290,7 @@ class Filter(object):
             room_id = None
             ev_type = "m.presence"
             contains_url = False
+            labels = []  # type: List[str]
         else:
             sender = event.get("sender", None)
             if not sender:
@@ -299,11 +308,12 @@ class Filter(object):
 
             content = event.get("content", {})
             # check if there is a string url field in the content for filtering purposes
-            contains_url = isinstance(content.get("url"), text_type)
+            contains_url = isinstance(content.get("url"), str)
+            labels = content.get(EventContentFields.LABELS, [])
 
-        return self.check_fields(room_id, sender, ev_type, contains_url)
+        return self.check_fields(room_id, sender, ev_type, labels, contains_url)
 
-    def check_fields(self, room_id, sender, event_type, contains_url):
+    def check_fields(self, room_id, sender, event_type, labels, contains_url):
         """Checks whether the filter matches the given event fields.
 
         Returns:
@@ -313,6 +323,7 @@ class Filter(object):
             "rooms": lambda v: room_id == v,
             "senders": lambda v: sender == v,
             "types": lambda v: _matches_wildcard(event_type, v),
+            "labels": lambda v: v in labels,
         }
 
         for name, match_func in literal_keys.items():

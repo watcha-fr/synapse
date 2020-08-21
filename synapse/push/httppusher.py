@@ -15,20 +15,16 @@
 # limitations under the License.
 import logging
 
-import six
-
 from prometheus_client import Counter
 
-from twisted.internet import defer
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 
+from synapse.api.constants import EventTypes
+from synapse.logging import opentracing
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import PusherConfigException
 
 from . import push_rule_evaluator, push_tools
-
-if six.PY3:
-    long = int
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +59,7 @@ class HttpPusher(object):
     def __init__(self, hs, pusherdict):
         self.hs = hs
         self.store = self.hs.get_datastore()
+        self.storage = self.hs.get_storage()
         self.clock = self.hs.get_clock()
         self.state_handler = self.hs.get_state_handler()
         self.user_id = pusherdict["user_name"]
@@ -101,7 +98,7 @@ class HttpPusher(object):
         if "url" not in self.data:
             raise PusherConfigException("'url' required in data for HTTP pusher")
         self.url = self.data["url"]
-        self.http_client = hs.get_simple_http_client()
+        self.http_client = hs.get_proxied_http_client()
         self.data_minus_url = {}
         self.data_minus_url.update(self.data)
         del self.data_minus_url["url"]
@@ -130,10 +127,11 @@ class HttpPusher(object):
         # but currently that's the only type of receipt anyway...
         run_as_background_process("http_pusher.on_new_receipts", self._update_badge)
 
-    @defer.inlineCallbacks
-    def _update_badge(self):
-        badge = yield push_tools.get_badge_count(self.hs.get_datastore(), self.user_id)
-        yield self._send_badge(badge)
+    async def _update_badge(self):
+        # XXX as per https://github.com/matrix-org/matrix-doc/issues/2627, this seems
+        # to be largely redundant. perhaps we can remove it.
+        badge = await push_tools.get_badge_count(self.hs.get_datastore(), self.user_id)
+        await self._send_badge(badge)
 
     def on_timer(self):
         self._start_processing()
@@ -152,8 +150,7 @@ class HttpPusher(object):
 
         run_as_background_process("httppush.process", self._process)
 
-    @defer.inlineCallbacks
-    def _process(self):
+    async def _process(self):
         # we should never get here if we are already processing
         assert not self._is_processing
 
@@ -164,7 +161,7 @@ class HttpPusher(object):
             while True:
                 starting_max_ordering = self.max_stream_ordering
                 try:
-                    yield self._unsafe_process()
+                    await self._unsafe_process()
                 except Exception:
                     logger.exception("Exception processing notifs")
                 if self.max_stream_ordering == starting_max_ordering:
@@ -172,8 +169,7 @@ class HttpPusher(object):
         finally:
             self._is_processing = False
 
-    @defer.inlineCallbacks
-    def _unsafe_process(self):
+    async def _unsafe_process(self):
         """
         Looks for unset notifications and dispatch them, in order
         Never call this directly: use _process which will only allow this to
@@ -181,7 +177,7 @@ class HttpPusher(object):
         """
 
         fn = self.store.get_unread_push_actions_for_user_in_range_for_http
-        unprocessed = yield fn(
+        unprocessed = await fn(
             self.user_id, self.last_stream_ordering, self.max_stream_ordering
         )
 
@@ -194,19 +190,27 @@ class HttpPusher(object):
         )
 
         for push_action in unprocessed:
-            processed = yield self._process_one(push_action)
+            with opentracing.start_active_span(
+                "http-push",
+                tags={
+                    "authenticated_entity": self.user_id,
+                    "event_id": push_action["event_id"],
+                    "app_id": self.app_id,
+                    "app_display_name": self.app_display_name,
+                },
+            ):
+                processed = await self._process_one(push_action)
+
             if processed:
                 http_push_processed_counter.inc()
                 self.backoff_delay = HttpPusher.INITIAL_BACKOFF_SEC
                 self.last_stream_ordering = push_action["stream_ordering"]
-                pusher_still_exists = (
-                    yield self.store.update_pusher_last_stream_ordering_and_success(
-                        self.app_id,
-                        self.pushkey,
-                        self.user_id,
-                        self.last_stream_ordering,
-                        self.clock.time_msec(),
-                    )
+                pusher_still_exists = await self.store.update_pusher_last_stream_ordering_and_success(
+                    self.app_id,
+                    self.pushkey,
+                    self.user_id,
+                    self.last_stream_ordering,
+                    self.clock.time_msec(),
                 )
                 if not pusher_still_exists:
                     # The pusher has been deleted while we were processing, so
@@ -216,14 +220,14 @@ class HttpPusher(object):
 
                 if self.failing_since:
                     self.failing_since = None
-                    yield self.store.update_pusher_failing_since(
+                    await self.store.update_pusher_failing_since(
                         self.app_id, self.pushkey, self.user_id, self.failing_since
                     )
             else:
                 http_push_failed_counter.inc()
                 if not self.failing_since:
                     self.failing_since = self.clock.time_msec()
-                    yield self.store.update_pusher_failing_since(
+                    await self.store.update_pusher_failing_since(
                         self.app_id, self.pushkey, self.user_id, self.failing_since
                     )
 
@@ -235,14 +239,14 @@ class HttpPusher(object):
                     # we really only give up so that if the URL gets
                     # fixed, we don't suddenly deliver a load
                     # of old notifications.
-                    logger.warn(
-                        "Giving up on a notification to user %s, " "pushkey %s",
+                    logger.warning(
+                        "Giving up on a notification to user %s, pushkey %s",
                         self.user_id,
                         self.pushkey,
                     )
                     self.backoff_delay = HttpPusher.INITIAL_BACKOFF_SEC
                     self.last_stream_ordering = push_action["stream_ordering"]
-                    pusher_still_exists = yield self.store.update_pusher_last_stream_ordering(
+                    pusher_still_exists = await self.store.update_pusher_last_stream_ordering(
                         self.app_id,
                         self.pushkey,
                         self.user_id,
@@ -255,7 +259,7 @@ class HttpPusher(object):
                         return
 
                     self.failing_since = None
-                    yield self.store.update_pusher_failing_since(
+                    await self.store.update_pusher_failing_since(
                         self.app_id, self.pushkey, self.user_id, self.failing_since
                     )
                 else:
@@ -268,18 +272,17 @@ class HttpPusher(object):
                     )
                     break
 
-    @defer.inlineCallbacks
-    def _process_one(self, push_action):
+    async def _process_one(self, push_action):
         if "notify" not in push_action["actions"]:
             return True
 
         tweaks = push_rule_evaluator.tweaks_for_actions(push_action["actions"])
-        badge = yield push_tools.get_badge_count(self.hs.get_datastore(), self.user_id)
+        badge = await push_tools.get_badge_count(self.hs.get_datastore(), self.user_id)
 
-        event = yield self.store.get_event(push_action["event_id"], allow_none=True)
+        event = await self.store.get_event(push_action["event_id"], allow_none=True)
         if event is None:
             return True  # It's been redacted
-        rejected = yield self.dispatch_push(event, tweaks, badge)
+        rejected = await self.dispatch_push(event, tweaks, badge)
         if rejected is False:
             return False
 
@@ -288,28 +291,37 @@ class HttpPusher(object):
                 if pk != self.pushkey:
                     # for sanity, we only remove the pushkey if it
                     # was the one we actually sent...
-                    logger.warn(
-                        ("Ignoring rejected pushkey %s because we" " didn't send it"),
-                        pk,
+                    logger.warning(
+                        ("Ignoring rejected pushkey %s because we didn't send it"), pk,
                     )
                 else:
                     logger.info("Pushkey %s was rejected: removing", pk)
-                    yield self.hs.remove_pusher(self.app_id, pk, self.user_id)
+                    await self.hs.remove_pusher(self.app_id, pk, self.user_id)
         return True
 
-    @defer.inlineCallbacks
-    def _build_notification_dict(self, event, tweaks, badge):
+    async def _build_notification_dict(self, event, tweaks, badge):
+        priority = "low"
+        if (
+            event.type == EventTypes.Encrypted
+            or tweaks.get("highlight")
+            or tweaks.get("sound")
+        ):
+            # HACK send our push as high priority only if it generates a sound, highlight
+            #  or may do so (i.e. is encrypted so has unknown effects).
+            priority = "high"
+
         if self.data.get("format") == "event_id_only":
             d = {
                 "notification": {
                     "event_id": event.event_id,
                     "room_id": event.room_id,
                     "counts": {"unread": badge},
+                    "prio": priority,
                     "devices": [
                         {
                             "app_id": self.app_id,
                             "pushkey": self.pushkey,
-                            "pushkey_ts": long(self.pushkey_ts / 1000),
+                            "pushkey_ts": int(self.pushkey_ts / 1000),
                             "data": self.data_minus_url,
                         }
                     ],
@@ -317,8 +329,8 @@ class HttpPusher(object):
             }
             return d
 
-        ctx = yield push_tools.get_context_for_event(
-            self.store, self.state_handler, event, self.user_id
+        ctx = await push_tools.get_context_for_event(
+            self.storage, self.state_handler, event, self.user_id
         )
 
         d = {
@@ -328,9 +340,8 @@ class HttpPusher(object):
                 "room_id": event.room_id,
                 "type": event.type,
                 "sender": event.user_id,
-                "counts": {  # -- we don't mark messages as read yet so
-                    # we have no way of knowing
-                    # Just set the badge to 1 until we have read receipts
+                "prio": priority,
+                "counts": {
                     "unread": badge,
                     # 'missed_calls': 2
                 },
@@ -338,7 +349,7 @@ class HttpPusher(object):
                     {
                         "app_id": self.app_id,
                         "pushkey": self.pushkey,
-                        "pushkey_ts": long(self.pushkey_ts / 1000),
+                        "pushkey_ts": int(self.pushkey_ts / 1000),
                         "data": self.data_minus_url,
                         "tweaks": tweaks,
                     }
@@ -360,13 +371,12 @@ class HttpPusher(object):
 
         return d
 
-    @defer.inlineCallbacks
-    def dispatch_push(self, event, tweaks, badge):
-        notification_dict = yield self._build_notification_dict(event, tweaks, badge)
+    async def dispatch_push(self, event, tweaks, badge):
+        notification_dict = await self._build_notification_dict(event, tweaks, badge)
         if not notification_dict:
             return []
         try:
-            resp = yield self.http_client.post_json_get_json(
+            resp = await self.http_client.post_json_get_json(
                 self.url, notification_dict
             )
         except Exception as e:
@@ -383,13 +393,12 @@ class HttpPusher(object):
             rejected = resp["rejected"]
         return rejected
 
-    @defer.inlineCallbacks
-    def _send_badge(self, badge):
+    async def _send_badge(self, badge):
         """
         Args:
             badge (int): number of unread messages
         """
-        logger.info("Sending updated badge count %d to %s", badge, self.name)
+        logger.debug("Sending updated badge count %d to %s", badge, self.name)
         d = {
             "notification": {
                 "id": "",
@@ -400,14 +409,14 @@ class HttpPusher(object):
                     {
                         "app_id": self.app_id,
                         "pushkey": self.pushkey,
-                        "pushkey_ts": long(self.pushkey_ts / 1000),
+                        "pushkey_ts": int(self.pushkey_ts / 1000),
                         "data": self.data_minus_url,
                     }
                 ],
             }
         }
         try:
-            yield self.http_client.post_json_get_json(self.url, d)
+            await self.http_client.post_json_get_json(self.url, d)
             http_badges_processed_counter.inc()
         except Exception as e:
             logger.warning(

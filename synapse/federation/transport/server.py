@@ -18,11 +18,9 @@
 import functools
 import logging
 import re
-
-from twisted.internet.defer import maybeDeferred
+from typing import Optional, Tuple, Type
 
 import synapse
-import synapse.logging.opentracing as opentracing
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.room_versions import RoomVersions
 from synapse.api.urls import (
@@ -39,6 +37,13 @@ from synapse.http.servlet import (
     parse_string_from_args,
 )
 from synapse.logging.context import run_in_background
+from synapse.logging.opentracing import (
+    start_active_span,
+    start_active_span_from_request,
+    tags,
+    whitelisted_homeserver,
+)
+from synapse.server import HomeServer
 from synapse.types import ThirdPartyInstanceID, get_domain_from_id
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.versionstring import get_version_string
@@ -96,12 +101,17 @@ class NoAuthenticationError(AuthenticationError):
 
 
 class Authenticator(object):
-    def __init__(self, hs):
+    def __init__(self, hs: HomeServer):
         self._clock = hs.get_clock()
         self.keyring = hs.get_keyring()
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
         self.federation_domain_whitelist = hs.config.federation_domain_whitelist
+        self.notifier = hs.get_notifier()
+
+        self.replication_client = None
+        if hs.config.worker.worker_app:
+            self.replication_client = hs.get_tcp_replication()
 
     # A method just so we can pass 'self' as the authenticator to the Servlets
     async def authenticate_request(self, request, content):
@@ -146,7 +156,7 @@ class Authenticator(object):
             origin, json_request, now, "Incoming request"
         )
 
-        logger.info("Request from %s", origin)
+        logger.debug("Request from %s", origin)
         request.authenticated_entity = origin
 
         # If we get a valid signed request from the other side, its probably
@@ -160,7 +170,18 @@ class Authenticator(object):
     async def _reset_retry_timings(self, origin):
         try:
             logger.info("Marking origin %r as up", origin)
-            await self.store.set_destination_retry_timings(origin, 0, 0)
+            await self.store.set_destination_retry_timings(origin, None, 0, 0)
+
+            # Inform the relevant places that the remote server is back up.
+            self.notifier.notify_remote_server_up(origin)
+            if self.replication_client:
+                # If we're on a worker we try and inform master about this. The
+                # replication client doesn't hook into the notifier to avoid
+                # infinite loops where we send a `REMOTE_SERVER_UP` command to
+                # master, which then echoes it back to us which in turn pokes
+                # the notifier.
+                self.replication_client.send_remote_server_up(origin)
+
         except Exception:
             logger.exception("Error resetting retry timings on %s", origin)
 
@@ -197,7 +218,7 @@ def _parse_auth_header(header_bytes):
         sig = strip_quotes(param_dict["sig"])
         return origin, key, sig
     except Exception as e:
-        logger.warn(
+        logger.warning(
             "Error parsing auth header '%s': %s",
             header_bytes.decode("ascii", "replace"),
             e,
@@ -245,6 +266,8 @@ class BaseFederationServlet(object):
                 returned.
     """
 
+    PATH = ""  # Overridden in subclasses, the regex to match against the path.
+
     REQUIRE_AUTH = True
 
     PREFIX = FEDERATION_V1_PREFIX  # Allows specifying the API version
@@ -282,28 +305,45 @@ class BaseFederationServlet(object):
             except NoAuthenticationError:
                 origin = None
                 if self.REQUIRE_AUTH:
-                    logger.warn("authenticate_request failed: missing authentication")
+                    logger.warning(
+                        "authenticate_request failed: missing authentication"
+                    )
                     raise
             except Exception as e:
-                logger.warn("authenticate_request failed: %s", e)
+                logger.warning("authenticate_request failed: %s", e)
                 raise
 
-            # Start an opentracing span
-            with opentracing.start_active_span_from_context(
-                request.requestHeaders,
-                "incoming-federation-request",
-                tags={
-                    "request_id": request.get_request_id(),
-                    opentracing.tags.SPAN_KIND: opentracing.tags.SPAN_KIND_RPC_SERVER,
-                    opentracing.tags.HTTP_METHOD: request.get_method(),
-                    opentracing.tags.HTTP_URL: request.get_redacted_uri(),
-                    opentracing.tags.PEER_HOST_IPV6: request.getClientIP(),
-                    "authenticated_entity": origin,
-                },
-            ):
+            request_tags = {
+                "request_id": request.get_request_id(),
+                tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
+                tags.HTTP_METHOD: request.get_method(),
+                tags.HTTP_URL: request.get_redacted_uri(),
+                tags.PEER_HOST_IPV6: request.getClientIP(),
+                "authenticated_entity": origin,
+                "servlet_name": request.request_metrics.name,
+            }
+
+            # Only accept the span context if the origin is authenticated
+            # and whitelisted
+            if origin and whitelisted_homeserver(origin):
+                scope = start_active_span_from_request(
+                    request, "incoming-federation-request", tags=request_tags
+                )
+            else:
+                scope = start_active_span(
+                    "incoming-federation-request", tags=request_tags
+                )
+
+            with scope:
                 if origin:
                     with ratelimiter.ratelimit(origin) as d:
                         await d
+                        if request._disconnected:
+                            logger.warning(
+                                "client disconnected before we started processing "
+                                "request"
+                            )
+                            return -1, None
                         response = await func(
                             origin, content, request.args, *args, **kwargs
                         )
@@ -313,9 +353,6 @@ class BaseFederationServlet(object):
                     )
 
             return response
-
-        # Extra logic that functools.wraps() doesn't finish
-        new_func.__self__ = func.__self__
 
         return new_func
 
@@ -328,7 +365,7 @@ class BaseFederationServlet(object):
                 continue
 
             server.register_paths(
-                method, (pattern,), self._wrap(code), self.__class__.__name__
+                method, (pattern,), self._wrap(code), self.__class__.__name__,
             )
 
 
@@ -401,7 +438,7 @@ class FederationEventServlet(BaseFederationServlet):
         return await self.handler.on_pdu_request(origin, event_id)
 
 
-class FederationStateServlet(BaseFederationServlet):
+class FederationStateV1Servlet(BaseFederationServlet):
     PATH = "/state/(?P<context>[^/]*)/?"
 
     # This is when someone asks for all data for a given context.
@@ -409,7 +446,7 @@ class FederationStateServlet(BaseFederationServlet):
         return await self.handler.on_context_state_request(
             origin,
             context,
-            parse_string_from_args(query, "event_id", None, required=True),
+            parse_string_from_args(query, "event_id", None, required=False),
         )
 
 
@@ -486,8 +523,18 @@ class FederationMakeLeaveServlet(BaseFederationServlet):
         return 200, content
 
 
-class FederationSendLeaveServlet(BaseFederationServlet):
+class FederationV1SendLeaveServlet(BaseFederationServlet):
     PATH = "/send_leave/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+
+    async def on_PUT(self, origin, content, query, room_id, event_id):
+        content = await self.handler.on_send_leave_request(origin, content, room_id)
+        return 200, (200, content)
+
+
+class FederationV2SendLeaveServlet(BaseFederationServlet):
+    PATH = "/send_leave/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+
+    PREFIX = FEDERATION_V2_PREFIX
 
     async def on_PUT(self, origin, content, query, room_id, event_id):
         content = await self.handler.on_send_leave_request(origin, content, room_id)
@@ -501,8 +548,20 @@ class FederationEventAuthServlet(BaseFederationServlet):
         return await self.handler.on_event_auth(origin, context, event_id)
 
 
-class FederationSendJoinServlet(BaseFederationServlet):
+class FederationV1SendJoinServlet(BaseFederationServlet):
     PATH = "/send_join/(?P<context>[^/]*)/(?P<event_id>[^/]*)"
+
+    async def on_PUT(self, origin, content, query, context, event_id):
+        # TODO(paul): assert that context/event_id parsed from path actually
+        #   match those given in content
+        content = await self.handler.on_send_join_request(origin, content, context)
+        return 200, (200, content)
+
+
+class FederationV2SendJoinServlet(BaseFederationServlet):
+    PATH = "/send_join/(?P<context>[^/]*)/(?P<event_id>[^/]*)"
+
+    PREFIX = FEDERATION_V2_PREFIX
 
     async def on_PUT(self, origin, content, query, context, event_id):
         # TODO(paul): assert that context/event_id parsed from path actually
@@ -520,7 +579,7 @@ class FederationV1InviteServlet(BaseFederationServlet):
         # state resolution algorithm, and we don't use that for processing
         # invites
         content = await self.handler.on_invite_request(
-            origin, content, room_version=RoomVersions.V1.identifier
+            origin, content, room_version_id=RoomVersions.V1.identifier
         )
 
         # V1 federation API is defined to return a content of `[200, {...}]`
@@ -547,7 +606,7 @@ class FederationV2InviteServlet(BaseFederationServlet):
         event.setdefault("unsigned", {})["invite_room_state"] = invite_room_state
 
         content = await self.handler.on_invite_request(
-            origin, event, room_version=room_version
+            origin, event, room_version_id=room_version
         )
         return 200, content
 
@@ -557,7 +616,7 @@ class FederationThirdPartyInviteExchangeServlet(BaseFederationServlet):
 
     async def on_PUT(self, origin, content, query, room_id):
         content = await self.handler.on_exchange_third_party_invite_request(
-            origin, room_id, content
+            room_id, content
         )
         return 200, content
 
@@ -582,17 +641,6 @@ class FederationClientKeysClaimServlet(BaseFederationServlet):
     async def on_POST(self, origin, content, query):
         response = await self.handler.on_claim_client_keys(origin, content)
         return 200, response
-
-
-class FederationQueryAuthServlet(BaseFederationServlet):
-    PATH = "/query_auth/(?P<context>[^/]*)/(?P<event_id>[^/]*)"
-
-    async def on_POST(self, origin, content, query, context, event_id):
-        new_content = await self.handler.on_query_auth_request(
-            origin, content, context, event_id
-        )
-
-        return 200, new_content
 
 
 class FederationGetMissingEventsServlet(BaseFederationServlet):
@@ -694,7 +742,7 @@ class PublicRoomList(BaseFederationServlet):
 
     This API returns information in the same format as /publicRooms on the
     client API, but will only ever include local public rooms and hence is
-    intended for consumption by other home servers.
+    intended for consumption by other homeservers.
 
     GET /publicRooms HTTP/1.1
 
@@ -747,13 +795,53 @@ class PublicRoomList(BaseFederationServlet):
         else:
             network_tuple = ThirdPartyInstanceID(None, None)
 
-        data = await maybeDeferred(
-            self.handler.get_local_public_room_list,
-            limit,
-            since_token,
+        if limit == 0:
+            # zero is a special value which corresponds to no limit.
+            limit = None
+
+        data = await self.handler.get_local_public_room_list(
+            limit, since_token, network_tuple=network_tuple, from_federation=True
+        )
+        return 200, data
+
+    async def on_POST(self, origin, content, query):
+        # This implements MSC2197 (Search Filtering over Federation)
+        if not self.allow_access:
+            raise FederationDeniedError(origin)
+
+        limit = int(content.get("limit", 100))  # type: Optional[int]
+        since_token = content.get("since", None)
+        search_filter = content.get("filter", None)
+
+        include_all_networks = content.get("include_all_networks", False)
+        third_party_instance_id = content.get("third_party_instance_id", None)
+
+        if include_all_networks:
+            network_tuple = None
+            if third_party_instance_id is not None:
+                raise SynapseError(
+                    400, "Can't use include_all_networks with an explicit network"
+                )
+        elif third_party_instance_id is None:
+            network_tuple = ThirdPartyInstanceID(None, None)
+        else:
+            network_tuple = ThirdPartyInstanceID.from_string(third_party_instance_id)
+
+        if search_filter is None:
+            logger.warning("Nonefilter")
+
+        if limit == 0:
+            # zero is a special value which corresponds to no limit.
+            limit = None
+
+        data = await self.handler.get_local_public_room_list(
+            limit=limit,
+            since_token=since_token,
+            search_filter=search_filter,
             network_tuple=network_tuple,
             from_federation=True,
         )
+
         return 200, data
 
 
@@ -868,7 +956,7 @@ class FederationGroupsAddRoomsConfigServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        result = await self.groups_handler.update_room_in_group(
+        result = await self.handler.update_room_in_group(
             group_id, requester_user_id, room_id, config_key, content
         )
 
@@ -1296,18 +1384,19 @@ class RoomComplexityServlet(BaseFederationServlet):
 FEDERATION_SERVLET_CLASSES = (
     FederationSendServlet,
     FederationEventServlet,
-    FederationStateServlet,
+    FederationStateV1Servlet,
     FederationStateIdsServlet,
     FederationBackfillServlet,
     FederationQueryServlet,
     FederationMakeJoinServlet,
     FederationMakeLeaveServlet,
     FederationEventServlet,
-    FederationSendJoinServlet,
-    FederationSendLeaveServlet,
+    FederationV1SendJoinServlet,
+    FederationV2SendJoinServlet,
+    FederationV1SendLeaveServlet,
+    FederationV2SendLeaveServlet,
     FederationV1InviteServlet,
     FederationV2InviteServlet,
-    FederationQueryAuthServlet,
     FederationGetMissingEventsServlet,
     FederationEventAuthServlet,
     FederationClientKeysQueryServlet,
@@ -1317,11 +1406,13 @@ FEDERATION_SERVLET_CLASSES = (
     On3pidBindServlet,
     FederationVersionServlet,
     RoomComplexityServlet,
-)
+)  # type: Tuple[Type[BaseFederationServlet], ...]
 
-OPENID_SERVLET_CLASSES = (OpenIdUserInfo,)
+OPENID_SERVLET_CLASSES = (
+    OpenIdUserInfo,
+)  # type: Tuple[Type[BaseFederationServlet], ...]
 
-ROOM_LIST_CLASSES = (PublicRoomList,)
+ROOM_LIST_CLASSES = (PublicRoomList,)  # type: Tuple[Type[PublicRoomList], ...]
 
 GROUP_SERVER_SERVLET_CLASSES = (
     FederationGroupsProfileServlet,
@@ -1342,17 +1433,19 @@ GROUP_SERVER_SERVLET_CLASSES = (
     FederationGroupsAddRoomsServlet,
     FederationGroupsAddRoomsConfigServlet,
     FederationGroupsSettingJoinPolicyServlet,
-)
+)  # type: Tuple[Type[BaseFederationServlet], ...]
 
 
 GROUP_LOCAL_SERVLET_CLASSES = (
     FederationGroupsLocalInviteServlet,
     FederationGroupsRemoveLocalUserServlet,
     FederationGroupsBulkPublicisedServlet,
-)
+)  # type: Tuple[Type[BaseFederationServlet], ...]
 
 
-GROUP_ATTESTATION_SERVLET_CLASSES = (FederationGroupsRenewAttestaionServlet,)
+GROUP_ATTESTATION_SERVLET_CLASSES = (
+    FederationGroupsRenewAttestaionServlet,
+)  # type: Tuple[Type[BaseFederationServlet], ...]
 
 DEFAULT_SERVLET_GROUPS = (
     "federation",

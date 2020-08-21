@@ -84,18 +84,16 @@ def compute_registration_token(user, email=None, password=None):
 # (to keep a copy of the received emails)
 BCC_TO='registration+sent@watcha.fr'
 
-@defer.inlineCallbacks
-def create_display_inviter_name(hs, inviter):
+async def create_display_inviter_name(hs, inviter):
 
     # TODO: Test why was:
     # inviter_room_state = yield hs.get_state_handler().get_current_state(room_id)
     # inviter_member_event = inviter_room_state.get((EventTypes.Member, inviter.to_string()))
     # inviter_display_name = inviter_member_event.content.get("displayname", "") if inviter_member_event else ""
     # instead of:
-    # inviter_display_name = yield hs.get_profile_handler().get_displayname(inviter)
+    inviter_display_name = await hs.get_profile_handler().get_displayname(inviter)
     # which seems to work too..
-    inviter_display_name = yield hs.get_profile_handler().get_displayname(inviter)
-    inviter_threepids = yield hs.get_datastore().user_get_threepids(inviter.to_string())
+    inviter_threepids = await hs.get_datastore().user_get_threepids(inviter.to_string())
     inviter_emails = [ threepid["address"] for threepid in inviter_threepids if threepid["medium"] == "email"]
     inviter_email = inviter_emails[0] if inviter_emails else ""
     inviter_name = (
@@ -110,10 +108,10 @@ def create_display_inviter_name(hs, inviter):
         if inviter_display_name
         else inviter_email
     )
-    defer.returnValue(inviter_name)
+    return inviter_name
 
 
-def send_registration_email(
+async def send_registration_email(
     config, recipient, template_name, token, inviter_name, full_name
 ):
     """
@@ -152,12 +150,12 @@ def send_registration_email(
         'preventlinks': lambda text: text.replace(
             ".", "<a class=\"prevent-link\" href=\"#\">.</a>"
         ),
-        'spacebefore': lambda text: (" " + text) if text else "",        
+        'spacebefore': lambda text: (" " + text) if text else "",
         'b64content': lambda file_name: base64.b64encode(
             Path(TEMPLATE_DIR, file_name).read_bytes()
         ).decode()
     })
-    
+
     subject = jinjaenv.get_template(template_name + "_subject.j2").render(fields)
     fields["title"] = subject
 
@@ -172,8 +170,8 @@ def send_registration_email(
         body = jinjaenv.get_template(template_name + ".j2").render(fields)
         # suggested by https://www.htmlemailcheck.com/check/
         # (as well as ".ExternalClass" in the CSS)
-        body = body.replace('<div>', '<div style="mso-line-height-rule:exactly;">') 
-       
+        body = body.replace('<div>', '<div style="mso-line-height-rule:exactly;">')
+
         message.attach(MIMEText(body, mimetype, "utf-8"))
         # useful for debugging...
         #Path("/tmp", f"{template_name}.{mimetype}").write_text(body)

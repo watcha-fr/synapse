@@ -25,6 +25,7 @@ from synapse.appservice.scheduler import (
 from synapse.logging.context import make_deferred_yieldable
 
 from tests import unittest
+from tests.test_utils import make_awaitable
 
 from ..utils import MockClock
 
@@ -37,11 +38,9 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
         self.recoverer = Mock()
         self.recoverer_fn = Mock(return_value=self.recoverer)
         self.txnctrl = _TransactionController(
-            clock=self.clock,
-            store=self.store,
-            as_api=self.as_api,
-            recoverer_fn=self.recoverer_fn,
+            clock=self.clock, store=self.store, as_api=self.as_api
         )
+        self.txnctrl.RECOVERER_CLASS = self.recoverer_fn
 
     def test_single_service_up_txn_sent(self):
         # Test: The AS is up and the txn is successfully sent.
@@ -54,11 +53,11 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
         self.store.get_appservice_state = Mock(
             return_value=defer.succeed(ApplicationServiceState.UP)
         )
-        txn.send = Mock(return_value=defer.succeed(True))
+        txn.send = Mock(return_value=make_awaitable(True))
         self.store.create_appservice_txn = Mock(return_value=defer.succeed(txn))
 
         # actual call
-        self.txnctrl.send(service, events)
+        self.successResultOf(defer.ensureDeferred(self.txnctrl.send(service, events)))
 
         self.store.create_appservice_txn.assert_called_once_with(
             service=service, events=events  # txn made and saved
@@ -79,7 +78,7 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
         self.store.create_appservice_txn = Mock(return_value=defer.succeed(txn))
 
         # actual call
-        self.txnctrl.send(service, events)
+        self.successResultOf(defer.ensureDeferred(self.txnctrl.send(service, events)))
 
         self.store.create_appservice_txn.assert_called_once_with(
             service=service, events=events  # txn made and saved
@@ -100,11 +99,11 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
             return_value=defer.succeed(ApplicationServiceState.UP)
         )
         self.store.set_appservice_state = Mock(return_value=defer.succeed(True))
-        txn.send = Mock(return_value=defer.succeed(False))  # fails to send
+        txn.send = Mock(return_value=make_awaitable(False))  # fails to send
         self.store.create_appservice_txn = Mock(return_value=defer.succeed(txn))
 
         # actual call
-        self.txnctrl.send(service, events)
+        self.successResultOf(defer.ensureDeferred(self.txnctrl.send(service, events)))
 
         self.store.create_appservice_txn.assert_called_once_with(
             service=service, events=events
@@ -146,7 +145,8 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
         self.recoverer.recover()
         # shouldn't have called anything prior to waiting for exp backoff
         self.assertEquals(0, self.store.get_oldest_unsent_txn.call_count)
-        txn.send = Mock(return_value=True)
+        txn.send = Mock(return_value=make_awaitable(True))
+        txn.complete.return_value = make_awaitable(None)
         # wait for exp backoff
         self.clock.advance_time(2)
         self.assertEquals(1, txn.send.call_count)
@@ -171,7 +171,8 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
 
         self.recoverer.recover()
         self.assertEquals(0, self.store.get_oldest_unsent_txn.call_count)
-        txn.send = Mock(return_value=False)
+        txn.send = Mock(return_value=make_awaitable(False))
+        txn.complete.return_value = make_awaitable(None)
         self.clock.advance_time(2)
         self.assertEquals(1, txn.send.call_count)
         self.assertEquals(0, txn.complete.call_count)
@@ -184,7 +185,7 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
         self.assertEquals(3, txn.send.call_count)
         self.assertEquals(0, txn.complete.call_count)
         self.assertEquals(0, self.callback.call_count)
-        txn.send = Mock(return_value=True)  # successfully send the txn
+        txn.send = Mock(return_value=make_awaitable(True))  # successfully send the txn
         pop_txn = True  # returns the txn the first time, then no more.
         self.clock.advance_time(16)
         self.assertEquals(1, txn.send.call_count)  # new mock reset call count

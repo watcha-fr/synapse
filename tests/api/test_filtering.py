@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2017 Vector Creations Ltd
+# Copyright 2018-2019 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,9 +22,10 @@ import jsonschema
 
 from twisted.internet import defer
 
+from synapse.api.constants import EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
-from synapse.events import FrozenEvent
+from synapse.events import make_event_from_dict
 
 from tests import unittest
 from tests.utils import DeferredMockCallable, MockHttpResource, setup_test_homeserver
@@ -34,7 +38,7 @@ def MockEvent(**kwargs):
         kwargs["event_id"] = "fake_event_id"
     if "type" not in kwargs:
         kwargs["type"] = "fake_type"
-    return FrozenEvent(kwargs)
+    return make_event_from_dict(kwargs)
 
 
 class FilteringTestCase(unittest.TestCase):
@@ -95,6 +99,8 @@ class FilteringTestCase(unittest.TestCase):
                         "types": ["m.room.message"],
                         "not_rooms": ["!726s6s6q:example.com"],
                         "not_senders": ["@spam:example.com"],
+                        "org.matrix.labels": ["#fun"],
+                        "org.matrix.not_labels": ["#work"],
                     },
                     "ephemeral": {
                         "types": ["m.receipt", "m.typing"],
@@ -320,6 +326,46 @@ class FilteringTestCase(unittest.TestCase):
         )
         self.assertFalse(Filter(definition).check(event))
 
+    def test_filter_labels(self):
+        definition = {"org.matrix.labels": ["#fun"]}
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content={EventContentFields.LABELS: ["#fun"]},
+        )
+
+        self.assertTrue(Filter(definition).check(event))
+
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content={EventContentFields.LABELS: ["#notfun"]},
+        )
+
+        self.assertFalse(Filter(definition).check(event))
+
+    def test_filter_not_labels(self):
+        definition = {"org.matrix.not_labels": ["#fun"]}
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content={EventContentFields.LABELS: ["#fun"]},
+        )
+
+        self.assertFalse(Filter(definition).check(event))
+
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content={EventContentFields.LABELS: ["#notfun"]},
+        )
+
+        self.assertTrue(Filter(definition).check(event))
+
     @defer.inlineCallbacks
     def test_filter_presence_match(self):
         user_filter_json = {"presence": {"types": ["m.*"]}}
@@ -329,8 +375,10 @@ class FilteringTestCase(unittest.TestCase):
         event = MockEvent(sender="@foo:bar", type="m.profile")
         events = [event]
 
-        user_filter = yield self.filtering.get_user_filter(
-            user_localpart=user_localpart, filter_id=filter_id
+        user_filter = yield defer.ensureDeferred(
+            self.filtering.get_user_filter(
+                user_localpart=user_localpart, filter_id=filter_id
+            )
         )
 
         results = user_filter.filter_presence(events=events)
@@ -350,8 +398,10 @@ class FilteringTestCase(unittest.TestCase):
         )
         events = [event]
 
-        user_filter = yield self.filtering.get_user_filter(
-            user_localpart=user_localpart + "2", filter_id=filter_id
+        user_filter = yield defer.ensureDeferred(
+            self.filtering.get_user_filter(
+                user_localpart=user_localpart + "2", filter_id=filter_id
+            )
         )
 
         results = user_filter.filter_presence(events=events)
@@ -366,8 +416,10 @@ class FilteringTestCase(unittest.TestCase):
         event = MockEvent(sender="@foo:bar", type="m.room.topic", room_id="!foo:bar")
         events = [event]
 
-        user_filter = yield self.filtering.get_user_filter(
-            user_localpart=user_localpart, filter_id=filter_id
+        user_filter = yield defer.ensureDeferred(
+            self.filtering.get_user_filter(
+                user_localpart=user_localpart, filter_id=filter_id
+            )
         )
 
         results = user_filter.filter_room_state(events=events)
@@ -384,8 +436,10 @@ class FilteringTestCase(unittest.TestCase):
         )
         events = [event]
 
-        user_filter = yield self.filtering.get_user_filter(
-            user_localpart=user_localpart, filter_id=filter_id
+        user_filter = yield defer.ensureDeferred(
+            self.filtering.get_user_filter(
+                user_localpart=user_localpart, filter_id=filter_id
+            )
         )
 
         results = user_filter.filter_room_state(events)
@@ -419,8 +473,10 @@ class FilteringTestCase(unittest.TestCase):
         self.assertEquals(
             user_filter_json,
             (
-                yield self.datastore.get_user_filter(
-                    user_localpart=user_localpart, filter_id=0
+                yield defer.ensureDeferred(
+                    self.datastore.get_user_filter(
+                        user_localpart=user_localpart, filter_id=0
+                    )
                 )
             ),
         )
@@ -433,8 +489,10 @@ class FilteringTestCase(unittest.TestCase):
             user_localpart=user_localpart, user_filter=user_filter_json
         )
 
-        filter = yield self.filtering.get_user_filter(
-            user_localpart=user_localpart, filter_id=filter_id
+        filter = yield defer.ensureDeferred(
+            self.filtering.get_user_filter(
+                user_localpart=user_localpart, filter_id=filter_id
+            )
         )
 
         self.assertEquals(filter.get_filter_json(), user_filter_json)

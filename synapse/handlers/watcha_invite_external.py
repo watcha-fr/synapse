@@ -31,10 +31,9 @@ class InviteExternalHandler(BaseHandler):
         )
         return user_id
 
-    @defer.inlineCallbacks
-    def invite(self, room_id, inviter, inviter_device_id, invitee):
+    async def invite(self, room_id, inviter, inviter_device_id, invitee):
 
-        full_user_id = yield self.hs.get_auth_handler().find_user_id_by_email(invitee)
+        full_user_id = await self.hs.get_auth_handler().find_user_id_by_email(invitee)
 
         # the user already exists. it is an internal user or an external user.
         if full_user_id:
@@ -46,7 +45,7 @@ class InviteExternalHandler(BaseHandler):
             )
 
             user = UserID.from_string(full_user_id)
-            yield self.hs.get_room_member_handler().update_membership(
+            await self.hs.get_room_member_handler().update_membership(
                 requester=create_requester(inviter.to_string()),
                 target=user,
                 room_id=room_id,
@@ -64,7 +63,7 @@ class InviteExternalHandler(BaseHandler):
 
             # only send email if that user is external.
             # this restriction can be removed once internal users will also receive notifications from invitations by user ID.
-            is_partner = yield self.hs.get_auth_handler().is_partner(full_user_id)
+            is_partner = await self.hs.get_auth_handler().is_partner(full_user_id)
             if not is_partner:
                 logger.info(
                     "Invitee is an internal user. Do not send a notification email."
@@ -84,9 +83,9 @@ class InviteExternalHandler(BaseHandler):
             user_password = generate_password()
 
             try:
-                yield self.hs.get_registration_handler().register_user(
+                await self.hs.get_registration_handler().register_user(
                     localpart=user_id,
-                    password=user_password,
+                    password_hash=user_password,
                     guest_access_token=None,
                     make_guest=False,
                     admin=False,
@@ -96,7 +95,7 @@ class InviteExternalHandler(BaseHandler):
 
                 """
                 # we save the account type
-                result = yield self.store.set_partner(
+                result = await self.store.set_partner(
                 user_id,
                 self.store.EXTERNAL_RESTRICTED_USER
                 )
@@ -116,14 +115,14 @@ class InviteExternalHandler(BaseHandler):
                     raise SynapseError(400, "Registration error: {0}".format(detail))
 
         # log invitation in DB
-        yield self.store.insert_partner_invitation(
+        await  self.store.insert_partner_invitation(
             partner_user_id=full_user_id,
             inviter_user_id=inviter,
             inviter_device_id=inviter_device_id,
             email_sent=True,
         )
 
-        inviter_name = yield create_display_inviter_name(self.hs, inviter)
+        inviter_name = await create_display_inviter_name(self.hs, inviter)
 
         logger.info(
             "Generating message: invitation_name=%s invitee=%s user_id=%s user_pw=<REDACTED> new_user=%s",
@@ -140,7 +139,7 @@ class InviteExternalHandler(BaseHandler):
             token = compute_registration_token(user_id, invitee)
             template_name = "invite_existing_account"
 
-        send_registration_email(
+        await send_registration_email(
             self.hs.config,
             invitee,
             template_name=template_name,
@@ -149,4 +148,4 @@ class InviteExternalHandler(BaseHandler):
             full_name=None
         )
 
-        defer.returnValue(full_user_id)
+        return full_user_id

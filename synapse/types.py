@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,20 +13,56 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import abc
 import re
 import string
+import sys
 from collections import namedtuple
+from typing import Any, Dict, Tuple, Type, TypeVar
 
 import attr
+from signedjson.key import decode_verify_key_bytes
+from unpaddedbase64 import decode_base64
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import Codes, SynapseError
+
+# define a version of typing.Collection that works on python 3.5
+if sys.version_info[:3] >= (3, 6, 0):
+    from typing import Collection
+else:
+    from typing import Container, Iterable, Sized
+
+    T_co = TypeVar("T_co", covariant=True)
+
+    class Collection(Iterable[T_co], Container[T_co], Sized):  # type: ignore
+        __slots__ = ()
 
 
+# Define a state map type from type/state_key to T (usually an event ID or
+# event)
+T = TypeVar("T")
+StateMap = Dict[Tuple[str, str], T]
+
+
+# the type of a JSON-serialisable dict. This could be made stronger, but it will
+# do for now.
+JsonDict = Dict[str, Any]
+
+
+""" !watcha
+class Requester(
+    namedtuple(
+        "Requester", ["user", "access_token_id", "is_guest", "device_id", "app_service"]
+    )
+):
+"""
+# watcha+
 class Requester(
     namedtuple(
         "Requester", ["user", "access_token_id", "is_guest", "device_id", "is_partner", "app_service"]
     )
 ):
+# +watcha
     """
     Represents the user making a request
 
@@ -50,7 +87,7 @@ class Requester(
             "access_token_id": self.access_token_id,
             "is_guest": self.is_guest,
             "device_id": self.device_id,
-            "is_partner": self.is_partner,  # modified for watcha
+            "is_partner": self.is_partner,  # watcha+
             "app_server_id": self.app_service.id if self.app_service else None,
         }
 
@@ -75,14 +112,21 @@ class Requester(
             access_token_id=input["access_token_id"],
             is_guest=input["is_guest"],
             device_id=input["device_id"],
-            is_partner=input["is_partner"],  # modified for watcha
+            is_partner=input["is_partner"], # watcha+
             app_service=appservice,
         )
 
 
+""" !watcha
+def create_requester(
+    user_id, access_token_id=None, is_guest=False, device_id=None, app_service=None
+):
+"""
+# watcha+
 def create_requester(
     user_id, access_token_id=None, is_guest=False, device_id=None, is_partner=False, app_service=None  # modified for watcha: added is_partner
 ):
+# +watcha
     """
     Create a new ``Requester`` object
 
@@ -99,7 +143,10 @@ def create_requester(
     """
     if not isinstance(user_id, UserID):
         user_id = UserID.from_string(user_id)
-    return Requester(user_id, access_token_id, is_guest, device_id, is_partner, app_service)  # modified for watcha: added is_partner
+    """ !watcha
+    return Requester(user_id, access_token_id, is_guest, device_id, app_service)
+    """
+    return Requester(user_id, access_token_id, is_guest, device_id, is_partner, app_service)  # watcha+
 
 
 def get_domain_from_id(string):
@@ -116,6 +163,9 @@ def get_localpart_from_id(string):
     return string[1:idx]
 
 
+DS = TypeVar("DS", bound="DomainSpecificString")
+
+
 class DomainSpecificString(namedtuple("DomainSpecificString", ("localpart", "domain"))):
     """Common base class among ID/name strings that have a local part and a
     domain name, prefixed with a sigil.
@@ -125,6 +175,10 @@ class DomainSpecificString(namedtuple("DomainSpecificString", ("localpart", "dom
         'localpart' : The local part of the name (without the leading sigil)
         'domain' : The domain part of the name
     """
+
+    __metaclass__ = abc.ABCMeta
+
+    SIGIL = abc.abstractproperty()  # type: str  # type: ignore
 
     # Deny iteration because it will bite you if you try to create a singleton
     # set by:
@@ -141,11 +195,13 @@ class DomainSpecificString(namedtuple("DomainSpecificString", ("localpart", "dom
         return self
 
     @classmethod
-    def from_string(cls, s):
+    def from_string(cls: Type[DS], s: str) -> DS:
         """Parse the string given by 's' into a structure object."""
         if len(s) < 1 or s[0:1] != cls.SIGIL:
             raise SynapseError(
-                400, "Expected %s string to start with '%s'" % (cls.__name__, cls.SIGIL)
+                400,
+                "Expected %s string to start with '%s'" % (cls.__name__, cls.SIGIL),
+                Codes.INVALID_PARAM,
             )
 
         parts = s[1:].split(":", 1)
@@ -154,6 +210,7 @@ class DomainSpecificString(namedtuple("DomainSpecificString", ("localpart", "dom
                 400,
                 "Expected %s of the form '%slocalname:domain'"
                 % (cls.__name__, cls.SIGIL),
+                Codes.INVALID_PARAM,
             )
 
         domain = parts[1]
@@ -162,12 +219,12 @@ class DomainSpecificString(namedtuple("DomainSpecificString", ("localpart", "dom
         # names on one HS
         return cls(localpart=parts[0], domain=domain)
 
-    def to_string(self):
+    def to_string(self) -> str:
         """Return a string encoding the fields of the structure object."""
         return "%s%s:%s" % (self.SIGIL, self.localpart, self.domain)
 
     @classmethod
-    def is_valid(cls, s):
+    def is_valid(cls: Type[DS], s: str) -> bool:
         try:
             cls.from_string(s)
             return True
@@ -207,14 +264,17 @@ class GroupID(DomainSpecificString):
     SIGIL = "+"
 
     @classmethod
-    def from_string(cls, s):
-        group_id = super(GroupID, cls).from_string(s)
+    def from_string(cls: Type[DS], s: str) -> DS:
+        group_id = super().from_string(s)  # type: DS # type: ignore
+
         if not group_id.localpart:
-            raise SynapseError(400, "Group ID cannot be empty")
+            raise SynapseError(400, "Group ID cannot be empty", Codes.INVALID_PARAM)
 
         if contains_invalid_mxid_characters(group_id.localpart):
             raise SynapseError(
-                400, "Group ID can only contain characters a-z, 0-9, or '=_-./'"
+                400,
+                "Group ID can only contain characters a-z, 0-9, or '=_-./'",
+                Codes.INVALID_PARAM,
             )
 
         return group_id
@@ -320,6 +380,7 @@ class StreamToken(
     )
 ):
     _SEPARATOR = "_"
+    START = None  # type: StreamToken
 
     @classmethod
     def from_string(cls, string):
@@ -404,7 +465,7 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
     followed by the "stream_ordering" id of the event it comes after.
     """
 
-    __slots__ = []
+    __slots__ = []  # type: list
 
     @classmethod
     def parse(cls, string):
@@ -477,3 +538,24 @@ class ReadReceipt(object):
     user_id = attr.ib()
     event_ids = attr.ib()
     data = attr.ib()
+
+
+def get_verify_key_from_cross_signing_key(key_info):
+    """Get the key ID and signedjson verify key from a cross-signing key dict
+
+    Args:
+        key_info (dict): a cross-signing key dict, which must have a "keys"
+            property that has exactly one item in it
+
+    Returns:
+        (str, VerifyKey): the key ID and verify key for the cross-signing key
+    """
+    # make sure that exactly one key is provided
+    if "keys" not in key_info:
+        raise ValueError("Invalid key")
+    keys = key_info["keys"]
+    if len(keys) != 1:
+        raise ValueError("Invalid key")
+    # and return that one key
+    for key_id, key_data in keys.items():
+        return (key_id, decode_verify_key_bytes(key_id, decode_base64(key_data)))

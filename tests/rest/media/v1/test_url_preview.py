@@ -12,8 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import json
 import os
+import re
+
+from mock import patch
 
 import attr
 
@@ -74,6 +77,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
         config["url_preview_ip_range_whitelist"] = ("1.1.1.1",)
         config["url_preview_url_blacklist"] = []
+        config["url_preview_accept_language"] = [
+            "en-UK",
+            "en-US;q=0.9",
+            "fr;q=0.8",
+            "*;q=0.7",
+        ]
 
         self.storage_path = self.mktemp()
         self.media_store_path = self.mktemp()
@@ -125,7 +134,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.reactor.nameResolver = Resolver()
 
     def test_cache_returns_correct_type(self):
-        self.lookups["matrix.org"] = [(IPv4Address, "8.8.8.8")]
+        self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
 
         request, channel = self.make_request(
             "GET", "url_preview?url=http://matrix.org", shorthand=False
@@ -181,7 +190,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
 
     def test_non_ascii_preview_httpequiv(self):
-        self.lookups["matrix.org"] = [(IPv4Address, "8.8.8.8")]
+        self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
 
         end_content = (
             b"<html><head>"
@@ -215,7 +224,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.json_body["og:title"], "\u0434\u043a\u0430")
 
     def test_non_ascii_preview_content_type(self):
-        self.lookups["matrix.org"] = [(IPv4Address, "8.8.8.8")]
+        self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
 
         end_content = (
             b"<html><head>"
@@ -247,11 +256,46 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body["og:title"], "\u0434\u043a\u0430")
 
+    def test_overlong_title(self):
+        self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
+
+        end_content = (
+            b"<html><head>"
+            b"<title>" + b"x" * 2000 + b"</title>"
+            b'<meta property="og:description" content="hi" />'
+            b"</head></html>"
+        )
+
+        request, channel = self.make_request(
+            "GET", "url_preview?url=http://matrix.org", shorthand=False
+        )
+        request.render(self.preview_url)
+        self.pump()
+
+        client = self.reactor.tcpClients[0][2].buildProtocol(None)
+        server = AccumulatingProtocol()
+        server.makeConnection(FakeTransport(client, self.reactor))
+        client.makeConnection(FakeTransport(server, self.reactor))
+        client.dataReceived(
+            (
+                b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                b'Content-Type: text/html; charset="windows-1251"\r\n\r\n'
+            )
+            % (len(end_content),)
+            + end_content
+        )
+
+        self.pump()
+        self.assertEqual(channel.code, 200)
+        res = channel.json_body
+        # We should only see the `og:description` field, as `title` is too long and should be stripped out
+        self.assertCountEqual(["og:description"], res.keys())
+
     def test_ipaddr(self):
         """
         IP addresses can be previewed directly.
         """
-        self.lookups["example.com"] = [(IPv4Address, "8.8.8.8")]
+        self.lookups["example.com"] = [(IPv4Address, "10.1.2.3")]
 
         request, channel = self.make_request(
             "GET", "url_preview?url=http://example.com", shorthand=False
@@ -398,7 +442,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         # Hardcode the URL resolving to the IP we want.
         self.lookups["example.com"] = [
             (IPv4Address, "1.1.1.2"),
-            (IPv4Address, "8.8.8.8"),
+            (IPv4Address, "10.1.2.3"),
         ]
 
         request, channel = self.make_request(
@@ -473,6 +517,179 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body, {})
 
+    def test_accept_language_config_option(self):
+        """
+        Accept-Language header is sent to the remote server
+        """
+        self.lookups["example.com"] = [(IPv4Address, "10.1.2.3")]
+
+        # Build and make a request to the server
+        request, channel = self.make_request(
+            "GET", "url_preview?url=http://example.com", shorthand=False
+        )
+        request.render(self.preview_url)
+        self.pump()
+
+        # Extract Synapse's tcp client
+        client = self.reactor.tcpClients[0][2].buildProtocol(None)
+
+        # Build a fake remote server to reply with
+        server = AccumulatingProtocol()
+
+        # Connect the two together
+        server.makeConnection(FakeTransport(client, self.reactor))
+        client.makeConnection(FakeTransport(server, self.reactor))
+
+        # Tell Synapse that it has received some data from the remote server
+        client.dataReceived(
+            b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\nContent-Type: text/html\r\n\r\n"
+            % (len(self.end_content),)
+            + self.end_content
+        )
+
+        # Move the reactor along until we get a response on our original channel
+        self.pump()
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(
+            channel.json_body, {"og:title": "~matrix~", "og:description": "hi"}
+        )
+
+        # Check that the server received the Accept-Language header as part
+        # of the request from Synapse
+        self.assertIn(
+            (
+                b"Accept-Language: en-UK\r\n"
+                b"Accept-Language: en-US;q=0.9\r\n"
+                b"Accept-Language: fr;q=0.8\r\n"
+                b"Accept-Language: *;q=0.7"
+            ),
+            server.data,
+        )
+
+    def test_oembed_photo(self):
+        """Test an oEmbed endpoint which returns a 'photo' type which redirects the preview to a new URL."""
+        # Route the HTTP version to an HTTP endpoint so that the tests work.
+        with patch.dict(
+            "synapse.rest.media.v1.preview_url_resource._oembed_patterns",
+            {
+                re.compile(
+                    r"http://twitter\.com/.+/status/.+"
+                ): "http://publish.twitter.com/oembed",
+            },
+            clear=True,
+        ):
+
+            self.lookups["publish.twitter.com"] = [(IPv4Address, "10.1.2.3")]
+            self.lookups["cdn.twitter.com"] = [(IPv4Address, "10.1.2.3")]
+
+            result = {
+                "version": "1.0",
+                "type": "photo",
+                "url": "http://cdn.twitter.com/matrixdotorg",
+            }
+            oembed_content = json.dumps(result).encode("utf-8")
+
+            end_content = (
+                b"<html><head>"
+                b"<title>Some Title</title>"
+                b'<meta property="og:description" content="hi" />'
+                b"</head></html>"
+            )
+
+            request, channel = self.make_request(
+                "GET",
+                "url_preview?url=http://twitter.com/matrixdotorg/status/12345",
+                shorthand=False,
+            )
+            request.render(self.preview_url)
+            self.pump()
+
+            client = self.reactor.tcpClients[0][2].buildProtocol(None)
+            server = AccumulatingProtocol()
+            server.makeConnection(FakeTransport(client, self.reactor))
+            client.makeConnection(FakeTransport(server, self.reactor))
+            client.dataReceived(
+                (
+                    b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                    b'Content-Type: application/json; charset="utf8"\r\n\r\n'
+                )
+                % (len(oembed_content),)
+                + oembed_content
+            )
+
+            self.pump()
+
+            client = self.reactor.tcpClients[1][2].buildProtocol(None)
+            server = AccumulatingProtocol()
+            server.makeConnection(FakeTransport(client, self.reactor))
+            client.makeConnection(FakeTransport(server, self.reactor))
+            client.dataReceived(
+                (
+                    b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                    b'Content-Type: text/html; charset="utf8"\r\n\r\n'
+                )
+                % (len(end_content),)
+                + end_content
+            )
+
+            self.pump()
+
+            self.assertEqual(channel.code, 200)
+            self.assertEqual(
+                channel.json_body, {"og:title": "Some Title", "og:description": "hi"}
+            )
+
+    def test_oembed_rich(self):
+        """Test an oEmbed endpoint which returns HTML content via the 'rich' type."""
+        # Route the HTTP version to an HTTP endpoint so that the tests work.
+        with patch.dict(
+            "synapse.rest.media.v1.preview_url_resource._oembed_patterns",
+            {
+                re.compile(
+                    r"http://twitter\.com/.+/status/.+"
+                ): "http://publish.twitter.com/oembed",
+            },
+            clear=True,
+        ):
+
+            self.lookups["publish.twitter.com"] = [(IPv4Address, "10.1.2.3")]
+
+            result = {
+                "version": "1.0",
+                "type": "rich",
+                "html": "<div>Content Preview</div>",
+            }
+            end_content = json.dumps(result).encode("utf-8")
+
+            request, channel = self.make_request(
+                "GET",
+                "url_preview?url=http://twitter.com/matrixdotorg/status/12345",
+                shorthand=False,
+            )
+            request.render(self.preview_url)
+            self.pump()
+
+            client = self.reactor.tcpClients[0][2].buildProtocol(None)
+            server = AccumulatingProtocol()
+            server.makeConnection(FakeTransport(client, self.reactor))
+            client.makeConnection(FakeTransport(server, self.reactor))
+            client.dataReceived(
+                (
+                    b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                    b'Content-Type: application/json; charset="utf8"\r\n\r\n'
+                )
+                % (len(end_content),)
+                + end_content
+            )
+
+            self.pump()
+            self.assertEqual(channel.code, 200)
+            self.assertEqual(
+                channel.json_body,
+                {"og:title": None, "og:description": "Content Preview"},
+            )
+
+    # watcha+
     test_cache_returns_correct_type.skip = "Disabled for Watcha because URL preview is disabled"
     test_non_ascii_preview_httpequiv.skip = "Disabled for Watcha because URL preview is disabled"
     test_non_ascii_preview_content_type.skip = "Disabled for Watcha because URL preview is disabled"
@@ -485,3 +702,8 @@ class URLPreviewTests(unittest.HomeserverTestCase):
     test_blacklisted_ip_with_external_ip.skip = "Disabled for Watcha because URL preview is disabled"
     test_blacklisted_ipv6_specific.skip = "Disabled for Watcha because URL preview is disabled"
     test_blacklisted_ipv6_range.skip = "Disabled for Watcha because URL preview is disabled"
+    test_accept_language_config_option = "Disabled for Watcha because URL preview is disabled"
+    test_oembed_photo = "Disabled for Watcha because URL preview is disabled"
+    test_oembed_rich = "Disabled for Watcha because URL preview is disabled"
+    test_overlong_title = "Disabled for Watcha because URL preview is disabled"
+    # +watcha

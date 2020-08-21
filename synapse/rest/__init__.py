@@ -28,7 +28,7 @@ from synapse.rest.client.v1 import (
     pusher,
     room,
     voip,
-    watcha,
+    watcha, # watcha+
 )
 from synapse.rest.client.v2_alpha import (
     account,
@@ -42,6 +42,7 @@ from synapse.rest.client.v2_alpha import (
     keys,
     notifications,
     openid,
+    password_policy,
     read_marker,
     receipts,
     register,
@@ -74,7 +75,7 @@ class ClientRestResource(JsonResource):
 
     @staticmethod
     def register_servlets(client_resource, hs):
-        versions.register_servlets(client_resource)
+        versions.register_servlets(hs, client_resource)
 
         # Deprecated in r0
         initial_sync.register_servlets(hs, client_resource)
@@ -93,7 +94,7 @@ class ClientRestResource(JsonResource):
         pusher.register_servlets(hs, client_resource)
         push_rule.register_servlets(hs, client_resource)
         logout.register_servlets(hs, client_resource)
-        watcha.register_servlets(hs, client_resource)
+        watcha.register_servlets(hs, client_resource) # watcha+
 
         # "v2"
         sync.register_servlets(hs, client_resource)
@@ -120,6 +121,7 @@ class ClientRestResource(JsonResource):
         capabilities.register_servlets(hs, client_resource)
         account_validity.register_servlets(hs, client_resource)
         relations.register_servlets(hs, client_resource)
+        password_policy.register_servlets(hs, client_resource)
 
         # moving to /_synapse/admin
         synapse.rest.admin.register_servlets_for_client_rest_resource(

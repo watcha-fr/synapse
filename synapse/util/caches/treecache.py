@@ -1,4 +1,4 @@
-from six import itervalues
+from typing import Dict
 
 SENTINEL = object()
 
@@ -12,7 +12,7 @@ class TreeCache(object):
 
     def __init__(self):
         self.size = 0
-        self.root = {}
+        self.root = {}  # type: Dict
 
     def __setitem__(self, key, value):
         return self.set(key, value)
@@ -79,7 +79,7 @@ def iterate_tree_cache_entry(d):
     can contain dicts.
     """
     if isinstance(d, dict):
-        for value_d in itervalues(d):
+        for value_d in d.values():
             for value in iterate_tree_cache_entry(value_d):
                 yield value
     else:

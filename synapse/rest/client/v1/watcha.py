@@ -4,7 +4,6 @@ import sys
 import json
 import hmac
 from hashlib import sha1
-from urllib.parse import urlparse
 
 import logging
 
@@ -24,7 +23,7 @@ from synapse.util.watcha import (
     create_display_inviter_name,
 )
 from synapse.types import UserID, create_requester
-from synapse.api.constants import Membership, EventTypes
+from synapse.api.constants import Membership
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +46,7 @@ def _decode_share_secret_parameters(config, parameter_names, parameters):
         key=config.registration_shared_secret.encode("utf-8"), digestmod=sha1,
     )
     for parameter_name in parameter_names:
-        want_mac.update(str(parameters[parameter_name]).encode("utf-8"))
+        want_mac.update(repr(parameters[parameter_name]).encode("utf-8"))
         want_mac.update(b"\x00")
     if not compare_digest(want_mac.hexdigest(), got_mac):
         logger.error(
@@ -63,26 +62,25 @@ def _decode_share_secret_parameters(config, parameter_names, parameters):
     return parameters
 
 
-@defer.inlineCallbacks
-def _check_admin(auth, request):
-    requester = yield auth.get_user_by_req(request)
-    is_admin = yield auth.is_server_admin(requester.user)
+async def _check_admin(auth, request):
+    requester = await auth.get_user_by_req(request)
+    is_admin = await auth.is_server_admin(requester.user)
     if not is_admin:
         raise AuthError(403, "You are not a server admin")
 
 
-@defer.inlineCallbacks
-def _check_admin_or_secret(config, auth, request, parameter_names):
+async def _check_admin_or_secret(config, auth, request, parameter_names):
     auth_headers = request.requestHeaders.getRawHeaders("Authorization")
     parameter_json = parse_json_object_from_request(request)
+
     if auth_headers:
-        yield _check_admin(auth, request)
+        await _check_admin(auth, request)
         ret = parameter_json
     else:
         # auth by checking that the HMAC is valid. this raises an error otherwise.
         ret = _decode_share_secret_parameters(config, parameter_names, parameter_json)
 
-    defer.returnValue(ret)
+    return ret
 
 
 class WatchaUserlistRestServlet(RestServlet):
@@ -94,11 +92,10 @@ class WatchaUserlistRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        yield _check_admin(self.auth, request)
-        ret = yield self.handlers.watcha_admin_handler.watcha_user_list()
-        defer.returnValue((200, ret))
+    async def on_GET(self, request):
+        await _check_admin(self.auth, request)
+        ret = await self.handlers.watcha_admin_handler.watcha_user_list()
+        return 200, ret
 
 
 class WatchaRoomMembershipRestServlet(RestServlet):
@@ -110,11 +107,10 @@ class WatchaRoomMembershipRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        yield _check_admin(self.auth, request)
-        ret = yield self.handlers.watcha_admin_handler.watcha_room_membership()
-        defer.returnValue((200, ret))
+    async def on_GET(self, request):
+        await _check_admin(self.auth, request)
+        ret = await self.handlers.watcha_admin_handler.watcha_room_membership()
+        return 200, ret
 
 
 class WatchaRoomNameRestServlet(RestServlet):
@@ -126,97 +122,10 @@ class WatchaRoomNameRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        yield _check_admin(self.auth, request)
-        ret = yield self.handlers.watcha_admin_handler.watcha_room_name()
-        defer.returnValue((200, ret))
-
-
-class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
-
-    PATTERNS = client_patterns("/watcha_room_nextcloud_activity", v1=True)
-
-    def __init__(self, hs):
-        super().__init__()
-        self.hs = hs
-        self.auth = hs.get_auth()
-        self.event_creation_handler = hs.get_event_creation_handler()
-        self.handler = hs.get_handlers()
-
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        params = yield _check_admin_or_secret(
-            self.hs.config,
-            self.auth,
-            request,
-            ["file_name", "link", "directory", "activity_type"],
-        )
-
-        nc_file_name = params["file_name"]
-        nc_link = params["link"]
-        nc_directory = params["directory"]
-        nc_activity_type = params["activity_type"]
-
-        if not nc_file_name or not nc_link or not nc_directory or not nc_activity_type:
-            raise SynapseError(
-                400,
-                "'file_name', 'link', 'directory args and 'activity_type' cannot be empty.",
-            )
-
-        server_name = self.hs.get_config().server_name
-
-        nc_directory_parsed = urlparse(nc_directory)
-        nc_link_parsed = urlparse(nc_link)
-
-        if not {"http", "https"}.issuperset(
-            (nc_directory_parsed.scheme, nc_link_parsed.scheme)
-        ):
-            raise SynapseError(
-                400, "Wrong Nextcloud URL scheme.",
-            )
-
-        if {server_name} != {nc_directory_parsed.netloc, nc_link_parsed.netloc}:
-            raise SynapseError(
-                400, "Wrong Nextcloud URL netloc.",
-            )
-
-        if nc_activity_type not in (
-            "file_created",
-            "file_deleted",
-            "file_changed",
-            "file_restored",
-        ):
-            raise SynapseError(
-                400, "Wrong value for nextcloud activity_type.",
-            )
-
-        room_id = yield self.handler.watcha_room_handler.get_roomId_from_NC_folder_url(
-            nc_directory
-        )
-
-        if not room_id:
-            raise SynapseError(
-                400, "No room has been linked with this Nextcloud folder url."
-            )
-
-        first_room_admin = yield self.handler.watcha_room_handler.get_first_room_admin(
-            room_id
-        )
-
-        if not first_room_admin:
-            raise SynapseError(
-                400,
-                "No administrators are in the room. The Nextcloud notification cannot be posted.",
-            )
-
-        requester = create_requester(first_room_admin)
-
-        event = yield self.handler.watcha_room_handler.send_NC_notification_in_room(
-            requester, room_id, params
-        )
-
-        return (200, {"event_id": event.event_id})
+    async def on_GET(self, request):
+        await _check_admin(self.auth, request)
+        ret = await self.handlers.watcha_admin_handler.watcha_room_name()
+        return 200, ret
 
 
 class WatchaDisplayNameRestServlet(RestServlet):
@@ -228,11 +137,10 @@ class WatchaDisplayNameRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        yield _check_admin(self.auth, request)
-        ret = yield self.handlers.watcha_admin_handler.watcha_display_name()
-        defer.returnValue((200, ret))
+    async def on_GET(self, request):
+        await _check_admin(self.auth, request)
+        ret = await self.handlers.watcha_admin_handler.watcha_display_name()
+        return 200, ret
 
 
 class WatchaRoomListRestServlet(RestServlet):
@@ -243,11 +151,10 @@ class WatchaRoomListRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        yield _check_admin(self.auth, request)
-        ret = yield self.handlers.watcha_admin_handler.watcha_room_list()
-        defer.returnValue((200, ret))
+    async def on_GET(self, request):
+        await _check_admin(self.auth, request)
+        ret = await self.handlers.watcha_admin_handler.watcha_room_list()
+        return 200, ret
 
 
 class WatchaUpdateMailRestServlet(RestServlet):
@@ -263,37 +170,36 @@ class WatchaUpdateMailRestServlet(RestServlet):
         self.auth_handler = hs.get_auth_handler()
         self.account_activity_handler = hs.get_account_validity_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, target_user_id):
-        yield _check_admin(self.auth, request)
+    async def on_PUT(self, request, target_user_id):
+        await _check_admin(self.auth, request)
         params = parse_json_object_from_request(request)
         new_email = params["new_email"]
 
         if not new_email:
             raise SynapseError(400, "Missing 'new_email' arg")
 
-        users = yield self.handlers.admin_handler.get_users()
+        users = await self.handlers.admin_handler.get_users()
         if not target_user_id in [user["name"] for user in users]:
             raise SynapseError(
                 400, "The target user is not registered in this homeserver."
             )
 
         try:
-            email = yield self.account_activity_handler.get_email_address_for_user(
+            email = await self.account_activity_handler.get_email_address_for_user(
                 target_user_id
             )
         except SynapseError:
             logger.error("No email are defined for this user.")
             raise
 
-        yield self.auth_handler.delete_threepid(
+        await self.auth_handler.delete_threepid(
             target_user_id, "email", email, id_server=None
         )
-        yield self.auth_handler.add_threepid(
+        await self.auth_handler.add_threepid(
             target_user_id, "email", new_email, self.hs.get_clock().time_msec()
         )
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 class WatchaUpdateUserRoleRestServlet(RestServlet):
@@ -307,12 +213,11 @@ class WatchaUpdateUserRoleRestServlet(RestServlet):
         self.handlers = hs.get_handlers()
         self.admin_handler = hs.get_handlers().admin_handler
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, target_user_id):
-        yield _check_admin(self.auth, request)
+    async def on_PUT(self, request, target_user_id):
+        await _check_admin(self.auth, request)
         params = parse_json_object_from_request(request)
 
-        users = yield self.admin_handler.get_users()
+        users = await self.admin_handler.get_users()
         if not target_user_id in [user["name"] for user in users]:
             raise SynapseError(
                 400, "The target user is not registered in this homeserver."
@@ -322,10 +227,10 @@ class WatchaUpdateUserRoleRestServlet(RestServlet):
         if role not in ["partner", "collaborator", "admin"]:
             raise SynapseError(400, "%s is not a defined role." % role)
 
-        result = yield self.handlers.watcha_admin_handler.watcha_update_user_role(
+        result = await self.handlers.watcha_admin_handler.watcha_update_user_role(
             target_user_id, role
         )
-        defer.returnValue((200, {"new_role": result}))
+        return 200, {"new_role": result}
 
 
 class WatchaIsAdmin(RestServlet):
@@ -336,11 +241,10 @@ class WatchaIsAdmin(RestServlet):
         super(WatchaIsAdmin, self).__init__()
         self.auth = hs.get_auth()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-        defer.returnValue((200, {"is_admin": is_admin}))
+    async def on_GET(self, request):
+        requester = await self.auth.get_user_by_req(request)
+        is_admin = await self.auth.is_server_admin(requester.user)
+        return 200, {"is_admin": is_admin}
 
 
 class WatchaAdminStatsRestServlet(RestServlet):
@@ -362,11 +266,10 @@ class WatchaAdminStatsRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        yield _check_admin(self.auth, request)
-        ret = yield self.handlers.watcha_admin_handler.watcha_admin_stat()
-        defer.returnValue((200, ret))
+    async def on_GET(self, request):
+        await _check_admin(self.auth, request)
+        ret = await self.handlers.watcha_admin_handler.watcha_admin_stat()
+        return 200, ret
 
 
 class WatchaUserIp(RestServlet):
@@ -380,11 +283,10 @@ class WatchaUserIp(RestServlet):
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, target_user_id):
-        yield _check_admin(self.auth, request)
-        ret = yield self.handlers.watcha_admin_handler.watcha_user_ip(target_user_id)
-        defer.returnValue((200, ret))
+    async def on_GET(self, request, target_user_id):
+        await _check_admin(self.auth, request)
+        ret = await self.handlers.watcha_admin_handler.watcha_user_ip(target_user_id)
+        return 200, ret
 
 
 class WatchaRegisterRestServlet(RestServlet):
@@ -399,11 +301,11 @@ class WatchaRegisterRestServlet(RestServlet):
         super(WatchaRegisterRestServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
+        self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        params = yield _check_admin_or_secret(
+    async def on_POST(self, request):
+        params = await _check_admin_or_secret(
             self.hs.config,
             self.auth,
             request,
@@ -425,7 +327,7 @@ class WatchaRegisterRestServlet(RestServlet):
                 500, "Email address cannot be empty",
             )
 
-        full_user_id = yield self.hs.auth_handler.find_user_id_by_email(email)
+        full_user_id = await self.auth_handler.find_user_id_by_email(email)
         if full_user_id:
             raise SynapseError(
                 500,
@@ -433,13 +335,13 @@ class WatchaRegisterRestServlet(RestServlet):
             )
 
         try:
-            requester = yield self.auth.get_user_by_req(request)
+            requester = await self.auth.get_user_by_req(request)
         except Exception:
             # no token - not logged in - inviter should be provided
             requester = None
 
         if requester:
-            inviter_name = yield create_display_inviter_name(self.hs, requester.user)
+            inviter_name = await create_display_inviter_name(self.hs, requester.user)
         else:
             if not params["inviter"]:
                 raise AuthError(
@@ -448,30 +350,29 @@ class WatchaRegisterRestServlet(RestServlet):
                 )
             inviter_name = params["inviter"]
 
-        if 'password' in params:
-            password = params['password']
-        else:            
-            password = generate_password()
-
+        password = params['password'] if 'password' in params else generate_password()
+        password_hash = await self.auth_handler.hash(password)
         admin = params["admin"] == "admin"
         bind_emails = [params["email"]]
-        user_id = yield self.registration_handler.register_user(
+
+        user_id = await self.registration_handler.register_user(
             localpart=params["user"],
-            password=password,
+            password_hash=password_hash,
             admin=admin,
             bind_emails=bind_emails,
         )
+
         user = UserID.from_string(user_id)
-        yield self.hs.profile_handler.set_displayname(
+        await self.hs.profile_handler.set_displayname(
             user, create_requester(user_id), params["full_name"], by_admin=True
         )
 
-        display_name = yield self.hs.profile_handler.get_displayname(user)
+        display_name = await self.hs.profile_handler.get_displayname(user)
 
         if 'password' not in params:
             token = compute_registration_token(user_id, email, password)
 
-            send_registration_email(
+            await send_registration_email(
                 self.hs.config,
                 email,
                 template_name="invite_new_account",
@@ -481,8 +382,7 @@ class WatchaRegisterRestServlet(RestServlet):
             )
         else:
             logger.info("Not sending email for user password for user %s, password is defined by sender", user_id)
-
-        return (200, {"display_name": display_name, "user_id": user_id})
+        return 200, {"display_name": display_name, "user_id": user_id}
 
 
 class WatchaResetPasswordRestServlet(RestServlet):
@@ -497,9 +397,8 @@ class WatchaResetPasswordRestServlet(RestServlet):
         self.account_activity_handler = hs.get_account_validity_handler()
         # end of insertion
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        params = yield _check_admin_or_secret(
+    async def on_POST(self, request):
+        params = await _check_admin_or_secret(
             self.hs.config, self.auth, request, ["user"]
         )
 
@@ -513,20 +412,20 @@ class WatchaResetPasswordRestServlet(RestServlet):
         logger.info("Setting password for user %s", user_id)
         user = UserID.from_string(user_id)
 
-        email = yield self.account_activity_handler.get_email_address_for_user(user_id)
+        email = await self.account_activity_handler.get_email_address_for_user(user_id)
 
         requester = create_requester(user_id)
-        yield self.hs.get_set_password_handler().set_password(
+        await self.hs.get_set_password_handler().set_password(
             user_id, password, requester
         )
-        yield self.handlers.watcha_admin_handler.watcha_reactivate_account(user_id)
+        await self.handlers.watcha_admin_handler.watcha_reactivate_account(user_id)
 
         try:
-            display_name = yield self.hs.profile_handler.get_displayname(user)
+            display_name = await self.hs.profile_handler.get_displayname(user)
         except:
             display_name = None
 
-        send_registration_email(
+        await send_registration_email(
             self.hs.config,
             email,
             template_name="reset_password",
@@ -535,7 +434,7 @@ class WatchaResetPasswordRestServlet(RestServlet):
             full_name=display_name,
         )
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
 def register_servlets(hs, http_server):
     WatchaResetPasswordRestServlet(hs).register(http_server)
@@ -549,6 +448,5 @@ def register_servlets(hs, http_server):
     WatchaRoomListRestServlet(hs).register(http_server)
     WatchaRoomMembershipRestServlet(hs).register(http_server)
     WatchaRoomNameRestServlet(hs).register(http_server)
-    WatchaSendNextcloudActivityToWatchaRoomServlet(hs).register(http_server)
     WatchaDisplayNameRestServlet(hs).register(http_server)
-    
+

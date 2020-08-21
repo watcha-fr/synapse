@@ -69,15 +69,17 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
 
     def test_state_event_in_room(self):
         self.ensure_user_joined_room()
-        # MODIFIED BY WATCHA - TBH not really sure why :) but stricter so OK :)
-        #self.set_alias_via_state_event(200)
-        self.set_alias_via_state_event(403)
+        """ !watcha - TBH not really sure why :) but stricter so OK :)
+        self.set_alias_via_state_event(200)
+        """
+        self.set_alias_via_state_event(403) # watcha +
 
     def test_directory_in_room(self):
         self.ensure_user_joined_room()
-        # MODIFIED BY WATCHA - TBH not really sure why :) but stricter so OK :)
-        #self.set_alias_via_directory(200)
-        self.set_alias_via_directory(403)
+        """ !watcha - TBH not really sure why :) but stricter so OK :)
+        self.set_alias_via_directory(200)
+        """
+        self.set_alias_via_directory(403) # watcha+
 
     def test_room_creation_too_long(self):
         url = "/_matrix/client/r0/createRoom"

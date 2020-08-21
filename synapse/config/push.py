@@ -14,13 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
+from ._base import Config, ShardedWorkerHandlingConfig
 
 
 class PushConfig(Config):
+    section = "push"
+
     def read_config(self, config, **kwargs):
         push_config = config.get("push", {})
         self.push_include_content = push_config.get("include_content", True)
+
+        pusher_instances = config.get("pusher_instances") or []
+        self.pusher_shard_config = ShardedWorkerHandlingConfig(pusher_instances)
 
         # There was a a 'redact_content' setting but mistakenly read from the
         # 'email'section'. Check for the flag in the 'push' section, and log,
@@ -33,7 +38,7 @@ class PushConfig(Config):
 
         # Now check for the one in the 'email' section and honour it,
         # with a warning.
-        push_config = config.get("email", {})
+        push_config = config.get("email") or {}
         redact_content = push_config.get("redact_content")
         if redact_content is not None:
             print(

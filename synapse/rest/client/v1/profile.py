@@ -14,26 +14,26 @@
 # limitations under the License.
 
 """ This module contains REST servlets to do with profile: /profile/<paths> """
-from twisted.internet import defer
 
+from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import UserID
-# insertion for watcha
+# watcha+
 from synapse.api.errors import SynapseError
 import logging
 
 logger = logging.getLogger(__name__)
-# end of insertion
+# watcha+
 
 class ProfileDisplaynameRestServlet(RestServlet):
-    """ change for watcha
+    """ !watcha
     # BIG HACK for the iOS app which doesn't escape the user_id when setting the display name
     # This means that user_ids with the pattern "<user_id>/displayname" will not work -
     # but they can't occur - it's only domains names after the "/"
     PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/displayname", v1=True)
     """
-    PATTERNS = client_patterns("/profile/(?P<user_id>.*)/displayname", v1=True)
+    PATTERNS = client_patterns("/profile/(?P<user_id>.*)/displayname", v1=True) # watcha+
 
     def __init__(self, hs):
         super(ProfileDisplaynameRestServlet, self).__init__()
@@ -41,45 +41,46 @@ class ProfileDisplaynameRestServlet(RestServlet):
         self.profile_handler = hs.get_profile_handler()
         self.auth = hs.get_auth()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, user_id):
+    async def on_GET(self, request, user_id):
         requester_user = None
 
         if self.hs.config.require_auth_for_profile_requests:
-            requester = yield self.auth.get_user_by_req(request)
+            requester = await self.auth.get_user_by_req(request)
             requester_user = requester.user
 
         user = UserID.from_string(user_id)
 
-        yield self.profile_handler.check_profile_query_allowed(user, requester_user)
+        await self.profile_handler.check_profile_query_allowed(user, requester_user)
 
-        displayname = yield self.profile_handler.get_displayname(user)
+        displayname = await self.profile_handler.get_displayname(user)
 
         ret = {}
         if displayname is not None:
             ret["displayname"] = displayname
 
-        return (200, ret)
+        return 200, ret
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, user_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True)
+    async def on_PUT(self, request, user_id):
+        """ !watcha
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        """
+        requester = await self.auth.get_user_by_req(request, allow_partner=True, allow_guest=True) # watcha+
         user = UserID.from_string(user_id)
-        is_admin = yield self.auth.is_server_admin(requester.user)
+        is_admin = await self.auth.is_server_admin(requester.user)
 
         content = parse_json_object_from_request(request)
 
         try:
             new_name = content["displayname"]
         except Exception:
-            return (400, "Unable to parse name")
+            return 400, "Unable to parse name"
 
-        yield self.profile_handler.set_displayname(user, requester, new_name, is_admin)
+        await self.profile_handler.set_displayname(user, requester, new_name, is_admin)
 
-        return (200, {})
+        return 200, {}
 
     def on_OPTIONS(self, request, user_id):
-        return (200, {})
+        return 200, {}
 
 
 class ProfileAvatarURLRestServlet(RestServlet):
@@ -91,44 +92,49 @@ class ProfileAvatarURLRestServlet(RestServlet):
         self.profile_handler = hs.get_profile_handler()
         self.auth = hs.get_auth()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, user_id):
+    async def on_GET(self, request, user_id):
         requester_user = None
 
         if self.hs.config.require_auth_for_profile_requests:
-            requester = yield self.auth.get_user_by_req(request)
+            requester = await self.auth.get_user_by_req(request)
             requester_user = requester.user
 
         user = UserID.from_string(user_id)
 
-        yield self.profile_handler.check_profile_query_allowed(user, requester_user)
+        await self.profile_handler.check_profile_query_allowed(user, requester_user)
 
-        avatar_url = yield self.profile_handler.get_avatar_url(user)
+        avatar_url = await self.profile_handler.get_avatar_url(user)
 
         ret = {}
         if avatar_url is not None:
             ret["avatar_url"] = avatar_url
 
-        return (200, ret)
+        return 200, ret
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, user_id):
-        requester = yield self.auth.get_user_by_req(request, allow_partner=True)
+    async def on_PUT(self, request, user_id):
+        """ !watcha
+        requester = await self.auth.get_user_by_req(request)
+        """
+        requester = await self.auth.get_user_by_req(request, allow_partner=True) # watcha+
         user = UserID.from_string(user_id)
-        is_admin = yield self.auth.is_server_admin(requester.user)
+        is_admin = await self.auth.is_server_admin(requester.user)
 
         content = parse_json_object_from_request(request)
         try:
-            new_name = content["avatar_url"]
-        except Exception:
-            return (400, "Unable to parse name")
+            new_avatar_url = content["avatar_url"]
+        except KeyError:
+            raise SynapseError(
+                400, "Missing key 'avatar_url'", errcode=Codes.MISSING_PARAM
+            )
 
-        yield self.profile_handler.set_avatar_url(user, requester, new_name, is_admin)
+        await self.profile_handler.set_avatar_url(
+            user, requester, new_avatar_url, is_admin
+        )
 
-        return (200, {})
+        return 200, {}
 
     def on_OPTIONS(self, request, user_id):
-        return (200, {})
+        return 200, {}
 
 
 class ProfileRestServlet(RestServlet):
@@ -139,44 +145,40 @@ class ProfileRestServlet(RestServlet):
         self.hs = hs
         self.profile_handler = hs.get_profile_handler()
         self.auth = hs.get_auth()
-        # insertion for watcha
-        self.account_activity_handler = hs.get_account_validity_handler()
-        # end of insertion
+        self.account_activity_handler = hs.get_account_validity_handler() # watcha+
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, user_id):
+    async def on_GET(self, request, user_id):
         requester_user = None
 
         if self.hs.config.require_auth_for_profile_requests:
-            requester = yield self.auth.get_user_by_req(request)
+            requester = await self.auth.get_user_by_req(request)
             requester_user = requester.user
 
         user = UserID.from_string(user_id)
 
-        yield self.profile_handler.check_profile_query_allowed(user, requester_user)
+        await self.profile_handler.check_profile_query_allowed(user, requester_user)
 
-        displayname = yield self.profile_handler.get_displayname(user)
-        avatar_url = yield self.profile_handler.get_avatar_url(user)
+        displayname = await self.profile_handler.get_displayname(user)
+        avatar_url = await self.profile_handler.get_avatar_url(user)
 
         ret = {}
         if displayname is not None:
             ret["displayname"] = displayname
         if avatar_url is not None:
             ret["avatar_url"] = avatar_url
-        # insertion for watcha
-        # For personal data protection, we don't return phone number of the other users.
+
+        # watcha+
         try:
-            email = yield self.account_activity_handler.get_email_address_for_user(
+            email = await self.account_activity_handler.get_email_address_for_user(
                 user_id
             )
             ret["email"] = email
         except SynapseError:
             logger.error("Email is not defined for this user.")
-        # end of insertion
+        # watcha+
+        return 200, ret
         
-        return (200, ret)
-
-
+        
 def register_servlets(hs, http_server):
     ProfileDisplaynameRestServlet(hs).register(http_server)
     ProfileAvatarURLRestServlet(hs).register(http_server)
