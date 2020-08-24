@@ -896,7 +896,7 @@ class RoomCreationHandler(BaseHandler):
                 "events": {
                     EventTypes.Name: 50,
                     EventTypes.PowerLevels: 100,
-                    EventTypes.RoomHistoryVisibility: 50, # watcha+
+                    EventTypes.RoomHistoryVisibility: 50,
                     EventTypes.CanonicalAlias: 50,
                     EventTypes.RoomAvatar: 50,
                     EventTypes.Tombstone: 100,
@@ -1346,8 +1346,8 @@ class RoomShutdownHandler(object):
             "local_aliases": aliases_for_room,
             "new_room_id": new_room_id,
         }
-        return (events, next_key)
 
+# watcha+
 class WatchaRoomHandler(BaseHandler):
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -1391,3 +1391,4 @@ class WatchaRoomHandler(BaseHandler):
         )
 
         return event
+# +watcha
