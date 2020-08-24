@@ -719,7 +719,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         )
         '''
 
-       #watcha +
+        # watcha +
         self.assertEqual(
             r1stats["current_state_events"]-1, EXPT_NUM_STATE_EVTS_IN_FRESH_PUBLIC_ROOM
         )

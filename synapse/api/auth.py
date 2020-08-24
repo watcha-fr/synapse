@@ -214,7 +214,7 @@ class Auth(object):
             user = user_info["user"]
             token_id = user_info["token_id"]
             is_guest = user_info["is_guest"]
-            is_partner = user_info["is_partner"] #watcha+
+            is_partner = user_info["is_partner"] # watcha+
 
             # Deny the request if the user account has expired.
             if self._account_validity.enabled and not allow_expired:
