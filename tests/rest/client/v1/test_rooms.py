@@ -1016,9 +1016,9 @@ class PublicRoomsRestrictedTestCase(unittest.HomeserverTestCase):
 
         request, channel = self.make_request("GET", self.url, access_token=tok)
         self.render(request)
-        """ !watcha - directory disabled
+        """ watcha! - directory disabled
         self.assertEqual(channel.code, 200, channel.result)
-        """
+        !watcha """
         self.assertEqual(channel.code, 403, channel.result)
 
 

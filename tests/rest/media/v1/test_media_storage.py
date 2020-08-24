@@ -264,12 +264,12 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         self.assertEqual(
             headers.getRawHeaders(b"Content-Type"), [self.test_image.content_type]
         )
-        """ !watcha
+        """ watcha!
         self.assertEqual(
             headers.getRawHeaders(b"Content-Disposition"),
             [b"inline; filename=out" + self.test_image.extension],
         )
-        """
+        !watcha """
         # watcha+
         self.assertEqual(
             headers.getRawHeaders(b"Content-Disposition"),
@@ -292,12 +292,12 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         self.assertEqual(
             headers.getRawHeaders(b"Content-Type"), [self.test_image.content_type]
         )
-        """ !watcha
+        """ watcha!
         self.assertEqual(
             headers.getRawHeaders(b"Content-Disposition"),
             [b"inline; filename*=utf-8''" + filename + self.test_image.extension],
         )
-        """
+        !watcha """
         # watcha+
         self.assertEqual(
             headers.getRawHeaders(b"Content-Disposition"),

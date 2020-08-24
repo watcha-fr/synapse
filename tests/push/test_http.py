@@ -117,9 +117,9 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # One push was attempted to be sent -- it'll be the first message
         self.assertEqual(len(self.push_attempts), 1)
-        """ !watcha
+        """ watcha!
         self.assertEqual(self.push_attempts[0][1], "example.com")
-        """
+        !watcha """
         # watcha+ hardcoded in synapse/push/pusherpool.py,
         # because we need different AppIds for Android and iOS and the code doesn't support it
         self.assertEqual(self.push_attempts[0][1],
@@ -144,9 +144,9 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Now it'll try and send the second push message, which will be the second one
         self.assertEqual(len(self.push_attempts), 2)
-        """ !watcha
+        """ watcha!
         self.assertEqual(self.push_attempts[1][1], "example.com")
-        """
+        !watcha """
         # watcha+
         self.assertEqual(self.push_attempts[1][1],
                          "http://127.0.0.1:5000/_matrix/push/v1/notify")
@@ -310,10 +310,10 @@ class HTTPPusherTests(HomeserverTestCase):
         yet_another_user_id = self.register_user("yetanotheruser", "pass")
         yet_another_access_token = self.login("yetanotheruser", "pass")
 
-        # Create a room        
-        """ !watcha
+        # Create a room
+        """ watcha!
         room = self.helper.create_room_as(user_id, tok=access_token)
-        """
+        !watcha """
         # watcha+
         room = self.helper.create_room_as(user_id, tok=access_token)
         self.helper.invite (room, user_id, other_user_id, tok=access_token)

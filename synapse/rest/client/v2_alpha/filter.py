@@ -35,9 +35,9 @@ class GetFilterRestServlet(RestServlet):
 
     async def on_GET(self, request, user_id, filter_id):
         target_user = UserID.from_string(user_id)
-        """ !watcha
+        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        """
+        !watcha """
         requester = await self.auth.get_user_by_req(request, allow_partner=True) # watcha+
 
         if target_user != requester.user:
@@ -75,9 +75,9 @@ class CreateFilterRestServlet(RestServlet):
     async def on_POST(self, request, user_id):
 
         target_user = UserID.from_string(user_id)
-        """ !watcha
+        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        """
+        !watcha """
         requester = await self.auth.get_user_by_req(request, allow_partner=True) # watcha+
 
         if target_user != requester.user:

@@ -21,9 +21,9 @@ from synapse.api.room_versions import RoomVersions
 from synapse.types import RoomAlias, RoomID, UserID
 
 from tests import unittest
-""" !watcha
+""" watcha!
 from tests.utils import setup_test_homeserver
-"""
+!watcha """
 from tests.utils import create_room, setup_test_homeserver # watcha+
 
 
@@ -149,7 +149,7 @@ class RoomEventsStoreTestCase(unittest.TestCase):
     # Not testing the various 'level' methods for now because there's lots
     # of them and need coalescing; see JIRA SPEC-11
 
-# watcha+ - OP433
+# watcha+ op433
 class WatchaRoomEventsStoreTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.event_builder_factory = hs.get_event_builder_factory()

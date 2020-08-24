@@ -187,9 +187,9 @@ class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):
 
         # Now let's create a room, which will insert a membership
         user = UserID("alice", "test")
-        """ !watcha
+        """ watcha!
         requester = Requester(user, None, False, None, None)
-        """
+        !watcha """
         requester = Requester(user, None, False, None, False, None)   # watcha+
         self.get_success(self.room_creator.create_room(requester, {}))
 

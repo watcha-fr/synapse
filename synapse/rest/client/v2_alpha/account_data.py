@@ -44,9 +44,9 @@ class AccountDataServlet(RestServlet):
         if self._is_worker:
             raise Exception("Cannot handle PUT /account_data on worker")
 
-        """ !watcha
+        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        """
+        !watcha """
         requester = await self.auth.get_user_by_req(request, allow_partner=True) # watcha+
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
@@ -99,9 +99,9 @@ class RoomAccountDataServlet(RestServlet):
         if self._is_worker:
             raise Exception("Cannot handle PUT /account_data on worker")
 
-        """ !watcha
+        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        """
+        !watcha """
         requester = await self.auth.get_user_by_req(request, allow_partner=True) # watcha+
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")

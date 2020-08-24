@@ -118,9 +118,9 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         )
         self.assertEqual(counter[(EventTypes.Message, None)], 1)
         self.assertEqual(counter[(EventTypes.Member, self.user1)], 1)
-        """ !watcha
+        """ watcha!
         self.assertEqual(counter[(EventTypes.Member, self.user2)], 1)
-        """
+        !watcha """
         self.assertEqual(counter[(EventTypes.Member, self.user2)], 2) # watcha+ - from 1 to 2 because of additional invit event
 
     def test_single_left_room(self):
@@ -155,9 +155,9 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         )
         self.assertEqual(counter[(EventTypes.Message, None)], 2)
         self.assertEqual(counter[(EventTypes.Member, self.user1)], 1)
-        """ !watcha
+        """ watcha!
         self.assertEqual(counter[(EventTypes.Member, self.user2)], 2)
-        """
+        !watcha """
         self.assertEqual(counter[(EventTypes.Member, self.user2)], 3) # watcha+ - from 2 to 3 because of additional invit event
 
     def test_single_left_rejoined_private_room(self):
@@ -201,9 +201,9 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         )
         self.assertEqual(counter[(EventTypes.Message, None)], 2)
         self.assertEqual(counter[(EventTypes.Member, self.user1)], 1)
-        """ !watcha
+        """ watcha!
         self.assertEqual(counter[(EventTypes.Member, self.user2)], 3)
-        """
+        !watcha """
         self.assertEqual(counter[(EventTypes.Member, self.user2)], 5) # watcha+ - from 3 to 5 because of additional invit events
 
     def test_invite(self):

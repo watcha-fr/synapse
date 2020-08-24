@@ -521,11 +521,11 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             self.presence_handler.current_state_for_user("@test2:server")
         )
         self.assertEqual(expected_state.state, PresenceState.ONLINE)
-        """ !watcha
+        """ watcha!
         self.federation_sender.send_presence_to_destinations.assert_called_once_with(
             destinations=["server2"], states=[expected_state]
         )
-        """
+        !watcha """
         self.federation_sender.send_presence_to_destinations.assert_not_called() # watcha+ - not sending presence to other servers
 
         #
@@ -536,11 +536,11 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         self._add_new_user(room_id, "@bob:server3")
 
         self.federation_sender.send_presence.assert_not_called()
-        """ !watcha
+        """ watcha!
         self.federation_sender.send_presence_to_destinations.assert_called_once_with(
             destinations=["server3"], states=[expected_state]
         )
-        """
+        !watcha """
         self.federation_sender.send_presence_to_destinations.assert_not_called() # watcha+
 
     def test_remote_gets_presence_when_local_user_joins(self):
@@ -592,11 +592,11 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             self.presence_handler.current_state_for_user("@test2:server")
         )
         self.assertEqual(expected_state.state, PresenceState.ONLINE)
-        """ !watcha
+        """ watcha!
         self.federation_sender.send_presence_to_destinations.assert_called_once_with(
             destinations={"server2", "server3"}, states=[expected_state]
         )
-        """
+        !watcha """
         # watcha+
         self.federation_sender.send_presence_to_destinations.assert_called_once_with(
             destinations=set(), states=[expected_state]
@@ -635,11 +635,11 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         self.get_success(self.federation_handler.on_receive_pdu(hostname, event))
 
         # Check that it was successfully persisted.
-        """ !watcha - makes sense that remote event is not persisted.
+        """ watcha! - makes sense that remote event is not persisted.
         .. but not enough to make the test work. disabled below.
         self.get_success(self.store.get_event(event.event_id))
         self.get_success(self.store.get_event(event.event_id))
-        """
+        !watcha """
         # watcha+
         from synapse.api.errors import NotFoundError
         self.get_failure(self.store.get_event(event.event_id),

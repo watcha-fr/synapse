@@ -638,9 +638,9 @@ class RoomCreationHandler(BaseHandler):
 
         invite_3pid_list = config.get("invite_3pid", [])
 
-        """ !watcha
+        """ watcha!
         visibility = config.get("visibility", None)
-        """
+        !watcha """
         visibility = "private" # watcha+
         is_public = visibility == "public"
 
@@ -745,6 +745,22 @@ class RoomCreationHandler(BaseHandler):
             )
 
         for invite_3pid in invite_3pid_list:
+            """ watcha!
+            id_server = invite_3pid["id_server"]
+            id_access_token = invite_3pid.get("id_access_token")  # optional
+            address = invite_3pid["address"]
+            medium = invite_3pid["medium"]
+            last_stream_id = await self.hs.get_room_member_handler().do_3pid_invite(
+                room_id,
+                requester.user,
+                medium,
+                address,
+                id_server,
+                requester,
+                txn_id=None,
+                id_access_token=id_access_token,
+            )
+            !watcha """
             # watcha+
             logger.info("invitation on creation: inviter id=%s, device_id=%s",
                 requester.user, requester.device_id)
@@ -773,23 +789,6 @@ class RoomCreationHandler(BaseHandler):
                 content=content,
             )
             # +watcha
-
-            """ !watcha
-            id_server = invite_3pid["id_server"]
-            id_access_token = invite_3pid.get("id_access_token")  # optional
-            address = invite_3pid["address"]
-            medium = invite_3pid["medium"]
-            last_stream_id = await self.hs.get_room_member_handler().do_3pid_invite(
-                room_id,
-                requester.user,
-                medium,
-                address,
-                id_server,
-                requester,
-                txn_id=None,
-                id_access_token=id_access_token,
-            )
-            """
 
         result = {"room_id": room_id}
 
@@ -867,7 +866,7 @@ class RoomCreationHandler(BaseHandler):
                 etype=EventTypes.PowerLevels, content=pl_content
             )
         else:
-            """ !watcha
+            """ watcha!
             power_level_content = {
                 "users": {creator_id: 100},
                 "users_default": 0,
@@ -888,7 +887,7 @@ class RoomCreationHandler(BaseHandler):
                 "redact": 50,
                 "invite": 50,
             }
-            """
+            !watcha """
             # watcha+
             power_level_content = {
                 "users": {creator_id: 100},

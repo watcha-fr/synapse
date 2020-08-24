@@ -921,7 +921,7 @@ class PersistEventsStore:
             elif event.type == EventTypes.Retention:
                 # Update the room_retention table.
                 self._store_retention_policy_for_room_txn(txn, event)
-            # watcha+ - OP433
+            # watcha+ op433
             elif event.type == EventTypes.VectorSetting:
                 self._store_room_link_with_NC(txn, event)
             # +watcha
@@ -1262,7 +1262,7 @@ class PersistEventsStore:
                 txn, self.store.get_retention_policy_for_room, (event.room_id,)
             )
 
-    # watcha+ - OP433
+    # watcha+ op433
     def _store_room_link_with_NC(self, txn, event):
         """ Store the link between Watcha room and Nextcloud folder.
         """

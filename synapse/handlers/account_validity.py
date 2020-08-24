@@ -20,9 +20,9 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import List
 
-""" !watcha
+""" watcha!
 from synapse.api.errors import StoreError
-"""
+!watcha """
 from synapse.api.errors import StoreError, SynapseError # watcha+
 from synapse.logging.context import make_deferred_yieldable
 from synapse.metrics.background_process_metrics import run_as_background_process

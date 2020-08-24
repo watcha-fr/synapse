@@ -38,9 +38,9 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
 
         # Create a test user and room
         self.user = UserID("alice", "test")
-        """ !watcha
+        """ watcha!
         self.requester = Requester(self.user, None, False, None, None)
-        """
+        !watcha """
         self.requester = Requester(self.user, None, False, None, False, None) # watcha+
         info, _ = self.get_success(self.room_creator.create_room(self.requester, {}))
         self.room_id = info["room_id"]
@@ -269,9 +269,9 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         self.user = UserID.from_string(self.user1)
         # +watcha
         self.token1 = self.login("user1", "password")
-        """ !watcha
+        """ watcha!
         self.requester = Requester(self.user, None, False, None, None)
-        """
+        !watcha """
         self.requester = Requester(self.user, None, False, None, False, None)  # watcha+
         info, _ = self.get_success(self.room_creator.create_room(self.requester, {}))
         self.room_id = info["room_id"]

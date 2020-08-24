@@ -261,11 +261,11 @@ class Auth(object):
             if device_id:
                 opentracing.set_tag("device_id", device_id)
 
-            """ !watcha
+            """ watcha!
             return synapse.types.create_requester(
                 user, token_id, is_guest, device_id, app_service=app_service
             )
-            """
+            !watcha """
             # watcha+
             return synapse.types.create_requester(
                 user, token_id, is_guest, device_id, is_partner, app_service=app_service

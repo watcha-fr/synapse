@@ -187,7 +187,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
 
-    # watcha+ - OP189
+    # watcha+ op189
     def test_LOGIN_with_trim(self):
        self.register_user("kermit", "monkey")
 

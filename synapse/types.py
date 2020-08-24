@@ -49,13 +49,13 @@ StateMap = Dict[Tuple[str, str], T]
 JsonDict = Dict[str, Any]
 
 
-""" !watcha
+""" watcha!
 class Requester(
     namedtuple(
         "Requester", ["user", "access_token_id", "is_guest", "device_id", "app_service"]
     )
 ):
-"""
+!watcha """ 
 # watcha+
 class Requester(
     namedtuple(
@@ -117,11 +117,11 @@ class Requester(
         )
 
 
-""" !watcha
+""" watcha!
 def create_requester(
     user_id, access_token_id=None, is_guest=False, device_id=None, app_service=None
 ):
-"""
+!watcha """ 
 # watcha+
 def create_requester(
     user_id, access_token_id=None, is_guest=False, device_id=None, is_partner=False, app_service=None  # modified for watcha: added is_partner
@@ -143,9 +143,9 @@ def create_requester(
     """
     if not isinstance(user_id, UserID):
         user_id = UserID.from_string(user_id)
-    """ !watcha
+    """ watcha!
     return Requester(user_id, access_token_id, is_guest, device_id, app_service)
-    """
+    !watcha """ 
     return Requester(user_id, access_token_id, is_guest, device_id, is_partner, app_service)  # watcha+
 
 

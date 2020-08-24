@@ -130,9 +130,9 @@ class PushRuleRestServlet(RestServlet):
                 raise
 
     async def on_GET(self, request, path):
-        """ !watcha
+        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        """
+        !watcha """
         requester = await self.auth.get_user_by_req(request, allow_partner=True) # watcha+
         user_id = requester.user.to_string()
 

@@ -56,9 +56,9 @@ class PresenceStatusRestServlet(RestServlet):
         return 200, state
 
     async def on_PUT(self, request, user_id):
-        """ !watcha
+        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        """
+        !watcha """
         requester = await self.auth.get_user_by_req(request, allow_partner=True) # watcha+
         user = UserID.from_string(user_id)
 

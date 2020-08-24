@@ -33,9 +33,9 @@ class ReadMarkerRestServlet(RestServlet):
         self.presence_handler = hs.get_presence_handler()
 
     async def on_POST(self, request, room_id):
-        """ !watcha
+        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        """
+        !watcha """
         requester = await self.auth.get_user_by_req(request, allow_partner=True) # watcha+
 
         await self.presence_handler.bump_presence_active_time(requester.user)
