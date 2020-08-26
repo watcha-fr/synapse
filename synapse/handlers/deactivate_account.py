@@ -110,7 +110,7 @@ class DeactivateAccountHandler(BaseHandler):
 
         await self.store.user_set_password_hash(user_id, None)
 
-        await self.store.watcha_deactivate_account(user_id)# watcha+
+        await self.store.watcha_deactivate_account(user_id) # watcha+
         # Add the user to a table of users pending deactivation (ie.
         # removal from all the rooms they're a member of)
         await self.store.add_user_pending_deactivation(user_id)

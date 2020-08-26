@@ -419,4 +419,4 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         consent_uri_builder.build_user_consent_uri.return_value = "http://example.com"
         self.event_creator._consent_uri_builder = consent_uri_builder
 
-    test_send_dummy_events_when_insufficient_power.skip = "Disable for Watcha"
+    test_send_dummy_events_when_insufficient_power.skip = "Disable for Watcha" # watcha+

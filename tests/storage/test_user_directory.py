@@ -68,9 +68,6 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
     # watcha+
     test_search_user_dir.skip = "Not working because of Watcha modification"
     test_search_user_dir_all_users.skip = "Not working because of Watcha modification"
-    # +watcha
-
-    # watcha+
     @defer.inlineCallbacks
     def test_search_user_dir_for_watcha(self):
         # This only tests that it's not crashing :) after our motifs.
