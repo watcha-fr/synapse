@@ -1069,7 +1069,6 @@ class AuthHandler(BaseHandler):
             "email",
             address
         )
-
         return ret
     # +watcha
 
