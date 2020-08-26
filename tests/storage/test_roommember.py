@@ -190,7 +190,7 @@ class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):
         """ watcha!
         requester = Requester(user, None, False, None, None)
         !watcha """
-        requester = Requester(user, None, False, None, False, None)   # watcha+
+        requester = Requester(user, None, False, None, False, None) # watcha+
         self.get_success(self.room_creator.create_room(requester, {}))
 
         # Register the background update to run again.
