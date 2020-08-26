@@ -161,7 +161,7 @@ class Auth(object):
         self,
         request: Request,
         allow_guest: bool = False,
-        allow_partner: bool = False, # watcha+ allow_partner parameter
+        allow_partner: bool = False, # watcha+
         rights: str = "access",
         allow_expired: bool = False,
     ) -> synapse.types.Requester:
