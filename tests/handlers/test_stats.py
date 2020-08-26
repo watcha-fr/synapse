@@ -301,7 +301,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertIsNotNone(r2stats)
 
         # contains the default things you'd expect in a fresh room
-        ''' !watcha
+        """ watcha!
         self.assertEqual(
             r1stats["total_events"],
             EXPT_NUM_STATE_EVTS_IN_FRESH_PUBLIC_ROOM,
@@ -309,7 +309,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             " You may need to update this if more state events are added to"
             " the room creation process.",
         )
-        '''
+        !watcha """
         # watcha+
         self.assertEqual(
             r1stats["total_events"]-1,
@@ -325,11 +325,11 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             " the room creation process.",
         )
 
-        ''' !watcha 
+        """ watcha! 
         self.assertEqual(
             r1stats["current_state_events"], EXPT_NUM_STATE_EVTS_IN_FRESH_PUBLIC_ROOM
         )
-        '''
+        !watcha """
         # watcha+
         self.assertEqual(
             r1stats["current_state_events"]-1, EXPT_NUM_STATE_EVTS_IN_FRESH_PUBLIC_ROOM
@@ -476,7 +476,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         r1stats_post = self._get_current_stats("room", r1)
 
-        ''' !watcha
+        """ watcha!
         self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
         self.assertEqual(
             r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
@@ -485,7 +485,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertEqual(
             r1stats_post["joined_members"] - r1stats_ante["joined_members"], 1
         )
-        '''
+        !watcha """
         # watcha+
         self.assertEqual(r1stats_post["total_events"]-1 - r1stats_ante["total_events"], 1)
         self.assertEqual(
@@ -495,7 +495,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertEqual(
             r1stats_post["joined_members"] - r1stats_ante["joined_members"], 1
         )
-        # + watcha
+        # +watcha
 
     def test_join_after_leave(self):
         """
@@ -525,9 +525,9 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         r1stats_post = self._get_current_stats("room", r1)
 
-        ''' !watcha
+        """ watcha!
         self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
-        '''
+        !watcha """
         self.assertEqual(r1stats_post["total_events"]-1 - r1stats_ante["total_events"], 1) # watcha+
         self.assertEqual(
             r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
@@ -713,11 +713,11 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         u1stats = self._get_current_stats("user", u1)
 
         self.assertEqual(r1stats["joined_members"], 1)
-        ''' !watcha
+        """ watcha!
         self.assertEqual(
             r1stats["current_state_events"], EXPT_NUM_STATE_EVTS_IN_FRESH_PUBLIC_ROOM
         )
-        '''
+        !watcha """
 
         # watcha +
         self.assertEqual(

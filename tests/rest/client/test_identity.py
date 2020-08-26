@@ -33,7 +33,10 @@ class IdentityTestCase(unittest.HomeserverTestCase):
 
         config = self.default_config()
         config["enable_3pid_lookup"] = False
-        config["public_baseurl"] = 'https://localhsot:8008' # watcha+ - this tests the external invitation, in fact ! So adding the needed setting.
+        # watcha+
+        # this tests the external invitation, in fact ! So adding the needed setting.
+        config["public_baseurl"] = 'https://localhsot:8008'
+        # +watcha
         self.hs = self.setup_test_homeserver(config=config)
 
         return self.hs
@@ -62,7 +65,8 @@ class IdentityTestCase(unittest.HomeserverTestCase):
             b"POST", request_url, request_data, access_token=tok
         )
         self.render(request)
-        """ watcha! this tests the external invitation, in fact !
+        """ watcha! 
+        this tests the external invitation, in fact !
         self.assertEquals(channel.result["code"], b"403", channel.result)
         !watcha """
-        self.assertEquals(channel.result["code"], b"200", channel.result)
+        self.assertEquals(channel.result["code"], b"200", channel.result) # watcha+

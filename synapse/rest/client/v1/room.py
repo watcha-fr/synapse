@@ -228,7 +228,6 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     content['history_visibility'] = "invited"
                 logger.info("RoomHistoryEvent. New content=" + str(content))
 
-            # added by watcha
             # override room permissions config requests
             # 0 means a generic user - 50 means a moderator - 100 means an administrator
             if event_type == EventTypes.PowerLevels:
@@ -418,7 +417,10 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             else:
                 pass
 
-        raise AuthError(403, "Directory is not available") # watcha+ disable pubic room
+        # watcha+
+        # disable pubic room
+        raise AuthError(403, "Directory is not available")
+        # +watcha
 
         limit = parse_integer(request, "limit", 0)
         since_token = parse_string(request, "since", None)
@@ -445,7 +447,10 @@ class PublicRoomListRestServlet(TransactionRestServlet):
     async def on_POST(self, request):
         await self.auth.get_user_by_req(request, allow_guest=True)
 
-        raise AuthError(403, "Directory is not available") # watcha+ disable pubic room
+        # watcha+
+        # disable pubic room
+        raise AuthError(403, "Directory is not available")
+        # +watcha
 
         server = parse_string(request, "server", default=None)
         content = parse_json_object_from_request(request)
@@ -779,10 +784,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
     async def on_POST(self, request, room_id, membership_action, txn_id=None):
         """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True) # watcha+
 
-        """ watcha!
         if requester.is_guest and membership_action not in {
             Membership.JOIN,
             Membership.LEAVE,
@@ -790,15 +792,18 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             raise AuthError(403, "Guest access not allowed")
         !watcha """
         # watcha+
-        if (requester.is_guest or requester.is_partner) and membership_action not in { # watcha+
+        requester = await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True)
+
+        if (requester.is_guest or requester.is_partner) and membership_action not in {
             Membership.JOIN,
             Membership.LEAVE,
         }:
-            if requester.is_guest: # watcha+
+            if requester.is_guest:
                 raise AuthError(403, "Guest access not allowed")
             else:
                 raise AuthError(403, "Partners can only join and leave rooms")
         # +watcha
+
         try:
             content = parse_json_object_from_request(request)
         except Exception:

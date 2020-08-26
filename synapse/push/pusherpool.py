@@ -96,7 +96,8 @@ class PusherPool:
 
         time_now_msec = self.clock.time_msec()
 
-        # watcha+ we override url for iOS
+        # watcha+ 
+        # we override url for iOS
         # two options to distinguish iOS and Android push rules
         # - app_id: for android it is "im.vector.app.android", while for iOS it is "im.watcha.app.voip"
         # - app_display_name: android: "im.watcha" and iOS "Watcha (iOS)"

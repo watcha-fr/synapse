@@ -127,7 +127,10 @@ class TestCreateAlias(unittest.HomeserverTestCase):
         # Create a test user.
         self.test_user = self.register_user("user", "pass", admin=False)
         self.test_user_tok = self.login("user", "pass")
-        self.helper.invite(self.room_id, src=self.admin_user, tok=self.admin_user_tok, targ=self.test_user) # watcha+ - needed since rooms are private
+        # watcha+
+        # needed since rooms are private
+        self.helper.invite(self.room_id, src=self.admin_user, tok=self.admin_user_tok, targ=self.test_user)
+        # +watcha
         self.helper.join(room=self.room_id, user=self.test_user, tok=self.test_user_tok)
 
     def test_create_alias_joined_room(self):
@@ -192,7 +195,10 @@ class TestDeleteAlias(unittest.HomeserverTestCase):
         # Create a test user.
         self.test_user = self.register_user("user", "pass", admin=False)
         self.test_user_tok = self.login("user", "pass")
-        self.helper.invite(self.room_id, src=self.admin_user, tok=self.admin_user_tok, targ=self.test_user) # watcha+ - needed since rooms are private
+        # watcha+
+        # needed since rooms are private
+        self.helper.invite(self.room_id, src=self.admin_user, tok=self.admin_user_tok, targ=self.test_user)
+        # +watcha
         self.helper.join(room=self.room_id, user=self.test_user, tok=self.test_user_tok)
 
     def _create_alias(self, user):

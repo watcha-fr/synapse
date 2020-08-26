@@ -146,7 +146,7 @@ def create_requester(
     """ watcha!
     return Requester(user_id, access_token_id, is_guest, device_id, app_service)
     !watcha """ 
-    return Requester(user_id, access_token_id, is_guest, device_id, is_partner, app_service)  # watcha+
+    return Requester(user_id, access_token_id, is_guest, device_id, is_partner, app_service) # watcha+
 
 
 def get_domain_from_id(string):

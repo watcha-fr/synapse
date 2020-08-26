@@ -273,7 +273,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         # watcha+
         self.assertEqual(
             headers.getRawHeaders(b"Content-Disposition"),
-            [b"attachment; filename=out" + self.test_image.extension],# modified by watcha: inline -> attachment
+            [b"attachment; filename=out" + self.test_image.extension],
         )
         # +watcha
 
@@ -301,7 +301,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         # watcha+
         self.assertEqual(
             headers.getRawHeaders(b"Content-Disposition"),
-            [b"attachment; filename*=utf-8''" + filename + self.test_image.extension],# modified for watcha inline=>attachment
+            [b"attachment; filename*=utf-8''" + filename + self.test_image.extension],
         )
         # +watcha
 

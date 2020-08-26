@@ -1,139 +1,152 @@
 <!DOCTYPE html>
 <html lang="fr">
+    <head>
+        <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+        <title>{{ title }}</title>
+        <style>
+            html {
+                font-family: sans-serif;
+            }
 
-<head>
-	<meta http-equiv="content-type" content="text/html; charset=UTF-8">
-	<title>{{ title }}</title>
-	<style>
-		html {
-			font-family: sans-serif;
-		}
+            body {
+                max-width: 600px;
+                padding: 1em;
+            }
 
-		body {
-			max-width: 600px;
-			padding: 1em;
-		}
+            #logo {
+                width: 8em;
+                height: auto;
+                max-width: 20vw;
+                margin-bottom: 2em;
+            }
 
-		#logo {
-			width: 8em;
-			height: auto;
-			max-width: 20vw;
-			margin-bottom: 2em;
-		}
+            .centered {
+                display: table;
+                margin: 0 auto;
+            }
 
-		.centered {
-			display: table;
-			margin: 0 auto;
-		}
+            .btn-primary {
+                background-color: #007bff;
+                border-radius: 0.25rem;
+                border: 1px solid #007bff;
+                color: #fff;
+                font-family: sans-serif;
+                font-size: 1.25em;
+                font-weight: 400;
+                line-height: 1.5;
+                margin-bottom: 2em;
+                margin-top: 2em;
+                padding: 0.375rem 0.75rem;
+                text-decoration: none;
+                transition: 0.15s ease-in-out;
+            }
 
-		.btn-primary {
-			background-color: #007bff;
-			border-radius: .25rem;
-			border: 1px solid #007bff;
-			color: #fff;
-			font-family: sans-serif;
-			font-size: 1.25em;
-			font-weight: 400;
-			line-height: 1.5;
-			margin-bottom: 2em;
-			margin-top: 2em;
-			padding: .375rem .75rem;
-			text-decoration: none;
-			transition: 0.15s ease-in-out;
-		}
+            .btn-primary:hover {
+                background-color: #0069d9;
+                border-color: #0062cc;
+            }
 
-		.btn-primary:hover {
-			background-color: #0069d9;
-			border-color: #0062cc;
-		}
+            .btn-primary:active {
+                box-shadow: 0 0 0 0.2rem #7fbcff;
+                background-color: #0062cc;
+                border-color: #005cbf;
+            }
 
-		.btn-primary:active {
-			box-shadow: 0 0 0 .2rem #7fbcff;
-			background-color: #0062cc;
-			border-color: #005cbf;
-		}
+            .credential-table {
+                width: 100%;
+                margin-bottom: 1em;
+                padding: 1em 1em 0 1em;
+                border: 1px solid black;
+                border-radius: 0.25rem;
+                border-spacing: 0;
+            }
 
-		.credential-table {
-			width: 100%;
-			margin-bottom: 1em;
-			padding: 1em 1em 0 1em;
-			border: 1px solid black;
-			border-radius: .25rem;
-			border-spacing: 0;
-		}
+            .credential-title {
+                padding-bottom: 0.75em;
+                font-weight: bold;
+            }
 
-		.credential-title {
-			padding-bottom: 0.75em;
-			font-weight: bold;
-		}
+            .credential {
+                padding-left: 3em;
+                padding-bottom: 1.5em;
+            }
 
-		.credential {
-			padding-left: 3em;
-			padding-bottom: 1.5em;
-		}
+            .hint {
+                color: rgb(100, 100, 100);
+            }
 
-		.hint {
-			color: rgb(100, 100, 100);
-		}
+            .fallback {
+                margin-bottom: 3em;
+                font-size: small;
+            }
 
-		.fallback {
-			margin-bottom: 3em;
-			font-size: small;
-		}
+            .url {
+                word-break: break-all;
+            }
 
-		.url {
-			word-break: break-all;
-		}
+            .prevent-link {
+                text-decoration: none;
+                color: #000;
+                cursor: default;
+            }
 
-                .prevent-link {
-			text-decoration: none;
-			color: #000;
-			cursor: default;
-		}
-                
-		.ExternalClass p, .ExternalClass span, .ExternalClass font, .ExternalClass td {
-			line-height: 100%;
-		}
+            .ExternalClass p,
+            .ExternalClass span,
+            .ExternalClass font,
+            .ExternalClass td {
+                line-height: 100%;
+            }
 
-		.ExternalClass {
-			width: 100%;
-		}
+            .ExternalClass {
+                width: 100%;
+            }
+        </style>
+    </head>
 
-	</style>
-</head>
-
-<body class="centered">
-	<img id="logo" class="centered" src="data:image/jpeg;base64,{{ "watcha.jpg"|b64content }}" alt="Logo Watcha" />
-	<p>Bonjour{{ full_name|spacebefore }},</p>
-	{% block introduction %}{% endblock %}
-	<a class="btn-primary centered" href="{{ login_url }}">{% block button %}Se connecter à Watcha{% endblock %}</a>
-	{% block usage %}{% endblock %}
-	<table class="credential-table">
-		<tbody>
-			<tr>
-				<td class="credential-title">Email&nbsp;:</td>
-			</tr>
-			<tr>
-				<td class="credential">{{ email|preventlinks }}</td>
-			</tr>
-			<tr>
-				<td class="credential-title">Mot de passe&nbsp;:</td>
-			</tr>
-			<tr>
-				<td class="credential hint"><em>(&nbsp;{% block password %}{% endblock %}&nbsp;)</em></td>
-			</tr>
-			<tr>
-				<td class="credential-title">Espace de travail&nbsp;:</td>
-			</tr>
-			<tr>
-				<td class="credential">{{ server }}</td>
-			</tr>
-		</tbody>
-	</table>
-	<p class="fallback">Si le lien ne fonctionne pas, copiez-collez cette URL dans la barre d'adresse de votre
-		navigateur internet&nbsp;: <span class="url hint"><a href="{{ login_url }}">{{ login_url }}</a></span></p>
-	<p>N'hésitez pas à nous contacter en répondant à cet email,</p>
-	<p>L'équipe Watcha</p>
-</body>
-
+    <body class="centered">
+        <img id="logo" class="centered" src="data:image/jpeg;base64,{{
+        "watcha.jpg"|b64content }}" alt="Logo Watcha" />
+        <p>Bonjour{{ full_name|spacebefore }},</p>
+        {% block introduction %}{% endblock %}
+        <a class="btn-primary centered" href="{{ login_url }}"
+            >{% block button %}Se connecter à Watcha{% endblock %}</a
+        >
+        {% block usage %}{% endblock %}
+        <table class="credential-table">
+            <tbody>
+                <tr>
+                    <td class="credential-title">Email&nbsp;:</td>
+                </tr>
+                <tr>
+                    <td class="credential">{{ email|preventlinks }}</td>
+                </tr>
+                <tr>
+                    <td class="credential-title">Mot de passe&nbsp;:</td>
+                </tr>
+                <tr>
+                    <td class="credential hint">
+                        <em
+                            >(&nbsp;{% block password %}{% endblock
+                            %}&nbsp;)</em
+                        >
+                    </td>
+                </tr>
+                <tr>
+                    <td class="credential-title">Espace de travail&nbsp;:</td>
+                </tr>
+                <tr>
+                    <td class="credential">{{ server }}</td>
+                </tr>
+            </tbody>
+        </table>
+        <p class="fallback">
+            Si le lien ne fonctionne pas, copiez-collez cette URL dans la barre
+            d'adresse de votre navigateur internet&nbsp;:
+            <span class="url hint"
+                ><a href="{{ login_url }}">{{ login_url }}</a></span
+            >
+        </p>
+        <p>N'hésitez pas à nous contacter en répondant à cet email,</p>
+        <p>L'équipe Watcha</p>
+    </body>
 </html>

@@ -1016,10 +1016,11 @@ class PublicRoomsRestrictedTestCase(unittest.HomeserverTestCase):
 
         request, channel = self.make_request("GET", self.url, access_token=tok)
         self.render(request)
-        """ watcha! - directory disabled
+        """ watcha!
+        # directory disabled
         self.assertEqual(channel.code, 200, channel.result)
         !watcha """
-        self.assertEqual(channel.code, 403, channel.result)
+        self.assertEqual(channel.code, 403, channel.result) # watcha+
 
 
 class PerRoomProfilesForbiddenTestCase(unittest.HomeserverTestCase):
@@ -1134,9 +1135,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         self._check_for_reason(reason)
 
     def test_kick_reason(self):
-        # watcha+
-        self.helper.invite(self.room_id,self.creator,self.second_user_id, tok=self.creator_tok)
-        # +watcha
+        self.helper.invite(self.room_id,self.creator,self.second_user_id, tok=self.creator_tok) # watcha+
         self.helper.join(self.room_id, user=self.second_user_id, tok=self.second_tok)
 
         reason = "hello"
@@ -1824,7 +1823,7 @@ class RoomAliasListTestCase(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEqual(channel.code, expected_code, channel.result)
 
-    test_peekable_room.skip = "Disable for Watcha"
+    test_peekable_room.skip = "Disable for Watcha" # watcha+
 
 
 class RoomCanonicalAliasTestCase(unittest.HomeserverTestCase):

@@ -219,7 +219,8 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 400, channel.result)
 
         res = self.get_displayname()
-        """ watcha! - fixed the test to work for ExternalUserProfileTestCase
+        """ watcha!
+        # fixed the test to work for ExternalUserProfileTestCase
         self.assertEqual(res, "owner")
         !watcha """
         self.assertEqual(res, synapse.types.UserID.from_string(self.owner).localpart) # watcha+
@@ -347,7 +348,10 @@ class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
     def test_in_shared_room(self):
         self.ensure_requester_left_room()
 
-        self.helper.invite(self.room_id, src=self.owner, tok=self.owner_tok, targ=self.requester) # watcha+ - need to be invited
+        # watcha+
+        # need to be invited
+        self.helper.invite(self.room_id, src=self.owner, tok=self.owner_tok, targ=self.requester)
+        # watcha+
         self.helper.join(room=self.room_id, user=self.requester, tok=self.requester_tok)
 
         self.try_fetch_profile(200, self.requester_tok)

@@ -69,7 +69,8 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
 
     def test_state_event_in_room(self):
         self.ensure_user_joined_room()
-        """ watcha! - TBH not really sure why :) but stricter so OK :)
+        """ watcha!
+        # TBH not really sure why :) but stricter so OK :)
         self.set_alias_via_state_event(200)
         !watcha """
         self.set_alias_via_state_event(403) # watcha +

@@ -261,9 +261,9 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         self.event_creator_handler = homeserver.get_event_creation_handler()
 
         # Create a test user and room
-        ''' watcha!
+        """ watcha!
         self.user = UserID.from_string(self.register_user("user1", "password"))
-        '''
+        !watcha """
         # watcha+
         self.user1 = self.register_user("user1", "password")
         self.user = UserID.from_string(self.user1)
