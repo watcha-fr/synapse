@@ -170,7 +170,10 @@ class EmailConfig(Config):
             self.email_enable_notifs
             or account_validity_renewal_enabled
             or self.threepid_behaviour_email == ThreepidBehaviour.LOCAL
-            or True # watcha+  - email config is available even if notifications are disabled
+            # watcha+
+            # email config is available even if notifications are disabled
+            or True
+            # +watcha
         ):
             # make sure we can import the required deps
             import bleach
