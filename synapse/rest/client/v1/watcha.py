@@ -4,7 +4,7 @@ import sys
 import json
 import hmac
 from hashlib import sha1
-from urllib.parse import urlparse, parse_qs # insertion for Watcha OP486
+from urllib.parse import urlparse, parse_qs
 
 import logging
 
