@@ -1022,7 +1022,7 @@ class WatchaRoomHandler(BaseHandler):
 
         defer.returnValue(rooms)
 
-    def _get_all_parents_directories(self, directory, all_parents_directories=[]):
+    def _get_all_parents_directories(self, directory, all_parents_directories=None):
         if directory.count("/") > 1:
             parent_directory = dirname(directory)
             all_parents_directories.append(parent_directory)
