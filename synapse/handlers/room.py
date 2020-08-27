@@ -20,7 +20,7 @@ import logging
 import math
 import string
 from collections import OrderedDict
-from os.path import dirname # insertion for Watcha OP486
+from os.path import dirname # watcha+ op486
 
 from six import iteritems, string_types
 
