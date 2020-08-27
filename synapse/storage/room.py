@@ -522,7 +522,7 @@ class RoomStore(RoomWorkerStore, SearchStore):
         first_room_admin = result[0][0] if result is not None else result
 
         defer.returnValue(first_room_admin)
-    # end of insertion
+    # +watcha
 
     def add_event_report(
         self, room_id, event_id, user_id, reason, content, received_ts
