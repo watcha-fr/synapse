@@ -22,7 +22,8 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
-from synapse.api.errors import StoreError, SynapseError # insertion for Watcha OP486
+from synapse.api.errors import StoreError
+from synapse.api.errors import SynapseError # watcha+ op486
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.search import SearchStore
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
