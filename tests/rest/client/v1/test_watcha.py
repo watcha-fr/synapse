@@ -440,12 +440,12 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTest
         request_content["directory"] = nextcloud_urls_by_case["subdirectory_case"]
         channel = self._send_POST_nextcloud_notification_request(request_content)
         self.assertEquals(200, channel.code)
-        self.assertEquals(
+        self.assertListEqual(
             json.loads(channel.result["body"])["rooms_id"],
             [
-                room_id_by_case["subdirectory_case"],
                 self.room_id,
                 room_id_by_case["parent_directory_case"],
+                room_id_by_case["subdirectory_case"],
             ],
         )
 
@@ -456,14 +456,14 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTest
         self.assertEquals(
             json.loads(channel.result["body"])["rooms_id"],
             [
-                room_id_by_case["sub_subdirectory_case"],
                 room_id_by_case["subdirectory_case"],
                 self.room_id,
                 room_id_by_case["parent_directory_case"],
+                room_id_by_case["sub_subdirectory_case"],
             ],
         )
 
-        # # in parent directory case :
+        # in parent directory case :
         request_content["directory"] = nextcloud_urls_by_case["parent_directory_case"]
         channel = self._send_POST_nextcloud_notification_request(request_content)
         self.assertEquals(200, channel.code)
@@ -472,14 +472,14 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(BaseHomeserverWithEmailTest
             [room_id_by_case["parent_directory_case"]],
         )
 
-        # # cross directory case :
+        # cross directory case :
         request_content["directory"] = nextcloud_urls_by_case["cross_directory_case"]
         channel = self._send_POST_nextcloud_notification_request(request_content)
         self.assertEquals(200, channel.code)
         self.assertEquals(
             json.loads(channel.result["body"])["rooms_id"],
             [
-                room_id_by_case["cross_directory_case"],
                 room_id_by_case["parent_directory_case"],
+                room_id_by_case["cross_directory_case"],
             ],
         )

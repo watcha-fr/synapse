@@ -20,7 +20,7 @@ import logging
 import math
 import string
 from collections import OrderedDict
-from os.path import dirname # watcha+ op486
+from pathlib import PurePath
 
 from six import iteritems, string_types
 
@@ -1005,11 +1005,10 @@ class WatchaRoomHandler(BaseHandler):
     @defer.inlineCallbacks
     def get_room_list_to_send_NC_notification(self, directory_path):
         rooms = []
-        all_parents_directories = self._get_all_parents_directories(
-            directory_path, [directory_path]
-        )
+        directories = [str(directory) for directory in PurePath(directory_path).parents]
+        directories.append(directory_path)
 
-        for directory in all_parents_directories:
+        for directory in directories:
             room = yield self.store.get_room_to_send_NC_notification(directory)
 
             if room:
@@ -1021,16 +1020,6 @@ class WatchaRoomHandler(BaseHandler):
             )
 
         defer.returnValue(rooms)
-
-    def _get_all_parents_directories(self, directory, all_parents_directories=None):
-        if directory.count("/") > 1:
-            parent_directory = dirname(directory)
-            all_parents_directories.append(parent_directory)
-            return self._get_all_parents_directories(
-                parent_directory, all_parents_directories
-            )
-        else:
-            return all_parents_directories
 
     @defer.inlineCallbacks
     def _get_first_room_admin(self, room_id):
