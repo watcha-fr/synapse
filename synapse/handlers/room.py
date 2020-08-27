@@ -996,6 +996,8 @@ class RoomEventSource(object):
 
         return (events, next_key)
 
+
+# watcha+
 class WatchaRoomHandler(BaseHandler):
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -1046,7 +1048,7 @@ class WatchaRoomHandler(BaseHandler):
             "url": "",
         }
 
-        if file_operation in ["file_created", "file_restored", "file_moved"]:
+        if file_operation in ("file_created", "file_restored", "file_moved"):
             content["url"] = file_url
 
         for room in rooms:
@@ -1070,3 +1072,4 @@ class WatchaRoomHandler(BaseHandler):
             yield self.event_creation_handler.create_and_send_nonmember_event(
                 requester, event_dict
             )
+# +watcha
