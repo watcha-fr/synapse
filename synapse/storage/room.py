@@ -519,7 +519,7 @@ class RoomStore(RoomWorkerStore, SearchStore):
 
         result = yield self._execute("get_first_room_admin", None, sql, room_id)
 
-        first_room_admin = result[0][0] if result else result
+        first_room_admin = result[0][0] if result is not None else result
 
         defer.returnValue(first_room_admin)
     # end of insertion
