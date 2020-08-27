@@ -20,7 +20,7 @@ import logging
 import math
 import string
 from collections import OrderedDict
-from pathlib import Path +watcha op488
+from pathlib import Path # watcha+ op488
 
 from six import iteritems, string_types
 
@@ -997,6 +997,8 @@ class RoomEventSource(object):
 
         return (events, next_key)
 
+
+# watcha+
 class WatchaRoomHandler(BaseHandler):
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -1072,3 +1074,4 @@ class WatchaRoomHandler(BaseHandler):
             events_Id.append(event.event_id)
 
         defer.returnValue(events_Id)
+# +watcha
