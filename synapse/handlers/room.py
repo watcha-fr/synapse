@@ -1061,7 +1061,7 @@ class WatchaRoomHandler(BaseHandler):
             first_room_admin = yield self._get_first_room_admin(room)
 
             if not first_room_admin:
-                logger.info(
+                logger.warn(
                     "No administrators are in the room. The Nextcloud notification cannot be posted.",
                 )
                 continue
