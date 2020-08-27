@@ -20,7 +20,7 @@ import logging
 import math
 import string
 from collections import OrderedDict
-from pathlib import PurePath
+from pathlib import Path +watcha op488
 
 from six import iteritems, string_types
 
