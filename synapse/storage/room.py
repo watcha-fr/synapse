@@ -16,7 +16,7 @@
 import collections
 import logging
 import re
-from urllib.parse import parse_qs, urlparse # insertion for Watcha OP486
+from urllib.parse import parse_qs, urlparse # watcha+ op486
 
 from canonicaljson import json
 
