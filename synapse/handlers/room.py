@@ -1058,7 +1058,7 @@ class WatchaRoomHandler(BaseHandler):
             "url": "",
         }
 
-        if file_operation in ["file_created", "file_restored", "file_moved"]:
+        if file_operation in ("file_created", "file_restored", "file_moved"):
             content["url"] = file_url
 
         for room in rooms:
