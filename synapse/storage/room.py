@@ -438,7 +438,7 @@ class RoomStore(RoomWorkerStore, SearchStore):
             )
             txn.execute(sql, (event.event_id, event.room_id, event.content[key]))
 
-    # insertion for watcha - OP433 :
+    # watcha+ op433
     def _store_room_link_with_NC(self, txn, event):
         """ Store the link between Watcha room and Nextcloud folder.
         """
