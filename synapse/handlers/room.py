@@ -1005,7 +1005,7 @@ class WatchaRoomHandler(BaseHandler):
     @defer.inlineCallbacks
     def get_room_list_to_send_NC_notification(self, directory_path):
         rooms = []
-        directories = [str(directory) for directory in PurePath(directory_path).parents]
+        directories = [str(directory) for directory in Path(directory_path).parents]
         directories.append(directory_path)
 
         for directory in directories:
