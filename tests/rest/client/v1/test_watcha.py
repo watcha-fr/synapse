@@ -432,7 +432,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
                 log.output[0],
             )
 
-    def test_send_notification_with_invalid_directory_path(self):
+    def test_send_notification_with_empty_directory_path(self):
         with self.assertLogs("synapse.rest.client.v1.watcha", level="INFO") as log:
             request_content = {
                 "file_name": self.nextcloud_file_name,
@@ -448,7 +448,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
 
             channel = self._send_POST_nextcloud_notification_request(request_content)
             self.assertIn(
-                "ERROR:synapse.rest.client.v1.watcha:Error during getting rooms to send notifications : 400: The directory path is not valid",
+                "ERROR:synapse.rest.client.v1.watcha:Error during getting rooms to send notifications : 400: The directory path is empty",
                 log.output[0],
             )
 
@@ -534,7 +534,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
                 {
                     "file_name": self.nextcloud_file_name,
                     "file_operation": "file_created",
-                    "rooms": [sub_room_id, main_room_id, parent_room_id,],
+                    "rooms": [main_room_id, parent_room_id, sub_room_id],
                 }
             ],
         )
@@ -551,7 +551,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
                 {
                     "file_name": self.nextcloud_file_name,
                     "file_operation": "file_created",
-                    "rooms": [main_room_id, parent_room_id,],
+                    "rooms": [ parent_room_id, main_room_id],
                 }
             ],
         )
@@ -585,7 +585,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
                 {
                     "file_name": self.nextcloud_file_name,
                     "file_operation": "file_created",
-                    "rooms": [cross_room_id, parent_room_id,],
+                    "rooms": [ parent_room_id, cross_room_id],
                 }
             ],
         )
@@ -625,7 +625,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
                 {
                     "file_name": self.nextcloud_file_name,
                     "file_operation": "file_deleted",
-                    "rooms": [sub_room_id, main_room_id],
+                    "rooms": [ main_room_id, sub_room_id],
                 },
                 {
                     "file_name": self.nextcloud_file_name,

@@ -20,7 +20,7 @@ import logging
 import math
 import string
 from collections import OrderedDict
-from os.path import dirname # insertion for Watcha OP486
+from pathlib import Path
 
 from six import iteritems, string_types
 
@@ -1006,16 +1006,19 @@ class WatchaRoomHandler(BaseHandler):
         self, directory, limit_of_notification_propagation
     ):
         rooms = []
-        all_parents_directories = self._get_all_parents_directories(
-            directory, limit_of_notification_propagation
-        )
 
-        if not all_parents_directories:
-            raise SynapseError(
-                400, "The directory path is not valid"
-            )
+        if not directory:
+            raise SynapseError(400, "The directory path is empty")
 
-        for directory in all_parents_directories:
+        directories = [
+            str(directory)
+            for directory in Path(directory).parents
+            if limit_of_notification_propagation in str(directory)
+            and str(directory) != limit_of_notification_propagation
+        ]
+        directories.append(directory)
+
+        for directory in directories:
             room = yield self.store.get_room_to_send_NC_notification(directory)
 
             if room:
@@ -1027,19 +1030,6 @@ class WatchaRoomHandler(BaseHandler):
             )
 
         defer.returnValue(rooms)
-
-    def _get_all_parents_directories(
-        self, directory, limit_of_notification_propagation
-    ):
-        all_parents_directories = [directory]
-        for _ in range(directory.count("/")):
-            parent_directory = dirname(directory)
-
-            if parent_directory == limit_of_notification_propagation:
-                return all_parents_directories
-
-            all_parents_directories.append(parent_directory)
-            directory = parent_directory
 
     @defer.inlineCallbacks
     def _get_first_room_admin(self, room_id):
