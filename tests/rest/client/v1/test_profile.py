@@ -351,7 +351,7 @@ class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
         # watcha+
         # need to be invited
         self.helper.invite(self.room_id, src=self.owner, tok=self.owner_tok, targ=self.requester)
-        # watcha+
+        # +watcha
         self.helper.join(room=self.room_id, user=self.requester, tok=self.requester_tok)
 
         self.try_fetch_profile(200, self.requester_tok)

@@ -24,7 +24,7 @@ from synapse.api.errors import SynapseError
 import logging
 
 logger = logging.getLogger(__name__)
-# watcha+
+# +watcha
 
 class ProfileDisplaynameRestServlet(RestServlet):
     """ watcha!
@@ -175,7 +175,7 @@ class ProfileRestServlet(RestServlet):
             ret["email"] = email
         except SynapseError:
             logger.error("Email is not defined for this user.")
-        # watcha+
+        # +watcha
         return 200, ret
 
 
