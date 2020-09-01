@@ -22,10 +22,8 @@ from synapse.api.room_versions import RoomVersions
 from synapse.types import RoomAlias, RoomID, UserID
 
 from tests import unittest
-""" watcha!
 from tests.utils import setup_test_homeserver
-!watcha """
-from tests.utils import create_room, setup_test_homeserver # watcha+
+from tests.utils import create_room # watcha+
 
 
 class RoomStoreTestCase(unittest.TestCase):
@@ -164,8 +162,8 @@ class WatchaRoomEventsStoreTestCase(unittest.HomeserverTestCase):
         self.room = RoomID.from_string("!abc123:test")
         self.second_room = RoomID.from_string("!abc456:test")
         self.nextcloud_directory_path = "/Test_NC"
-        self.nextcloud_folder_url = "http://test.watcha.fr/nextcloud/apps/files/?dir={}".format(
-            self.nextcloud_directory_path
+        self.nextcloud_folder_url = (
+            "http://test.watcha.fr/nextcloud/apps/files/?dir={}".format(self.nextcloud_directory_path)
         )
 
         yield defer.ensureDeferred(
@@ -228,7 +226,6 @@ class WatchaRoomEventsStoreTestCase(unittest.HomeserverTestCase):
 
     @defer.inlineCallbacks
     def test_get_NC_directory_path(self):
-
         result = yield defer.ensureDeferred(
             self.store.db_pool.simple_select_onecol(
                 table="room_mapping_with_NC",
@@ -242,8 +239,8 @@ class WatchaRoomEventsStoreTestCase(unittest.HomeserverTestCase):
     @defer.inlineCallbacks
     def test_update_NC_directory_path(self):
         new_nextcloud_directory_path = "/Test_NC2"
-        new_nextcloud_folder_url = "http://test.watcha.fr/nextcloud/apps/files/?dir={}".format(
-            new_nextcloud_directory_path
+        new_nextcloud_folder_url = (
+            "http://test.watcha.fr/nextcloud/apps/files/?dir={}".format(new_nextcloud_directory_path)
         )
         yield self._send_room_mapping_event(
             self.room.to_string(), new_nextcloud_folder_url
