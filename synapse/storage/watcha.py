@@ -44,6 +44,7 @@ def _add_column_if_needed(db_conn, table, column, column_details):
         db_conn.rollback()
         raise
 
+
 def _drop_column_if_needed(db_conn, table, copy_table, column_to_drop):
     """ WARNING : if the table has default string value, PLEASE TEST as it may remove this default value."""
 
@@ -108,6 +109,7 @@ def _drop_column_if_needed(db_conn, table, copy_table, column_to_drop):
         )
         db_conn.rollback()
         raise
+
 
 # add "partners_invited_by" table
 # this is a no-op if it is already there.

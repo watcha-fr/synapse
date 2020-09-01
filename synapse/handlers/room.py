@@ -1353,10 +1353,21 @@ class WatchaRoomHandler(BaseHandler):
         self.store = hs.get_datastore()
         self.event_creation_handler = hs.get_event_creation_handler()
 
-    async def get_room_list_to_send_NC_notification(self, directory_path):
+    async def get_room_list_to_send_NC_notification(
+        self, directory, limit_of_notification_propagation
+    ):
         rooms = []
-        directories = [str(directory) for directory in Path(directory_path).parents]
-        directories.append(directory_path)
+
+        if not directory:
+            raise SynapseError(400, "The directory path is empty")
+
+        directories = [
+            str(directory)
+            for directory in Path(directory).parents
+            if limit_of_notification_propagation in str(directory)
+            and str(directory) != limit_of_notification_propagation
+        ]
+        directories.append(directory)
 
         for directory in directories:
             room = await self.store.get_room_to_send_NC_notification(directory)
@@ -1366,7 +1377,7 @@ class WatchaRoomHandler(BaseHandler):
 
         if not rooms:
             raise SynapseError(
-                400, "No rooms has been linked with this Nextcloud directory."
+                400, "No rooms are linked with this Nextcloud directory."
             )
 
         return rooms
@@ -1375,25 +1386,17 @@ class WatchaRoomHandler(BaseHandler):
         result = await self.store.get_first_room_admin(room_id)
         return result
 
-    async def send_NC_notification_in_rooms(self, rooms, file_info):
-        nc_activity_type = file_info["activity_type"]
-
-        if nc_activity_type == "file_changed":
-            raise SynapseError(
-                400, "'file_changed' Nextcloud activity is not managed.",
-            )
+    async def send_NC_notification_to_rooms(self, rooms, file_name, file_url, file_operation):
 
         content = {
-            "body": nc_activity_type,
-            "filename": file_info["file_name"],
+            "body": file_operation,
+            "filename": file_name,
             "msgtype": "m.file",
             "url": "",
         }
 
-        if nc_activity_type in ("file_created", "file_restored"):
-            content["url"] = file_info["link"]
-
-        events_Id = []
+        if file_operation in ("file_created", "file_restored", "file_moved"):
+            content["url"] = file_url
 
         for room in rooms:
             first_room_admin = await self._get_first_room_admin(room)
@@ -1413,11 +1416,6 @@ class WatchaRoomHandler(BaseHandler):
                 "sender": requester.user.to_string(),
             }
 
-            event = await self.event_creation_handler.create_and_send_nonmember_event(
+            await self.event_creation_handler.create_and_send_nonmember_event(
                 requester, event_dict
             )
-
-            events_Id.append(event[0].event_id)
-
-        return events_Id
-# +watcha
