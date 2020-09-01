@@ -1429,15 +1429,16 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         return rooms
 
     # watcha+
-    async def get_roomId_from_NC_folder_url(self, folder_url):
+    async def get_room_to_send_NC_notification(self, directory_path):
         """ Get the room_id of the room which is linked with the Nextcloud folder url.
         """
 
         return await self.db_pool.simple_select_one_onecol(
             table="room_mapping_with_NC",
-            keyvalues={"link_url": folder_url},
+            keyvalues={"directory_path": directory_path},
             retcol="room_id",
             allow_none=True,
+            desc="get_room_to_send_NC_notification",
         )
 
     async def get_first_room_admin(self, room_id):
