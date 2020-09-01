@@ -85,13 +85,14 @@ class BaseHomeserverWithEmailTestCase(unittest.HomeserverTestCase):
 
 class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
     def test_register_user(self):
-        request_content = {
-            "user": "user_test",
-            "full_name": "test",
-            "email": "test@test.com",
-            "admin": False,
-        }
         with self.assertLogs("synapse.util.watcha", level="INFO") as cm:
+            request_content = {
+                "user": "user_test",
+                "full_name": "test",
+                "email": "test@test.com",
+                "admin": False,
+                "password": "",
+            }
             channel = self._do_register_user(request_content)
             self.assertIn(
                 "INFO:synapse.util.watcha:NOT Sending registration email to 'test@test.com', we are in test mode",
@@ -104,12 +105,28 @@ class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
             )
             self.assertEqual(channel.code, 200)
 
+    def test_register_user_with_password(self):
+        request_content = {
+            "user": "user_test",
+            "full_name": "test",
+            "email": "test@test.com",
+            "admin": False,
+            "password": "password",
+        }
+        channel = self._do_register_user(request_content)
+        self.assertEqual(
+            channel.result["body"],
+            b'{"display_name":"test","user_id":"@user_test:test"}',
+        )
+        self.assertEqual(channel.code, 200)
+
     def test_register_user_with_upper_user_id(self):
         request_content = {
             "user": "USER_TEST",
             "full_name": "test",
             "email": "test@test.com",
             "admin": False,
+            "password": "",
         }
         channel = self._do_register_user(request_content)
         self.assertEqual(channel.code, 500)
@@ -120,6 +137,7 @@ class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
             "full_name": "test",
             "email": "",
             "admin": False,
+            "password": "",
         }
         channel = self._do_register_user(request_content)
         self.assertEqual(channel.code, 500)
@@ -130,6 +148,7 @@ class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
             "full_name": "test",
             "email": "test@test.com",
             "admin": False,
+            "password": "",
         }
         self._do_register_user(request_content)
         request_content = {
@@ -137,18 +156,20 @@ class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
             "full_name": "other",
             "email": "test@test.com",
             "admin": False,
+            "password": "",
         }
         channel = self._do_register_user(request_content)
         self.assertEqual(channel.code, 500)
 
     def test_register_user_with_plus_in_email(self):
-        request_content = {
-            "user": "user_test",
-            "full_name": "test",
-            "email": "test+test@test.com",
-            "admin": False,
-        }
         with self.assertLogs("synapse.util.watcha", level="INFO") as cm:
+            request_content = {
+                "user": "user_test",
+                "full_name": "test",
+                "email": "test+test@test.com",
+                "admin": False,
+                "password": "",
+            }
             channel = self._do_register_user(request_content)
             self.assertIn(
                 "INFO:synapse.util.watcha:NOT Sending registration email to 'test+test@test.com', we are in test mode",
@@ -170,6 +191,7 @@ class WatchaResetPasswordRestServletTestCase(BaseHomeserverWithEmailTestCase):
                 "full_name": "test",
                 "email": "test@test.com",
                 "admin": False,
+                "password": "password",
             }
         )
         with self.assertLogs("synapse.util.watcha", level="INFO") as cm:
@@ -193,28 +215,19 @@ class WatchaResetPasswordRestServletTestCase(BaseHomeserverWithEmailTestCase):
 
 class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
     def test_watcha_user_list(self):
-
-        users_to_register = [
+        self._do_register_user(
             {
-                "user": "user_test1",
-                "full_name": "test1",
-                "email": "test1@test.com",
+                "user": "user_test",
+                "full_name": "test",
+                "email": "test@test.com",
                 "admin": False,
-            },
-            {
-                "user": "user_test2",
-                "full_name": "test2",
-                "email": "test2@test.com",
-                "admin": False,
-            },
-        ]
-
-        for user in users_to_register:
-            self._do_register_user(user)
+                "password": "",
+            }
+        )
 
         request, channel = self.make_request(
             "POST",
-            "admin/deactivate/@user_test2:test",
+            "admin/deactivate/@user_test:test",
             access_token=self.user_access_token,
         )
         self.render(request)
@@ -224,37 +237,29 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
         )
         self.render(request)
 
-        expected_result = [
-            {
-                "creation_ts": 0,
-                "display_name": "admin",
-                "email_address": "example@email.com",
-                "last_seen": None,
-                "role": "administrator",
-                "status": "invited",
-                "user_id": "@admin:test",
-            },
-            {
-                "creation_ts": 0,
-                "display_name": "test1",
-                "email_address": "test1@test.com",
-                "last_seen": None,
-                "role": "collaborator",
-                "status": "invited",
-                "user_id": "@user_test1:test",
-            },
-            {
-                "creation_ts": 0,
-                "display_name": "test2",
-                "email_address": None,
-                "last_seen": None,
-                "role": "collaborator",
-                "status": "inactive",
-                "user_id": "@user_test2:test",
-            },
-        ]
-
-        self.assertEqual(json.loads(channel.result["body"]), expected_result)
+        self.assertEqual(
+            json.loads(channel.result["body"]),
+            [
+                {
+                    "creation_ts": 0,
+                    "display_name": "admin",
+                    "email_address": "example@email.com",
+                    "last_seen": None,
+                    "role": "administrator",
+                    "status": "invited",
+                    "user_id": "@admin:test",
+                },
+                {
+                    "creation_ts": 0,
+                    "display_name": "test",
+                    "email_address": None,
+                    "last_seen": None,
+                    "role": "collaborator",
+                    "status": "inactive",
+                    "user_id": "@user_test:test",
+                },
+            ],
+        )
 
     def test_get_watcha_admin_user_stats(self):
         self._do_register_user(
@@ -263,6 +268,7 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
                 "full_name": "test",
                 "email": "test@test.com",
                 "admin": False,
+                "password": "",
             }
         )
 
@@ -270,7 +276,6 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
             "GET", "/watcha_admin_stats", access_token=self.user_access_token,
         )
         self.render(request)
-
         self.assertEquals(
             json.loads(channel.result["body"])["users"],
             {
@@ -344,22 +349,8 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
         self.assertEquals(200, channel.code)
 
 class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(BaseHomeserverWithEmailTestCase):
-    def _do_hmac_with_shared_secret(self, parameters):
-        mac = hmac.new(
-            key=self.hs.get_config().registration_shared_secret.encode(),
-            digestmod=hashlib.sha1,
-        )
-
-        for parameter_value in parameters:
-            mac.update(parameter_value.encode())
-            mac.update(b"\x00")
-
-        return mac.hexdigest()
 
     def _send_POST_nextcloud_notification_request(self, request_content):
-        mac = self._do_hmac_with_shared_secret(request_content)
-        request_content["mac"] = mac
-
         request, channel = self.make_request(
             "POST",
             "/watcha_room_nextcloud_activity",
