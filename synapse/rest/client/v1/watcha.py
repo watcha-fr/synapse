@@ -2,7 +2,7 @@ import sys
 import json
 import hmac
 from hashlib import sha1
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 import logging
 
@@ -85,7 +85,6 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
-        self.event_creation_handler = hs.get_event_creation_handler()
         self.handler = hs.get_handlers()
 
     async def on_POST(self, request):
@@ -95,69 +94,60 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
         params = parse_json_object_from_request(request)
 
         nc_file_name = params["file_name"]
-        nc_link = params["link"]
-        nc_directory = params["directory"]
+        nc_file_url = params["link"]
         nc_activity_type = params["activity_type"]
+        nc_directory_url = params["directory"]
 
-        if not nc_file_name or not nc_link or not nc_directory or not nc_activity_type:
-            raise SynapseError(
-                400,
-                "'file_name', 'link', 'directory args and 'activity_type' cannot be empty.",
-            )
-
-        server_name = self.hs.get_config().server_name
-
-        nc_directory_parsed = urlparse(nc_directory)
-        nc_link_parsed = urlparse(nc_link)
-
-        if not {"http", "https"}.issuperset(
-            (nc_directory_parsed.scheme, nc_link_parsed.scheme)
+        if (
+            not nc_file_name
+            or not nc_file_url
+            or not nc_activity_type
+            or not nc_directory_url
         ):
             raise SynapseError(
-                400, "Wrong Nextcloud URL scheme.",
+                400, "Some data in payload have empty value.",
             )
 
-        if {server_name} != {nc_directory_parsed.netloc, nc_link_parsed.netloc}:
-            raise SynapseError(
-                400, "Wrong Nextcloud URL netloc.",
-            )
-
-        if nc_activity_type not in (
+        if nc_activity_type not in [
             "file_created",
             "file_deleted",
             "file_changed",
             "file_restored",
-        ):
+        ]:
             raise SynapseError(
                 400, "Wrong value for nextcloud activity_type.",
             )
 
-        room_id = await self.handler.watcha_room_handler.get_roomId_from_NC_folder_url(
+        server_name = self.hs.get_config().server_name
+
+        if not server_name:
+            raise SynapseError(400, "No server name in homeserver config.")
+
+        nc_file_url_parsed = urlparse(nc_file_url)
+        nc_directory_url_parsed = urlparse(nc_directory_url)
+
+        for url in (nc_file_url_parsed, nc_directory_url_parsed):
+            if url.scheme not in ["http", "https"] or url.netloc != server_name:
+                raise SynapseError(
+                    400, "The Nextcloud url is not recognized.",
+                )
+
+        nc_directory_url_query = parse_qs(nc_directory_url_parsed.query)
+
+        if "dir" not in nc_directory_url_query:
+            raise SynapseError(400, "The url doesn't point to a valid directory path.")
+
+        nc_directory = nc_directory_url_query["dir"][0]
+
+        rooms = await self.handler.watcha_room_handler.get_room_list_to_send_NC_notification(
             nc_directory
         )
 
-        if not room_id:
-            raise SynapseError(
-                400, "No room has been linked with this Nextcloud folder url."
-            )
-
-        first_room_admin = await self.handler.watcha_room_handler.get_first_room_admin(
-            room_id
+        events_Id = await self.handler.watcha_room_handler.send_NC_notification_in_rooms(
+            rooms, params
         )
 
-        if not first_room_admin:
-            raise SynapseError(
-                400,
-                "No administrators are in the room. The Nextcloud notification cannot be posted.",
-            )
-
-        requester = create_requester(first_room_admin)
-
-        event = await self.handler.watcha_room_handler.send_NC_notification_in_room(
-            requester, room_id, params
-        )
-
-        return (200, {"event_id": event[0].event_id})
+        return (200, {"events_id": events_Id, "rooms_id": rooms})
 
 
 class WatchaDisplayNameRestServlet(RestServlet):
@@ -486,4 +476,3 @@ def register_servlets(hs, http_server):
     WatchaRoomNameRestServlet(hs).register(http_server)
     WatchaSendNextcloudActivityToWatchaRoomServlet(hs).register(http_server)
     WatchaDisplayNameRestServlet(hs).register(http_server)
-

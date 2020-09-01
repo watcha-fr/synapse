@@ -18,6 +18,7 @@ import itertools
 import logging
 from collections import OrderedDict, namedtuple
 from typing import TYPE_CHECKING, Dict, Iterable, List, Tuple
+from urllib.parse import parse_qs, urlparse # watcha+ op486
 
 import attr
 from prometheus_client import Counter
@@ -26,7 +27,7 @@ from twisted.internet import defer
 
 import synapse.metrics
 from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
-from synapse.api.errors import StoreError # watcha+
+from synapse.api.errors import StoreError, SynapseError # watcha+
 from synapse.api.room_versions import RoomVersions
 from synapse.crypto.event_signing import compute_event_reference_hash
 from synapse.events import EventBase  # noqa: F401
@@ -1267,36 +1268,48 @@ class PersistEventsStore:
         """ Store the link between Watcha room and Nextcloud folder.
         """
 
-        if hasattr(event, "content") and "nextcloud" in event.content:
-            nextcloud_folder_url = event.content["nextcloud"]
-            room_id = event.room_id
+        if not hasattr(event, "content") or "nextcloud" not in event.content:
+            raise SynapseError(
+                400, "The nextcloud url is needed to store room link with NC."
+            )
 
-            if nextcloud_folder_url:
-                link_url = self.db_pool.simple_select_one_onecol_txn(
-                    txn,
-                    table="room_mapping_with_NC",
-                    keyvalues={"link_url": nextcloud_folder_url},
-                    retcol="link_url",
-                    allow_none=True,
-                )
+        room_id = event.room_id
+        nextcloud_folder_url = event.content["nextcloud"]
 
-                if link_url:
-                    raise StoreError(
-                        500, "This Nextcloud folder is already linked with another room."
-                    )
+        if not nextcloud_folder_url:
+            self.db_pool.simple_delete_one(
+                table="room_mapping_with_NC",
+                keyvalues={"room_id": room_id},
+                desc="delete_room_link_with_NC",
+            )
+            return
 
-                self.db_pool.simple_upsert_txn(
-                    txn,
-                    table="room_mapping_with_NC",
-                    keyvalues={"room_id": room_id},
-                    values={"room_id": room_id, "link_url": nextcloud_folder_url},
-                )
-            else:
-                self.db_pool.simple_delete_one(
-                    table="room_mapping_with_NC",
-                    keyvalues={"room_id": room_id},
-                    desc="delete_room_link_with_NC",
-                )
+        nextcloud_url_query = parse_qs(urlparse(nextcloud_folder_url).query)
+
+        if "dir" not in nextcloud_url_query:
+            raise SynapseError(400, "The url doesn't point to a valid directory path.")
+
+        nextcloud_directory_path = nextcloud_url_query["dir"][0]
+
+        linked_room = self.db_pool.simple_select_one_onecol_txn(
+            txn,
+            table="room_mapping_with_NC",
+            keyvalues={"directory_path": nextcloud_directory_path,},
+            retcol="room_id",
+            allow_none=True,
+        )
+
+        if linked_room:
+            raise StoreError(
+                500, "This Nextcloud folder is already linked with another room."
+            )
+
+        self.db_pool.simple_upsert_txn(
+            txn,
+            table="room_mapping_with_NC",
+            keyvalues={"room_id": room_id},
+            values={"room_id": room_id, "directory_path": nextcloud_directory_path,},
+        )
     # +watcha
 
     def store_event_search_txn(self, txn, event, key, value):

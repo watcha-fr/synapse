@@ -22,6 +22,7 @@ import logging
 import math
 import string
 from collections import OrderedDict
+from pathlib import Path # watcha+ op488
 from typing import Awaitable, Optional, Tuple
 
 from synapse.api.constants import (
@@ -1352,15 +1353,29 @@ class WatchaRoomHandler(BaseHandler):
         self.store = hs.get_datastore()
         self.event_creation_handler = hs.get_event_creation_handler()
 
-    async def get_roomId_from_NC_folder_url(self, folder_url):
-        result = await self.store.get_roomId_from_NC_folder_url(folder_url)
-        return result
+    async def get_room_list_to_send_NC_notification(self, directory_path):
+        rooms = []
+        directories = [str(directory) for directory in Path(directory_path).parents]
+        directories.append(directory_path)
 
-    async def get_first_room_admin(self, room_id):
+        for directory in directories:
+            room = await self.store.get_room_to_send_NC_notification(directory)
+
+            if room:
+                rooms.append(room)
+
+        if not rooms:
+            raise SynapseError(
+                400, "No rooms has been linked with this Nextcloud directory."
+            )
+
+        return rooms
+
+    async def _get_first_room_admin(self, room_id):
         result = await self.store.get_first_room_admin(room_id)
         return result
 
-    async def send_NC_notification_in_room(self, requester, room_id, file_info):
+    async def send_NC_notification_in_rooms(self, rooms, file_info):
         nc_activity_type = file_info["activity_type"]
 
         if nc_activity_type == "file_changed":
@@ -1378,16 +1393,31 @@ class WatchaRoomHandler(BaseHandler):
         if nc_activity_type in ("file_created", "file_restored"):
             content["url"] = file_info["link"]
 
-        event_dict = {
-            "type": EventTypes.Message,
-            "content": content,
-            "room_id": room_id,
-            "sender": requester.user.to_string(),
-        }
+        events_Id = []
 
-        event = await self.event_creation_handler.create_and_send_nonmember_event(
-            requester, event_dict
-        )
+        for room in rooms:
+            first_room_admin = await self._get_first_room_admin(room)
 
-        return event
+            if not first_room_admin:
+                logger.warn(
+                    "No administrators are in the room. The Nextcloud notification cannot be posted.",
+                )
+                continue
+
+            requester = create_requester(first_room_admin)
+
+            event_dict = {
+                "type": EventTypes.Message,
+                "content": content,
+                "room_id": room,
+                "sender": requester.user.to_string(),
+            }
+
+            event = await self.event_creation_handler.create_and_send_nonmember_event(
+                requester, event_dict
+            )
+
+            events_Id.append(event[0].event_id)
+
+        return events_Id
 # +watcha
