@@ -903,6 +903,11 @@ class OidcHandler:
         # not taken, register the user
         registered_user_id = await self._registration_handler.register_user(
             localpart=localpart, default_display_name=attributes["display_name"],
+            # watcha+ op524
+            bind_emails=attributes["emails"],
+            admin=attributes["is_admin"],
+            make_partner=attributes["is_partner"],
+            # +watcha
         )
 
         await self._datastore.record_user_external_id(
@@ -911,8 +916,21 @@ class OidcHandler:
         return registered_user_id
 
 
+""" watcha! op524
 UserAttribute = TypedDict(
     "UserAttribute", {"localpart": str, "display_name": Optional[str]}
+!watcha """
+# watcha+ op524
+UserAttribute = TypedDict(
+    "UserAttribute",
+    {
+        "localpart": str,
+        "display_name": Optional[str],
+        "emails": Optional[List[str]],
+        "is_admin": Optional[bool],
+        "is_partner": Optional[bool],
+    }
+# +watcha
 )
 C = TypeVar("C")
 
@@ -1043,4 +1061,22 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             if display_name == "":
                 display_name = None
 
+        """ watcha! op524
         return UserAttribute(localpart=localpart, display_name=display_name)
+        !watcha """
+        # watcha+ op524
+        email = userinfo.get("email")
+        emails = [email] if email else []  # type: Optional[List[str]]
+
+        is_admin = userinfo.get("is_admin", False)  # type: Optional[bool]
+
+        is_partner = userinfo.get("is_partner", False)  # type: Optional[bool]
+
+        return UserAttribute(
+            localpart=localpart,
+            display_name=display_name,
+            emails=emails,
+            is_admin=is_admin,
+            is_partner=is_partner,
+        )
+        # +watcha
