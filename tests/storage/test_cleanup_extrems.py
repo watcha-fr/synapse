@@ -38,9 +38,9 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
 
         # Create a test user and room
         self.user = UserID("alice", "test")
-        """ !watcha
+        """ watcha!
         self.requester = Requester(self.user, None, False, None, None)
-        """
+        !watcha """
         self.requester = Requester(self.user, None, False, None, False, None) # watcha+
         info, _ = self.get_success(self.room_creator.create_room(self.requester, {}))
         self.room_id = info["room_id"]
@@ -261,17 +261,17 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         self.event_creator_handler = homeserver.get_event_creation_handler()
 
         # Create a test user and room
-        ''' watcha!
+        """ watcha!
         self.user = UserID.from_string(self.register_user("user1", "password"))
-        '''
+        !watcha """
         # watcha+
         self.user1 = self.register_user("user1", "password")
         self.user = UserID.from_string(self.user1)
         # +watcha
         self.token1 = self.login("user1", "password")
-        """ !watcha
+        """ watcha!
         self.requester = Requester(self.user, None, False, None, None)
-        """
+        !watcha """
         self.requester = Requester(self.user, None, False, None, False, None)  # watcha+
         info, _ = self.get_success(self.room_creator.create_room(self.requester, {}))
         self.room_id = info["room_id"]
@@ -419,4 +419,4 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         consent_uri_builder.build_user_consent_uri.return_value = "http://example.com"
         self.event_creator._consent_uri_builder = consent_uri_builder
 
-    test_send_dummy_events_when_insufficient_power.skip = "Disable for Watcha"
+    test_send_dummy_events_when_insufficient_power.skip = "Disable for Watcha" # watcha+

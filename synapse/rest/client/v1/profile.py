@@ -24,15 +24,15 @@ from synapse.api.errors import SynapseError
 import logging
 
 logger = logging.getLogger(__name__)
-# watcha+
+# +watcha
 
 class ProfileDisplaynameRestServlet(RestServlet):
-    """ !watcha
+    """ watcha!
     # BIG HACK for the iOS app which doesn't escape the user_id when setting the display name
     # This means that user_ids with the pattern "<user_id>/displayname" will not work -
     # but they can't occur - it's only domains names after the "/"
     PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/displayname", v1=True)
-    """
+    !watcha """
     PATTERNS = client_patterns("/profile/(?P<user_id>.*)/displayname", v1=True) # watcha+
 
     def __init__(self, hs):
@@ -61,9 +61,9 @@ class ProfileDisplaynameRestServlet(RestServlet):
         return 200, ret
 
     async def on_PUT(self, request, user_id):
-        """ !watcha
+        """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        """
+        !watcha """
         requester = await self.auth.get_user_by_req(request, allow_partner=True, allow_guest=True) # watcha+
         user = UserID.from_string(user_id)
         is_admin = await self.auth.is_server_admin(requester.user)
@@ -112,9 +112,9 @@ class ProfileAvatarURLRestServlet(RestServlet):
         return 200, ret
 
     async def on_PUT(self, request, user_id):
-        """ !watcha
+        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        """
+        !watcha """
         requester = await self.auth.get_user_by_req(request, allow_partner=True) # watcha+
         user = UserID.from_string(user_id)
         is_admin = await self.auth.is_server_admin(requester.user)
@@ -175,10 +175,10 @@ class ProfileRestServlet(RestServlet):
             ret["email"] = email
         except SynapseError:
             logger.error("Email is not defined for this user.")
-        # watcha+
+        # +watcha
         return 200, ret
-        
-        
+
+
 def register_servlets(hs, http_server):
     ProfileDisplaynameRestServlet(hs).register(http_server)
     ProfileAvatarURLRestServlet(hs).register(http_server)

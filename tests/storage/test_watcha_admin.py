@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Watcha SAS
 #
 # This code is not licensed unless agreed with Watcha SAS.

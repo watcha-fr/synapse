@@ -4,11 +4,6 @@ from twisted.internet import defer
 from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
 logger = logging.getLogger(__name__)
 
-# from synapse.api.errors import StoreError, Codes
-
-
-# from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
-
 
 class ExternalInvitationStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):

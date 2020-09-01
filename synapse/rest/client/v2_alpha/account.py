@@ -261,9 +261,9 @@ class PasswordRestServlet(RestServlet):
         # In the second case, we require a password to confirm their identity.
 
         if self.auth.has_access_token(request):
-            """ !watcha
+            """ watcha!
             requester = await self.auth.get_user_by_req(request)
-            """
+            !watcha """
             requester = await self.auth.get_user_by_req(request, allow_partner=True) # watcha+
             try:
                 params, session_id = await self.auth_handler.validate_user_via_ui_auth(
@@ -694,9 +694,9 @@ class ThreepidRestServlet(RestServlet):
         self.account_activity_handler = hs.get_account_validity_handler() # watcha+
 
     async def on_GET(self, request):
-        """ !watcha
+        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        """
+        !watcha """
         requester = await self.auth.get_user_by_req(request, allow_partner=True) # watcha+
 
         threepids = await self.datastore.user_get_threepids(requester.user.to_string())

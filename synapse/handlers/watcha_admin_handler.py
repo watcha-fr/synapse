@@ -37,12 +37,6 @@ class WatchaAdminHandler(BaseHandler):
         result = await self.store.watcha_room_name()
         return result
 
-    async def watcha_display_name(self):
-        # TODO this cannot work - there is no store.watchauser_display_name method
-        # Fortunately it doesn't seem to be called :)
-        result = await self.store.watchauser_display_name()
-        return result
-
     async def watcha_room_list(self):
         result = await self.store.watcha_room_list()
         return result

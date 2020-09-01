@@ -108,12 +108,12 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         self.pump()
 
         http_client_mock.post_json_get_json.assert_called_once()
-        ''' !watcha
+        """ watcha!
         self.assertEqual(
             http_client_mock.post_json_get_json.call_args[0][0],
             "https://push.example.com/push",
         )
-        '''
+        !watcha """
         # watcha+
         self.assertEqual(
             http_client_mock.post_json_get_json.call_args[0][0],
@@ -169,12 +169,12 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
 
         http_client_mock1.post_json_get_json.assert_called_once()
         http_client_mock2.post_json_get_json.assert_not_called()
-        '''! watcha
+        """ watcha!
         self.assertEqual(
             http_client_mock1.post_json_get_json.call_args[0][0],
             "https://push.example.com/push",
         )
-        '''
+        !watcha """
         # watcha+
         self.assertEqual(
             http_client_mock1.post_json_get_json.call_args[0][0],
@@ -201,12 +201,12 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
 
         http_client_mock1.post_json_get_json.assert_not_called()
         http_client_mock2.post_json_get_json.assert_called_once()
-        ''' !watcha
+        """ watcha!
         self.assertEqual(
             http_client_mock2.post_json_get_json.call_args[0][0],
             "https://push.example.com/push",
         )
-        '''
+        !watcha """
         # watcha+
         self.assertEqual(
             http_client_mock2.post_json_get_json.call_args[0][0],

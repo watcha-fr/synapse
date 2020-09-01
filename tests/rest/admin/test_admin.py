@@ -319,9 +319,9 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         non_admin_user = self.register_user("room_nonadmin", "pass", admin=False)
         non_admin_user_tok = self.login("room_nonadmin", "pass")
 
-        """ !watcha
+        """ watcha!
         room_id = self.helper.create_room_as(non_admin_user, tok=admin_user_tok)
-        """
+        !watcha """
         room_id = self.helper.create_room_as(non_admin_user, tok=non_admin_user_tok) # watcha+
         self.helper.join(room_id, non_admin_user, tok=non_admin_user_tok)
 

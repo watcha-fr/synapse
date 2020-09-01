@@ -703,7 +703,7 @@ class AuthHandler(BaseHandler):
             SynapseError if there was a problem with the request
             LoginError if there was an authentication problem.
         """
-        username = username.strip() # watcha+ - OP189
+        username = username.strip() # watcha+ op189
 
         if username.startswith("@"):
             qualified_user_id = username
@@ -940,7 +940,7 @@ class AuthHandler(BaseHandler):
         # case sensitive).
         if medium == "email":
             address = canonicalise_email(address)
-            # watcha+ - OP251
+            # watcha+ op251
             emails = await self.store.watcha_email_list()
             if address in (item[1] for item in emails):
                raise SynapseError(
@@ -1069,7 +1069,6 @@ class AuthHandler(BaseHandler):
             "email",
             address
         )
-
         return ret
     # +watcha
 

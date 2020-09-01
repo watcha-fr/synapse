@@ -150,7 +150,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
                 "failed_attempts": {"per_second": 0.17, "burst_count": 5},
             }
         }
-    )    
+    )
     def test_POST_ratelimiting_per_account_failed_attempts(self):
         self.register_user("kermit", "monkey")
 
@@ -187,7 +187,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
 
-    # watcha+ - OP189
+    # watcha+ op189
     def test_LOGIN_with_trim(self):
        self.register_user("kermit", "monkey")
 

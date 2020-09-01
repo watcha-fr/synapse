@@ -1511,4 +1511,4 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(private_room_id, channel.json_body["joined_rooms"][0])
 
-    test_join_public_room.skip = "Disable for Watcha"
+    test_join_public_room.skip = "Disable for Watcha" # watcha+

@@ -26,7 +26,7 @@ from tests.test_utils import make_awaitable
 from tests.unittest import override_config
 
 from .. import unittest
-from ..utils import setup_test_homeserver # watcha+ - OP251
+from ..utils import setup_test_homeserver # watcha+ op251
 
 
 class RegistrationHandlers(object):

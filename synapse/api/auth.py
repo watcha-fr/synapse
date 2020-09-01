@@ -161,7 +161,7 @@ class Auth(object):
         self,
         request: Request,
         allow_guest: bool = False,
-        allow_partner: bool = False, # watcha+ allow_partner parameter
+        allow_partner: bool = False, # watcha+
         rights: str = "access",
         allow_expired: bool = False,
     ) -> synapse.types.Requester:
@@ -214,7 +214,7 @@ class Auth(object):
             user = user_info["user"]
             token_id = user_info["token_id"]
             is_guest = user_info["is_guest"]
-            is_partner = user_info["is_partner"] #watcha+
+            is_partner = user_info["is_partner"] # watcha+
 
             # Deny the request if the user account has expired.
             if self._account_validity.enabled and not allow_expired:
@@ -261,11 +261,11 @@ class Auth(object):
             if device_id:
                 opentracing.set_tag("device_id", device_id)
 
-            """ !watcha
+            """ watcha!
             return synapse.types.create_requester(
                 user, token_id, is_guest, device_id, app_service=app_service
             )
-            """
+            !watcha """
             # watcha+
             return synapse.types.create_requester(
                 user, token_id, is_guest, device_id, is_partner, app_service=app_service
