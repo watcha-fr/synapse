@@ -308,7 +308,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         return self.db_pool.runInteraction("set_server_admin", set_server_admin_txn)
 
     def _query_for_auth(self, txn, token):
-        """ !watcha
+        """ watcha!
         sql = (
             "SELECT users.name, users.is_guest, access_tokens.id as token_id,"
             " access_tokens.device_id, access_tokens.valid_until_ms"
@@ -316,7 +316,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             " INNER JOIN access_tokens on users.name = access_tokens.user_id"
             " WHERE token = ?"
         )
-        """
+        !watcha """
         # watcha+
         sql = (
             "SELECT users.name, users.is_guest, users.is_partner, access_tokens.id as token_id,"
@@ -1561,7 +1561,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             values={"expiration_ts_ms": expiration_ts, "email_sent": False},
         )
 
-    # watcha+ - OP318
+    # watcha+ op318
     async def is_user_partner(self, user_id):
 
         is_partner = await self.db_pool.simple_select_one_onecol(

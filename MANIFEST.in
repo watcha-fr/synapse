@@ -15,7 +15,7 @@ recursive-include synapse/storage *.py
 recursive-include synapse/storage *.txt
 recursive-include synapse/storage *.md
 
-recursive-include synapse/util/watcha_templates *
+recursive-include synapse/util/watcha_templates * # watcha+
 recursive-include docs *
 recursive-include scripts *
 recursive-include scripts-dev *

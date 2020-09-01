@@ -196,7 +196,7 @@ def main():
         "-k", "--shared-secret", help="Shared secret as defined in server config file."
     )
 
-    """ !watcha
+    """ watcha!
     parser.add_argument(
         "server_url",
         default="https://localhost:8448",
@@ -204,7 +204,7 @@ def main():
         help="URL to use to talk to the homeserver. Defaults to "
         " 'https://localhost:8448'.",
     )
-    """
+    !watcha """
     # watcha+
     parser.add_argument(
         "server_url",

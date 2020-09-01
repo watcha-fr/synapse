@@ -170,7 +170,10 @@ class EmailConfig(Config):
             self.email_enable_notifs
             or account_validity_renewal_enabled
             or self.threepid_behaviour_email == ThreepidBehaviour.LOCAL
-            or True # watcha+  - email config is available even if notifications are disabled
+            # watcha+
+            # email config is available even if notifications are disabled
+            or True
+            # +watcha
         ):
             # make sure we can import the required deps
             import bleach
@@ -306,14 +309,13 @@ class EmailConfig(Config):
             self.email_notif_for_new_users = email_config.get(
                 "notif_for_new_users", True
             )
-            """ !watcha
+            """ watcha!
             self.email_riot_base_url = email_config.get(
                 "client_base_url", email_config.get("riot_base_url", None)
             )
-            """
-        # watcha+
-        self.email_riot_base_url = email_config.get("riot_base_url", None)
-        # +watcha
+            !watcha """
+
+        self.email_riot_base_url = email_config.get("riot_base_url", None) # watcha+
 
         if account_validity_renewal_enabled:
             self.email_expiry_template_html = email_config.get(

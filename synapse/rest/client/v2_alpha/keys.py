@@ -70,9 +70,9 @@ class KeyUploadServlet(RestServlet):
 
     @trace(opname="upload_keys")
     async def on_POST(self, request, device_id):
-        """ !watcha
+        """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        """
+        !watcha """
         requester = await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True) # watcha+
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
