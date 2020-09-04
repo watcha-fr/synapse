@@ -1441,26 +1441,22 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             desc="get_room_to_send_NC_notification",
         )
 
-    async def get_first_room_admin(self, room_id):
+    async def get_room_creator(self, room_id):
         """ Get a list of administrators of the room.
         """
 
-        def get_first_room_admin_txn(txn):
+        def get_room_creator_txn(txn):
             sql = """
                 SELECT
-                    state_key
-                FROM current_state_events
-                INNER JOIN users ON users.name = current_state_events.state_key
-                WHERE type = "m.room.member"
-                    AND (membership = "join" OR membership = "invite")
-                    AND users.admin = 1
-                    AND current_state_events.room_id = ?;
+                    creator
+                FROM rooms
+                WHERE rooms.room_id = ?;
                 """
             txn.execute(sql, (room_id,))
             return txn.fetchone()
 
         first_room_admin = await self.db_pool.runInteraction(
-            "get_first_room_admin", get_first_room_admin_txn
+            "get_room_creator", get_room_creator_txn
         )
 
         return first_room_admin[0]
