@@ -1412,6 +1412,7 @@ class WatchaRoomHandler(BaseHandler):
                     "The user {} doesn't have the access right to the folder {}.".format(
                         requester_id, nextcloud_directory_path
                     ),
+                    Codes.W_NEXTCLOUD_FOLDER_PERMISSION,
                 )
 
             raise SynapseError(
@@ -1498,6 +1499,7 @@ class WatchaRoomHandler(BaseHandler):
                     "The user {} doesn't have the access right to the folder {}.".format(
                         requester_id, nextcloud_directory_path
                     ),
+                    Codes.W_NEXTCLOUD_FOLDER_PERMISSION,
                 )
 
             raise SynapseError(
