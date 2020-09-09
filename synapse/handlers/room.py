@@ -20,10 +20,15 @@
 import itertools
 import logging
 import math
+# watcha+ op544
+from requests import get, post, auth, HTTPError
+from requests.auth import HTTPBasicAuth
+# +watcha
 import string
 from collections import OrderedDict
 from pathlib import Path # watcha+ op488
 from typing import Awaitable, Optional, Tuple
+from urllib.parse import parse_qs, urlparse # watcha+ op486
 
 from synapse.api.constants import (
     EventTypes,
@@ -47,6 +52,7 @@ from synapse.types import (
     UserID,
     create_requester,
 )
+from synapse.types import get_localpart_from_id # watcha+ op544
 from synapse.util import stringutils
 from synapse.util.async_helpers import Linearizer, maybe_awaitable
 from synapse.util.caches.response_cache import ResponseCache
@@ -59,6 +65,12 @@ logger = logging.getLogger(__name__)
 id_server_scheme = "https://"
 
 FIVE_MINUTES_IN_MS = 5 * 60 * 1000
+KEYCLOAK_SERVER = "https://localhost/auth"
+KEYCLOAK_REALM = "watcha"
+NEXTCLOUD_SHARED_SECRET = "jupiter10"
+NEXTCLOUD_SERVER = "http://localhost/nextcloud"
+SERVICE_ACCOUNT_NAME = "watcha_service_account"
+SERVICE_ACCOUNT_PASSWORD = "jupiter10"
 
 
 class RoomCreationHandler(BaseHandler):
@@ -1352,6 +1364,362 @@ class WatchaRoomHandler(BaseHandler):
     def __init__(self, hs):
         self.store = hs.get_datastore()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.server_name = hs.config.public_baseurl
+        self.keycloak_access_token = ""
+
+    async def delete_room_mapping_with_nextcloud_directory(self, room_id, requester_id):
+        """ Delete a mapping between a room and an Nextcloud folder.
+
+        Args :
+            room_id: the id of the room.
+            requester_id: the user_id of the requester.
+        """
+
+        directory_path = await self.store.get_nextcloud_directory_path_from_roomID(
+            room_id
+        )
+
+        try:
+            self.keycloak_access_token = await self.get_keycloak_access_token()
+        except HttpError:
+            raise SynapseError(
+                400,
+                "Unable to retrieve the Keycloak access token of realm {}".format(
+                    KEYCLOAK_REALM
+                ),
+            )
+
+        try:
+            nextcloud_username = await self.get_nextcloud_username(
+                get_localpart_from_id(requester_id)
+            )
+        except HTTPError:
+            raise SynapseError(
+                400,
+                "Unable to retrieve the corresponding Nextcloud username of user {}.".format(
+                    requester_id
+                ),
+            )
+
+        try:
+            all_shares = await self.get_shares_for_directory(
+                nextcloud_username, directory_path
+            )
+        except HTTPError as e:
+            if e.response.status_code == 404:
+                raise SynapseError(
+                    400,
+                    "The user {} doesn't have the access right to the folder {}.".format(
+                        requester_id, nextcloud_directory_path
+                    ),
+                )
+
+            raise SynapseError(
+                400,
+                "Unable to get shares on the folder {}.".format(
+                    nextcloud_directory_path
+                ),
+            )
+
+        group_share_id = ""
+        for share in all_shares:
+            if share["share_with"] == room_id:
+                group_share_id = share["id"]
+                break
+
+        if not group_share_id:
+            raise SynapseError(
+                400,
+                "Unable to retrieve share id between Watcha room {} and Nextcloud directory {}".format(
+                    room_id, directory_path
+                ),
+            )
+
+        try:
+            await self.delete_nextcloud_share(nextcloud_username, group_share_id)
+        except HTTPError:
+            raise SynapseError(
+                400,
+                "Unable to delete the share on the nextcloud folder {} for the nextcloud group {}.".format(
+                    room_id, nextcloud_directory_path
+                ),
+            )
+
+        await self.store.deleted_room_mapping_with_nextcloud_directory(room_id)
+
+    async def add_room_mapping_with_nextcloud_directory(
+        self, room_id, requester_id, nextcloud_URL
+    ):
+        """ Add a mapping between a room and an Nextcloud folder.
+
+        Args :
+            room_id: the id of the room which must be linked with the Nextcloud folder.
+            requester_id: the user_id of the requester.
+            nextcloud_URL: an URL pointing on the Nextcloud folder to link with the room.
+        """
+
+        nextcloud_URL_query = parse_qs(urlparse(nextcloud_URL).query)
+
+        if "dir" not in nextcloud_URL_query:
+            raise SynapseError(400, "The url doesn't point to a valid directory path.")
+
+        nextcloud_directory_path = nextcloud_URL_query["dir"][0]
+
+        try:
+            self.keycloak_access_token = await self.get_keycloak_access_token()
+        except HttpError:
+            raise SynapseError(
+                400,
+                "Unable to retrieve the Keycloak access token of realm {}".format(
+                    KEYCLOAK_REALM
+                ),
+            )
+
+        try:
+            nextcloud_username = await self.get_nextcloud_username(
+                get_localpart_from_id(requester_id)
+            )
+        except HTTPError:
+            raise SynapseError(
+                400,
+                "Unable to retrieve the corresponding Nextcloud username of user {}.".format(
+                    requester_id
+                ),
+            )
+
+        try:
+            await self.get_shares_for_directory(
+                nextcloud_username, nextcloud_directory_path
+            )
+        except HTTPError as e:
+            if e.response.status_code == 404:
+                raise SynapseError(
+                    400,
+                    "The user {} doesn't have the access right to the folder {}.".format(
+                        requester_id, nextcloud_directory_path
+                    ),
+                )
+
+            raise SynapseError(
+                400,
+                "Unable to get shares on the folder {}.".format(
+                    nextcloud_directory_path
+                ),
+            )
+
+        try:
+            group_exists = await self.room_group_exist(room_id)
+        except HTTPError:
+            raise SynapseError(
+                400,
+                "Unable to retrieve to know if the nextcloud group {} exists or not.".format(
+                    room_id
+                ),
+            )
+
+        if not group_exists:
+            try:
+                await self.create_nextcloud_group(room_id)
+            except HTTPError:
+                raise SynapseError(
+                    400, "Unable to create the Nextcloud group {}.".format(room_id)
+                )
+
+        try:
+            await self.create_new_nextcloud_share(
+                nextcloud_username, nextcloud_directory_path, room_id
+            )
+        except HTTPError:
+            raise SynapseError(
+                400,
+                "Unable to create a share for the nextcloud group {} on the nextcloud folder {}.".format(
+                    room_id, nextcloud_directory_path
+                ),
+            )
+
+        await self.store.set_room_mapping_with_nextcloud_directory(
+            room_id, nextcloud_directory_path
+        )
+
+    async def get_nextcloud_username(self, user_localpart):
+        """ Get the corresponding Nextcloud username of the synapse user from Keycloak.
+
+        Args :
+            user_localpart: the synapse user localpart.
+
+        Returns:
+            The Nextcloud username.
+        """
+
+        request = get(
+            "{}/admin/realms/{}/users".format(KEYCLOAK_SERVER, KEYCLOAK_REALM),
+            headers={"Authorization": "Bearer {}".format(self.keycloak_access_token)},
+            params={"username": user_localpart},
+        )
+        request.raise_for_status()
+
+        return request.json()[0]["id"]
+
+    async def get_keycloak_access_token(self):
+        """ Get the realm Keycloak access token in order to use Keycloak Admin API.
+
+        Returns:
+            The realm Keycloak access token.
+        """
+
+        request = post(
+            "{}/realms/{}/protocol/openid-connect/token".format(
+                KEYCLOAK_SERVER, KEYCLOAK_REALM
+            ),
+            data={
+                "client_id": "admin-cli",
+                "username": SERVICE_ACCOUNT_NAME,
+                "password": SERVICE_ACCOUNT_PASSWORD,
+                "grant_type": "password",
+            },
+        )
+        request.raise_for_status()
+
+        return request.json()["access_token"]
+
+    async def get_shares_for_directory(self, username, directory_path):
+        """ Get share for the requester and all reshares on the folder.
+
+        Args:
+            username: the Nextcloud username of the requester.
+            directory: the directory path of the folder concerned by the share search.
+
+        Returns:
+            A list which contains all shares on the folder.
+            Each share is a dict that contains lot of information about the share (id, share_with, owner_uid...)
+        
+        Raises:
+            HTTPError 401 : Wrong Basic Auth.
+            HTTPError 404 : Couldn't fetch shares. Most likely due to the fact that the user doesn't have a share on the folder or the folder doesn't exists.
+        """
+
+        request = get(
+            "{}/ocs/v2.php/apps/files_sharing/api/v1/shares".format(NEXTCLOUD_SERVER),
+            headers={"OCS-APIRequest": "true"},
+            auth=HTTPBasicAuth(username, NEXTCLOUD_SHARED_SECRET),
+            params={"path": directory, "reshares": "true", "format": "json"},
+        )
+        request.raise_for_status()
+
+        return request.json()["ocs"]["data"]
+
+    async def room_group_exist(self, group_name):
+        """ Ask Nextcloud if the group name exist or not.
+
+        Args:
+            group_name: the name of Nextcloud group.
+
+        Returns:
+            True if the group exists, else False.
+        """
+
+        request = get(
+            "{}/ocs/v1.php/cloud/groups".format(NEXTCLOUD_SERVER),
+            headers={"OCS-APIRequest": "true"},
+            auth=HTTPBasicAuth(SERVICE_ACCOUNT_NAME, SERVICE_ACCOUNT_PASSWORD),
+            params={"search": group_name, "format": "json"},
+        )
+        request.raise_for_status()
+        response = request.json()["ocs"]["data"]
+
+        return (
+            True
+            if "groups" in response and len(response["ocs"]["data"]["groups"]) > 0
+            else False
+        )
+
+    async def create_nextcloud_group(self, room_id):
+        """ Create an Nextcloud group named as room_id and add all users in the room into the new Nextcloud group.
+
+        Args:
+            room_id: the room_id of the room which Nextcloud directory is linked.
+        """
+
+        request = post(
+            "{}/ocs/v1.php/cloud/groups".format(NEXTCLOUD_SERVER),
+            headers={"OCS-APIRequest": "true"},
+            auth=HTTPBasicAuth(SERVICE_ACCOUNT_NAME, SERVICE_ACCOUNT_PASSWORD),
+            data={"groupid": room_id, "format": "json"},
+        )
+        request.raise_for_status()
+
+        users = await self.store.get_users_in_room(room_id)
+
+        for user in users:
+            try:
+                nextcloud_username = await self.get_nextcloud_username(
+                    get_localpart_from_id(user)
+                )
+                await self.add_user_to_nextcloud_groups(nextcloud_username, room_id)
+            except HTTPError:
+                logger.warn(
+                    "An error occured during the addition of the user {} in the Nextcloud group {}.".format(
+                        user, room_id
+                    )
+                )
+                continue
+
+    async def add_user_to_nextcloud_groups(self, username, group_name):
+        """ Create an Nextcloud group named as room_id and add all users in the room into the new Nextcloud group.
+
+        Args:
+            room_id: the room_id of the room which Nextcloud directory is linked.
+        """
+
+        request = post(
+            "{}/ocs/v1.php/cloud/users/{}/groups".format(NEXTCLOUD_SERVER, username),
+            headers={"OCS-APIRequest": "true"},
+            auth=HTTPBasicAuth(SERVICE_ACCOUNT_NAME, SERVICE_ACCOUNT_PASSWORD),
+            data={"groupid": group_name, "format": "json"},
+        )
+        request.raise_for_status()
+
+    async def create_new_nextcloud_share(self, requester, directory_path, group_name):
+        """ Create a share on Nextcloud folder for the specified Nextcloud group.
+        Post arguments: 
+            permission = 31 -> give all right on the folder (read, update, create, deleted and share)
+            shareType = 1 -> a group share
+
+        Args:
+            requester: the Nextcloud username of the requester who want to create the new share.
+            directory_path: the path of the folder to share.
+            group_name: the Nextcloud group id.
+        """
+
+        request = post(
+            "{}/ocs/v2.php/apps/files_sharing/api/v1/shares".format(NEXTCLOUD_SERVER),
+            headers={"OCS-APIRequest": "true"},
+            auth=HTTPBasicAuth(requester, SERVICE_ACCOUNT_PASSWORD),
+            data={
+                "path": directory_path,
+                "shareType": 1,
+                "shareWith": group_name,
+                "permissions": 31,
+                "format": "json",
+            },
+        )
+        request.raise_for_status()
+
+    async def delete_nextcloud_share(self, requester, share_id):
+        """ Delete an existing share (corresponding to the share id) on the folder. 
+
+        Args:
+            requester: the Nextcloud username of the requester who want to delete an existing share.
+            share_id: the id of the share to delete.
+        """
+        request = delete(
+            "{}/ocs/v2.php/apps/files_sharing/api/v1/shares/{}".format(
+                NEXTCLOUD_SERVER, share_id
+            ),
+            headers={"OCS-APIRequest": "true"},
+            auth=HTTPBasicAuth(requester, SERVICE_ACCOUNT_PASSWORD),
+        )
+        request.raise_for_status()
 
     async def get_room_list_to_send_NC_notification(
         self, directory, limit_of_notification_propagation
@@ -1370,7 +1738,7 @@ class WatchaRoomHandler(BaseHandler):
         directories.append(directory)
 
         for directory in directories:
-            room = await self.store.get_room_to_send_NC_notification(directory)
+            room = await self.store.get_roomID_from_nextcloud_directory_path(directory)
 
             if room:
                 rooms.append(room)
@@ -1386,7 +1754,9 @@ class WatchaRoomHandler(BaseHandler):
         result = await self.store.get_first_room_admin(room_id)
         return result
 
-    async def send_NC_notification_to_rooms(self, rooms, file_name, file_url, file_operation):
+    async def send_NC_notification_to_rooms(
+        self, rooms, file_name, file_url, file_operation
+    ):
 
         content = {
             "body": file_operation,
@@ -1419,3 +1789,4 @@ class WatchaRoomHandler(BaseHandler):
             await self.event_creation_handler.create_and_send_nonmember_event(
                 requester, event_dict
             )
+# +watcha
