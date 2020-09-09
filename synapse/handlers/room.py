@@ -21,7 +21,7 @@ import itertools
 import logging
 import math
 # watcha+ op544
-from requests import get, post, auth, HTTPError
+from requests import get, post, delete, auth, HTTPError
 from requests.auth import HTTPBasicAuth
 # +watcha
 import string
@@ -65,12 +65,6 @@ logger = logging.getLogger(__name__)
 id_server_scheme = "https://"
 
 FIVE_MINUTES_IN_MS = 5 * 60 * 1000
-KEYCLOAK_SERVER = "https://localhost/auth"
-KEYCLOAK_REALM = "watcha"
-NEXTCLOUD_SHARED_SECRET = "jupiter10"
-NEXTCLOUD_SERVER = "http://localhost/nextcloud"
-SERVICE_ACCOUNT_NAME = "watcha_service_account"
-SERVICE_ACCOUNT_PASSWORD = "jupiter10"
 
 
 class RoomCreationHandler(BaseHandler):
@@ -1364,7 +1358,15 @@ class WatchaRoomHandler(BaseHandler):
     def __init__(self, hs):
         self.store = hs.get_datastore()
         self.event_creation_handler = hs.get_event_creation_handler()
-        self.server_name = hs.config.public_baseurl
+
+        # Nextcloud Integration config : 
+        self.keycloak_server = hs.config.keycloak_serveur
+        self.keycloak_realm = hs.config.keycloak_realm
+        self.nextcloud_shared_secret = hs.config.nextcloud_shared_secret
+        self.nextcloud_server = hs.config.nextcloud_server
+        self.service_account_name = hs.config.service_account_name
+        self.service_account_password = hs.config.service_account_password
+
         self.keycloak_access_token = ""
 
     async def delete_room_mapping_with_nextcloud_directory(self, room_id, requester_id):
@@ -1381,11 +1383,11 @@ class WatchaRoomHandler(BaseHandler):
 
         try:
             self.keycloak_access_token = await self.get_keycloak_access_token()
-        except HttpError:
+        except HTTPError:
             raise SynapseError(
                 400,
                 "Unable to retrieve the Keycloak access token of realm {}".format(
-                    KEYCLOAK_REALM
+                    self.keycloak_realm
                 ),
             )
 
@@ -1468,11 +1470,11 @@ class WatchaRoomHandler(BaseHandler):
 
         try:
             self.keycloak_access_token = await self.get_keycloak_access_token()
-        except HttpError:
+        except HTTPError:
             raise SynapseError(
                 400,
                 "Unable to retrieve the Keycloak access token of realm {}".format(
-                    KEYCLOAK_REALM
+                    self.keycloak_realm
                 ),
             )
 
@@ -1554,7 +1556,7 @@ class WatchaRoomHandler(BaseHandler):
         """
 
         request = get(
-            "{}/admin/realms/{}/users".format(KEYCLOAK_SERVER, KEYCLOAK_REALM),
+            "{}/admin/realms/{}/users".format(self.keycloak_server, self.keycloak_realm),
             headers={"Authorization": "Bearer {}".format(self.keycloak_access_token)},
             params={"username": user_localpart},
         )
@@ -1571,12 +1573,12 @@ class WatchaRoomHandler(BaseHandler):
 
         request = post(
             "{}/realms/{}/protocol/openid-connect/token".format(
-                KEYCLOAK_SERVER, KEYCLOAK_REALM
+                self.keycloak_server, self.keycloak_realm
             ),
             data={
                 "client_id": "admin-cli",
-                "username": SERVICE_ACCOUNT_NAME,
-                "password": SERVICE_ACCOUNT_PASSWORD,
+                "username": self.service_account_name,
+                "password": self.service_account_password,
                 "grant_type": "password",
             },
         )
@@ -1601,10 +1603,10 @@ class WatchaRoomHandler(BaseHandler):
         """
 
         request = get(
-            "{}/ocs/v2.php/apps/files_sharing/api/v1/shares".format(NEXTCLOUD_SERVER),
+            "{}/ocs/v2.php/apps/files_sharing/api/v1/shares".format(self.nextcloud_server),
             headers={"OCS-APIRequest": "true"},
-            auth=HTTPBasicAuth(username, NEXTCLOUD_SHARED_SECRET),
-            params={"path": directory, "reshares": "true", "format": "json"},
+            auth=HTTPBasicAuth(username, self.nextcloud_shared_secret),
+            params={"path": directory_path, "reshares": "true", "format": "json"},
         )
         request.raise_for_status()
 
@@ -1621,9 +1623,9 @@ class WatchaRoomHandler(BaseHandler):
         """
 
         request = get(
-            "{}/ocs/v1.php/cloud/groups".format(NEXTCLOUD_SERVER),
+            "{}/ocs/v1.php/cloud/groups".format(self.nextcloud_server),
             headers={"OCS-APIRequest": "true"},
-            auth=HTTPBasicAuth(SERVICE_ACCOUNT_NAME, SERVICE_ACCOUNT_PASSWORD),
+            auth=HTTPBasicAuth(self.service_account_name, self.service_account_password),
             params={"search": group_name, "format": "json"},
         )
         request.raise_for_status()
@@ -1631,7 +1633,7 @@ class WatchaRoomHandler(BaseHandler):
 
         return (
             True
-            if "groups" in response and len(response["ocs"]["data"]["groups"]) > 0
+            if "groups" in response and len(response["groups"]) > 0
             else False
         )
 
@@ -1643,9 +1645,9 @@ class WatchaRoomHandler(BaseHandler):
         """
 
         request = post(
-            "{}/ocs/v1.php/cloud/groups".format(NEXTCLOUD_SERVER),
+            "{}/ocs/v1.php/cloud/groups".format(self.nextcloud_server),
             headers={"OCS-APIRequest": "true"},
-            auth=HTTPBasicAuth(SERVICE_ACCOUNT_NAME, SERVICE_ACCOUNT_PASSWORD),
+            auth=HTTPBasicAuth(self.service_account_name, self.service_account_password),
             data={"groupid": room_id, "format": "json"},
         )
         request.raise_for_status()
@@ -1674,9 +1676,9 @@ class WatchaRoomHandler(BaseHandler):
         """
 
         request = post(
-            "{}/ocs/v1.php/cloud/users/{}/groups".format(NEXTCLOUD_SERVER, username),
+            "{}/ocs/v1.php/cloud/users/{}/groups".format(self.nextcloud_server, username),
             headers={"OCS-APIRequest": "true"},
-            auth=HTTPBasicAuth(SERVICE_ACCOUNT_NAME, SERVICE_ACCOUNT_PASSWORD),
+            auth=HTTPBasicAuth(self.service_account_name, self.service_account_password),
             data={"groupid": group_name, "format": "json"},
         )
         request.raise_for_status()
@@ -1694,9 +1696,9 @@ class WatchaRoomHandler(BaseHandler):
         """
 
         request = post(
-            "{}/ocs/v2.php/apps/files_sharing/api/v1/shares".format(NEXTCLOUD_SERVER),
+            "{}/ocs/v2.php/apps/files_sharing/api/v1/shares".format(self.nextcloud_server),
             headers={"OCS-APIRequest": "true"},
-            auth=HTTPBasicAuth(requester, SERVICE_ACCOUNT_PASSWORD),
+            auth=HTTPBasicAuth(requester, self.service_account_password),
             data={
                 "path": directory_path,
                 "shareType": 1,
@@ -1716,10 +1718,10 @@ class WatchaRoomHandler(BaseHandler):
         """
         request = delete(
             "{}/ocs/v2.php/apps/files_sharing/api/v1/shares/{}".format(
-                NEXTCLOUD_SERVER, share_id
+                self.nextcloud_server, share_id
             ),
             headers={"OCS-APIRequest": "true"},
-            auth=HTTPBasicAuth(requester, SERVICE_ACCOUNT_PASSWORD),
+            auth=HTTPBasicAuth(requester, self.service_account_password),
         )
         request.raise_for_status()
 
