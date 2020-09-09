@@ -18,7 +18,6 @@ import itertools
 import logging
 from collections import OrderedDict, namedtuple
 from typing import TYPE_CHECKING, Dict, Iterable, List, Tuple
-from urllib.parse import parse_qs, urlparse # watcha+ op486
 
 import attr
 from prometheus_client import Counter
@@ -922,10 +921,6 @@ class PersistEventsStore:
             elif event.type == EventTypes.Retention:
                 # Update the room_retention table.
                 self._store_retention_policy_for_room_txn(txn, event)
-            # watcha+ op433
-            elif event.type == EventTypes.VectorSetting:
-                self._store_room_link_with_NC(txn, event)
-            # +watcha
 
             self._handle_event_relations(txn, event)
 
@@ -1262,55 +1257,6 @@ class PersistEventsStore:
             self.store._invalidate_cache_and_stream(
                 txn, self.store.get_retention_policy_for_room, (event.room_id,)
             )
-
-    # watcha+ op433
-    def _store_room_link_with_NC(self, txn, event):
-        """ Store the link between Watcha room and Nextcloud folder.
-        """
-
-        if not hasattr(event, "content") or "nextcloud" not in event.content:
-            raise SynapseError(
-                400, "The nextcloud url is needed to store room link with NC."
-            )
-
-        room_id = event.room_id
-        nextcloud_folder_url = event.content["nextcloud"]
-
-        if not nextcloud_folder_url:
-            self.db_pool.simple_delete_one(
-                table="room_mapping_with_NC",
-                keyvalues={"room_id": room_id},
-                desc="delete_room_link_with_NC",
-            )
-            return
-
-        nextcloud_url_query = parse_qs(urlparse(nextcloud_folder_url).query)
-
-        if "dir" not in nextcloud_url_query:
-            raise SynapseError(400, "The url doesn't point to a valid directory path.")
-
-        nextcloud_directory_path = nextcloud_url_query["dir"][0]
-
-        linked_room = self.db_pool.simple_select_one_onecol_txn(
-            txn,
-            table="room_mapping_with_NC",
-            keyvalues={"directory_path": nextcloud_directory_path,},
-            retcol="room_id",
-            allow_none=True,
-        )
-
-        if linked_room:
-            raise StoreError(
-                500, "This Nextcloud folder is already linked with another room."
-            )
-
-        self.db_pool.simple_upsert_txn(
-            txn,
-            table="room_mapping_with_NC",
-            keyvalues={"room_id": room_id},
-            values={"room_id": room_id, "directory_path": nextcloud_directory_path,},
-        )
-    # +watcha
 
     def store_event_search_txn(self, txn, event, key, value):
         """Add event to the search table
