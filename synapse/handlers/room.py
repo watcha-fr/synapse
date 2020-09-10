@@ -1404,7 +1404,7 @@ class WatchaRoomHandler(BaseHandler):
             )
 
         try:
-            all_shares = await self.get_shares_for_directory(
+            all_shares = await self.get_sharing_of_nextcloud_directory(
                 nextcloud_username, directory_path
             )
         except HTTPError as e:
@@ -1439,7 +1439,7 @@ class WatchaRoomHandler(BaseHandler):
             )
 
         try:
-            await self.delete_nextcloud_share(nextcloud_username, group_share_id)
+            await self.delete_existing_nextcloud_share(nextcloud_username, group_share_id)
         except HTTPError:
             raise SynapseError(
                 400,
@@ -1491,7 +1491,7 @@ class WatchaRoomHandler(BaseHandler):
             )
 
         try:
-            await self.get_shares_for_directory(
+            await self.get_sharing_of_nextcloud_directory(
                 nextcloud_username, nextcloud_directory_path
             )
         except HTTPError as e:
@@ -1512,7 +1512,7 @@ class WatchaRoomHandler(BaseHandler):
             )
 
         try:
-            group_exists = await self.room_group_exist(room_id)
+            group_exists = await self.nextcloud_room_group_exists(room_id)
         except HTTPError:
             raise SynapseError(
                 400,
@@ -1586,7 +1586,7 @@ class WatchaRoomHandler(BaseHandler):
 
         return request.json()["access_token"]
 
-    async def get_shares_for_directory(self, username, directory_path):
+    async def get_sharing_of_nextcloud_directory(self, username, directory_path):
         """ Get share for the requester and all reshares on the folder.
 
         Args:
@@ -1612,7 +1612,7 @@ class WatchaRoomHandler(BaseHandler):
 
         return request.json()["ocs"]["data"]
 
-    async def room_group_exist(self, group_name):
+    async def nextcloud_room_group_exists(self, group_name):
         """ Ask Nextcloud if the group name exist or not.
 
         Args:
@@ -1709,7 +1709,7 @@ class WatchaRoomHandler(BaseHandler):
         )
         request.raise_for_status()
 
-    async def delete_nextcloud_share(self, requester, share_id):
+    async def delete_existing_nextcloud_share(self, requester, share_id):
         """ Delete an existing share (corresponding to the share id) on the folder. 
 
         Args:
