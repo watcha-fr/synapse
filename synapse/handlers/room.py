@@ -1412,7 +1412,7 @@ class WatchaRoomHandler(BaseHandler):
                 raise SynapseError(
                     400,
                     "The user {} doesn't have the access right to the folder {}.".format(
-                        requester_id, nextcloud_directory_path
+                        requester_id, directory_path
                     ),
                     Codes.W_NEXTCLOUD_FOLDER_PERMISSION,
                 )
@@ -1420,7 +1420,7 @@ class WatchaRoomHandler(BaseHandler):
             raise SynapseError(
                 400,
                 "Unable to get shares on the folder {}.".format(
-                    nextcloud_directory_path
+                    directory_path
                 ),
             )
 
@@ -1444,7 +1444,7 @@ class WatchaRoomHandler(BaseHandler):
             raise SynapseError(
                 400,
                 "Unable to delete the share on the nextcloud folder {} for the nextcloud group {}.".format(
-                    room_id, nextcloud_directory_path
+                    room_id, directory_path
                 ),
             )
 
