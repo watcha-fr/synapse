@@ -1669,10 +1669,11 @@ class WatchaRoomHandler(BaseHandler):
                 continue
 
     async def add_user_to_nextcloud_groups(self, username, group_name):
-        """ Create an Nextcloud group named as room_id and add all users in the room into the new Nextcloud group.
+        """ Add user to the Nextcloud group named as room_id.
 
         Args:
-            room_id: the room_id of the room which Nextcloud directory is linked.
+            username: the room_id of the room which Nextcloud directory is linked.
+            group_name: the Nextcloud group name, equivalent to room_id of the room linked.
         """
 
         request = post(
