@@ -1452,7 +1452,7 @@ class WatchaRoomHandler(BaseHandler):
             nextcloud_username = await self.get_nextcloud_username(
                 get_localpart_from_id(requester_id)
             )
-        except HTTPError:
+        except (HTTPError, IndexError):
             raise SynapseError(
                 400,
                 "Unable to retrieve the corresponding Nextcloud username of user {}.".format(
@@ -1539,7 +1539,7 @@ class WatchaRoomHandler(BaseHandler):
             nextcloud_username = await self.get_nextcloud_username(
                 get_localpart_from_id(requester_id)
             )
-        except HTTPError:
+        except (HTTPError, IndexError):
             raise SynapseError(
                 400,
                 "Unable to retrieve the corresponding Nextcloud username of user {}.".format(
