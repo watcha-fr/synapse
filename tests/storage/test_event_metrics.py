@@ -28,9 +28,9 @@ class ExtremStatisticsTestCase(HomeserverTestCase):
 
         user = UserID("alice", "test")
         """ watcha!
-        requester = Requester(user, None, False, None, None)
+        requester = Requester(user, None, False, False, None, None)
         !watcha """
-        requester = Requester(user, None, False, None, False, None) # watcha+
+        requester = Requester(user, None, False, False, None, False, None) # watcha+
 
         # Real events, forward extremities
         events = [(3, 2), (6, 2), (4, 6)]

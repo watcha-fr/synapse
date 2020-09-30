@@ -25,7 +25,7 @@ from .watcha_admin_handler import WatchaAdminHandler
 # +watcha
 
 
-class Handlers(object):
+class Handlers:
 
     """ Deprecated. A collection of handlers.
 

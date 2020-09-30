@@ -6,13 +6,7 @@ import psutil
 from collections import defaultdict
 import inspect
 
-from twisted.internet import defer
-
 from synapse.storage._base import SQLBaseStore
-from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
-from synapse.api.constants import EventTypes, JoinRules
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
-from synapse.types import get_domain_from_id, get_localpart_from_id
 from synapse.storage.database import DatabasePool
 
 logger = logging.getLogger(__name__)

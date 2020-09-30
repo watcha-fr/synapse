@@ -21,14 +21,13 @@ import re
 from typing import List, Optional
 from urllib import parse as urlparse
 
-from canonicaljson import json
-
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
     HttpResponseException,
     InvalidClientCredentialsError,
+    ShadowBanError,
     SynapseError,
 )
 from synapse.api.filtering import Filter
@@ -46,6 +45,8 @@ from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
+from synapse.util import json_decoder
+from synapse.util.stringutils import random_string
 
 MYPY = False
 if MYPY:
@@ -177,8 +178,6 @@ class RoomStateEventRestServlet(TransactionRestServlet):
             room_id=room_id,
             event_type=event_type,
             state_key=state_key,
-            is_guest=requester.is_guest,
-            is_partner=requester.is_partner, # watcha+
         )
 
         if not data:
@@ -208,67 +207,76 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         if state_key is not None:
             event_dict["state_key"] = state_key
 
-        if event_type == EventTypes.Member:
-            membership = content.get("membership", None)
-            event_id, _ = await self.room_member_handler.update_membership(
-                requester,
-                target=UserID.from_string(state_key),
-                room_id=room_id,
-                action=membership,
-                content=content,
-            )
-        else:
-            # watcha+
-            # override history visibility incoming config requests.
-            if event_type == EventTypes.RoomHistoryVisibility:
-                logger.info("RoomHistoryEvent. Original content=" + str(content))
-                if content['history_visibility'] == "world_readable":
-                    content['history_visibility'] = "shared"
-                if content['history_visibility'] == "joined":
-                    content['history_visibility'] = "invited"
-                logger.info("RoomHistoryEvent. New content=" + str(content))
+        try:
+            if event_type == EventTypes.Member:
+                membership = content.get("membership", None)
+                event_id, _ = await self.room_member_handler.update_membership(
+                    requester,
+                    target=UserID.from_string(state_key),
+                    room_id=room_id,
+                    action=membership,
+                    content=content,
+                )
+            else:
+                # watcha+
+                # override history visibility incoming config requests.
+                if event_type == EventTypes.RoomHistoryVisibility:
+                    logger.info("RoomHistoryEvent. Original content=" + str(content))
+                    if content["history_visibility"] == "world_readable":
+                        content["history_visibility"] = "shared"
+                    if content["history_visibility"] == "joined":
+                        content["history_visibility"] = "invited"
+                    logger.info("RoomHistoryEvent. New content=" + str(content))
 
-            # override room permissions config requests
-            # 0 means a generic user - 50 means a moderator - 100 means an administrator
-            if event_type == EventTypes.PowerLevels:
-                logger.info("PowerLevelsEvent. Original content=" + str(content))
-                content['events'] = {
-                    EventTypes.RoomAvatar : 50, # change avatar of the room
-                    EventTypes.CanonicalAlias : 50, # change the alias of the room
-                    EventTypes.Name : 50, # change the name of the room
-                    EventTypes.PowerLevels : 100, # change the permissions (name, revoke moderators)
-                    EventTypes.Topic : 50, # change topic in the room
-                }
-                content['invite'] = 50; # invite users
-                content['kick'] = 50; # kick users
-                content['ban'] = 50; # permanently kick users from the room
-                content['redact'] = 50; # TODO option to prevent people from removing their posts.
-                content['state_default'] = 50; # change config of the room
-                content['users_default'] = 0; # default permission for new users.
-                logger.info("PowerLevelsEvent. New content=" + str(content))
+                # override room permissions config requests
+                # 0 means a generic user - 50 means a moderator - 100 means an administrator
+                if event_type == EventTypes.PowerLevels:
+                    logger.info("PowerLevelsEvent. Original content=" + str(content))
+                    content["events"] = {
+                        EventTypes.RoomAvatar: 50,  # change avatar of the room
+                        EventTypes.CanonicalAlias: 50,  # change the alias of the room
+                        EventTypes.Name: 50,  # change the name of the room
+                        EventTypes.PowerLevels: 100,  # change the permissions (name, revoke moderators)
+                        EventTypes.Topic: 50,  # change topic in the room
+                    }
+                    content["invite"] = 50
+                    # invite users
+                    content["kick"] = 50
+                    # kick users
+                    content["ban"] = 50
+                    # permanently kick users from the room
+                    content["redact"] = 50
+                    # TODO option to prevent people from removing their posts.
+                    content["state_default"] = 50
+                    # change config of the room
+                    content["users_default"] = 0
+                    # default permission for new users.
+                    logger.info("PowerLevelsEvent. New content=" + str(content))
 
-            if event_type == "org.matrix.room.preview_urls":
-                logger.info("PreviewUrlsEvent. Original content=" + str(content))
-                content['disable'] = True;
-                logger.info("PreviewUrlsEvent. New content=" + str(content))
+                if event_type == "org.matrix.room.preview_urls":
+                    logger.info("PreviewUrlsEvent. Original content=" + str(content))
+                    content["disable"] = True
+                    logger.info("PreviewUrlsEvent. New content=" + str(content))
 
-            if event_type == EventTypes.JoinRules:
-                logger.info("JoinRulesEvent. Original content=" + str(content))
-                content['join_rule'] = "invite"
-                logger.info("JoinRulesEvent. New content=" + str(content))
+                if event_type == EventTypes.JoinRules:
+                    logger.info("JoinRulesEvent. Original content=" + str(content))
+                    content["join_rule"] = "invite"
+                    logger.info("JoinRulesEvent. New content=" + str(content))
 
-            if event_type == EventTypes.GuestAccess:
-                logger.info("GuestAccessEvent. Original content=" + str(content))
-                content['guest_access'] = "forbidden"
-                logger.info("GuestAccessEvent. New content=" + str(content))
-            # +watcha
-            (
-                event,
-                _,
-            ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                requester, event_dict, txn_id=txn_id
-            )
-            event_id = event.event_id
+                if event_type == EventTypes.GuestAccess:
+                    logger.info("GuestAccessEvent. Original content=" + str(content))
+                    content["guest_access"] = "forbidden"
+                    logger.info("GuestAccessEvent. New content=" + str(content))
+                # +watcha
+                (
+                    event,
+                    _,
+                ) = await self.event_creation_handler.create_and_send_nonmember_event(
+                    requester, event_dict, txn_id=txn_id
+                )
+                event_id = event.event_id
+        except ShadowBanError:
+            event_id = "$" + random_string(43)
 
         set_tag("event_id", event_id)
         ret = {"event_id": event_id}
@@ -304,12 +312,19 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         if b"ts" in request.args and requester.app_service:
             event_dict["origin_server_ts"] = parse_integer(request, "ts", 0)
 
-        event, _ = await self.event_creation_handler.create_and_send_nonmember_event(
-            requester, event_dict, txn_id=txn_id
-        )
+        try:
+            (
+                event,
+                _,
+            ) = await self.event_creation_handler.create_and_send_nonmember_event(
+                requester, event_dict, txn_id=txn_id
+            )
+            event_id = event.event_id
+        except ShadowBanError:
+            event_id = "$" + random_string(43)
 
-        set_tag("event_id", event.event_id)
-        return 200, {"event_id": event.event_id}
+        set_tag("event_id", event_id)
+        return 200, {"event_id": event_id}
 
     def on_GET(self, request, room_id, event_type, txn_id):
         return 200, "Not implemented"
@@ -590,7 +605,9 @@ class RoomMessageListRestServlet(RestServlet):
         filter_str = parse_string(request, b"filter", encoding="utf-8")
         if filter_str:
             filter_json = urlparse.unquote(filter_str)
-            event_filter = Filter(json.loads(filter_json))  # type: Optional[Filter]
+            event_filter = Filter(
+                json_decoder.decode(filter_json)
+            )  # type: Optional[Filter]
             if (
                 event_filter
                 and event_filter.filter_json.get("event_format", "client")
@@ -712,7 +729,9 @@ class RoomEventContextServlet(RestServlet):
         filter_str = parse_string(request, b"filter", encoding="utf-8")
         if filter_str:
             filter_json = urlparse.unquote(filter_str)
-            event_filter = Filter(json.loads(filter_json))  # type: Optional[Filter]
+            event_filter = Filter(
+                json_decoder.decode(filter_json)
+            )  # type: Optional[Filter]
         else:
             event_filter = None
 
@@ -813,16 +832,20 @@ class RoomMembershipRestServlet(TransactionRestServlet):
 
         """ watcha!
         if membership_action == "invite" and self._has_3pid_invite_keys(content):
-            await self.room_member_handler.do_3pid_invite(
-                room_id,
-                requester.user,
-                content["medium"],
-                content["address"],
-                content["id_server"],
-                requester,
-                txn_id,
-                content.get("id_access_token"),
-            )
+            try:
+                await self.room_member_handler.do_3pid_invite(
+                    room_id,
+                    requester.user,
+                    content["medium"],
+                    content["address"],
+                    content["id_server"],
+                    requester,
+                    txn_id,
+                    content.get("id_access_token"),
+                )
+            except ShadowBanError:
+                # Pretend the request succeeded.
+                pass
             return 200, {}
         !watcha """
         # watcha+
@@ -852,15 +875,19 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         if "reason" in content:
             event_content = {"reason": content["reason"]}
 
-        await self.room_member_handler.update_membership(
-            requester=requester,
-            target=target,
-            room_id=room_id,
-            action=membership_action,
-            txn_id=txn_id,
-            third_party_signed=content.get("third_party_signed", None),
-            content=event_content,
-        )
+        try:
+            await self.room_member_handler.update_membership(
+                requester=requester,
+                target=target,
+                room_id=room_id,
+                action=membership_action,
+                txn_id=txn_id,
+                third_party_signed=content.get("third_party_signed", None),
+                content=event_content,
+            )
+        except ShadowBanError:
+            # Pretend the request succeeded.
+            pass
 
         return_value = {}
 
@@ -898,20 +925,27 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
         requester = await self.auth.get_user_by_req(request)
         content = parse_json_object_from_request(request)
 
-        event, _ = await self.event_creation_handler.create_and_send_nonmember_event(
-            requester,
-            {
-                "type": EventTypes.Redaction,
-                "content": content,
-                "room_id": room_id,
-                "sender": requester.user.to_string(),
-                "redacts": event_id,
-            },
-            txn_id=txn_id,
-        )
+        try:
+            (
+                event,
+                _,
+            ) = await self.event_creation_handler.create_and_send_nonmember_event(
+                requester,
+                {
+                    "type": EventTypes.Redaction,
+                    "content": content,
+                    "room_id": room_id,
+                    "sender": requester.user.to_string(),
+                    "redacts": event_id,
+                },
+                txn_id=txn_id,
+            )
+            event_id = event.event_id
+        except ShadowBanError:
+            event_id = "$" + random_string(43)
 
-        set_tag("event_id", event.event_id)
-        return 200, {"event_id": event.event_id}
+        set_tag("event_id", event_id)
+        return 200, {"event_id": event_id}
 
     def on_PUT(self, request, room_id, event_id, txn_id):
         set_tag("txn_id", txn_id)
@@ -957,17 +991,21 @@ class RoomTypingRestServlet(RestServlet):
         # Limit timeout to stop people from setting silly typing timeouts.
         timeout = min(content.get("timeout", 30000), 120000)
 
-        if content["typing"]:
-            await self.typing_handler.started_typing(
-                target_user=target_user,
-                auth_user=requester.user,
-                room_id=room_id,
-                timeout=timeout,
-            )
-        else:
-            await self.typing_handler.stopped_typing(
-                target_user=target_user, auth_user=requester.user, room_id=room_id
-            )
+        try:
+            if content["typing"]:
+                await self.typing_handler.started_typing(
+                    target_user=target_user,
+                    requester=requester,
+                    room_id=room_id,
+                    timeout=timeout,
+                )
+            else:
+                await self.typing_handler.stopped_typing(
+                    target_user=target_user, requester=requester, room_id=room_id
+                )
+        except ShadowBanError:
+            # Pretend this worked without error.
+            pass
 
         return 200, {}
 

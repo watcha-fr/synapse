@@ -253,7 +253,11 @@ class HomeserverTestCase(TestCase):
                 !watcha """
                 async def get_user_by_req(request, allow_guest=False, allow_partner=False, rights="access"): # watcha+
                     return create_requester(
-                        UserID.from_string(self.helper.auth_user_id), 1, False, None
+                        UserID.from_string(self.helper.auth_user_id),
+                        1,
+                        False,
+                        False,
+                        None,
                     )
 
                 self.hs.get_auth().get_user_by_req = get_user_by_req
@@ -544,9 +548,9 @@ class HomeserverTestCase(TestCase):
         event_creator = self.hs.get_event_creation_handler()
         secrets = self.hs.get_secrets()
         """ watcha!
-        requester = Requester(user, None, False, None, None)
+        requester = Requester(user, None, False, False, None, None)
         !watcha """
-        requester = Requester(user, None, False, None, False, None) # watcha+
+        requester = Requester(user, None, False, False, None, False, None) # watcha+
 
         event, context = self.get_success(
             event_creator.create_event(
@@ -616,7 +620,7 @@ class FederatingHomeserverTestCase(HomeserverTestCase):
     """
 
     def prepare(self, reactor, clock, homeserver):
-        class Authenticator(object):
+        class Authenticator:
             def authenticate_request(self, request, content):
                 return succeed("other.example.com")
 

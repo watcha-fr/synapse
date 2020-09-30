@@ -377,7 +377,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
 
     def _create_room(self):
         user = UserID("admin", "test")
-        requester = Requester(user, None, False, None, False, None)
+        requester = Requester(user, None, False, False, None, False, None)
 
         return self.get_success(self.room_creator.create_room(requester, {}))[0]["room_id"]
 

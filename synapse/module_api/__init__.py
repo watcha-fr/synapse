@@ -31,7 +31,7 @@ __all__ = ["errors", "make_deferred_yieldable", "run_in_background", "ModuleApi"
 logger = logging.getLogger(__name__)
 
 
-class ModuleApi(object):
+class ModuleApi:
     """A proxy object that gets passed to various plugin modules so they
     can register new users etc if necessary.
     """
@@ -45,7 +45,7 @@ class ModuleApi(object):
 
     """ watcha!
     def get_user_by_req(self, req, allow_guest=False):
-    watcha! """
+    !watcha """
     def get_user_by_req(self, req, allow_guest=False, allow_partner=False): # watcha+
         """Check the access_token provided for a request
 
@@ -64,7 +64,7 @@ class ModuleApi(object):
         """
         """ watcha!
         return self._auth.get_user_by_req(req, allow_guest)
-        watcha! """
+        !watcha """
         return self._auth.get_user_by_req(req, allow_guest, allow_partner) # watcha+
 
     def get_qualified_user_id(self, username):
@@ -174,8 +174,10 @@ class ModuleApi(object):
             external_id: id on that system
             user_id: complete mxid that it is mapped to
         """
-        return self._store.record_user_external_id(
-            auth_provider_id, remote_user_id, registered_user_id
+        return defer.ensureDeferred(
+            self._store.record_user_external_id(
+                auth_provider_id, remote_user_id, registered_user_id
+            )
         )
 
     def generate_short_term_login_token(
@@ -230,7 +232,9 @@ class ModuleApi(object):
         Returns:
             Deferred[object]: result of func
         """
-        return self._store.db_pool.runInteraction(desc, func, *args, **kwargs)
+        return defer.ensureDeferred(
+            self._store.db_pool.runInteraction(desc, func, *args, **kwargs)
+        )
 
     def complete_sso_login(
         self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str

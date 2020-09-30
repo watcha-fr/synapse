@@ -19,7 +19,7 @@ import urllib
 from io import BytesIO
 
 import treq
-from canonicaljson import encode_canonical_json, json
+from canonicaljson import encode_canonical_json
 from netaddr import IPAddress
 from prometheus_client import Counter
 from zope.interface import implementer, provider
@@ -47,6 +47,7 @@ from synapse.http import (
 from synapse.http.proxyagent import ProxyAgent
 from synapse.logging.context import make_deferred_yieldable
 from synapse.logging.opentracing import set_tag, start_active_span, tags
+from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
 
 logger = logging.getLogger(__name__)
@@ -85,7 +86,7 @@ def _make_scheduler(reactor):
     return _scheduler
 
 
-class IPBlacklistingResolver(object):
+class IPBlacklistingResolver:
     """
     A proxy for reactor.nameResolver which only produces non-blacklisted IP
     addresses, preventing DNS rebinding attacks on URL preview.
@@ -132,7 +133,7 @@ class IPBlacklistingResolver(object):
             r.resolutionComplete()
 
         @provider(IResolutionReceiver)
-        class EndpointReceiver(object):
+        class EndpointReceiver:
             @staticmethod
             def resolutionBegan(resolutionInProgress):
                 pass
@@ -191,7 +192,7 @@ class BlacklistingAgentWrapper(Agent):
         )
 
 
-class SimpleHttpClient(object):
+class SimpleHttpClient:
     """
     A simple, no-frills HTTP client with methods that wrap up common ways of
     using HTTP in Matrix
@@ -243,7 +244,7 @@ class SimpleHttpClient(object):
             )
 
             @implementer(IReactorPluggableNameResolver)
-            class Reactor(object):
+            class Reactor:
                 def __getattr__(_self, attr):
                     if attr == "nameResolver":
                         return nameResolver
@@ -391,7 +392,7 @@ class SimpleHttpClient(object):
         body = await make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            return json.loads(body.decode("utf-8"))
+            return json_decoder.decode(body.decode("utf-8"))
         else:
             raise HttpResponseException(
                 response.code, response.phrase.decode("ascii", errors="replace"), body
@@ -433,7 +434,7 @@ class SimpleHttpClient(object):
         body = await make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            return json.loads(body.decode("utf-8"))
+            return json_decoder.decode(body.decode("utf-8"))
         else:
             raise HttpResponseException(
                 response.code, response.phrase.decode("ascii", errors="replace"), body
@@ -463,7 +464,7 @@ class SimpleHttpClient(object):
             actual_headers.update(headers)
 
         body = await self.get_raw(uri, args, headers=headers)
-        return json.loads(body.decode("utf-8"))
+        return json_decoder.decode(body.decode("utf-8"))
 
     async def put_json(self, uri, json_body, args={}, headers=None):
         """ Puts some json to the given URI.
@@ -506,7 +507,7 @@ class SimpleHttpClient(object):
         body = await make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            return json.loads(body.decode("utf-8"))
+            return json_decoder.decode(body.decode("utf-8"))
         else:
             raise HttpResponseException(
                 response.code, response.phrase.decode("ascii", errors="replace"), body

@@ -18,7 +18,7 @@ import re
 import string
 import sys
 from collections import namedtuple
-from typing import Any, Dict, Tuple, Type, TypeVar
+from typing import Any, Dict, Mapping, MutableMapping, Tuple, Type, TypeVar
 
 import attr
 from signedjson.key import decode_verify_key_bytes
@@ -41,8 +41,9 @@ else:
 # Define a state map type from type/state_key to T (usually an event ID or
 # event)
 T = TypeVar("T")
-StateMap = Dict[Tuple[str, str], T]
-
+StateKey = Tuple[str, str]
+StateMap = Mapping[StateKey, T]
+MutableStateMap = MutableMapping[StateKey, T]
 
 # the type of a JSON-serialisable dict. This could be made stronger, but it will
 # do for now.
@@ -52,14 +53,31 @@ JsonDict = Dict[str, Any]
 """ watcha!
 class Requester(
     namedtuple(
-        "Requester", ["user", "access_token_id", "is_guest", "device_id", "app_service"]
+        "Requester",
+        [
+            "user",
+            "access_token_id",
+            "is_guest",
+            "shadow_banned",
+            "device_id",
+            "app_service",
+        ],
     )
 ):
 !watcha """ 
 # watcha+
 class Requester(
     namedtuple(
-        "Requester", ["user", "access_token_id", "is_guest", "device_id", "is_partner", "app_service"]
+        "Requester",
+        [
+            "user",
+            "access_token_id",
+            "is_guest",
+            "shadow_banned",
+            "device_id",
+            "is_partner",
+            "app_service",
+        ],
     )
 ):
 # +watcha
@@ -71,6 +89,7 @@ class Requester(
         access_token_id (int|None):  *ID* of the access token used for this
             request, or None if it came via the appservice API or similar
         is_guest (bool):  True if the user making this request is a guest user
+        shadow_banned (bool):  True if the user making this request has been shadow-banned.
         device_id (str|None):  device_id which was set at authentication time
         app_service (ApplicationService|None):  the AS requesting on behalf of the user
     """
@@ -86,6 +105,7 @@ class Requester(
             "user_id": self.user.to_string(),
             "access_token_id": self.access_token_id,
             "is_guest": self.is_guest,
+            "shadow_banned": self.shadow_banned,
             "device_id": self.device_id,
             "is_partner": self.is_partner,  # watcha+
             "app_server_id": self.app_service.id if self.app_service else None,
@@ -111,6 +131,7 @@ class Requester(
             user=UserID.from_string(input["user_id"]),
             access_token_id=input["access_token_id"],
             is_guest=input["is_guest"],
+            shadow_banned=input["shadow_banned"],
             device_id=input["device_id"],
             is_partner=input["is_partner"], # watcha+
             app_service=appservice,
@@ -119,12 +140,23 @@ class Requester(
 
 """ watcha!
 def create_requester(
-    user_id, access_token_id=None, is_guest=False, device_id=None, app_service=None
+    user_id,
+    access_token_id=None,
+    is_guest=False,
+    shadow_banned=False,
+    device_id=None,
+    app_service=None,
 ):
 !watcha """ 
 # watcha+
 def create_requester(
-    user_id, access_token_id=None, is_guest=False, device_id=None, is_partner=False, app_service=None  # modified for watcha: added is_partner
+    user_id,
+    access_token_id=None,
+    is_guest=False,
+    shadow_banned=False,
+    device_id=None,
+    is_partner=False,
+    app_service=None,
 ):
 # +watcha
     """
@@ -135,6 +167,7 @@ def create_requester(
         access_token_id (int|None):  *ID* of the access token used for this
             request, or None if it came via the appservice API or similar
         is_guest (bool):  True if the user making this request is a guest user
+        shadow_banned (bool):  True if the user making this request is shadow-banned.
         device_id (str|None):  device_id which was set at authentication time
         app_service (ApplicationService|None):  the AS requesting on behalf of the user
 
@@ -146,7 +179,7 @@ def create_requester(
     """ watcha!
     return Requester(user_id, access_token_id, is_guest, device_id, app_service)
     !watcha """ 
-    return Requester(user_id, access_token_id, is_guest, device_id, is_partner, app_service) # watcha+
+    return Requester(user_id, access_token_id, is_guest, shadow_banned, device_id, is_partner, app_service) # watcha+
 
 
 def get_domain_from_id(string):
@@ -530,7 +563,7 @@ class ThirdPartyInstanceID(
 
 
 @attr.s(slots=True)
-class ReadReceipt(object):
+class ReadReceipt:
     """Information about a read-receipt"""
 
     room_id = attr.ib()
