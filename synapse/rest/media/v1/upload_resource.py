@@ -41,7 +41,10 @@ class UploadResource(DirectServeJsonResource):
         respond_with_json(request, 200, {}, send_cors=True)
 
     async def _async_render_POST(self, request):
+        """ watcha!
         requester = await self.auth.get_user_by_req(request)
+        !watcha """
+        requester = await self.auth.get_user_by_req(request, allow_partner=True) # watcha+
         # TODO: The checks here are a bit late. The content will have
         # already been uploaded to a tmp file at this point
         content_length = request.getHeader(b"Content-Length").decode("ascii")

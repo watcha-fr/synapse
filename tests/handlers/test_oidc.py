@@ -85,7 +85,18 @@ class TestMappingProvider(OidcMappingProvider):
         return userinfo["sub"]
 
     async def map_user_attributes(self, userinfo, token):
+        """ watcha!
         return {"localpart": userinfo["username"], "display_name": None}
+        !watcha """
+        # watcha+
+        return {
+            "localpart": userinfo["username"],
+            "display_name": None,
+            "emails": [userinfo["email"]],
+            "is_admin": userinfo["is_admin"],
+            "is_partner": userinfo["is_partner"],
+        }
+        # +watcha
 
 
 def simple_async_mock(return_value=None, raises=None):
@@ -596,6 +607,11 @@ class OidcHandlerTestCase(HomeserverTestCase):
         userinfo = {
             "sub": "test_user",
             "username": "test_user",
+            # watcha+
+            "email": "test_user@test.com",
+            "is_admin": True,
+            "is_partner": False,
+            # +watcha
         }
         # The token doesn't matter with the default user mapping provider.
         token = {}
@@ -610,6 +626,11 @@ class OidcHandlerTestCase(HomeserverTestCase):
         userinfo = {
             "sub": 1234,
             "username": "test_user_2",
+            # watcha+
+            "email": "test_user_2@test.com",
+            "is_admin": False,
+            "is_partner": True,
+            # +watcha
         }
         mxid = self.get_success(
             self.handler._map_userinfo_to_user(

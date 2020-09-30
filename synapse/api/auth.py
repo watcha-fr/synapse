@@ -161,6 +161,7 @@ class Auth:
         self,
         request: Request,
         allow_guest: bool = False,
+        allow_partner: bool = False, # watcha+
         rights: str = "access",
         allow_expired: bool = False,
     ) -> synapse.types.Requester:
@@ -214,6 +215,7 @@ class Auth:
             token_id = user_info["token_id"]
             is_guest = user_info["is_guest"]
             shadow_banned = user_info["shadow_banned"]
+            is_partner = user_info["is_partner"] # watcha+
 
             # Deny the request if the user account has expired.
             if self._account_validity.enabled and not allow_expired:
@@ -247,11 +249,20 @@ class Auth:
                     errcode=Codes.GUEST_ACCESS_FORBIDDEN,
                 )
 
+            # watcha+
+            if is_partner and not allow_partner:
+                raise AuthError(
+                    403,
+                    "Partner access not allowed",
+                    errcode=Codes.GUEST_ACCESS_FORBIDDEN,
+                )
+            # +watcha
             request.authenticated_entity = user.to_string()
             opentracing.set_tag("authenticated_entity", user.to_string())
             if device_id:
                 opentracing.set_tag("device_id", device_id)
 
+            """ watcha!
             return synapse.types.create_requester(
                 user,
                 token_id,
@@ -260,6 +271,19 @@ class Auth:
                 device_id,
                 app_service=app_service,
             )
+            !watcha """
+            # watcha+
+            return synapse.types.create_requester(
+                user,
+                token_id,
+                is_guest,
+                shadow_banned,
+                device_id,
+                is_partner,
+                app_service=app_service,
+            )
+            # +watcha
+
         except KeyError:
             raise MissingClientTokenError()
 
@@ -499,6 +523,7 @@ class Auth:
             "is_guest": False,
             "shadow_banned": ret.get("shadow_banned"),
             "device_id": ret.get("device_id"),
+            "is_partner": ret.get("is_partner"), # watcha+
             "valid_until_ms": ret.get("valid_until_ms"),
         }
         return user_info
