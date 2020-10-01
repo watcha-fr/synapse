@@ -827,7 +827,6 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         !watcha """
         # watcha+
         if membership_action == "invite" and self._has_3pid_invite_keys(content):
-            # added for watcha
             logger.info("invitation: inviter id=%s, device_id=%s",
                         requester.user, requester.device_id)
 
@@ -839,8 +838,6 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             )
             logger.info("invitee email=%s has been invited as %s in room_id=%s",
                         content["address"], content["user_id"], room_id)
-
-            return 200, {}
         # +watcha
 
         target = requester.user
