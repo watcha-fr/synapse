@@ -1382,8 +1382,8 @@ class WatchaRoomHandler(BaseHandler):
 
         return rooms
 
-    async def _get_first_room_admin(self, room_id):
-        result = await self.store.get_first_room_admin(room_id)
+    async def _get_room_creator(self, room_id):
+        result = await self.store.get_room_creator(room_id)
         return result
 
     async def send_NC_notification_to_rooms(self, rooms, file_name, file_url, file_operation):
@@ -1399,7 +1399,7 @@ class WatchaRoomHandler(BaseHandler):
             content["url"] = file_url
 
         for room in rooms:
-            first_room_admin = await self._get_first_room_admin(room)
+            first_room_admin = await self._get_room_creator(room)
 
             if not first_room_admin:
                 logger.warn(
