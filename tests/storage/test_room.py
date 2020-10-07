@@ -17,7 +17,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
-from synapse.api.errors import StoreError, SynapseError  # insertion for Watcha OP486
+from synapse.api.errors import StoreError, SynapseError  # watcha+ op486
 from synapse.api.room_versions import RoomVersions
 from synapse.types import RoomAlias, RoomID, UserID
 
