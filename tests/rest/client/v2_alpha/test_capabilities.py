@@ -80,6 +80,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertFalse(capabilities["m.change_password"]["enabled"])
 
+    # watcha+
     def test_get_change_password_capabilities_with_partner(self):
         localpart = "partner"
         password = "pass"
@@ -102,3 +103,4 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 200)
         self.assertFalse(capabilities["m.change_password"]["enabled"])
+    # +watcha

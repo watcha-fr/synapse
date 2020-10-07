@@ -458,7 +458,10 @@ class HomeserverTestCase(TestCase):
         self.pump()
         return self.failureResultOf(d, exc)
 
-    def register_user(self, username, password, admin=False, is_partner=False):
+    """ watcha!
+    def register_user(self, username, password, admin=False):
+    !watcha """
+    def register_user(self, username, password, admin=False, is_partner=False): # watcha+
         """
         Register a user. Requires the Admin API be registered.
 
@@ -497,7 +500,7 @@ class HomeserverTestCase(TestCase):
                 "admin": admin,
                 "mac": want_mac,
                 "inhibit_login": True,
-                "is_partner": if admin False else is_partner,
+                "is_partner": if admin False else is_partner, # watcha+
             }
         )
         request, channel = self.make_request(
