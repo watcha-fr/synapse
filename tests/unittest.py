@@ -500,7 +500,7 @@ class HomeserverTestCase(TestCase):
                 "admin": admin,
                 "mac": want_mac,
                 "inhibit_login": True,
-                "is_partner": if admin False else is_partner, # watcha+
+                "is_partner": False if admin else is_partner, # watcha+
             }
         )
         request, channel = self.make_request(
