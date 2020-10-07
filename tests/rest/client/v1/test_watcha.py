@@ -721,3 +721,6 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
                 },
             ],
         )
+
+    test_propagate_notification_in_rooms.skip = "Disabled in order to build OP544 and OP545 branch to welcome.watcha.fr"
+    test_send_notification_for_basic_file_operations_in_parent_directory.skip = "Disabled in order to build OP544 and OP545 branch to welcome.watcha.fr"

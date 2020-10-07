@@ -276,20 +276,6 @@ class WatchaUpdateUserRoleRestServlet(RestServlet):
         return 200, {"new_role": result}
 
 
-class WatchaIsAdmin(RestServlet):
-
-    PATTERNS = client_patterns("/watcha_is_admin", v1=True)
-
-    def __init__(self, hs):
-        super(WatchaIsAdmin, self).__init__()
-        self.auth = hs.get_auth()
-
-    async def on_GET(self, request):
-        requester = await self.auth.get_user_by_req(request)
-        is_admin = await self.auth.is_server_admin(requester.user)
-        return 200, {"is_admin": is_admin}
-
-
 class WatchaAdminStatsRestServlet(RestServlet):
     """Get stats on the server.
 
@@ -489,7 +475,6 @@ def register_servlets(hs, http_server):
     WatchaUpdateUserRoleRestServlet(hs).register(http_server)
     WatchaUserIp(hs).register(http_server)
     WatchaAdminStatsRestServlet(hs).register(http_server)
-    WatchaIsAdmin(hs).register(http_server)
     WatchaUpdateMailRestServlet(hs).register(http_server)
     WatchaUserlistRestServlet(hs).register(http_server)
     WatchaRoomListRestServlet(hs).register(http_server)
