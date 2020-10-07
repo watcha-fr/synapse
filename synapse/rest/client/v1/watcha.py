@@ -426,9 +426,7 @@ class WatchaResetPasswordRestServlet(RestServlet):
         self.hs = hs
         self.handlers = hs.get_handlers()
         self.auth = hs.get_auth()
-        # insertion for watcha
-        self.account_activity_handler = hs.get_account_validity_handler()
-        # end of insertion
+        self.account_activity_handler = hs.get_account_validity_handler() # watcha+
 
     async def on_POST(self, request):
         await _check_admin(
