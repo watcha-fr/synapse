@@ -64,7 +64,7 @@ class Requester(
         ],
     )
 ):
-!watcha """ 
+!watcha """
 # watcha+
 class Requester(
     namedtuple(
@@ -80,7 +80,7 @@ class Requester(
         ],
     )
 ):
-# +watcha
+    # +watcha
     """
     Represents the user making a request
 
@@ -147,7 +147,7 @@ def create_requester(
     device_id=None,
     app_service=None,
 ):
-!watcha """ 
+!watcha """
 # watcha+
 def create_requester(
     user_id,
@@ -158,7 +158,7 @@ def create_requester(
     is_partner=False,
     app_service=None,
 ):
-# +watcha
+    # +watcha
     """
     Create a new ``Requester`` object
 
@@ -177,9 +177,19 @@ def create_requester(
     if not isinstance(user_id, UserID):
         user_id = UserID.from_string(user_id)
     """ watcha!
-    return Requester(user_id, access_token_id, is_guest, device_id, app_service)
-    !watcha """ 
-    return Requester(user_id, access_token_id, is_guest, shadow_banned, device_id, is_partner, app_service) # watcha+
+    return Requester(
+        user_id, access_token_id, is_guest, device_id, app_service
+    )
+    !watcha """
+    return Requester(
+        user_id,
+        access_token_id,
+        is_guest,
+        shadow_banned,
+        device_id,
+        is_partner,
+        app_service,
+    )  # watcha+
 
 
 def get_domain_from_id(string):
