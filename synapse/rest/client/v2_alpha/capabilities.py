@@ -39,7 +39,7 @@ class CapabilitiesRestServlet(RestServlet):
         self.store = hs.get_datastore()
 
     async def on_GET(self, request):
-        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        requester = await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True)
         user = await self.store.get_user_by_id(requester.user.to_string())
         change_password = bool(user["password_hash"])
 
