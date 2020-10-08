@@ -395,6 +395,7 @@ class UserRegisterServlet(RestServlet):
 
             password_hash = await self.auth_handler.hash(password)
 
+        is_partner = body.get("is_partner", False) # watcha+
         admin = body.get("admin", None)
         user_type = body.get("user_type", None)
 
@@ -434,6 +435,7 @@ class UserRegisterServlet(RestServlet):
             admin=bool(admin),
             user_type=user_type,
             by_admin=True,
+            make_partner=is_partner, # watcha+
         )
 
         result = await register._create_registration_details(user_id, body)
