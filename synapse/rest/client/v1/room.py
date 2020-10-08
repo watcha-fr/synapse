@@ -52,6 +52,8 @@ MYPY = False
 if MYPY:
     import synapse.server
 
+from urllib.parse import parse_qs, urlparse # watcha+
+
 logger = logging.getLogger(__name__)
 
 
@@ -278,16 +280,26 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                             400, "VectorSetting is only used for Nextcloud integration."
                         )
 
-                    nextcloud_URL = content["nextcloud"]
                     requester_id = requester.user.to_string()
+                    nextcloud_url = content["nextcloud"]
 
-                    if not nextcloud_URL:
+                    if not nextcloud_url:
                         await self.handlers.watcha_room_handler.delete_room_mapping_with_nextcloud_directory(
-                            room_id, requester_id
+                            room_id
                         )
                     else:
-                        await self.handlers.watcha_room_handler.add_room_mapping_with_nextcloud_directory(
-                            room_id, requester_id, nextcloud_URL
+                        url_query = parse_qs(urlparse(nextcloud_url).query)
+
+                        if "dir" not in url_query:
+                            raise SynapseError(
+                                400,
+                                "The url doesn't point to a valid nextcloud directory path.",
+                            )
+
+                        nextcloud_directory_path = url_query["dir"][0]
+
+                        await self.handlers.watcha_room_handler.update_room_mapping_with_nextcloud_directory(
+                            room_id, requester_id, nextcloud_directory_path
                         )
                 # +watcha
                 (
