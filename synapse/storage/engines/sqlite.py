@@ -21,8 +21,6 @@ from synapse.storage.engines import BaseDatabaseEngine
 if typing.TYPE_CHECKING:
     import sqlite3  # noqa: F401
 
-from synapse.storage.watcha import check_db_customization # watcha+
-
 
 class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
     def __init__(self, database_module, database_config):
