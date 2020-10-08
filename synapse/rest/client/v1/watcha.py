@@ -426,9 +426,8 @@ class WatchaResetPasswordRestServlet(RestServlet):
         self.hs = hs
         self.handlers = hs.get_handlers()
         self.auth = hs.get_auth()
-        # insertion for watcha
+        self.auth_handler = hs.get_auth_handler()
         self.account_activity_handler = hs.get_account_validity_handler()
-        # end of insertion
 
     async def on_POST(self, request):
         await _check_admin(
@@ -442,6 +441,8 @@ class WatchaResetPasswordRestServlet(RestServlet):
             user_id = "@" + params["user"] + ":" + self.hs.get_config().server_name
 
         password = generate_password()
+        password_hash = await self.auth_handler.hash(password)
+
         logger.info("Setting password for user %s", user_id)
         user = UserID.from_string(user_id)
 
@@ -449,7 +450,7 @@ class WatchaResetPasswordRestServlet(RestServlet):
 
         requester = create_requester(user_id)
         await self.hs.get_set_password_handler().set_password(
-            user_id, password, requester
+            user_id, password_hash, requester
         )
         await self.handlers.watcha_admin_handler.watcha_reactivate_account(user_id)
 
