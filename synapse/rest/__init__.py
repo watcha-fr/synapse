@@ -28,7 +28,6 @@ from synapse.rest.client.v1 import (
     pusher,
     room,
     voip,
-    watcha, # watcha+
 )
 from synapse.rest.client.v2_alpha import (
     account,
@@ -59,6 +58,7 @@ from synapse.rest.client.v2_alpha import (
     user_directory,
 )
 
+from synapse.rest.client.v1 import watcha # watcha+
 
 class ClientRestResource(JsonResource):
     """Matrix Client API REST resource.

@@ -23,13 +23,7 @@ import math
 import random
 import string
 from collections import OrderedDict
-# watcha+
-from pathlib import Path
-from requests import get, post, delete, auth, HTTPError
-from requests.auth import HTTPBasicAuth
-# +watcha
 from typing import TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Tuple
-from urllib.parse import parse_qs, urlparse # watcha+ op486
 
 from synapse.api.constants import (
     EventTypes,
@@ -57,7 +51,6 @@ from synapse.types import (
     UserID,
     create_requester,
 )
-from synapse.types import get_localpart_from_id # watcha+ op544
 from synapse.util import stringutils
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.response_cache import ResponseCache
@@ -67,6 +60,14 @@ from ._base import BaseHandler
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+
+# watcha+
+from pathlib import Path
+from requests import get, post, delete, auth, HTTPError
+from requests.auth import HTTPBasicAuth
+from synapse.types import get_localpart_from_id
+from urllib.parse import parse_qs, urlparse
+# +watcha
 
 logger = logging.getLogger(__name__)
 

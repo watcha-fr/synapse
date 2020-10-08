@@ -73,9 +73,10 @@ from .transactions import TransactionStore
 from .ui_auth import UIAuthStore
 from .user_directory import UserDirectoryStore
 from .user_erasure_store import UserErasureStore
+
 # watcha+
-from .watcha_invite_external import ExternalInvitationStore
 from .watcha_admin import WatchaAdminStore
+from .watcha_invite_external import ExternalInvitationStore
 # +watcha
 
 logger = logging.getLogger(__name__)

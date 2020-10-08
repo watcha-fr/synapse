@@ -18,10 +18,11 @@ from .directory import DirectoryHandler
 from .federation import FederationHandler
 from .identity import IdentityHandler
 from .search import SearchHandler
+
 # watcha+
 from .room import WatchaRoomHandler
-from .watcha_invite_external import InviteExternalHandler
 from .watcha_admin_handler import WatchaAdminHandler
+from .watcha_invite_external import InviteExternalHandler
 # +watcha
 
 

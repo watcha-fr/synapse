@@ -28,6 +28,7 @@ from synapse.rest.client.v1 import login, profile, room
 from tests import unittest
 
 from ....utils import MockHttpResource, setup_test_homeserver
+
 from urllib.parse import quote # watcha+
 
 myid = "@1234ABCD:test"
