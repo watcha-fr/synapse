@@ -80,7 +80,7 @@ class Requester(
         ],
     )
 ):
-    # +watcha
+# +watcha
     """
     Represents the user making a request
 
@@ -133,32 +133,20 @@ class Requester(
             is_guest=input["is_guest"],
             shadow_banned=input["shadow_banned"],
             device_id=input["device_id"],
-            is_partner=input["is_partner"], # watcha+
+            is_partner=input["is_partner"],  # watcha+
             app_service=appservice,
         )
 
 
-""" watcha!
 def create_requester(
     user_id,
     access_token_id=None,
     is_guest=False,
     shadow_banned=False,
     device_id=None,
+    is_partner=False,  # watcha+
     app_service=None,
 ):
-!watcha """
-# watcha+
-def create_requester(
-    user_id,
-    access_token_id=None,
-    is_guest=False,
-    shadow_banned=False,
-    device_id=None,
-    is_partner=False,
-    app_service=None,
-):
-    # +watcha
     """
     Create a new ``Requester`` object
 
@@ -181,6 +169,7 @@ def create_requester(
         user_id, access_token_id, is_guest, device_id, app_service
     )
     !watcha """
+    # watcha+
     return Requester(
         user_id,
         access_token_id,
@@ -189,7 +178,8 @@ def create_requester(
         device_id,
         is_partner,
         app_service,
-    )  # watcha+
+    )  
+    # +watcha
 
 
 def get_domain_from_id(string):

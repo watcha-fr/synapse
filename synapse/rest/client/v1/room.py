@@ -167,9 +167,11 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         !watcha """
+        # watcha+
         requester = await self.auth.get_user_by_req(
             request, allow_guest=True, allow_partner=True
-        )  # watcha+
+        )
+        # +watcha
         format = parse_string(
             request, "format", default="content", allowed_values=["content", "event"]
         )
@@ -319,9 +321,11 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         !watcha """
+        # watcha+
         requester = await self.auth.get_user_by_req(
             request, allow_guest=True, allow_partner=True
-        )  # watcha+
+        )
+        # +watcha
         content = parse_json_object_from_request(request)
 
         event_dict = {
@@ -375,9 +379,11 @@ class JoinRoomAliasServlet(TransactionRestServlet):
         """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         !watcha """
+        # watcha+
         requester = await self.auth.get_user_by_req(
             request, allow_guest=True, allow_partner=True
-        )  # watcha+
+        )
+        # +watcha
 
         try:
             content = parse_json_object_from_request(request)
@@ -623,9 +629,11 @@ class RoomMessageListRestServlet(RestServlet):
         """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         !watcha """
+        # watcha+
         requester = await self.auth.get_user_by_req(
             request, allow_guest=True, allow_partner=True
-        )  # watcha+
+        )
+        # +watcha
         pagination_config = PaginationConfig.from_request(request, default_limit=10)
         as_client_event = b"raw" not in request.args
         filter_str = parse_string(request, b"filter", encoding="utf-8")
@@ -667,9 +675,11 @@ class RoomStateRestServlet(RestServlet):
         """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         !watcha """
+        # watcha+
         requester = await self.auth.get_user_by_req(
             request, allow_guest=True, allow_partner=True
-        )  # watcha+
+        )
+        # +watcha
         # Get all the current state for this room
         events = await self.message_handler.get_state_events(
             room_id=room_id,
@@ -693,9 +703,11 @@ class RoomInitialSyncRestServlet(RestServlet):
         """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         !watcha """
+        # watcha+
         requester = await self.auth.get_user_by_req(
             request, allow_guest=True, allow_partner=True
-        )  # watcha+
+        )
+        # +watcha
         pagination_config = PaginationConfig.from_request(request)
         content = await self.initial_sync_handler.room_initial_sync(
             room_id=room_id, requester=requester, pagin_config=pagination_config
@@ -751,9 +763,11 @@ class RoomEventContextServlet(RestServlet):
         """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         !watcha """
+        # watcha+
         requester = await self.auth.get_user_by_req(
             request, allow_guest=True, allow_partner=True
-        )  # watcha+
+        )
+        # +watcha
 
         limit = parse_integer(request, "limit", default=10)
 
@@ -1014,9 +1028,11 @@ class RoomTypingRestServlet(RestServlet):
         """ watcha!
         requester = await self.auth.get_user_by_req(request)
         !watcha """
+        # watcha+
         requester = await self.auth.get_user_by_req(
             request, allow_partner=True
-        )  # watcha+
+        )
+        # +watcha
 
         if not self._is_typing_writer:
             raise Exception("Got /typing request on instance that is not typing writer")
@@ -1106,9 +1122,11 @@ class JoinedRoomsRestServlet(RestServlet):
         """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         !watcha """
+        # watcha+
         requester = await self.auth.get_user_by_req(
             request, allow_guest=True, allow_partner=True
-        )  # watcha+
+        )
+        # +watcha
 
         room_ids = await self.store.get_rooms_for_user(requester.user.to_string())
         return 200, {"joined_rooms": list(room_ids)}

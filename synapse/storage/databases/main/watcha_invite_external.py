@@ -2,6 +2,7 @@ from synapse.storage.database import DatabasePool
 import logging
 from twisted.internet import defer
 from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
+
 logger = logging.getLogger(__name__)
 
 
