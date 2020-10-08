@@ -883,7 +883,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             )
             args = join_args + (full_query, exact_query, prefix_query, limit + 1)
         elif isinstance(self.database_engine, Sqlite3Engine):
-            '''!watcha
+            ''' watcha!
             search_query = _parse_query_sqlite(search_term)
 
             sql = """
@@ -902,7 +902,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 where_clause,
             )
             args = join_args + (search_query, limit + 1)
-            '''
+            !watcha '''
             # watcha+
             # TODO: change for PostgreSql
 

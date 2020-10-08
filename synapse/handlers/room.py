@@ -682,8 +682,6 @@ class RoomCreationHandler(BaseHandler):
                 % (user_id,),
             )
 
-        invite_3pid_list = config.get("invite_3pid", [])
-
         """ watcha!
         visibility = config.get("visibility", None)
         !watcha """
