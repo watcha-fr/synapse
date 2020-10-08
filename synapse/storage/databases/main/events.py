@@ -24,7 +24,6 @@ from prometheus_client import Counter
 
 import synapse.metrics
 from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
-from synapse.api.errors import StoreError, SynapseError # watcha+
 from synapse.api.room_versions import RoomVersions
 from synapse.crypto.event_signing import compute_event_reference_hash
 from synapse.events import EventBase  # noqa: F401
@@ -41,6 +40,8 @@ from synapse.util.iterutils import batch_iter
 if TYPE_CHECKING:
     from synapse.server import HomeServer
     from synapse.storage.databases.main import DataStore
+
+from synapse.api.errors import StoreError, SynapseError # watcha+
 
 
 logger = logging.getLogger(__name__)

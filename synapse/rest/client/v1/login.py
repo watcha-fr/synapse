@@ -33,6 +33,7 @@ from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import JsonDict, UserID
 from synapse.util.threepids import canonicalise_email
+
 from synapse.http.server import set_cors_headers # watcha+ op479
 
 logger = logging.getLogger(__name__)

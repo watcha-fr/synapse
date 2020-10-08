@@ -29,10 +29,8 @@ from synapse.storage.util.sequence import build_sequence_generator
 from synapse.types import UserID
 from synapse.util.caches.descriptors import cached
 
-# watcha+
-import logging
-logger = logging.getLogger(__name__)
-# +watcha
+import logging # watcha+
+
 THIRTY_MINUTES_IN_MS = 30 * 60 * 1000
 
 logger = logging.getLogger(__name__)

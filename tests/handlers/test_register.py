@@ -27,6 +27,7 @@ from tests.unittest import override_config
 from tests.utils import mock_getRawHeaders
 
 from .. import unittest
+
 from ..utils import setup_test_homeserver # watcha+ op251
 
 

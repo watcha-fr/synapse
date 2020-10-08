@@ -17,14 +17,16 @@
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
-from synapse.api.errors import StoreError, SynapseError  # insertion for Watcha OP486
 from synapse.api.room_versions import RoomVersions
 from synapse.types import RoomAlias, RoomID, UserID
 
 from tests import unittest
 from tests.utils import setup_test_homeserver
-from tests.utils import create_room # watcha+
 
+# watcha+
+from synapse.api.errors import StoreError, SynapseError
+from tests.utils import create_room
+# +watcha
 
 class RoomStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
