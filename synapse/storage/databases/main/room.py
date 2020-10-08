@@ -1485,7 +1485,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         """ Set mapping between Watcha room and Nextcloud directory.
         """
 
-        self.db_pool.simple_upsert(
+        await self.db_pool.simple_upsert(
             table="room_mapping_with_NC",
             keyvalues={"room_id": room_id},
             values={"room_id": room_id, "directory_path": directory_path,},
@@ -1496,7 +1496,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         """ Delete mapping between Watcha room and Nextcloud directory for room_id.
         """
 
-        self.db_pool.simple_delete(
+        await self.db_pool.simple_delete(
             table="room_mapping_with_NC",
             keyvalues={"room_id": room_id},
             desc="deleted_room_mapping_with_nextcloud_directory",
