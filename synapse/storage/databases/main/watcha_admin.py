@@ -479,14 +479,6 @@ class WatchaAdminStore(SQLBaseStore):
             desc="get_rooms",
         )
 
-    async def watcha_room_name(self):
-        return await self.db_pool.simple_select_list(
-            table="room_names",
-            keyvalues={},
-            retcols=["name", "room_id",],
-            desc="get_rooms",
-        )
-
     async def _update_user(self, user_id, **updatevalues):
         return await self.db_pool.simple_update(
             table="users",
