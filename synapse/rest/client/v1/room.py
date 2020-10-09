@@ -52,8 +52,6 @@ MYPY = False
 if MYPY:
     import synapse.server
 
-from urllib.parse import parse_qs, urlparse # watcha+
-
 logger = logging.getLogger(__name__)
 
 
@@ -288,7 +286,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                             room_id
                         )
                     else:
-                        url_query = parse_qs(urlparse(nextcloud_url).query)
+                        url_query = urlparse.parse_qs(urlparse.urlparse(nextcloud_url).query)
 
                         if "dir" not in url_query:
                             raise SynapseError(
