@@ -273,12 +273,12 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     logger.info("GuestAccessEvent. New content=" + str(content))
 
                 if event_type == EventTypes.VectorSetting:
-                    if "nextcloud" not in content:
+                    if "nextcloudShare" not in content:
                         raise SynapseError(
                             400, "VectorSetting is only used for Nextcloud integration."
                         )
 
-                    nextcloud_URL = content["nextcloud"]
+                    nextcloud_URL = content["nextcloudShare"]
                     requester_id = requester.user.to_string()
 
                     if not nextcloud_URL:
