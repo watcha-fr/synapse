@@ -332,7 +332,6 @@ class WatchaAdminStore(SQLBaseStore):
                 if user["user_id"] in users_with_pending_invitation
                 else "active"
             )
-        logger.info(users)
         return users
 
     async def watcha_email_list(self):
