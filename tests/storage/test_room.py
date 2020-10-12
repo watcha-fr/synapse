@@ -200,7 +200,7 @@ class WatchaRoomEventsStoreTestCase(unittest.HomeserverTestCase):
                 "type": EventTypes.VectorSetting,
                 "sender": self.user.to_string(),
                 "room_id": room_id,
-                "content": {"nextcloud": nextcloud_folder_url},
+                "content": {"nextcloudShare": nextcloud_folder_url},
             },
         )
 
