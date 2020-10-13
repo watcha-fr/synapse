@@ -1,12 +1,11 @@
-import json, logging, hmac, hashlib
+import json, logging
 
-from tests import unittest
-from tests.utils import setup_test_homeserver
-from synapse.rest.client.v1 import watcha, login, room
 from synapse.rest import admin
+from synapse.rest.client.v1 import watcha, login, room
 from synapse.types import Requester, UserID
-from synapse.api.errors import SynapseError
-from twisted.internet import defer
+from tests import unittest
+from tests.test_utils import get_awaitable_result
+from tests.utils import setup_test_homeserver
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +46,7 @@ class BaseHomeserverWithEmailTestCase(unittest.HomeserverTestCase):
             self.auth.add_threepid(
                 self.user_id, "email", "example@email.com", self.time
             )
-        )        
+        )
 
         self.room_id = self._create_room()
 
@@ -82,6 +81,7 @@ class BaseHomeserverWithEmailTestCase(unittest.HomeserverTestCase):
         )
 
         self.render(request)
+
 
 class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
     def test_register_user(self):
@@ -350,6 +350,7 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
             )
         self.assertEquals(200, channel.code)
 
+
 class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
     unittest.HomeserverTestCase
 ):
@@ -362,26 +363,33 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
     ]
 
     def prepare(self, reactor, clock, hs):
-        # register admin user :
+        self.store = hs.get_datastore()
+        self.room_creator = hs.get_room_creation_handler()
+
+        # register admin user:
         self.register_user("admin", "pass", True)
         self.user_access_token = self.login("admin", "pass")
 
-        self.room_creator = hs.get_room_creation_handler()
+        # user who creates rooms : 
+        self.user = UserID("user", "test")
 
         self.nextcloud_directory_url = "https://test/nextcloud/apps/files/?dir="
         self.nextcloud_root_directory = "/"
         self.nextcloud_file_name = "WATCHA-Brochure A4.pdf"
         self.nextcloud_file_url = "https://test/nextcloud/f/307"
 
-        self.rooms_mapping = self._do_rooms_mapping_with_nextcloud_directories()
+        self.rooms_mapping = self.get_success(
+            self._do_rooms_mapping_with_nextcloud_directories()
+        )
 
     def _create_room(self):
-        user = UserID("admin", "test")
-        requester = Requester(user, None, False, False, None, False, None)
+        requester = Requester(self.user, None, False, False, None, False, None)
 
-        return self.get_success(self.room_creator.create_room(requester, {}))[0]["room_id"]
+        return self.get_success(self.room_creator.create_room(requester, {}))[0][
+            "room_id"
+        ]
 
-    def _do_rooms_mapping_with_nextcloud_directories(self):
+    async def _do_rooms_mapping_with_nextcloud_directories(self):
         rooms_mapping = {
             "parent_directory": {"path": "/a",},
             "main_directory": {"path": "/a/b",},
@@ -389,19 +397,13 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
             "cross_directory": {"path": "/a/d",},
         }
 
-        for directory_name, mapping_value in rooms_mapping.items():
+        for _, mapping_value in rooms_mapping.items():
             room_id = self._create_room()
             mapping_value["room_id"] = room_id
 
-            request, _ = self.make_request(
-                "PUT",
-                "/rooms/{}/state/im.vector.web.settings".format(room_id),
-                content=json.dumps(
-                    {"nextcloudShare": self.nextcloud_directory_url + mapping_value["path"]}
-                ),
-                access_token=self.user_access_token,
+            await self.store.set_room_mapping_with_nextcloud_directory(
+                room_id, mapping_value["path"]
             )
-            self.render(request)
 
         return rooms_mapping
 
@@ -439,7 +441,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
                 {
                     "file_name": self.nextcloud_file_name,
                     "file_operation": "file_created",
-                    "rooms": [room_id],
+                    "notified_rooms": [{"room_id": room_id, "sender": self.user.to_string()}],
                 },
             ],
         )
@@ -454,7 +456,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
                 {
                     "file_name": self.nextcloud_file_name,
                     "file_operation": "file_deleted",
-                    "rooms": [room_id],
+                    "notified_rooms": [{"room_id": room_id, "sender": self.user.to_string()}],
                 },
             ],
         )
@@ -469,7 +471,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
                 {
                     "file_name": self.nextcloud_file_name,
                     "file_operation": "file_restored",
-                    "rooms": [room_id],
+                    "notified_rooms": [{"room_id": room_id, "sender": self.user.to_string()}],
                 },
             ],
         )
@@ -616,7 +618,11 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
                 {
                     "file_name": self.nextcloud_file_name,
                     "file_operation": "file_created",
-                    "rooms": [main_room_id, parent_room_id, sub_room_id],
+                    "notified_rooms": [
+                        {"room_id": main_room_id, "sender": self.user.to_string()},
+                        {"room_id": parent_room_id, "sender": self.user.to_string()},
+                        {"room_id": sub_room_id, "sender": self.user.to_string()},
+                    ],
                 }
             ],
         )
@@ -633,7 +639,10 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
                 {
                     "file_name": self.nextcloud_file_name,
                     "file_operation": "file_created",
-                    "rooms": [ parent_room_id, main_room_id],
+                    "notified_rooms": [
+                        {"room_id": parent_room_id, "sender": self.user.to_string()},
+                        {"room_id": main_room_id, "sender": self.user.to_string()},
+                    ],
                 }
             ],
         )
@@ -650,7 +659,9 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
                 {
                     "file_name": self.nextcloud_file_name,
                     "file_operation": "file_created",
-                    "rooms": [parent_room_id,],
+                    "notified_rooms": [
+                        {"room_id": parent_room_id, "sender": self.user.to_string()},
+                    ],
                 }
             ],
         )
@@ -667,7 +678,10 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
                 {
                     "file_name": self.nextcloud_file_name,
                     "file_operation": "file_created",
-                    "rooms": [ parent_room_id, cross_room_id],
+                    "notified_rooms": [
+                        {"room_id": parent_room_id, "sender": self.user.to_string()},
+                        {"room_id": cross_room_id, "sender": self.user.to_string()},
+                    ],
                 }
             ],
         )
@@ -707,20 +721,24 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
                 {
                     "file_name": self.nextcloud_file_name,
                     "file_operation": "file_deleted",
-                    "rooms": [ main_room_id, sub_room_id],
+                    "notified_rooms": [
+                        {"room_id": main_room_id, "sender": self.user.to_string()},
+                        {"room_id": sub_room_id, "sender": self.user.to_string()},
+                    ],
                 },
                 {
                     "file_name": self.nextcloud_file_name,
                     "file_operation": "file_created",
-                    "rooms": [cross_room_id],
+                    "notified_rooms": [
+                        {"room_id": cross_room_id, "sender": self.user.to_string()},
+                    ],
                 },
                 {
                     "file_name": self.nextcloud_file_name,
                     "file_operation": "file_moved",
-                    "rooms": [parent_room_id],
+                    "notified_rooms": [
+                        {"room_id": parent_room_id, "sender": self.user.to_string()},
+                    ],
                 },
             ],
         )
-
-    test_propagate_notification_in_rooms.skip = "Disabled in order to build OP544 and OP545 branch to welcome.watcha.fr"
-    test_send_notification_for_basic_file_operations_in_parent_directory.skip = "Disabled in order to build OP544 and OP545 branch to welcome.watcha.fr"
