@@ -1815,6 +1815,10 @@ class WatchaRoomHandler(BaseHandler):
     async def send_nextcloud_notification_to_rooms(
         self, rooms, file_name, file_url, file_operation
     ):
+        notification_sent = {
+            "file_name": file_name,
+            "file_operation": file_operation,
+        }
 
         content = {
             "body": file_operation,
@@ -1826,25 +1830,37 @@ class WatchaRoomHandler(BaseHandler):
         if file_operation in ("file_created", "file_restored", "file_moved"):
             content["url"] = file_url
 
+        notified_rooms = []
         for room in rooms:
-            first_room_admin = await self._get_room_creator(room)
+            users = await self.store.get_users_in_room(room)
 
-            if not first_room_admin:
+            if not users:
                 logger.warn(
-                    "No administrators are in the room. The Nextcloud notification cannot be posted.",
+                    "This room has no users. The Nextcloud notification cannot be posted.",
                 )
                 continue
 
-            requester = create_requester(first_room_admin)
+            requester = create_requester(users[0])
+            sender = requester.user.to_string()
 
             event_dict = {
                 "type": EventTypes.Message,
                 "content": content,
                 "room_id": room,
-                "sender": requester.user.to_string(),
+                "sender": sender,
             }
 
             await self.event_creation_handler.create_and_send_nonmember_event(
                 requester, event_dict
             )
+
+            notified_rooms.append(
+                {
+                    "room_id": room,
+                    "sender": sender,
+                }
+            )
+
+        notification_sent["notified_rooms"] = notified_rooms
+        return notification_sent
 # +watcha
