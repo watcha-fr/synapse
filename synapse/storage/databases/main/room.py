@@ -1448,7 +1448,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             allow_none=True,
             desc="get_nextcloud_directory_path_from_roomID",
         )
- 
+
     async def get_roomID_from_nextcloud_directory_path(self, directory_path):
         """ Get the room_id mapped with Nextcloud directory path.
         """
@@ -1481,4 +1481,4 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             keyvalues={"room_id": room_id},
             desc="deleted_room_mapping_with_nextcloud_directory",
         )
-    # +watcha        
+    # +watcha

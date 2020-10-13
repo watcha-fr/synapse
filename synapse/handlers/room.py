@@ -685,7 +685,7 @@ class RoomCreationHandler(BaseHandler):
         """ watcha!
         visibility = config.get("visibility", None)
         !watcha """
-        visibility = "private" # watcha+
+        visibility = "private"  # watcha+
         is_public = visibility == "public"
 
         room_id = await self._generate_room_id(
@@ -810,18 +810,27 @@ class RoomCreationHandler(BaseHandler):
             )
             !watcha """
             # watcha+
-            logger.info("invitation on creation: inviter id=%s, device_id=%s",
-                requester.user, requester.device_id)
+            logger.info(
+                "invitation on creation: inviter id=%s, device_id=%s",
+                requester.user,
+                requester.device_id,
+            )
 
-            invite_3pid["user_id"] = await self.hs.get_handlers().invite_external_handler.invite(
+            invite_3pid[
+                "user_id"
+            ] = await self.hs.get_handlers().invite_external_handler.invite(
                 room_id=room_id,
                 inviter=requester.user,
                 inviter_device_id=str(requester.device_id),
-                invitee=invite_3pid["address"]
+                invitee=invite_3pid["address"],
             )
 
-            logger.info("invitee email=%s has been invited as %s at the creation of the room with id=%s",
-                        invite_3pid["address"], invite_3pid["user_id"], room_id)
+            logger.info(
+                "invitee email=%s has been invited as %s at the creation of the room with id=%s",
+                invite_3pid["address"],
+                invite_3pid["user_id"],
+                room_id,
+            )
 
             content = {}
             is_direct = config.get("is_direct", None)
@@ -1410,13 +1419,14 @@ class RoomShutdownHandler:
             "new_room_id": new_room_id,
         }
 
+
 # watcha+
 class WatchaRoomHandler(BaseHandler):
     def __init__(self, hs):
         self.store = hs.get_datastore()
         self.event_creation_handler = hs.get_event_creation_handler()
 
-        # Nextcloud Integration config : 
+        # Nextcloud Integration config :
         self.keycloak_server = hs.config.keycloak_serveur
         self.keycloak_realm = hs.config.keycloak_realm
         self.nextcloud_shared_secret = hs.config.nextcloud_shared_secret
@@ -1475,10 +1485,7 @@ class WatchaRoomHandler(BaseHandler):
                 )
 
             raise SynapseError(
-                400,
-                "Unable to get shares on the folder {}.".format(
-                    directory_path
-                ),
+                400, "Unable to get shares on the folder {}.".format(directory_path),
             )
 
         group_share_id = ""
@@ -1496,7 +1503,9 @@ class WatchaRoomHandler(BaseHandler):
             )
 
         try:
-            await self.delete_existing_nextcloud_share(nextcloud_username, group_share_id)
+            await self.delete_existing_nextcloud_share(
+                nextcloud_username, group_share_id
+            )
         except HTTPError:
             raise SynapseError(
                 400,
@@ -1613,7 +1622,9 @@ class WatchaRoomHandler(BaseHandler):
         """
 
         request = get(
-            "{}/admin/realms/{}/users".format(self.keycloak_server, self.keycloak_realm),
+            "{}/admin/realms/{}/users".format(
+                self.keycloak_server, self.keycloak_realm
+            ),
             headers={"Authorization": "Bearer {}".format(self.keycloak_access_token)},
             params={"username": user_localpart},
         )
@@ -1660,7 +1671,9 @@ class WatchaRoomHandler(BaseHandler):
         """
 
         request = get(
-            "{}/ocs/v2.php/apps/files_sharing/api/v1/shares".format(self.nextcloud_server),
+            "{}/ocs/v2.php/apps/files_sharing/api/v1/shares".format(
+                self.nextcloud_server
+            ),
             headers={"OCS-APIRequest": "true"},
             auth=HTTPBasicAuth(username, self.nextcloud_shared_secret),
             params={"path": directory_path, "reshares": "true", "format": "json"},
@@ -1682,17 +1695,15 @@ class WatchaRoomHandler(BaseHandler):
         request = get(
             "{}/ocs/v1.php/cloud/groups".format(self.nextcloud_server),
             headers={"OCS-APIRequest": "true"},
-            auth=HTTPBasicAuth(self.service_account_name, self.service_account_password),
+            auth=HTTPBasicAuth(
+                self.service_account_name, self.service_account_password
+            ),
             params={"search": group_name, "format": "json"},
         )
         request.raise_for_status()
         response = request.json()["ocs"]["data"]
 
-        return (
-            True
-            if "groups" in response and len(response["groups"]) > 0
-            else False
-        )
+        return "groups" in response and len(response["groups"]) > 0
 
     async def create_nextcloud_group(self, room_id):
         """ Create an Nextcloud group named as room_id and add all users in the room into the new Nextcloud group.
@@ -1704,7 +1715,9 @@ class WatchaRoomHandler(BaseHandler):
         request = post(
             "{}/ocs/v1.php/cloud/groups".format(self.nextcloud_server),
             headers={"OCS-APIRequest": "true"},
-            auth=HTTPBasicAuth(self.service_account_name, self.service_account_password),
+            auth=HTTPBasicAuth(
+                self.service_account_name, self.service_account_password
+            ),
             data={"groupid": room_id, "format": "json"},
         )
         request.raise_for_status()
@@ -1734,9 +1747,13 @@ class WatchaRoomHandler(BaseHandler):
         """
 
         request = post(
-            "{}/ocs/v1.php/cloud/users/{}/groups".format(self.nextcloud_server, username),
+            "{}/ocs/v1.php/cloud/users/{}/groups".format(
+                self.nextcloud_server, username
+            ),
             headers={"OCS-APIRequest": "true"},
-            auth=HTTPBasicAuth(self.service_account_name, self.service_account_password),
+            auth=HTTPBasicAuth(
+                self.service_account_name, self.service_account_password
+            ),
             data={"groupid": group_name, "format": "json"},
         )
         request.raise_for_status()
@@ -1754,7 +1771,9 @@ class WatchaRoomHandler(BaseHandler):
         """
 
         request = post(
-            "{}/ocs/v2.php/apps/files_sharing/api/v1/shares".format(self.nextcloud_server),
+            "{}/ocs/v2.php/apps/files_sharing/api/v1/shares".format(
+                self.nextcloud_server
+            ),
             headers={"OCS-APIRequest": "true"},
             auth=HTTPBasicAuth(requester, self.service_account_password),
             data={
@@ -1855,10 +1874,7 @@ class WatchaRoomHandler(BaseHandler):
             )
 
             notified_rooms.append(
-                {
-                    "room_id": room,
-                    "sender": sender,
-                }
+                {"room_id": room, "sender": sender,}
             )
 
         notification_sent["notified_rooms"] = notified_rooms

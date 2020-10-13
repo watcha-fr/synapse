@@ -370,7 +370,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
         self.register_user("admin", "pass", True)
         self.user_access_token = self.login("admin", "pass")
 
-        # user who creates rooms : 
+        # user who creates rooms :
         self.user = UserID("user", "test")
 
         self.nextcloud_directory_url = "https://test/nextcloud/apps/files/?dir="
@@ -441,7 +441,9 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
                 {
                     "file_name": self.nextcloud_file_name,
                     "file_operation": "file_created",
-                    "notified_rooms": [{"room_id": room_id, "sender": self.user.to_string()}],
+                    "notified_rooms": [
+                        {"room_id": room_id, "sender": self.user.to_string()}
+                    ],
                 },
             ],
         )
@@ -456,7 +458,9 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
                 {
                     "file_name": self.nextcloud_file_name,
                     "file_operation": "file_deleted",
-                    "notified_rooms": [{"room_id": room_id, "sender": self.user.to_string()}],
+                    "notified_rooms": [
+                        {"room_id": room_id, "sender": self.user.to_string()}
+                    ],
                 },
             ],
         )
@@ -471,7 +475,9 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
                 {
                     "file_name": self.nextcloud_file_name,
                     "file_operation": "file_restored",
-                    "notified_rooms": [{"room_id": room_id, "sender": self.user.to_string()}],
+                    "notified_rooms": [
+                        {"room_id": room_id, "sender": self.user.to_string()}
+                    ],
                 },
             ],
         )

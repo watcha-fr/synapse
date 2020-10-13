@@ -97,11 +97,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
         file_url = params["file_url"]
         notifications = params["notifications"]
 
-        if (
-            not file_name
-            or not file_url
-            or not notifications
-        ):
+        if not file_name or not file_url or not notifications:
             raise SynapseError(
                 400, "Some data in payload have empty value.",
             )
@@ -329,8 +325,7 @@ class WatchaRegisterRestServlet(RestServlet):
 
     async def on_POST(self, request):
         await _check_admin(
-            self.auth,
-            request,
+            self.auth, request,
         )
         params = parse_json_object_from_request(request)
         logger.info("Adding Watcha user...")
@@ -372,7 +367,7 @@ class WatchaRegisterRestServlet(RestServlet):
             inviter_name = params["inviter"]
 
         send_email = False
-        password = params['password']
+        password = params["password"]
 
         if not password:
             password = generate_password()
@@ -408,7 +403,10 @@ class WatchaRegisterRestServlet(RestServlet):
                 full_name=display_name,
             )
         else:
-            logger.info("Not sending email for user password for user %s, password is defined by sender", user_id)
+            logger.info(
+                "Not sending email for user password for user %s, password is defined by sender",
+                user_id,
+            )
         return 200, {"display_name": display_name, "user_id": user_id}
 
 
@@ -463,6 +461,7 @@ class WatchaResetPasswordRestServlet(RestServlet):
         )
 
         return 200, {}
+
 
 def register_servlets(hs, http_server):
     WatchaResetPasswordRestServlet(hs).register(http_server)
