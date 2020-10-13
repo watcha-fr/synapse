@@ -1812,10 +1812,6 @@ class WatchaRoomHandler(BaseHandler):
 
         return rooms
 
-    async def _get_room_creator(self, room_id):
-        result = await self.store.get_room_creator(room_id)
-        return result
-
     async def send_nextcloud_notification_to_rooms(
         self, rooms, file_name, file_url, file_operation
     ):
