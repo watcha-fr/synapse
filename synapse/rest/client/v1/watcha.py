@@ -159,7 +159,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
                 continue
 
             try:
-                await self.handler.watcha_room_handler.send_NC_notification_to_rooms(
+                await self.handler.watcha_room_handler.send_nextcloud_notification_to_rooms(
                     rooms, file_name, file_url, file_operation
                 )
             except SynapseError as e:
