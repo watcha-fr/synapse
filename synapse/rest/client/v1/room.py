@@ -296,7 +296,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 
                         nextcloud_directory_path = url_query["dir"][0]
 
-                        await self.handlers.watcha_room_handler.update_room_mapping_with_nextcloud_directory(
+                        await self.handlers.watcha_room_handler.update_nextcloud_mapping(
                             room_id, requester_id, nextcloud_directory_path
                         )
                 # +watcha

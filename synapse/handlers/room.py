@@ -1451,7 +1451,7 @@ class WatchaRoomHandler(BaseHandler):
 
         await self.store.deleted_room_mapping_with_nextcloud_directory(room_id)
 
-    async def update_room_mapping_with_nextcloud_directory(
+    async def update_nextcloud_mapping(
         self, room_id, requester_id, nextcloud_directory_path
     ):
         """ Update the mapping between a room and a Nextcloud folder.
@@ -1790,7 +1790,7 @@ class WatchaRoomHandler(BaseHandler):
         )
         request.raise_for_status()
 
-    async def get_room_list_to_send_NC_notification(
+    async def get_room_list_to_send_nextcloud_notification(
         self, directory, limit_of_notification_propagation
     ):
         rooms = []
@@ -1823,7 +1823,7 @@ class WatchaRoomHandler(BaseHandler):
         result = await self.store.get_room_creator(room_id)
         return result
 
-    async def send_NC_notification_to_rooms(
+    async def send_nextcloud_notification_to_rooms(
         self, rooms, file_name, file_url, file_operation
     ):
 
