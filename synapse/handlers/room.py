@@ -1454,7 +1454,7 @@ class WatchaRoomHandler(BaseHandler):
     async def update_room_mapping_with_nextcloud_directory(
         self, room_id, requester_id, nextcloud_directory_path
     ):
-        """ Update the mapping between a room and an Nextcloud folder.
+        """ Update the mapping between a room and a Nextcloud folder.
 
         Args :
             room_id: the id of the room which must be linked with the Nextcloud folder.
