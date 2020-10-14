@@ -1442,7 +1442,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         """
 
         return await self.db_pool.simple_select_one_onecol(
-            table="room_mapping_with_NC",
+            table="room_nextcloud_mapping",
             keyvalues={"room_id": room_id},
             retcol="directory_path",
             allow_none=True,
@@ -1454,7 +1454,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         """
 
         return await self.db_pool.simple_select_one_onecol(
-            table="room_mapping_with_NC",
+            table="room_nextcloud_mapping",
             keyvalues={"directory_path": directory_path},
             retcol="room_id",
             allow_none=True,
@@ -1486,7 +1486,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         """
 
         await self.db_pool.simple_upsert(
-            table="room_mapping_with_NC",
+            table="room_nextcloud_mapping",
             keyvalues={"room_id": room_id},
             values={"room_id": room_id, "directory_path": directory_path,},
             desc="set_room_mapping_with_nextcloud_directory",
@@ -1497,7 +1497,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         """
 
         await self.db_pool.simple_delete(
-            table="room_mapping_with_NC",
+            table="room_nextcloud_mapping",
             keyvalues={"room_id": room_id},
             desc="deleted_room_mapping_with_nextcloud_directory",
         )

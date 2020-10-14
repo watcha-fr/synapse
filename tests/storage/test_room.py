@@ -242,7 +242,7 @@ class WatchaRoomEventsStoreTestCase(unittest.HomeserverTestCase):
     def test_get_NC_directory_path(self):
         result = yield defer.ensureDeferred(
             self.store.db_pool.simple_select_onecol(
-                table="room_mapping_with_NC",
+                table="room_nextcloud_mapping",
                 keyvalues={"room_id": self.room.to_string()},
                 retcol="directory_path",
             )
@@ -262,7 +262,7 @@ class WatchaRoomEventsStoreTestCase(unittest.HomeserverTestCase):
 
         result = yield defer.ensureDeferred(
             self.store.db_pool.simple_select_onecol(
-                table="room_mapping_with_NC",
+                table="room_mappiroom_nextcloud_mappingng_with_NC",
                 keyvalues={"room_id": self.room.to_string()},
                 retcol="directory_path",
             )
@@ -276,7 +276,7 @@ class WatchaRoomEventsStoreTestCase(unittest.HomeserverTestCase):
 
         result = yield defer.ensureDeferred(
             self.store.db_pool.simple_select_onecol(
-                table="room_mapping_with_NC",
+                table="room_nextcloud_mapping",
                 keyvalues={"room_id": self.room.to_string()},
                 retcol="directory_path",
             )
