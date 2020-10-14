@@ -21,8 +21,6 @@ DEFAULT_CONFIG = """
 # a shared secret for the service account.
 #
 #nextcloud_integration:
-#   keycloak_serveur: "https://example.com/auth"
-#   keycloak_realm: "example.com"
 #   nextcloud_server: "https://example.com/nextcloud"
 #   nextcloud_shared_secret: "YOUR_SHARED_SECRET"
 #   service_account_name: "example_account_service"
@@ -46,8 +44,6 @@ class NextcloudIntegrationConfig(Config):
 
     def read_config(self, config, **kwargs):
         nextcloud_integration_config = config.get("nextcloud_integration", {})
-        self.keycloak_serveur = nextcloud_integration_config.get("keycloak_serveur")
-        self.keycloak_realm = nextcloud_integration_config.get("keycloak_realm")
         self.nextcloud_server = nextcloud_integration_config.get("nextcloud_server")
         self.nextcloud_shared_secret = nextcloud_integration_config.get(
             "nextcloud_shared_secret"
