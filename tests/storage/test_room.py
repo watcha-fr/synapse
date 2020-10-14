@@ -262,7 +262,7 @@ class WatchaRoomEventsStoreTestCase(unittest.HomeserverTestCase):
 
         result = yield defer.ensureDeferred(
             self.store.db_pool.simple_select_onecol(
-                table="room_mappiroom_nextcloud_mappingng_with_NC",
+                table="room_nextcloud_mapping",
                 keyvalues={"room_id": self.room.to_string()},
                 retcol="directory_path",
             )
