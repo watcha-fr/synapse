@@ -1489,7 +1489,7 @@ class WatchaRoomHandler(BaseHandler):
         except HTTPError:
             raise SynapseError(
                 400,
-                "Unable to know if the nextcloud group {} exists or not.".format(
+                "Unable to know if the nextcloud group {} exists.".format(
                     room_id
                 ),
             )
