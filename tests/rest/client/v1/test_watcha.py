@@ -397,7 +397,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
                 "PUT",
                 "/rooms/{}/state/im.vector.web.settings".format(room_id),
                 content=json.dumps(
-                    {"nextcloud": self.nextcloud_directory_url + mapping_value["path"]}
+                    {"nextcloudShare": self.nextcloud_directory_url + mapping_value["path"]}
                 ),
                 access_token=self.user_access_token,
             )

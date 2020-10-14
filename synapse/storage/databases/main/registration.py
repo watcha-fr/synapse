@@ -1557,7 +1557,6 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             retcol="is_partner",
             desc="isUserPartner",
         )
-        logger.info("login from user %s. is_partner=%s", user_id, is_partner)
         return is_partner
 
     async def is_user_admin(self, user_id):

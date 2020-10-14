@@ -273,13 +273,13 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     logger.info("GuestAccessEvent. New content=" + str(content))
 
                 if event_type == EventTypes.VectorSetting:
-                    if "nextcloud" not in content:
+                    if "nextcloudShare" not in content:
                         raise SynapseError(
                             400, "VectorSetting is only used for Nextcloud integration."
                         )
 
+                    nextcloud_url = content["nextcloudShare"]
                     requester_id = requester.user.to_string()
-                    nextcloud_url = content["nextcloud"]
 
                     if not nextcloud_url:
                         await self.handlers.watcha_room_handler.delete_room_mapping_with_nextcloud_directory(
