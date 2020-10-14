@@ -33,10 +33,6 @@ class WatchaAdminHandler(BaseHandler):
         result = await self.store.watcha_room_membership()
         return result
 
-    async def watcha_room_name(self):
-        result = await self.store.watcha_room_name()
-        return result
-
     async def watcha_room_list(self):
         result = await self.store.watcha_room_list()
         return result
