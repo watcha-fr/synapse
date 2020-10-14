@@ -1426,8 +1426,10 @@ class WatchaRoomHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
 
         # Nextcloud Integration config :
-        self.keycloak_server = hs.config.keycloak_serveur
-        self.keycloak_realm = hs.config.keycloak_realm
+        issuer = hs.config.oidc_issuer
+        parsed_issuer = issuer.split("/realms/", 1)
+        self.keycloak_server = parsed_issuer[0]
+        self.keycloak_realm = parsed_issuer[1]
         self.nextcloud_shared_secret = hs.config.nextcloud_shared_secret
         self.nextcloud_server = hs.config.nextcloud_server
         self.service_account_name = hs.config.service_account_name
@@ -1488,10 +1490,7 @@ class WatchaRoomHandler(BaseHandler):
             group_exists = await self.nextcloud_room_group_exists(room_id)
         except HTTPError:
             raise SynapseError(
-                400,
-                "Unable to know if the nextcloud group {} exists.".format(
-                    room_id
-                ),
+                400, "Unable to know if the nextcloud group {} exists.".format(room_id),
             )
 
         if not group_exists:
