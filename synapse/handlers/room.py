@@ -1427,9 +1427,9 @@ class WatchaRoomHandler(BaseHandler):
 
         # Nextcloud Integration config :
         issuer = hs.config.oidc_issuer
-        parsed_issuer = issuer.split("/realms/", 1)
-        self.keycloak_server = parsed_issuer[0]
-        self.keycloak_realm = parsed_issuer[1]
+        keycloak_server, keycloak_realm  = issuer.split("/realms/", 1)
+        self.keycloak_server = keycloak_server
+        self.keycloak_realm = keycloak_realm
         self.nextcloud_shared_secret = hs.config.nextcloud_shared_secret
         self.nextcloud_server = hs.config.nextcloud_server
         self.service_account_name = hs.config.service_account_name
