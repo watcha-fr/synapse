@@ -62,21 +62,6 @@ class WatchaRoomMembershipRestServlet(RestServlet):
         return 200, ret
 
 
-class WatchaRoomNameRestServlet(RestServlet):
-
-    PATTERNS = client_patterns("/watcha_room_name", v1=True)
-
-    def __init__(self, hs):
-        super(WatchaRoomNameRestServlet, self).__init__()
-        self.auth = hs.get_auth()
-        self.watcha_admin_handler = hs.get_watcha_admin_handler()
-
-    async def on_GET(self, request):
-        await _check_admin(self.auth, request)
-        ret = await self.watcha_admin_handler.watcha_room_name()
-        return 200, ret
-
-
 class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
 
     PATTERNS = client_patterns("/watcha_room_nextcloud_activity", v1=True)
