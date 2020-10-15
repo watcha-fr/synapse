@@ -82,11 +82,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
         file_url = params["file_url"]
         notifications = params["notifications"]
 
-        if (
-            not file_name
-            or not file_url
-            or not notifications
-        ):
+        if not file_name or not file_url or not notifications:
             raise SynapseError(
                 400, "Some data in payload have empty value.",
             )
@@ -128,23 +124,17 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
                 logger.warn("This nextcloud file operation is not handled")
                 continue
 
-            notification_sent = {
-                "file_name": file_name,
-                "file_operation": file_operation,
-            }
-
             try:
-                rooms = await self.handler.watcha_room_handler.get_room_list_to_send_NC_notification(
+                rooms = await self.handler.watcha_room_handler.get_room_list_to_send_nextcloud_notification(
                     notification["directory"],
                     notification["limit_of_notification_propagation"],
                 )
-                notification_sent["rooms"] = rooms
             except SynapseError as e:
                 logger.error("Error during getting rooms to send notifications : %s", e)
                 continue
 
             try:
-                await self.handler.watcha_room_handler.send_NC_notification_to_rooms(
+                notification_sent = await self.handler.watcha_room_handler.send_nextcloud_notification_to_rooms(
                     rooms, file_name, file_url, file_operation
                 )
             except SynapseError as e:
@@ -320,8 +310,7 @@ class WatchaRegisterRestServlet(RestServlet):
 
     async def on_POST(self, request):
         await _check_admin(
-            self.auth,
-            request,
+            self.auth, request,
         )
         params = parse_json_object_from_request(request)
         logger.info("Adding Watcha user...")
@@ -363,7 +352,7 @@ class WatchaRegisterRestServlet(RestServlet):
             inviter_name = params["inviter"]
 
         send_email = False
-        password = params['password']
+        password = params["password"]
 
         if not password:
             password = generate_password()
@@ -399,7 +388,10 @@ class WatchaRegisterRestServlet(RestServlet):
                 full_name=display_name,
             )
         else:
-            logger.info("Not sending email for user password for user %s, password is defined by sender", user_id)
+            logger.info(
+                "Not sending email for user password for user %s, password is defined by sender",
+                user_id,
+            )
         return 200, {"display_name": display_name, "user_id": user_id}
 
 
@@ -455,6 +447,7 @@ class WatchaResetPasswordRestServlet(RestServlet):
 
         return 200, {}
 
+
 def register_servlets(hs, http_server):
     WatchaResetPasswordRestServlet(hs).register(http_server)
     WatchaRegisterRestServlet(hs).register(http_server)
@@ -465,6 +458,5 @@ def register_servlets(hs, http_server):
     WatchaUserlistRestServlet(hs).register(http_server)
     WatchaRoomListRestServlet(hs).register(http_server)
     WatchaRoomMembershipRestServlet(hs).register(http_server)
-    WatchaRoomNameRestServlet(hs).register(http_server)
     WatchaSendNextcloudActivityToWatchaRoomServlet(hs).register(http_server)
     WatchaDisplayNameRestServlet(hs).register(http_server)
