@@ -1448,7 +1448,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             allow_none=True,
             desc="get_nextcloud_directory_path_from_roomID",
         )
- 
+
     async def get_roomID_from_nextcloud_directory_path(self, directory_path):
         """ Get the room_id mapped with Nextcloud directory path.
         """
@@ -1460,26 +1460,6 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             allow_none=True,
             desc="get_roomID_from_nextcloud_directory_path",
         )
-
-    async def get_room_creator(self, room_id):
-        """ Get a list of administrators of the room.
-        """
-
-        def get_room_creator_txn(txn):
-            sql = """
-                SELECT
-                    creator
-                FROM rooms
-                WHERE rooms.room_id = ?;
-                """
-            txn.execute(sql, (room_id,))
-            return txn.fetchone()
-
-        first_room_admin = await self.db_pool.runInteraction(
-            "get_room_creator", get_room_creator_txn
-        )
-
-        return first_room_admin[0]
 
     async def set_room_mapping_with_nextcloud_directory(self, room_id, directory_path):
         """ Set mapping between Watcha room and Nextcloud directory.
@@ -1501,4 +1481,4 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             keyvalues={"room_id": room_id},
             desc="deleted_room_mapping_with_nextcloud_directory",
         )
-    # +watcha        
+    # +watcha
