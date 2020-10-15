@@ -1703,7 +1703,8 @@ class WatchaRoomHandler(BaseHandler):
         request.raise_for_status()
         response = request.json()["ocs"]["data"]
 
-        return "groups" in response and len(response["groups"]) > 0
+        groups = response.get("groups")
+        return groups is not None and len(groups) > 0
 
     async def create_nextcloud_group(self, room_id):
         """ Create an Nextcloud group named as room_id and add all users in the room into the new Nextcloud group.
