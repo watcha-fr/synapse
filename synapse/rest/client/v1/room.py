@@ -278,16 +278,26 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                             400, "VectorSetting is only used for Nextcloud integration."
                         )
 
-                    nextcloud_URL = content["nextcloudShare"]
+                    nextcloud_url = content["nextcloudShare"]
                     requester_id = requester.user.to_string()
 
-                    if not nextcloud_URL:
+                    if not nextcloud_url:
                         await self.watcha_room_handler.delete_room_mapping_with_nextcloud_directory(
-                            room_id, requester_id
+                            room_id
                         )
                     else:
-                        await self.watcha_room_handler.add_room_mapping_with_nextcloud_directory(
-                            room_id, requester_id, nextcloud_URL
+                        url_query = urlparse.parse_qs(urlparse.urlparse(nextcloud_url).query)
+
+                        if "dir" not in url_query:
+                            raise SynapseError(
+                                400,
+                                "The url doesn't point to a valid nextcloud directory path.",
+                            )
+
+                        nextcloud_directory_path = url_query["dir"][0]
+
+                        await self.watcha_room_handler.update_nextcloud_mapping(
+                            room_id, requester_id, nextcloud_directory_path
                         )
                 # +watcha
                 (
