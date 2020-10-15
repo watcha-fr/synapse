@@ -1476,8 +1476,8 @@ class WatchaRoomHandler(BaseHandler):
             if e.response.status_code == 404:
                 raise SynapseError(
                     400,
-                    "The user {} doesn't have the access right to the folder {}.".format(
-                        requester_id, directory_path
+                    "The user {requester} doesn't have the access right to the folder {directory_path}.".format(
+                        requester=requester_id, directory_path=directory_path
                     ),
                     Codes.NEXTCLOUD_FOLDER_ACCESS_FORBIDDEN,
                 )
@@ -1498,8 +1498,8 @@ class WatchaRoomHandler(BaseHandler):
         if not group_share_id:
             raise SynapseError(
                 400,
-                "Unable to retrieve share id between Watcha room {} and Nextcloud directory {}".format(
-                    room_id, directory_path
+                "Unable to retrieve share id between Watcha room {room_id} and Nextcloud directory {directory_path}".format(
+                    room_id=room_id, directory_path=directory_path
                 ),
             )
 
@@ -1508,8 +1508,8 @@ class WatchaRoomHandler(BaseHandler):
         except HTTPError:
             raise SynapseError(
                 400,
-                "Unable to delete the share on the nextcloud folder {} for the nextcloud group {}.".format(
-                    room_id, directory_path
+                "Unable to delete the share on the nextcloud folder {directory_path} for the Nextcloud group {group_name}.".format(
+                    directory_path=directory_path, group_name=room_id
                 ),
             )
 
@@ -1563,8 +1563,8 @@ class WatchaRoomHandler(BaseHandler):
             if e.response.status_code == 404:
                 raise SynapseError(
                     400,
-                    "The user {} doesn't have the access right to the folder {}.".format(
-                        requester_id, nextcloud_directory_path
+                    "The user {requester} doesn't have the access right to the folder {directory_path}.".format(
+                        requester=requester_id, directory_path=nextcloud_directory_path
                     ),
                     Codes.NEXTCLOUD_FOLDER_ACCESS_FORBIDDEN,
                 )
@@ -1601,8 +1601,8 @@ class WatchaRoomHandler(BaseHandler):
         except HTTPError:
             raise SynapseError(
                 400,
-                "Unable to create a share for the nextcloud group {} on the nextcloud folder {}.".format(
-                    room_id, nextcloud_directory_path
+                "Unable to create a share for the nextcloud group {group_name} on the nextcloud folder {directory_path}.".format(
+                    group_name=room_id, directory_path=nextcloud_directory_path
                 ),
             )
 
@@ -1621,7 +1621,7 @@ class WatchaRoomHandler(BaseHandler):
         """
 
         request = get(
-            "{}/admin/realms/{}/users".format(self.keycloak_server, self.keycloak_realm),
+            "{keycloak_server}/admin/realms/{keycloak_realm}/users".format(keycloak_server=self.keycloak_server, keycloak_realm=self.keycloak_realm),
             headers={"Authorization": "Bearer {}".format(self.keycloak_access_token)},
             params={"username": user_localpart},
         )
@@ -1637,8 +1637,8 @@ class WatchaRoomHandler(BaseHandler):
         """
 
         request = post(
-            "{}/realms/{}/protocol/openid-connect/token".format(
-                self.keycloak_server, self.keycloak_realm
+            "{keycloak_server}/realms/{keycloak_realm}/protocol/openid-connect/token".format(
+                keycloak_server=self.keycloak_server, keycloak_realm=self.keycloak_realm
             ),
             data={
                 "client_id": "admin-cli",
@@ -1727,8 +1727,8 @@ class WatchaRoomHandler(BaseHandler):
                 await self.add_user_to_nextcloud_groups(nextcloud_username, room_id)
             except HTTPError, SynapseError as e:
                 logger.warn(
-                    "An error occured during the addition of the user {} in the Nextcloud group {} : {}".format(
-                        user, room_id, e
+                    "An error occured during the addition of the user {username} in the Nextcloud group {group_name} : {error}".format(
+                        username=user, group_name=room_id, error=e
                     )
                 )
                 continue
@@ -1740,7 +1740,7 @@ class WatchaRoomHandler(BaseHandler):
         """
 
         request = get(
-            "{}/ocs/v1.php/cloud/users/{}".format(self.nextcloud_server, username),
+            "{nextcloud_server}/ocs/v1.php/cloud/users/{user_id}".format(nextcloud_server=self.nextcloud_server, user_id=username),
             headers=OCS_API_HEADERS
             auth=HTTPBasicAuth(self.service_account_name, self.service_account_password),
             params={"format": "json"},
@@ -1788,7 +1788,7 @@ class WatchaRoomHandler(BaseHandler):
             await self.create_nextcloud_account_for_user(username)
 
         request = post(
-            "{}/ocs/v1.php/cloud/users/{}/groups".format(self.nextcloud_server, username),
+            "{nextcloud_server}/ocs/v1.php/cloud/users/{user_id}/groups".format(nextcloud_server=self.nextcloud_server, user_id=username),
             headers=OCS_API_HEADERS
             auth=HTTPBasicAuth(self.service_account_name, self.service_account_password),
             data={"groupid": group_name, "format": "json"},
@@ -1829,8 +1829,8 @@ class WatchaRoomHandler(BaseHandler):
             share_id: the id of the share to delete.
         """
         request = delete(
-            "{}/ocs/v2.php/apps/files_sharing/api/v1/shares/{}".format(
-                self.nextcloud_server, share_id
+            "{nextcloud_server}/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}".format(
+                nextcloud_server=self.nextcloud_server, share_id=share_id
             ),
             headers=OCS_API_HEADERS
             auth=HTTPBasicAuth(requester, self.service_account_password),
