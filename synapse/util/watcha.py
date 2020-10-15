@@ -1,18 +1,16 @@
-import random
+import base64
 import logging
 import os
 import re
-import base64
-from os.path import join, dirname, abspath
-from pathlib import Path
 
-from jinja2 import Environment, FileSystemLoader
-from smtplib import SMTP
+from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.header import Header
-
-from twisted.internet import defer
+from jinja2 import Environment, FileSystemLoader
+from os.path import join, dirname, abspath
+from pathlib import Path
+from secrets import token_bytes
+from smtplib import SMTP
 
 from synapse.api.errors import SynapseError
 
@@ -24,42 +22,13 @@ TEMPLATE_DIR = join(dirname(abspath(__file__)), "watcha_templates")
 
 
 def generate_password():
-    """Generate 'good enough' password
+    """ Generate a base 64 encoded password with 16 bytes of randomness
 
-    password strength target: 1000 years of computation with 8 GTX 1080 cards.
-    hash algorithm is bcrypt, so hash speed is 105khash/s
-        (according to https://gist.github.com/epixoip/a83d38f412b4737e99bbef804a270c40)
-        log(1000 years * 105 khash/s) / log(2) = 51.6 bits of entropy.
-
-        first method: diceware password generation. you need to enable the diceware dependency.
-        the file 'wordlist_fr_5d.txt' is needed in ~/.synapse/lib/python2.7/site-packages/diceware/wordlists
-        the wordlist_fr_5d provides ~12.9bits of entropy per word
-        cf https://github.com/mbelivo/diceware-wordlists-fr
-        four words of 12.9 bits of entropy gives a password of 51.6 bits.
-        password = diceware.get_passphrase(diceware.handle_options(["-w", "fr_5d", "-n", "4", "-d", " ", "--no-caps"]))
-
-        alternate method: generate groups of random characters:
-        * lowercase alphanumeric characters
-          log(36)/log(2) = 5.17 bits / character. therefore, we need at least 10 characters.
-          dictionary = "abcdefghijklmnopqrstuvwxyz0123456789"
-        * lowercase and uppercase alphanumeric characters: log(62)/log(2) = 5.95 bits / character
-        * lowercase characters:
-          log(26)/log(2) = 4.7 bits / character. therefore, we need at least 11 characters.
-
-        here we use 12 random lowercase characters, in 3 groups of 4 characters.
+    Returns:
+        The encoded password.
     """
-    dictionary = "abcdefghijklmnopqrstuvwxyz"
-    grouplen = 4
-    password = "".join(
-        random.sample(dictionary, grouplen)
-        + ["-"]
-        + random.sample(dictionary, grouplen)
-        + ["-"]
-        + random.sample(dictionary, grouplen)
-    )
 
-    return password
-
+    return b64encode(token_bytes(16)).decode())
 
 def compute_registration_token(user, email=None, password=None):
     """Returns a (weakly encrypted) token that can be passed in a URL or in a JSON for temporaly login
