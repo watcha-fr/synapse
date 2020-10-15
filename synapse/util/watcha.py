@@ -28,7 +28,7 @@ def generate_password():
         The encoded password.
     """
 
-    return b64encode(token_bytes(16)).decode())
+    return b64encode(token_bytes(16)).decode()
 
 def compute_registration_token(user, email=None, password=None):
     """Returns a (weakly encrypted) token that can be passed in a URL or in a JSON for temporaly login
