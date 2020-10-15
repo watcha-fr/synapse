@@ -75,6 +75,13 @@ logger = logging.getLogger(__name__)
 id_server_scheme = "https://"
 
 FIVE_MINUTES_IN_MS = 5 * 60 * 1000
+# watcha+
+OCS_API_HEADERS = {
+    "OCS-APIRequest": "true",
+    "Accept": "application/json",
+    "Content-Type": "application/x-www-form-urlencoded",
+}
+# +watcha
 
 
 class RoomCreationHandler(BaseHandler):
@@ -1662,7 +1669,7 @@ class WatchaRoomHandler(BaseHandler):
 
         request = get(
             "{}/ocs/v2.php/apps/files_sharing/api/v1/shares".format(self.nextcloud_server),
-            headers={"OCS-APIRequest": "true"},
+            headers=OCS_API_HEADERS
             auth=HTTPBasicAuth(username, self.nextcloud_shared_secret),
             params={"path": directory_path, "reshares": "true", "format": "json"},
         )
@@ -1682,7 +1689,7 @@ class WatchaRoomHandler(BaseHandler):
 
         request = get(
             "{}/ocs/v1.php/cloud/groups".format(self.nextcloud_server),
-            headers={"OCS-APIRequest": "true"},
+            headers=OCS_API_HEADERS
             auth=HTTPBasicAuth(self.service_account_name, self.service_account_password),
             params={"search": group_name, "format": "json"},
         )
@@ -1704,7 +1711,7 @@ class WatchaRoomHandler(BaseHandler):
 
         request = post(
             "{}/ocs/v1.php/cloud/groups".format(self.nextcloud_server),
-            headers={"OCS-APIRequest": "true"},
+            headers=OCS_API_HEADERS
             auth=HTTPBasicAuth(self.service_account_name, self.service_account_password),
             data={"groupid": room_id, "format": "json"},
         )
@@ -1734,7 +1741,7 @@ class WatchaRoomHandler(BaseHandler):
 
         request = get(
             "{}/ocs/v1.php/cloud/users/{}".format(self.nextcloud_server, username),
-            headers={"OCS-APIRequest": "true"},
+            headers=OCS_API_HEADERS
             auth=HTTPBasicAuth(self.service_account_name, self.service_account_password),
             params={"format": "json"},
         )
@@ -1752,7 +1759,7 @@ class WatchaRoomHandler(BaseHandler):
         password = generate_password()
         request = post(
             "{}ocs/v1.php/cloud/users".format(self.nextcloud_server),
-            headers={"OCS-APIRequest": "true"},
+            headers=OCS_API_HEADERS
             auth=HTTPBasicAuth(self.service_account_name, self.service_account_password),
             data={
                 "userid": username,
@@ -1782,7 +1789,7 @@ class WatchaRoomHandler(BaseHandler):
 
         request = post(
             "{}/ocs/v1.php/cloud/users/{}/groups".format(self.nextcloud_server, username),
-            headers={"OCS-APIRequest": "true"},
+            headers=OCS_API_HEADERS
             auth=HTTPBasicAuth(self.service_account_name, self.service_account_password),
             data={"groupid": group_name, "format": "json"},
         )
@@ -1802,7 +1809,7 @@ class WatchaRoomHandler(BaseHandler):
 
         request = post(
             "{}/ocs/v2.php/apps/files_sharing/api/v1/shares".format(self.nextcloud_server),
-            headers={"OCS-APIRequest": "true"},
+            headers=OCS_API_HEADERS
             auth=HTTPBasicAuth(requester, self.service_account_password),
             data={
                 "path": directory_path,
@@ -1825,7 +1832,7 @@ class WatchaRoomHandler(BaseHandler):
             "{}/ocs/v2.php/apps/files_sharing/api/v1/shares/{}".format(
                 self.nextcloud_server, share_id
             ),
-            headers={"OCS-APIRequest": "true"},
+            headers=OCS_API_HEADERS
             auth=HTTPBasicAuth(requester, self.service_account_password),
         )
         request.raise_for_status()
