@@ -125,7 +125,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
                 continue
 
             try:
-                rooms = await self.watcha_room_handler.get_room_list_to_send_NC_notification(
+                rooms = await self.watcha_room_handler.get_room_list_to_send_nextcloud_notification(
                     notification["directory"],
                     notification["limit_of_notification_propagation"],
                 )
