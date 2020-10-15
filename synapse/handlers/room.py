@@ -1426,10 +1426,8 @@ class WatchaRoomHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
 
         # Nextcloud Integration config :
-        issuer = hs.config.oidc_issuer
-        keycloak_server, keycloak_realm = issuer.split("/realms/", 1)
-        self.keycloak_server = keycloak_server
-        self.keycloak_realm = keycloak_realm
+        self.keycloak_server = hs.config.keycloak_serveur
+        self.keycloak_realm = hs.config.keycloak_realm
         self.nextcloud_shared_secret = hs.config.nextcloud_shared_secret
         self.nextcloud_server = hs.config.nextcloud_server
         self.service_account_name = hs.config.service_account_name
