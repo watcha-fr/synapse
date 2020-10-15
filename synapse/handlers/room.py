@@ -66,6 +66,7 @@ from pathlib import Path
 from requests import get, post, delete, auth, HTTPError
 from requests.auth import HTTPBasicAuth
 from synapse.types import get_localpart_from_id
+from synapse.util.watcha import generate_password
 from urllib.parse import parse_qs, urlparse
 # +watcha
 
@@ -1717,21 +1718,67 @@ class WatchaRoomHandler(BaseHandler):
                     get_localpart_from_id(user)
                 )
                 await self.add_user_to_nextcloud_groups(nextcloud_username, room_id)
-            except HTTPError:
+            except HTTPError, SynapseError as e:
                 logger.warn(
-                    "An error occured during the addition of the user {} in the Nextcloud group {}.".format(
-                        user, room_id
+                    "An error occured during the addition of the user {} in the Nextcloud group {} : {}".format(
+                        user, room_id, e
                     )
                 )
                 continue
+
+    async def nextcloud_account_exists(username):
+        """ Retrieves information about a single Nextcloud user.
+        Args:
+            username: the username of the Nextcloud account.
+        """
+
+        request = get(
+            "{}/ocs/v1.php/cloud/users/{}".format(self.nextcloud_server, username),
+            headers={"OCS-APIRequest": "true"},
+            auth=HTTPBasicAuth(self.service_account_name, self.service_account_password),
+            params={"format": "json"},
+        )
+        request.raise_for_status()
+
+        return request.json()["ocs"]["meta"]["statuscode"] == 100
+
+    async def create_nextcloud_account_for_user(username):
+        """ Create a new user on the Nextcloud server.
+        
+        Args:
+            username: the username of the Nextcloud account.
+        """
+
+        password = generate_password()
+        request = post(
+            "{}ocs/v1.php/cloud/users".format(self.nextcloud_server),
+            headers={"OCS-APIRequest": "true"},
+            auth=HTTPBasicAuth(self.service_account_name, self.service_account_password),
+            data={
+                "userid": username,
+                "password": password,
+            },
+        )
+        request.raise_for_status()
+
+        if request.json()["ocs"]["meta"]["statuscode"] != 100:
+            raise SynapseError(
+                400,
+                "Unable to create a Nextcloud account for {}.".format(
+                    username
+                )
+            )
 
     async def add_user_to_nextcloud_groups(self, username, group_name):
         """ Add user to the Nextcloud group named as room_id.
 
         Args:
-            username: the room_id of the room which Nextcloud directory is linked.
+            username: the Nextcloud username of the user to add to the Nextcloud group.
             group_name: the Nextcloud group name, equivalent to room_id of the room linked.
         """
+
+        if not await self.nextcloud_account_exists:
+            await self.create_nextcloud_account_for_user(username)
 
         request = post(
             "{}/ocs/v1.php/cloud/users/{}/groups".format(self.nextcloud_server, username),
