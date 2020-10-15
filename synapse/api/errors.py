@@ -76,8 +76,15 @@ class Codes:
     INVALID_SIGNATURE = "M_INVALID_SIGNATURE"
     USER_DEACTIVATED = "M_USER_DEACTIVATED"
     BAD_ALIAS = "M_BAD_ALIAS"
-    NEXTCLOUD_FOLDER_ACCESS_FORBIDDEN = "W_NEXTCLOUD_FOLDER_ACCESS_FORBIDDEN" # watcha+
-
+    # watcha+
+    KEYCLOAK_CAN_NOT_GET_ACCESS_TOKEN = "W_KEYCLOAK_CAN_NOT_GET_ACCESS_TOKEN"
+    NEXTCLOUD_CAN_NOT_ADD_USER_TO_GROUP = "W_NEXTCLOUD_CAN_NOT_ADD_USER_TO_GROUP"
+    NEXTCLOUD_CAN_NOT_CREATE_GROUP = "W_NEXTCLOUD_CANNOT_CREATE_GROUP"
+    NEXTCLOUD_CAN_NOT_CREATE_NEW_SHARE = "W_NEXTCLOUD_CAN_NOT_CREATE_NEW_SHARE"
+    NEXTCLOUD_CAN_NOT_CREATE_USER = "W_NEXTCLOUD_CAN_NOT_CREATE_USER"
+    NEXTCLOUD_CAN_NOT_DELETE_SHARE = "W_NEXTCLOUD_CAN_NOT_DELETE_SHARE"
+    NEXTCLOUD_CAN_NOT_GET_SHARES = "W_NEXTCLOUD_CANNOT_GET_SHARES"
+    # +watcha
 
 class CodeMessageException(RuntimeError):
     """An exception with integer code and message string attributes.
@@ -144,6 +151,26 @@ class SynapseError(CodeMessageException):
 
     def error_dict(self):
         return cs_error(self.msg, self.errcode)
+
+
+# watcha+
+class NextcloudError(SynapseError):
+    """A base exception type for Nextcloud API errors which have a code (the payload status code attribute) and error
+    message corresponding to the OCS API status code in payload.
+    """
+
+    def __init__(self, code: int, msg: str, errcode: str = Codes.UNKNOWN):
+        """Constructs a nextcloud error.
+
+        Args:
+            code: The status code on the request payload
+            msg: The human-readable message corresponding to the status code.
+        """
+        super(NextcloudError, self).__init__(code, msg, errcode)
+
+    def error_dict(self):
+        return cs_error(self.msg, self.errcode)
+# +watcha
 
 
 class ProxiedRequestError(SynapseError):
