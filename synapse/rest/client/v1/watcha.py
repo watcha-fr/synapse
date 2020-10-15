@@ -458,6 +458,5 @@ def register_servlets(hs, http_server):
     WatchaUserlistRestServlet(hs).register(http_server)
     WatchaRoomListRestServlet(hs).register(http_server)
     WatchaRoomMembershipRestServlet(hs).register(http_server)
-    WatchaRoomNameRestServlet(hs).register(http_server)
     WatchaSendNextcloudActivityToWatchaRoomServlet(hs).register(http_server)
     WatchaDisplayNameRestServlet(hs).register(http_server)
