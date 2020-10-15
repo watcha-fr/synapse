@@ -1457,7 +1457,7 @@ class WatchaRoomHandler(BaseHandler):
             )
 
         try:
-            nextcloud_username = await self.get_nextcloud_username(
+            nextcloud_username = await self.get_keycloak_uid(
                 get_localpart_from_id(requester_id)
             )
         except (HTTPError, IndexError):
@@ -1544,7 +1544,7 @@ class WatchaRoomHandler(BaseHandler):
             )
 
         try:
-            nextcloud_username = await self.get_nextcloud_username(
+            nextcloud_username = await self.get_keycloak_uid(
                 get_localpart_from_id(requester_id)
             )
         except (HTTPError, IndexError):
@@ -1610,7 +1610,7 @@ class WatchaRoomHandler(BaseHandler):
             room_id, nextcloud_directory_path
         )
 
-    async def get_nextcloud_username(self, user_localpart):
+    async def get_keycloak_uid(self, user_localpart):
         """ Get the corresponding Nextcloud username of the synapse user from Keycloak.
 
         Args :
@@ -1721,7 +1721,7 @@ class WatchaRoomHandler(BaseHandler):
 
         for user in users:
             try:
-                nextcloud_username = await self.get_nextcloud_username(
+                nextcloud_username = await self.get_keycloak_uid(
                     get_localpart_from_id(user)
                 )
                 await self.add_user_to_nextcloud_groups(nextcloud_username, room_id)
