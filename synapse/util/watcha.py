@@ -1,8 +1,8 @@
-import base64
 import logging
 import os
 import re
 
+from base64 import b64decode, b64encode
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -44,7 +44,7 @@ def compute_registration_token(user, email=None, password=None):
         json = '{{"user":"{user}", "email":"{email}", "pw":"{password}"}}'.format(
             user=user, email=email, password=password
         )
-    return base64.b64encode(json.encode("utf-8")).decode("ascii")
+    return b64encode(json.encode("utf-8")).decode("ascii")
 
 # additional email we send to, when not sending to a mail gun
 # (to keep a copy of the received emails)
@@ -117,7 +117,7 @@ async def send_registration_email(
             ".", "<a class=\"prevent-link\" href=\"#\">.</a>"
         ),
         'spacebefore': lambda text: (" " + text) if text else "",
-        'b64content': lambda file_name: base64.b64encode(
+        'b64content': lambda file_name: b64encode(
             Path(TEMPLATE_DIR, file_name).read_bytes()
         ).decode()
     })
@@ -161,7 +161,7 @@ async def send_registration_email(
         )
         logger.info("Email subject is: " + subject)
         logger.info("Email text content follows:")
-        logger.info(str(base64.b64decode(message.get_payload()[0].get_payload())))
+        logger.info(str(b64decode(message.get_payload()[0].get_payload())))
         return
 
     if not config.email_riot_base_url:
