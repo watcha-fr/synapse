@@ -913,13 +913,17 @@ class OidcHandler:
             )
 
         # watcha+ op525
+        optional_params = {}
+
+        email = attributes["email"]
+        if email:
+            optional_params["bind_emails"] = [email]
+
         synapse_role = attributes["synapse_role"]
         if synapse_role == "administrator":
-            role_params = {"admin": True}
+            optional_params["admin"] = True
         elif synapse_role == "partner"
-            role_params = {"make_partner": True}
-        else:
-            role_params = {}
+            optional_params["make_partner"] = True
         # +watcha
 
         # It's the first time this user is logging in and the mapped mxid was
@@ -928,10 +932,7 @@ class OidcHandler:
             localpart=localpart,
             default_display_name=attributes["display_name"],
             user_agent_ips=(user_agent, ip_address),
-            # watcha+ op524
-            bind_emails=attributes["emails"],
-            **role_params
-            # +watcha
+            **optional_params, # watcha+ op524 op525
         )
 
         await self._datastore.record_user_external_id(
@@ -950,7 +951,7 @@ UserAttribute = TypedDict(
     {
         "localpart": str,
         "display_name": Optional[str],
-        "emails": Optional[List[str]],
+        "email": Optional[str],
         "synapse_role": Optional[str],
     }
 # +watcha
@@ -1087,16 +1088,15 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         """ watcha! op524
         return UserAttribute(localpart=localpart, display_name=display_name)
         !watcha """
-        # watcha+ op524
-        email = userinfo.get("email")
-        emails = [email] if email else []  # type: Optional[List[str]]
 
+        # watcha+ op524 op525
+        email = userinfo.get("email")  # type: Optional[str]
         synapse_role = userinfo.get("synapse_role")  # type: Optional[str]
 
         return UserAttribute(
             localpart=localpart,
             display_name=display_name,
-            emails=emails,
+            email=email,
             synapse_role=synapse_role
         )
         # +watcha
