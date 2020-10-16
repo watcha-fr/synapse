@@ -1474,11 +1474,11 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
 
         try:
             self.keycloak_access_token = await self.get_keycloak_access_token()
-        except HTTPError:
+        except HTTPError as e:
             raise SynapseError(
                 400,
-                "Unable to retrieve the Keycloak access token of realm {}".format(
-                    self.keycloak_realm
+                "Unable to retrieve the Keycloak access token of realm {keycloak_realm} : {error}".format(
+                    keycloak_realm=self.keycloak_realm, error=e
                 ),
                 Codes.KEYCLOAK_CAN_NOT_GET_ACCESS_TOKEN,
             )
@@ -1487,20 +1487,21 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
             nextcloud_username = await self.get_keycloak_uid(
                 get_localpart_from_id(requester_id)
             )
-        except (HTTPError, IndexError):
+        except HTTPError as e:
             raise SynapseError(
                 400,
-                "Unable to retrieve the corresponding Nextcloud username of user {}.".format(
-                    requester_id
+                "Unable to retrieve the corresponding Nextcloud username of user {user_id} : {error}".format(
+                    user_id=requester_id, error=e
                 ),
+                Codes.KEYCLOAK_CAN_NOT_GET_UID,
             )
 
         try:
             group_exists = await self.nextcloud_room_group_exists(room_id)
-        except HTTPError:
+        except HTTPError as e:
             raise SynapseError(
                 400,
-                "Unable to know if the nextcloud group {} exists.".format(room_id),
+                "Unable to know if the nextcloud group {group_name} exists : {error}".format(group_name=room_id, error=e),
                 Codes.UNKNOWN,
             )
 
@@ -1546,7 +1547,7 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
                 "Unable to create a share for the nextcloud group {group_name} on the nextcloud folder {directory_path}: {error}".format(
                     group_name=room_id,
                     directory_path=nextcloud_directory_path,
-                    error=error,
+                    error=e,
                 ),
                 Codes.UNKNOWN,
             )
