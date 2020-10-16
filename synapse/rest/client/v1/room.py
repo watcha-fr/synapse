@@ -282,7 +282,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     requester_id = requester.user.to_string()
 
                     if not nextcloud_url:
-                        await self.handlers.watcha_room_handler.delete_room_mapping_with_nextcloud_directory(
+                        await self.handlers.watcha_room_nextcloud_mapping_handler.delete_room_mapping_with_nextcloud_directory(
                             room_id
                         )
                     else:
@@ -296,7 +296,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 
                         nextcloud_directory_path = url_query["dir"][0]
 
-                        await self.handlers.watcha_room_handler.update_nextcloud_mapping(
+                        await self.handlers.watcha_room_nextcloud_mapping_handler.update_nextcloud_mapping(
                             room_id, requester_id, nextcloud_directory_path
                         )
                 # +watcha

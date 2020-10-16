@@ -125,7 +125,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
                 continue
 
             try:
-                rooms = await self.handler.watcha_room_handler.get_room_list_to_send_nextcloud_notification(
+                rooms = await self.handler.watcha_room_nextcloud_mapping_handler.get_room_list_to_send_nextcloud_notification(
                     notification["directory"],
                     notification["limit_of_notification_propagation"],
                 )
@@ -134,7 +134,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
                 continue
 
             try:
-                notification_sent = await self.handler.watcha_room_handler.send_nextcloud_notification_to_rooms(
+                notification_sent = await self.handler.watcha_room_nextcloud_mapping_handler.send_nextcloud_notification_to_rooms(
                     rooms, file_name, file_url, file_operation
                 )
             except SynapseError as e:

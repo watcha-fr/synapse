@@ -1430,7 +1430,7 @@ class RoomShutdownHandler:
 
 
 # watcha+
-class WatchaRoomHandler(BaseHandler):
+class WatchaRoomNextcloudMappingHandler(BaseHandler):
     def __init__(self, hs):
         self.store = hs.get_datastore()
         self.event_creation_handler = hs.get_event_creation_handler()
