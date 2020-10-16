@@ -912,6 +912,16 @@ class OidcHandler:
                 "mxid '{}' is already taken".format(user_id.to_string())
             )
 
+        # watcha+ op525
+        synapse_role = attributes["synapse_role"]
+        if synapse_role == "administrator":
+            role_params = {"admin": True}
+        elif synapse_role == "partner"
+            role_params = {"make_partner": True}
+        else:
+            role_params = {}
+        # +watcha
+
         # It's the first time this user is logging in and the mapped mxid was
         # not taken, register the user
         registered_user_id = await self._registration_handler.register_user(
@@ -920,8 +930,7 @@ class OidcHandler:
             user_agent_ips=(user_agent, ip_address),
             # watcha+ op524
             bind_emails=attributes["emails"],
-            admin=attributes["is_admin"],
-            make_partner=attributes["is_partner"],
+            **role_params
             # +watcha
         )
 
@@ -942,8 +951,7 @@ UserAttribute = TypedDict(
         "localpart": str,
         "display_name": Optional[str],
         "emails": Optional[List[str]],
-        "is_admin": Optional[bool],
-        "is_partner": Optional[bool],
+        "synapse_role": Optional[str],
     }
 # +watcha
 )
@@ -1083,15 +1091,12 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         email = userinfo.get("email")
         emails = [email] if email else []  # type: Optional[List[str]]
 
-        is_admin = userinfo.get("is_admin", False)  # type: Optional[bool]
-
-        is_partner = userinfo.get("is_partner", False)  # type: Optional[bool]
+        synapse_role = userinfo.get("synapse_role")  # type: Optional[str]
 
         return UserAttribute(
             localpart=localpart,
             display_name=display_name,
             emails=emails,
-            is_admin=is_admin,
-            is_partner=is_partner,
+            synapse_role=synapse_role
         )
         # +watcha
