@@ -1694,7 +1694,7 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
                 )
                 continue
 
-    async def nextcloud_account_exists(username):
+    async def nextcloud_account_exists(self, username):
         """ Retrieves information about a single Nextcloud user.
         Args:
             username: the username of the Nextcloud account.
@@ -1714,7 +1714,7 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
 
         return request.json()["ocs"]["meta"]["statuscode"] == 100
 
-    async def create_nextcloud_account_for_user(username):
+    async def create_nextcloud_account_for_user(self, username):
         """ Create a new user on the Nextcloud server.
         
         Args:
