@@ -33,6 +33,8 @@ from synapse.util.stringutils import random_string
 
 from tests import unittest
 
+from synapse.api.errors import SynapseError # watcha+
+
 PATH_PREFIX = b"/_matrix/client/api/v1"
 
 
@@ -2070,3 +2072,84 @@ class RoomCanonicalAliasTestCase(unittest.HomeserverTestCase):
         """An alias which does not point to the room raises a SynapseError."""
         self._set_canonical_alias({"alias": "@unknown:test"}, expected_code=400)
         self._set_canonical_alias({"alt_aliases": ["@unknown:test"]}, expected_code=400)
+
+# watcha+
+def simple_async_mock(return_value=None, raises=None):
+    # AsyncMock is not available in python3.5, this mimics part of its behaviour
+    async def cb(*args, **kwargs):
+        if raises:
+            raise raises
+        return return_value
+
+    return Mock(side_effect=cb)
+
+class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+        room.register_servlets,
+    ]
+
+
+    def prepare(self, reactor, clock, hs):
+        self.room_owner = self.register_user("room_owner", "test")
+        self.room_owner_tok = self.login("room_owner", "test")
+
+        self.room_id = self.helper.create_room_as(
+            self.room_owner, tok=self.room_owner_tok
+        )
+
+        self.handlers = hs.get_handlers().watcha_room_nextcloud_mapping_handler
+        self.handlers.update_nextcloud_mapping = simple_async_mock()
+        self.handlers.delete_room_mapping_with_nextcloud_directory = simple_async_mock()
+        self.nextcloud_directory_url = "https://test/nextcloud/apps/files/?dir=/directory"
+
+    def send_room_nextcloud_mapping_event(self, request_content):
+        request, channel = self.make_request(
+            "PUT",
+            "/rooms/{}/state/im.vector.web.settings".format(self.room_id),
+            content=json.dumps(
+                request_content
+            ),
+            access_token=self.room_owner_tok,
+        )
+        self.render(request)
+
+        return channel
+
+    def test_create_new_room_nextcloud_mapping(self):
+        channel = self.send_room_nextcloud_mapping_event({"nextcloudShare": self.nextcloud_directory_url})
+
+        self.assertTrue(self.handlers.update_nextcloud_mapping.called)
+        self.assertEquals(200, channel.code)
+
+    def test_delete_existing_room_nextcloud_mapping(self):
+        self.send_room_nextcloud_mapping_event({"nextcloudShare": self.nextcloud_directory_url})
+        channel = self.send_room_nextcloud_mapping_event({"nextcloudShare": ""})
+
+        self.assertTrue(self.handlers.delete_room_mapping_with_nextcloud_directory.called)
+        self.assertEquals(200, channel.code)
+
+    def test_update_existing_room_nextcloud_mapping(self):
+        self.send_room_nextcloud_mapping_event({"nextcloudShare": self.nextcloud_directory_url})
+        channel = self.send_room_nextcloud_mapping_event({"nextcloudShare": "https://test/nextcloud/apps/files/?dir=/directory2"})
+
+        self.assertTrue(self.handlers.update_nextcloud_mapping.called)
+        self.assertEquals(200, channel.code)
+
+    def test_create_new_room_nextcloud_mapping_without_nextcloudShare_attribute(self):
+        channel = self.send_room_nextcloud_mapping_event({"nextcloud": self.nextcloud_directory_url})
+
+        self.assertFalse(self.handlers.update_nextcloud_mapping.called)
+        self.assertRaises(SynapseError)
+        self.assertEquals(400, channel.code)
+        self.assertEquals("VectorSetting is only used for Nextcloud integration.", json.loads(channel.result["body"])["error"])
+
+    def test_create_new_room_nextcloud_mapping_with_wrong_url(self):
+        channel = self.send_room_nextcloud_mapping_event({"nextcloudShare": "https://test/nextcloud/apps/files/?file=brandbook.pdf"})
+
+        self.assertFalse(self.handlers.update_nextcloud_mapping.called)
+        self.assertRaises(SynapseError)
+        self.assertEquals(400, channel.code)
+        self.assertEquals("The url doesn't point to a valid nextcloud directory path.", json.loads(channel.result["body"])["error"])
+# +watcha
