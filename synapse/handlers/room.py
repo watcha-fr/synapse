@@ -1501,7 +1501,9 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
         except HTTPError as e:
             raise SynapseError(
                 400,
-                "Unable to know if the nextcloud group {group_name} exists : {error}".format(group_name=room_id, error=e),
+                "Unable to know if the nextcloud group {group_name} exists : {error}".format(
+                    group_name=room_id, error=e
+                ),
                 Codes.UNKNOWN,
             )
 

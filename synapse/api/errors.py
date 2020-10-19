@@ -88,6 +88,7 @@ class Codes:
     NEXTCLOUD_CAN_NOT_GET_SHARES = "W_NEXTCLOUD_CANNOT_GET_SHARES"
     # +watcha
 
+
 class CodeMessageException(RuntimeError):
     """An exception with integer code and message string attributes.
 
@@ -172,6 +173,8 @@ class NextcloudError(SynapseError):
 
     def error_dict(self):
         return cs_error(self.msg, self.errcode)
+
+
 # +watcha
 
 

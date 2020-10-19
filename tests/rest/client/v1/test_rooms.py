@@ -33,7 +33,7 @@ from synapse.util.stringutils import random_string
 
 from tests import unittest
 
-from synapse.api.errors import SynapseError # watcha+
+from synapse.api.errors import SynapseError  # watcha+
 
 PATH_PREFIX = b"/_matrix/client/api/v1"
 
@@ -1108,7 +1108,7 @@ class PublicRoomsRestrictedTestCase(unittest.HomeserverTestCase):
         # directory disabled
         self.assertEqual(channel.code, 200, channel.result)
         !watcha """
-        self.assertEqual(channel.code, 403, channel.result) # watcha+
+        self.assertEqual(channel.code, 403, channel.result)  # watcha+
 
 
 class PerRoomProfilesForbiddenTestCase(unittest.HomeserverTestCase):
@@ -1193,7 +1193,9 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         self.room_id = self.helper.create_room_as(self.creator, tok=self.creator_tok)
 
     def test_join_reason(self):
-        self.helper.invite(self.room_id,self.creator,self.second_user_id, tok=self.creator_tok) # watcha+
+        self.helper.invite(
+            self.room_id, self.creator, self.second_user_id, tok=self.creator_tok
+        )  # watcha+
         reason = "hello"
         request, channel = self.make_request(
             "POST",
@@ -1207,7 +1209,9 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         self._check_for_reason(reason)
 
     def test_leave_reason(self):
-        self.helper.invite(self.room_id,self.creator,self.second_user_id, tok=self.creator_tok) # watcha+
+        self.helper.invite(
+            self.room_id, self.creator, self.second_user_id, tok=self.creator_tok
+        )  # watcha+
         self.helper.join(self.room_id, user=self.second_user_id, tok=self.second_tok)
 
         reason = "hello"
@@ -1223,7 +1227,9 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         self._check_for_reason(reason)
 
     def test_kick_reason(self):
-        self.helper.invite(self.room_id,self.creator,self.second_user_id, tok=self.creator_tok) # watcha+
+        self.helper.invite(
+            self.room_id, self.creator, self.second_user_id, tok=self.creator_tok
+        )  # watcha+
         self.helper.join(self.room_id, user=self.second_user_id, tok=self.second_tok)
 
         reason = "hello"
@@ -1239,7 +1245,9 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         self._check_for_reason(reason)
 
     def test_ban_reason(self):
-        self.helper.invite(self.room_id,self.creator,self.second_user_id, tok=self.creator_tok) # watcha+
+        self.helper.invite(
+            self.room_id, self.creator, self.second_user_id, tok=self.creator_tok
+        )  # watcha+
         self.helper.join(self.room_id, user=self.second_user_id, tok=self.second_tok)
 
         reason = "hello"
@@ -1911,7 +1919,7 @@ class RoomAliasListTestCase(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEqual(channel.code, expected_code, channel.result)
 
-    test_peekable_room.skip = "Disable for Watcha" # watcha+
+    test_peekable_room.skip = "Disable for Watcha"  # watcha+
 
 
 class RoomCanonicalAliasTestCase(unittest.HomeserverTestCase):
@@ -2073,6 +2081,7 @@ class RoomCanonicalAliasTestCase(unittest.HomeserverTestCase):
         self._set_canonical_alias({"alias": "@unknown:test"}, expected_code=400)
         self._set_canonical_alias({"alt_aliases": ["@unknown:test"]}, expected_code=400)
 
+
 # watcha+
 def simple_async_mock(return_value=None, raises=None):
     # AsyncMock is not available in python3.5, this mimics part of its behaviour
@@ -2083,13 +2092,13 @@ def simple_async_mock(return_value=None, raises=None):
 
     return Mock(side_effect=cb)
 
+
 class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         room.register_servlets,
     ]
-
 
     def prepare(self, reactor, clock, hs):
         self.room_owner = self.register_user("room_owner", "test")
@@ -2102,15 +2111,15 @@ class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
         self.handlers = hs.get_handlers().watcha_room_nextcloud_mapping_handler
         self.handlers.update_nextcloud_mapping = simple_async_mock()
         self.handlers.delete_room_mapping_with_nextcloud_directory = simple_async_mock()
-        self.nextcloud_directory_url = "https://test/nextcloud/apps/files/?dir=/directory"
+        self.nextcloud_directory_url = (
+            "https://test/nextcloud/apps/files/?dir=/directory"
+        )
 
     def send_room_nextcloud_mapping_event(self, request_content):
         request, channel = self.make_request(
             "PUT",
             "/rooms/{}/state/im.vector.web.settings".format(self.room_id),
-            content=json.dumps(
-                request_content
-            ),
+            content=json.dumps(request_content),
             access_token=self.room_owner_tok,
         )
         self.render(request)
@@ -2118,38 +2127,60 @@ class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
         return channel
 
     def test_create_new_room_nextcloud_mapping(self):
-        channel = self.send_room_nextcloud_mapping_event({"nextcloudShare": self.nextcloud_directory_url})
+        channel = self.send_room_nextcloud_mapping_event(
+            {"nextcloudShare": self.nextcloud_directory_url}
+        )
 
         self.assertTrue(self.handlers.update_nextcloud_mapping.called)
         self.assertEquals(200, channel.code)
 
     def test_delete_existing_room_nextcloud_mapping(self):
-        self.send_room_nextcloud_mapping_event({"nextcloudShare": self.nextcloud_directory_url})
+        self.send_room_nextcloud_mapping_event(
+            {"nextcloudShare": self.nextcloud_directory_url}
+        )
         channel = self.send_room_nextcloud_mapping_event({"nextcloudShare": ""})
 
-        self.assertTrue(self.handlers.delete_room_mapping_with_nextcloud_directory.called)
+        self.assertTrue(
+            self.handlers.delete_room_mapping_with_nextcloud_directory.called
+        )
         self.assertEquals(200, channel.code)
 
     def test_update_existing_room_nextcloud_mapping(self):
-        self.send_room_nextcloud_mapping_event({"nextcloudShare": self.nextcloud_directory_url})
-        channel = self.send_room_nextcloud_mapping_event({"nextcloudShare": "https://test/nextcloud/apps/files/?dir=/directory2"})
+        self.send_room_nextcloud_mapping_event(
+            {"nextcloudShare": self.nextcloud_directory_url}
+        )
+        channel = self.send_room_nextcloud_mapping_event(
+            {"nextcloudShare": "https://test/nextcloud/apps/files/?dir=/directory2"}
+        )
 
         self.assertTrue(self.handlers.update_nextcloud_mapping.called)
         self.assertEquals(200, channel.code)
 
     def test_create_new_room_nextcloud_mapping_without_nextcloudShare_attribute(self):
-        channel = self.send_room_nextcloud_mapping_event({"nextcloud": self.nextcloud_directory_url})
+        channel = self.send_room_nextcloud_mapping_event(
+            {"nextcloud": self.nextcloud_directory_url}
+        )
 
         self.assertFalse(self.handlers.update_nextcloud_mapping.called)
         self.assertRaises(SynapseError)
         self.assertEquals(400, channel.code)
-        self.assertEquals("VectorSetting is only used for Nextcloud integration.", json.loads(channel.result["body"])["error"])
+        self.assertEquals(
+            "VectorSetting is only used for Nextcloud integration.",
+            json.loads(channel.result["body"])["error"],
+        )
 
     def test_create_new_room_nextcloud_mapping_with_wrong_url(self):
-        channel = self.send_room_nextcloud_mapping_event({"nextcloudShare": "https://test/nextcloud/apps/files/?file=brandbook.pdf"})
+        channel = self.send_room_nextcloud_mapping_event(
+            {"nextcloudShare": "https://test/nextcloud/apps/files/?file=brandbook.pdf"}
+        )
 
         self.assertFalse(self.handlers.update_nextcloud_mapping.called)
         self.assertRaises(SynapseError)
         self.assertEquals(400, channel.code)
-        self.assertEquals("The url doesn't point to a valid nextcloud directory path.", json.loads(channel.result["body"])["error"])
+        self.assertEquals(
+            "The url doesn't point to a valid nextcloud directory path.",
+            json.loads(channel.result["body"])["error"],
+        )
+
+
 # +watcha

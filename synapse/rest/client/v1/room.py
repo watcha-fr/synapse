@@ -286,7 +286,9 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                             room_id
                         )
                     else:
-                        url_query = urlparse.parse_qs(urlparse.urlparse(nextcloud_url).query)
+                        url_query = urlparse.parse_qs(
+                            urlparse.urlparse(nextcloud_url).query
+                        )
 
                         if "dir" not in url_query:
                             raise SynapseError(
@@ -1039,9 +1041,7 @@ class RoomTypingRestServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         !watcha """
         # watcha+
-        requester = await self.auth.get_user_by_req(
-            request, allow_partner=True
-        )
+        requester = await self.auth.get_user_by_req(request, allow_partner=True)
         # +watcha
 
         if not self._is_typing_writer:

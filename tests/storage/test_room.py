@@ -176,7 +176,9 @@ class WatchaRoomEventsStoreTestCase(unittest.HomeserverTestCase):
 
         # Set mapping between a room and a nextcloud directory :
         yield defer.ensureDeferred(
-            self.store.set_room_mapping_with_nextcloud_directory(self.room_id, self.directory_path)
+            self.store.set_room_mapping_with_nextcloud_directory(
+                self.room_id, self.directory_path
+            )
         )
 
     @defer.inlineCallbacks
@@ -206,11 +208,15 @@ class WatchaRoomEventsStoreTestCase(unittest.HomeserverTestCase):
     def test_update_room_mapping_with_nextcloud_directory(self):
         new_directory_path = "/directory2"
         yield defer.ensureDeferred(
-            self.store.set_room_mapping_with_nextcloud_directory(self.room_id, new_directory_path)
+            self.store.set_room_mapping_with_nextcloud_directory(
+                self.room_id, new_directory_path
+            )
         )
         mapped_directory = yield defer.ensureDeferred(
             self.store.get_nextcloud_directory_path_from_roomID(self.room_id)
         )
 
         self.assertEquals(mapped_directory, new_directory_path)
+
+
 # +watcha

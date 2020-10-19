@@ -23,6 +23,7 @@ from .search import SearchHandler
 from .room import WatchaRoomNextcloudMappingHandler
 from .watcha_admin_handler import WatchaAdminHandler
 from .watcha_invite_external import InviteExternalHandler
+
 # +watcha
 
 
@@ -52,7 +53,9 @@ class Handlers:
         self.identity_handler = IdentityHandler(hs)
         self.search_handler = SearchHandler(hs)
         # watcha+
-        self.invite_external_handler = InviteExternalHandler(hs) 
-        self.watcha_admin_handler = WatchaAdminHandler(hs) 
-        self.watcha_room_nextcloud_mapping_handler = WatchaRoomNextcloudMappingHandler(hs)
+        self.invite_external_handler = InviteExternalHandler(hs)
+        self.watcha_admin_handler = WatchaAdminHandler(hs)
+        self.watcha_room_nextcloud_mapping_handler = WatchaRoomNextcloudMappingHandler(
+            hs
+        )
         # +watcha
