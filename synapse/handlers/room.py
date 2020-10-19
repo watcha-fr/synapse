@@ -1443,8 +1443,6 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
         self.service_account_name = hs.config.service_account_name
         self.service_account_password = hs.config.service_account_password
 
-        self.keycloak_access_token = ""
-
     async def delete_room_mapping_with_nextcloud_directory(self, room_id):
         """ Delete a mapping between a room and an Nextcloud folder.
 
@@ -1473,28 +1471,19 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
         """
 
         try:
-            self.keycloak_access_token = await self.get_keycloak_access_token()
-        except HTTPError as e:
-            raise SynapseError(
-                400,
-                "Unable to retrieve the Keycloak access token of realm {keycloak_realm} : {error}".format(
-                    keycloak_realm=self.keycloak_realm, error=e
-                ),
-                Codes.KEYCLOAK_CAN_NOT_GET_ACCESS_TOKEN,
-            )
-
-        try:
-            nextcloud_username = await self.get_keycloak_uid(
+            keycloak_user_representation = await self.get_keycloak_uid(
                 get_localpart_from_id(requester_id)
             )
         except HTTPError as e:
             raise SynapseError(
                 400,
-                "Unable to retrieve the corresponding Nextcloud username of user {user_id} : {error}".format(
+                "Unable to retrieve the corresponding keycloak representation of user {user_id} : {error}".format(
                     user_id=requester_id, error=e
                 ),
                 Codes.KEYCLOAK_CAN_NOT_GET_UID,
             )
+
+        nextcloud_username = keycloak_user_representation[0]["id"]
 
         try:
             group_exists = await self.nextcloud_room_group_exists(room_id)
@@ -1558,7 +1547,7 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
             room_id, nextcloud_directory_path
         )
 
-    async def get_keycloak_uid(self, user_localpart):
+    async def get_keycloak_uid(self, user_localpart=None):
         """ Get the corresponding Nextcloud username of the synapse user from Keycloak.
 
         Args :
@@ -1568,16 +1557,27 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
             The Nextcloud username.
         """
 
+        try:
+            keycloak_access_token = await self.get_keycloak_access_token()
+        except HTTPError as e:
+            raise SynapseError(
+                400,
+                "Unable to retrieve the Keycloak access token of realm {keycloak_realm} : {error}".format(
+                    keycloak_realm=self.keycloak_realm, error=e
+                ),
+                Codes.KEYCLOAK_CAN_NOT_GET_ACCESS_TOKEN,
+            )
+
         request = get(
             "{keycloak_server}/admin/realms/{keycloak_realm}/users".format(
                 keycloak_server=self.keycloak_server, keycloak_realm=self.keycloak_realm
             ),
-            headers={"Authorization": "Bearer {}".format(self.keycloak_access_token)},
+            headers={"Authorization": "Bearer {}".format(keycloak_access_token)},
             params={"username": user_localpart},
         )
         request.raise_for_status()
 
-        return request.json()[0]["id"]
+        return request.json()
 
     async def get_keycloak_access_token(self):
         """ Get the realm Keycloak access token in order to use Keycloak Admin API.
@@ -1682,19 +1682,29 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
 
         users = await self.store.get_users_in_room(room_id)
 
-        for user in users:
-            try:
-                nextcloud_username = await self.get_keycloak_uid(
-                    get_localpart_from_id(user)
-                )
-                await self.add_user_to_nextcloud_groups(nextcloud_username, room_id)
-            except (HTTPError, NextcloudError) as e:
-                logger.warn(
-                    "An error occured during the addition of the user {username} in the Nextcloud group {group_name} : {error}".format(
-                        username=user, group_name=room_id, error=e
+        try:
+            keycloak_users_representation = await self.get_keycloak_uid()
+        except HTTPError as e:
+            raise SynapseError(
+                400,
+                "Unable to retrieve keycloak users representation : {}".format(e),
+                Codes.KEYCLOAK_CAN_NOT_GET_UID,
+            )
+
+        for keycloak_user in keycloak_users_representation:
+            synapse_localpart = keycloak_user["username"]
+            if synapse_localpart in users:
+                try:
+                    await self.add_user_to_nextcloud_groups(
+                        keycloak_user["id"], room_id
                     )
-                )
-                continue
+                except (HTTPError, NextcloudError) as e:
+                    logger.warn(
+                        "An error occured during the addition of the user {username} in the Nextcloud group {group_name} : {error}".format(
+                            username=synapse_localpart, group_name=room_id, error=e
+                        )
+                    )
+                    continue
 
     async def nextcloud_account_exists(self, username):
         """ Retrieves information about a single Nextcloud user.
