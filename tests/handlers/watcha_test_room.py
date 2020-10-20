@@ -2,7 +2,7 @@ from .. import unittest
 from mock import Mock
 from requests import HTTPError
 
-from synapse.api.errors import Codes, SynapseError, NextcloudError
+from synapse.api.errors import Codes, SynapseError
 
 
 def simple_async_mock(return_value=None, raises=None):
@@ -156,3 +156,45 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(error.value.code, 400)
         self.assertEqual(error.value.errcode, Codes.UNKNOWN)
+
+    def test_remove_user_from_nextcloud_group_with_exception(self):
+        user_id = "@user1:test"
+        group_name = "room1"
+        self.handlers.remove_user_from_nextcloud_group = simple_async_mock(
+            raises=HTTPError()
+        )
+
+        with self.assertLogs("synapse.handlers.room", level="WARN") as cm:
+            self.get_success(
+                self.handlers.update_existing_nextcloud_share_for_user(
+                    user_id, group_name, "leave"
+                )
+            )
+
+        self.assertIn(
+            "Unable to remove the user {user_id} from the Nextcloud group {group_name} : ".format(
+                user_id=user_id, group_name=group_name
+            ),
+            cm.output[0],
+        )
+
+    def test_add_user_to_nextcloud_group_with_exception(self):
+        user_id = "@user1:test"
+        group_name = "room1"
+        self.handlers.add_user_to_nextcloud_group = simple_async_mock(
+            raises=HTTPError()
+        )
+
+        with self.assertLogs("synapse.handlers.room", level="WARN") as cm:
+            self.get_success(
+                self.handlers.update_existing_nextcloud_share_for_user(
+                    user_id, group_name, "join"
+                )
+            )
+
+        self.assertIn(
+            "Unable to add the user {user_id} to the Nextcloud group {group_name} : ".format(
+                user_id=user_id, group_name=group_name
+            ),
+            cm.output[0],
+        )

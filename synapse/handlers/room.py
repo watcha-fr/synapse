@@ -65,7 +65,6 @@ if TYPE_CHECKING:
 from pathlib import Path
 from requests import get, post, delete, auth, HTTPError
 from requests.auth import HTTPBasicAuth
-from synapse.api.errors import NextcloudError
 from synapse.types import get_localpart_from_id
 from synapse.util.watcha import generate_password
 
@@ -82,6 +81,7 @@ OCS_API_HEADERS = {
     "Accept": "application/json",
     "Content-Type": "application/x-www-form-urlencoded",
 }
+NEXTCLOUD_OK_STATUS_CODE = (100, 200)
 # +watcha
 
 
@@ -1576,7 +1576,6 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
             params={"username": user_localpart},
         )
         request.raise_for_status()
-
         return request.json()
 
     async def get_keycloak_access_token(self):
@@ -1622,12 +1621,16 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
             params={"path": directory_path, "reshares": "true", "format": "json"},
         )
         request.raise_for_status()
-        response = request.json()["ocs"]["meta"]
+        response = request.json()["ocs"]
 
-        status_code = response["statuscode"]
-        if status_code != 100:
-            raise NextcloudError(
-                status_code, response["message"], Codes.NEXTCLOUD_CAN_NOT_GET_SHARES
+        status_code = response["meta"]["statuscode"]
+        if status_code not in NEXTCLOUD_OK_STATUS_CODE:
+            raise SynapseError(
+                400,
+                "Nextcloud API Error: {error_msg} - status code = {status_code}".format(
+                    error_msg=response["meta"]["message"], status_code=status_code
+                ),
+                Codes.NEXTCLOUD_CAN_NOT_GET_SHARES,
             )
 
         return response["data"]
@@ -1675,13 +1678,13 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
         response = request.json()["ocs"]["meta"]
 
         status_code = response["statuscode"]
-        if status_code != 100:
-            raise NextcloudError(
+        if status_code not in NEXTCLOUD_OK_STATUS_CODE:
+            raise SynapseError(
                 status_code, response["message"], Codes.NEXTCLOUD_CAN_NOT_CREATE_GROUP
             )
 
-        users = await self.store.get_users_in_room(room_id)
-
+        users_id = await self.store.get_users_in_room(room_id)
+        users_localpart = [get_localpart_from_id(user_id) for user_id in users_id]
         try:
             keycloak_users_representation = await self.get_keycloak_uid()
         except HTTPError as e:
@@ -1693,12 +1696,10 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
 
         for keycloak_user in keycloak_users_representation:
             synapse_localpart = keycloak_user["username"]
-            if synapse_localpart in users:
+            if synapse_localpart in users_localpart:
                 try:
-                    await self.add_user_to_nextcloud_groups(
-                        keycloak_user["id"], room_id
-                    )
-                except (HTTPError, NextcloudError) as e:
+                    await self.add_user_to_nextcloud_group(keycloak_user["id"], room_id)
+                except HTTPError as e:
                     logger.warn(
                         "An error occured during the addition of the user {username} in the Nextcloud group {group_name} : {error}".format(
                             username=synapse_localpart, group_name=room_id, error=e
@@ -1711,7 +1712,6 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
         Args:
             username: the username of the Nextcloud account.
         """
-
         request = get(
             "{nextcloud_server}/ocs/v1.php/cloud/users/{user_id}".format(
                 nextcloud_server=self.nextcloud_server, user_id=username
@@ -1735,20 +1735,24 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
 
         password = generate_password()
         request = post(
-            "{}ocs/v1.php/cloud/users".format(self.nextcloud_server),
+            "{}/ocs/v1.php/cloud/users".format(self.nextcloud_server),
             headers=OCS_API_HEADERS,
             auth=HTTPBasicAuth(
                 self.service_account_name, self.service_account_password
             ),
-            data={"userid": username, "password": password,},
+            data={"userid": username, "password": password, "format": "json"},
         )
         request.raise_for_status()
         response = request.json()["ocs"]["meta"]
 
         status_code = response["statuscode"]
-        if status_code != 100:
-            raise NextcloudError(
-                status_code, response["message"], Codes.NEXTCLOUD_CAN_NOT_CREATE_USER
+        if status_code not in NEXTCLOUD_OK_STATUS_CODE:
+            raise SynapseError(
+                400,
+                "Nextcloud API Error: {error_msg} - status code = {status_code}".format(
+                    error_msg=response["message"], status_code=status_code
+                ),
+                Codes.NEXTCLOUD_CAN_NOT_CREATE_USER,
             )
 
     async def delete_nextcloud_group(self, room_id):
@@ -1764,25 +1768,30 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
             auth=HTTPBasicAuth(
                 self.service_account_name, self.service_account_password
             ),
+            params={"format": "json"},
         )
         request.raise_for_status()
         response = request.json()["ocs"]["meta"]
 
         status_code = response["statuscode"]
-        if status_code != 100:
-            raise NextcloudError(
-                status_code, response["message"], Codes.NEXTCLOUD_CAN_NOT_DELETE_GROUP
+        if status_code not in NEXTCLOUD_OK_STATUS_CODE:
+            raise SynapseError(
+                400,
+                "Nextcloud API Error: {error_msg} - status code = {status_code}".format(
+                    error_msg=response["message"], status_code=status_code
+                ),
+                Codes.NEXTCLOUD_CAN_NOT_DELETE_GROUP,
             )
 
-    async def add_user_to_nextcloud_groups(self, username, group_name):
-        """ Add user to the Nextcloud group named as room_id.
+    async def add_user_to_nextcloud_group(self, username, group_name):
+        """ Add user to the Nextcloud group.
 
         Args:
             username: the Nextcloud username of the user to add to the Nextcloud group.
             group_name: the Nextcloud group name, equivalent to room_id of the room linked.
         """
-
-        if not await self.nextcloud_account_exists:
+        nextcloud_user_exists = await self.nextcloud_account_exists(username)
+        if not nextcloud_user_exists:
             await self.create_nextcloud_account_for_user(username)
 
         request = post(
@@ -1799,10 +1808,42 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
         response = request.json()["ocs"]["meta"]
 
         status_code = response["statuscode"]
-        if status_code != 100:
-            raise NextcloudError(
-                status_code,
-                response["message"],
+        if status_code not in NEXTCLOUD_OK_STATUS_CODE:
+            raise SynapseError(
+                400,
+                "Nextcloud API Error: {error_msg} - status code = {status_code}".format(
+                    error_msg=response["message"], status_code=status_code
+                ),
+                Codes.NEXTCLOUD_CAN_NOT_ADD_USER_TO_GROUP,
+            )
+
+    async def remove_user_from_nextcloud_group(self, username, group_name):
+        """ Remove user from the Nextcloud group.
+
+        Args:
+            username: the Nextcloud username of the user to add to the Nextcloud group.
+            group_name: the Nextcloud group name, equivalent to room_id of the room linked.
+        """
+
+        request = delete(
+            "{nextcloud_server}/ocs/v1.php/cloud/users/{user_id}/groups".format(
+                nextcloud_server=self.nextcloud_server, user_id=username
+            ),
+            headers=OCS_API_HEADERS,
+            auth=HTTPBasicAuth(
+                self.service_account_name, self.service_account_password
+            ),
+            data={"groupid": group_name, "format": "json"},
+        )
+        request.raise_for_status()
+        response = request.json()["ocs"]["meta"]
+
+        status_code = response["statuscode"]
+        if status_code not in NEXTCLOUD_OK_STATUS_CODE:
+            raise SynapseError(
+                "Nextcloud API Error: {error_msg} - status code = {status_code}".format(
+                    error_msg=response["message"], status_code=status_code
+                ),
                 Codes.NEXTCLOUD_CAN_NOT_ADD_USER_TO_GROUP,
             )
 
@@ -1838,17 +1879,19 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
         response = request.json()["ocs"]["meta"]
 
         status_code = response["statuscode"]
-        if status_code != 100:
-            raise NextcloudError(
-                status_code,
-                response["message"],
+        if status_code not in NEXTCLOUD_OK_STATUS_CODE:
+            raise SynapseError(
+                400,
+                "Nextcloud API Error: {error_msg} - status code = {status_code}".format(
+                    error_msg=response["message"], status_code=status_code
+                ),
                 Codes.NEXTCLOUD_CAN_NOT_CREATE_NEW_SHARE,
             )
 
     async def delete_existing_nextcloud_share(
         self, requester, mapped_directory_path, group_name
     ):
-        """ Delete an existing share (corresponding to the share id) on the folder. 
+        """ Delete an existing share (corresponding to the share id) on the folder with a Nextcloud group. 
 
         Args:
             requester: the Nextcloud username of the requester who want to delete an existing share.
@@ -1883,10 +1926,42 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
         response = request.json()["ocs"]["meta"]
 
         status_code = response["statuscode"]
-        if status_code != 100:
-            raise NextcloudError(
-                status_code, response["message"], Codes.NEXTCLOUD_CAN_NOT_DELETE_SHARE
+        if status_code not in NEXTCLOUD_OK_STATUS_CODE:
+            raise SynapseError(
+                400,
+                "Nextcloud API Error: {error_msg} - status code = {status_code}".format(
+                    error_msg=response["message"], status_code=status_code
+                ),
+                Codes.NEXTCLOUD_CAN_NOT_DELETE_SHARE,
             )
+
+    async def update_existing_nextcloud_share_for_user(
+        self, user_id, group_name, membership
+    ):
+        keycloak_user_representation = await self.get_keycloak_uid(
+            get_localpart_from_id(user_id)
+        )
+        nextcloud_username = keycloak_user_representation[0]["id"]
+        if membership in ["invite", "join"]:
+            try:
+                await self.add_user_to_nextcloud_group(nextcloud_username, group_name)
+            except Exception as e:
+                logger.warn(
+                    "Unable to add the user {username} to the Nextcloud group {group_name} : {error}".format(
+                        username=username, group_name=group_name, error=e
+                    ),
+                )
+        else:
+            try:
+                await self.remove_user_from_nextcloud_group(
+                    nextcloud_username, group_name
+                )
+            except Exception as e:
+                logger.warn(
+                    "Unable to remove the user {username} from the Nextcloud group {group_name} : {error}".format(
+                        username=nextcloud_username, group_name=group_name, error=e
+                    ),
+                )
 
     async def get_room_list_to_send_nextcloud_notification(
         self, directory, limit_of_notification_propagation

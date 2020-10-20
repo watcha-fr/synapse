@@ -156,28 +156,6 @@ class SynapseError(CodeMessageException):
         return cs_error(self.msg, self.errcode)
 
 
-# watcha+
-class NextcloudError(SynapseError):
-    """A base exception type for Nextcloud API errors which have a code (the payload status code attribute) and error
-    message corresponding to the OCS API status code in payload.
-    """
-
-    def __init__(self, code: int, msg: str, errcode: str = Codes.UNKNOWN):
-        """Constructs a nextcloud error.
-
-        Args:
-            code: The status code on the request payload
-            msg: The human-readable message corresponding to the status code.
-        """
-        super(NextcloudError, self).__init__(code, msg, errcode)
-
-    def error_dict(self):
-        return cs_error(self.msg, self.errcode)
-
-
-# +watcha
-
-
 class ProxiedRequestError(SynapseError):
     """An error from a general matrix endpoint, eg. from a proxied Matrix API call.
 
