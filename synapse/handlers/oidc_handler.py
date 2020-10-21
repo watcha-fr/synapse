@@ -922,7 +922,7 @@ class OidcHandler:
         synapse_role = attributes["synapse_role"]
         if synapse_role == "administrator":
             optional_params["admin"] = True
-        elif synapse_role == "partner"
+        elif synapse_role == "partner":
             optional_params["make_partner"] = True
         # +watcha
 
