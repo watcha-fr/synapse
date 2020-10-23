@@ -2109,8 +2109,8 @@ class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
         )
 
         self.handlers = hs.get_handlers().watcha_room_nextcloud_mapping_handler
-        self.handlers.update_nextcloud_mapping = simple_async_mock()
-        self.handlers.delete_room_mapping_with_nextcloud_directory = simple_async_mock()
+        self.handlers.update_room_nextcloud_mapping = simple_async_mock()
+        self.handlers.delete_room_nextcloud_mapping = simple_async_mock()
         self.nextcloud_directory_url = (
             "https://test/nextcloud/apps/files/?dir=/directory"
         )
@@ -2131,7 +2131,7 @@ class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
             {"nextcloudShare": self.nextcloud_directory_url}
         )
 
-        self.assertTrue(self.handlers.update_nextcloud_mapping.called)
+        self.assertTrue(self.handlers.update_room_nextcloud_mapping.called)
         self.assertEquals(200, channel.code)
 
     def test_delete_existing_room_nextcloud_mapping(self):
@@ -2141,7 +2141,7 @@ class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
         channel = self.send_room_nextcloud_mapping_event({"nextcloudShare": ""})
 
         self.assertTrue(
-            self.handlers.delete_room_mapping_with_nextcloud_directory.called
+            self.handlers.delete_room_nextcloud_mapping.called
         )
         self.assertEquals(200, channel.code)
 
@@ -2153,7 +2153,7 @@ class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
             {"nextcloudShare": "https://test/nextcloud/apps/files/?dir=/directory2"}
         )
 
-        self.assertTrue(self.handlers.update_nextcloud_mapping.called)
+        self.assertTrue(self.handlers.update_room_nextcloud_mapping.called)
         self.assertEquals(200, channel.code)
 
     def test_create_new_room_nextcloud_mapping_without_nextcloudShare_attribute(self):
@@ -2161,7 +2161,7 @@ class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
             {"nextcloud": self.nextcloud_directory_url}
         )
 
-        self.assertFalse(self.handlers.update_nextcloud_mapping.called)
+        self.assertFalse(self.handlers.update_room_nextcloud_mapping.called)
         self.assertRaises(SynapseError)
         self.assertEquals(400, channel.code)
         self.assertEquals(
@@ -2174,7 +2174,7 @@ class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
             {"nextcloudShare": "https://test/nextcloud/apps/files/?file=brandbook.pdf"}
         )
 
-        self.assertFalse(self.handlers.update_nextcloud_mapping.called)
+        self.assertFalse(self.handlers.update_room_nextcloud_mapping.called)
         self.assertRaises(SynapseError)
         self.assertEquals(400, channel.code)
         self.assertEquals(
@@ -2195,11 +2195,11 @@ class WatchaMembershipNextcloudSharingTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
-        self.creator = self.register_user("creator", "test")
-        self.creator_tok = self.login("creator", "test")
+        self.creator = self.register_user("creator", "pass")
+        self.creator_tok = self.login("creator", "pass")
 
-        self.second_user_id = self.register_user("second", "test")
-        self.second_tok = self.login("second", "test")
+        self.inviter = self.register_user("inviter", "pass")
+        self.inviter_tok = self.login("inviter", "pass")
 
         self.room_id = self.helper.create_room_as(self.creator, tok=self.creator_tok)
 
@@ -2211,75 +2211,78 @@ class WatchaMembershipNextcloudSharingTestCase(unittest.HomeserverTestCase):
         )
 
         # mock some functions of WatchaRoomNextcloudMappingHandler
-        self.handlers = hs.get_handlers().watcha_room_nextcloud_mapping_handler
-        self.handlers.remove_user_from_nextcloud_group = simple_async_mock()
-        self.handlers.add_user_to_nextcloud_group = simple_async_mock()
-        self.handlers.get_keycloak_uid = simple_async_mock(
-            return_value=[{"id": "second"}]
+        self.watcha_room_nextcloud_mapping = (
+            hs.get_handlers().watcha_room_nextcloud_mapping_handler
         )
+
+        self.keycloak_client = self.watcha_room_nextcloud_mapping.keycloak_client
+        self.nextcloud_client = self.watcha_room_nextcloud_mapping.nextcloud_client
+
+        self.keycloak_client.get_keycloak_user = simple_async_mock(
+            return_value={"id": "1234", "username": "creator"},
+        )
+        self.nextcloud_client.add_user_to_group = simple_async_mock()
+        self.nextcloud_client.remove_from_group = simple_async_mock()
 
     def test_update_nextcloud_share_on_invite_and_join_event(self):
         self.helper.invite(
-            self.room_id, self.creator, self.second_user_id, tok=self.creator_tok
+            self.room_id, self.creator, self.inviter, tok=self.creator_tok
         )
-
-        self.assertTrue(self.handlers.add_user_to_nextcloud_group.called)
-        self.handlers.add_user_to_nextcloud_group.reset_mock()
 
         request, channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/{}/join".format(self.room_id),
-            access_token=self.second_tok,
+            access_token=self.inviter_tok,
         )
         self.render(request)
 
-        self.assertTrue(self.handlers.add_user_to_nextcloud_group.called)
+        self.assertEquals(self.nextcloud_client.add_user_to_group.call_count, 2)
         self.assertEqual(200, channel.code)
 
     def test_update_nextcloud_share_on_leave_event(self):
         self.helper.invite(
-            self.room_id, self.creator, self.second_user_id, tok=self.creator_tok
+            self.room_id, self.creator, self.inviter, tok=self.creator_tok
         )
-
-        self.assertTrue(self.handlers.add_user_to_nextcloud_group.called)
 
         request, channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/{}/leave".format(self.room_id),
-            access_token=self.second_tok,
+            access_token=self.inviter_tok,
         )
         self.render(request)
 
-        self.assertTrue(self.handlers.remove_user_from_nextcloud_group.called)
+        self.nextcloud_client.add_user_to_group.assert_called_once()
+        self.nextcloud_client.remove_from_group.assert_called_once()
         self.assertEqual(200, channel.code)
 
     def test_update_nextcloud_share_on_kick_event(self):
         self.helper.invite(
-            self.room_id, self.creator, self.second_user_id, tok=self.creator_tok
+            self.room_id, self.creator, self.inviter, tok=self.creator_tok
         )
-        self.handlers.add_user_to_nextcloud_group.reset_mock()
-        self.helper.join(self.room_id, user=self.second_user_id, tok=self.second_tok)
-
-        self.assertTrue(self.handlers.add_user_to_nextcloud_group.called)
+        self.helper.join(self.room_id, user=self.inviter, tok=self.inviter_tok)
 
         request, channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/{}/kick".format(self.room_id),
-            content={"user_id": self.second_user_id},
-            access_token=self.second_tok,
+            content={"user_id": self.inviter},
+            access_token=self.inviter_tok,
         )
         self.render(request)
 
-        self.assertTrue(self.handlers.remove_user_from_nextcloud_group.called)
+        self.assertEquals(self.nextcloud_client.add_user_to_group.call_count, 2)
+        self.nextcloud_client.remove_from_group.assert_called_once()
         self.assertEqual(200, channel.code)
 
     def test_update_nextcloud_share_with_an_unmapped_room(self):
+        self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user = simple_async_mock()
+        
         room_id = self.helper.create_room_as(self.creator, tok=self.creator_tok)
 
         self.helper.invite(
-            room_id, self.creator, self.second_user_id, tok=self.creator_tok
+            room_id, self.creator, self.inviter, tok=self.creator_tok
         )
-        self.assertFalse(self.handlers.add_user_to_nextcloud_group.called)
+        
+        self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user.assert_not_called()
 
 
 # +watcha

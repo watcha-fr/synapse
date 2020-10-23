@@ -2,6 +2,7 @@ import logging
 from base64 import b64encode
 
 from synapse.http.client import SimpleHttpClient
+from synapse.api.errors import Codes, SynapseError
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,9 @@ class WatchaNextcloudClient(SimpleHttpClient):
             "OCS-APIRequest": ["true"],
             "Authorization": [
                 "Basic "
-                + b64encode(bytes("{}:{}".format(username, password,), "utf-8",))
+                + b64encode(
+                    bytes("{}:{}".format(username, password,), "utf-8",)
+                ).decode()
             ],
         }
 
@@ -64,7 +67,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         if meta["statuscode"] == 102:
             logger.info("Nextcloud group {} already exists.".format(group_name))
         else:
-            self._raise_for_status(body, NEXTCLOUD_CAN_NOT_CREATE_GROUP)
+            self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_CREATE_GROUP)
 
     async def delete_group(self, group_name):
         """ Removes a existing Nextcloud group.
@@ -88,7 +91,9 @@ class WatchaNextcloudClient(SimpleHttpClient):
             headers=headers,
         )
 
-        self._raise_for_status(response["ocs"]["meta"], NEXTCLOUD_CAN_NOT_DELETE_GROUP)
+        self._raise_for_status(
+            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_DELETE_GROUP
+        )
 
     async def add_user_to_group(self, username, group_name):
         """ Add user to the Nextcloud group.
@@ -118,7 +123,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         )
 
         self._raise_for_status(
-            response["ocs"]["meta"], NEXTCLOUD_CAN_NOT_ADD_USER_TO_GROUP
+            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_ADD_USER_TO_GROUP
         )
 
     async def remove_from_group(self, username, group_name):
@@ -140,16 +145,16 @@ class WatchaNextcloudClient(SimpleHttpClient):
         headers = self._set_headers(
             self.service_account_name, self.service_account_password
         )
-        response = delete_get_json(
+        response = await self.delete_get_json(
             uri="{nextcloud_server}/ocs/v1.php/cloud/users/{user_id}/groups".format(
                 nextcloud_server=self.nextcloud_server, user_id=username
             ),
             headers=headers,
-            args={"groupid": group_name},
+            json_body={"groupid": group_name},
         )
 
         self._raise_for_status(
-            response["ocs"]["meta"], NEXTCLOUD_CAN_NOT_REMOVE_USER_TO_GROUP
+            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_REMOVE_USER_TO_GROUP
         )
 
     async def get_user(self, username):
@@ -174,7 +179,9 @@ class WatchaNextcloudClient(SimpleHttpClient):
             headers=headers,
         )
 
-        self._raise_for_status(response["ocs"]["meta"], NEXTCLOUD_CAN_NOT_GET_USER)
+        self._raise_for_status(
+            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_GET_USER
+        )
 
         return response["ocs"]["data"]
 
@@ -193,14 +200,16 @@ class WatchaNextcloudClient(SimpleHttpClient):
         """
 
         headers = self._set_headers(requester, self.nextcloud_shared_secret)
-        response = get_json(
-            uri="{nextcloud_server}/ocs/v2.php/apps/files_sharing/api/v1/shares/{}".format(
-                nextcloud_server=self.nextcloud_server, share_id=share_id
+        response = await self.get_json(
+            uri="{nextcloud_server}/ocs/v2.php/apps/files_sharing/api/v1/shares/".format(
+                nextcloud_server=self.nextcloud_server
             ),
             headers=headers,
         )
 
-        self._raise_for_status(response["ocs"]["meta"], NEXTCLOUD_CAN_NOT_GET_SHARES)
+        self._raise_for_status(
+            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_GET_SHARES
+        )
 
         return response["ocs"]["data"]
 
@@ -219,7 +228,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         """
 
         headers = self._set_headers(requester, self.nextcloud_shared_secret)
-        response = post_json_get_json(
+        response = await self.post_json_get_json(
             uri="{}/ocs/v2.php/apps/files_sharing/api/v1/shares".format(
                 self.nextcloud_server
             ),
@@ -233,7 +242,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         )
 
         self._raise_for_status(
-            response["ocs"]["meta"], NEXTCLOUD_CAN_NOT_CREATE_NEW_SHARE
+            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_CREATE_NEW_SHARE
         )
 
     async def delete_share(self, requester, share_id):
@@ -249,11 +258,13 @@ class WatchaNextcloudClient(SimpleHttpClient):
         """
 
         headers = self._set_headers(requester, self.nextcloud_shared_secret)
-        response = delete_get_json(
+        response = await self.delete_get_json(
             uri="{nextcloud_server}/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}".format(
                 nextcloud_server=self.nextcloud_server, share_id=share_id
             ),
             headers=headers,
         )
 
-        self._raise_for_status(response["ocs"]["meta"], NEXTCLOUD_CAN_NOT_DELETE_SHARE)
+        self._raise_for_status(
+            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_DELETE_SHARE
+        )

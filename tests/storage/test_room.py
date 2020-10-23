@@ -194,7 +194,7 @@ class WatchaRoomEventsStoreTestCase(unittest.HomeserverTestCase):
         self.assertEquals(mapped_room, self.room_id)
 
     @defer.inlineCallbacks
-    def test_delete_room_mapping_with_nextcloud_directory(self):
+    def test_delete_room_nextcloud_mapping(self):
         yield defer.ensureDeferred(
             self.store.deleted_room_mapping_with_nextcloud_directory(self.room_id)
         )

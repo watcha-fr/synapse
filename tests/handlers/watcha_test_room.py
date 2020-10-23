@@ -1,8 +1,12 @@
 from .. import unittest
 from mock import Mock
-from requests import HTTPError
 
 from synapse.api.errors import Codes, SynapseError
+from synapse.http.watcha_keycloak_api import WatchaKeycloakClient
+from synapse.http.watcha_nextcloud_api import WatchaNextcloudClient
+from synapse.rest.client.v1 import login, room
+from synapse.rest import admin
+from synapse.types import get_localpart_from_id
 
 
 def simple_async_mock(return_value=None, raises=None):
@@ -18,183 +22,276 @@ def simple_async_mock(return_value=None, raises=None):
 class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
     """ Tests the WatchaRoomNextcloudMappingHandler. """
 
+    servlets = [
+        admin.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+    ]
+
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
-        self.handlers = hs.get_handlers().watcha_room_nextcloud_mapping_handler
-
-        # Mock all functions which call Nextcloud API :
-        self.handlers.get_keycloak_uid = simple_async_mock(return_value="keycloak_id")
-        self.handlers.get_keycloak_access_token = simple_async_mock(return_value="tok")
-        self.handlers.nextcloud_room_group_exists = simple_async_mock(
-            return_value=False
+        self.watcha_room_nextcloud_mapping = (
+            hs.get_handlers().watcha_room_nextcloud_mapping_handler
         )
-        self.handlers.create_nextcloud_group = simple_async_mock()
-        self.handlers.create_new_nextcloud_share = simple_async_mock()
-        self.handlers.delete_existing_nextcloud_share = simple_async_mock()
-        self.handlers.delete_nextcloud_group = simple_async_mock()
+
+        self.keycloak_client = self.watcha_room_nextcloud_mapping.keycloak_client
+        self.nextcloud_client = self.watcha_room_nextcloud_mapping.nextcloud_client
+
+        # Create a room with two users :
+        self.creator = self.register_user("creator", "pass", admin=True)
+        self.creator_tok = self.login("creator", "pass")
+
+        self.inviter = self.register_user("inviter", "pass")
+        inviter_tok = self.login("inviter", "pass")
+
+        self.room_id = self.helper.create_room_as(self.creator, tok=self.creator_tok)
+        self.helper.invite(
+            self.room_id, src=self.creator, targ=self.inviter, tok=self.creator_tok
+        )
+        self.helper.join(self.room_id, self.inviter, tok=inviter_tok)
+
+        # Mock Keycloak client functions :
+        self.keycloak_client.get_keycloak_user = simple_async_mock(
+            return_value={"id": "1234", "username": "creator"},
+        )
+        self.keycloak_client.get_all_keycloak_users = simple_async_mock(
+            return_value=[
+                {"id": "1234", "username": "creator"},
+                {"id": "56789", "username": "inviter"},
+            ]
+        )
+
+        # Mock Nextcloud client functions :
+        self.nextcloud_client.add_group = simple_async_mock()
+        self.nextcloud_client.delete_group = simple_async_mock()
+        self.nextcloud_client.get_all_shares = simple_async_mock(
+            return_value=[{"id": "share1", "share_with": self.room_id}]
+        )
+        self.nextcloud_client.get_user = simple_async_mock()
+        self.nextcloud_client.add_user_to_group = simple_async_mock()
+        self.nextcloud_client.remove_from_group = simple_async_mock()
+        self.nextcloud_client.delete_share = simple_async_mock()
+        self.nextcloud_client.create_all_permission_share_with_group = (
+            simple_async_mock()
+        )
 
     def test_set_new_room_nextcloud_mapping(self):
         self.get_success(
-            self.handlers.update_nextcloud_mapping("room1", "@user1:test", "/directory")
+            self.watcha_room_nextcloud_mapping.update_room_nextcloud_mapping(
+                self.room_id, self.creator, "/directory"
+            )
         )
 
         mapped_directory = self.get_success(
-            self.store.get_nextcloud_directory_path_from_roomID("room1")
+            self.store.get_nextcloud_directory_path_from_roomID(self.room_id)
         )
+
+        # Verify that mocked functions has called once :
+        self.keycloak_client.get_keycloak_user.assert_called_once()
+        self.nextcloud_client.add_group.assert_called_once()
+        self.keycloak_client.get_all_keycloak_users.assert_called_once()
+        self.nextcloud_client.create_all_permission_share_with_group.assert_called_once()
+
+        # Verify that mocked functions has called twice :
+        self.assertEquals(self.nextcloud_client.get_user.call_count, 2)
+        self.assertEquals(self.nextcloud_client.add_user_to_group.call_count, 2)
+
+        # Verify that mocked functions has not called :
+        self.nextcloud_client.get_all_shares.assert_not_called()
+        self.nextcloud_client.delete_share.assert_not_called()
 
         self.assertEqual(mapped_directory, "/directory")
 
     def test_update_existing_room_nextcloud_mapping(self):
         self.get_success(
-            self.store.set_room_mapping_with_nextcloud_directory("room1", "/directory")
+            self.store.set_room_mapping_with_nextcloud_directory(
+                self.room_id, "/directory"
+            )
         )
+
         old_mapped_directory = self.get_success(
-            self.store.get_nextcloud_directory_path_from_roomID("room1")
+            self.store.get_nextcloud_directory_path_from_roomID(self.room_id)
         )
 
         self.assertEqual(old_mapped_directory, "/directory")
+
         self.get_success(
-            self.handlers.update_nextcloud_mapping(
-                "room1", "@user1:test", "/directory2"
+            self.watcha_room_nextcloud_mapping.update_room_nextcloud_mapping(
+                self.room_id, self.creator, "/directory2"
             )
         )
 
         mapped_directory = self.get_success(
-            self.store.get_nextcloud_directory_path_from_roomID("room1")
+            self.store.get_nextcloud_directory_path_from_roomID(self.room_id)
         )
+
+        # Verify that mocked functions has called :
+        self.nextcloud_client.get_all_shares.assert_called()
+        self.nextcloud_client.delete_share.assert_called()
 
         self.assertEqual(mapped_directory, "/directory2")
 
+    def test_update_existing_room_nextcloud_mapping_with_no_existing_share(self):
+        self.get_success(
+            self.store.set_room_mapping_with_nextcloud_directory(
+                self.room_id, "/directory"
+            )
+        )
+
+        self.nextcloud_client.get_all_shares = simple_async_mock(
+            return_value=[{"id": "share1", "share_with": "room1"}]
+        )
+
+        self.get_failure(
+            self.watcha_room_nextcloud_mapping.update_room_nextcloud_mapping(
+                self.room_id, self.creator, "/directory2"
+            ),
+            SynapseError,
+        )
+
     def test_delete_existing_room_nextcloud_mapping(self):
         self.get_success(
-            self.store.set_room_mapping_with_nextcloud_directory("room1", "/directory")
+            self.store.set_room_mapping_with_nextcloud_directory(
+                self.room_id, "/directory"
+            )
         )
         self.get_success(
-            self.handlers.delete_room_mapping_with_nextcloud_directory("room1")
-        )
-        mapped_directory = self.get_success(
-            self.store.get_nextcloud_directory_path_from_roomID("room1")
+            self.watcha_room_nextcloud_mapping.delete_room_nextcloud_mapping(
+                self.room_id
+            )
         )
 
+        mapped_directory = self.get_success(
+            self.store.get_nextcloud_directory_path_from_roomID(self.room_id)
+        )
+
+        self.nextcloud_client.delete_group.assert_called()
         self.assertIsNone(mapped_directory)
 
-    def test_set_new_room_nextcloud_mapping_without_access_token(self):
-        self.handlers.get_keycloak_access_token = simple_async_mock(raises=HTTPError)
-        error = self.get_failure(
-            self.handlers.update_nextcloud_mapping(
-                "room1", "@user1:test", "/directory"
-            ),
-            SynapseError,
-        )
-
-        self.assertEqual(error.value.code, 400)
-        self.assertEqual(error.value.errcode, Codes.KEYCLOAK_CAN_NOT_GET_ACCESS_TOKEN)
-
-    def test_set_new_room_nextcloud_mapping_without_keycloak_uid(self):
-        self.handlers.get_keycloak_uid = simple_async_mock(raises=HTTPError())
-        error = self.get_failure(
-            self.handlers.update_nextcloud_mapping(
-                "room1", "@user1:test", "/directory"
-            ),
-            SynapseError,
-        )
-
-        self.assertEqual(error.value.code, 400)
-        self.assertEqual(error.value.errcode, Codes.KEYCLOAK_CAN_NOT_GET_UID)
-
-    def test_set_new_room_nextcloud_mapping_without_group_existence(self):
-        self.handlers.nextcloud_room_group_exists = simple_async_mock(
-            raises=HTTPError()
-        )
-        error = self.get_failure(
-            self.handlers.update_nextcloud_mapping(
-                "room1", "@user1:test", "/directory"
-            ),
-            SynapseError,
-        )
-
-        self.assertEqual(error.value.code, 400)
-        self.assertEqual(error.value.errcode, Codes.UNKNOWN)
-
-    def test_set_new_room_nextcloud_mapping_with_group_creation_error(self):
-        self.handlers.create_nextcloud_group = simple_async_mock(raises=HTTPError())
-        error = self.get_failure(
-            self.handlers.update_nextcloud_mapping(
-                "room1", "@user1:test", "/directory"
-            ),
-            SynapseError,
-        )
-
-        self.assertEqual(error.value.code, 400)
-        self.assertEqual(error.value.errcode, Codes.UNKNOWN)
-
-    def test_set_new_room_nextcloud_mapping_with_share_creation_error(self):
-        self.handlers.create_new_nextcloud_share = simple_async_mock(raises=HTTPError())
-        error = self.get_failure(
-            self.handlers.update_nextcloud_mapping(
-                "room1", "@user1:test", "/directory"
-            ),
-            SynapseError,
-        )
-
-        self.assertEqual(error.value.code, 400)
-        self.assertEqual(error.value.errcode, Codes.UNKNOWN)
-
-    def test_update_existing_room_nextcloud_mapping_with_delete_share_error(self):
-        self.handlers.delete_existing_nextcloud_share = simple_async_mock(
-            raises=HTTPError()
-        )
-        self.get_success(
-            self.store.set_room_mapping_with_nextcloud_directory("room1", "/directory")
-        )
-        error = self.get_failure(
-            self.handlers.update_nextcloud_mapping(
-                "room1", "@user1:test", "/directory2"
-            ),
-            SynapseError,
-        )
-
-        self.assertEqual(error.value.code, 400)
-        self.assertEqual(error.value.errcode, Codes.UNKNOWN)
-
-    def test_remove_user_from_nextcloud_group_with_exception(self):
-        user_id = "@user1:test"
-        group_name = "room1"
-        self.handlers.remove_user_from_nextcloud_group = simple_async_mock(
-            raises=HTTPError()
-        )
+    def test_add_user_to_nextcloud_group_without_nextcloud_account(self):
+        self.nextcloud_client.get_user = simple_async_mock(raises=SynapseError)
 
         with self.assertLogs("synapse.handlers.room", level="WARN") as cm:
             self.get_success(
-                self.handlers.update_existing_nextcloud_share_for_user(
-                    user_id, group_name, "leave"
+                self.watcha_room_nextcloud_mapping.add_room_users_to_nextcloud_group(
+                    self.room_id
                 )
             )
 
         self.assertIn(
-            "Unable to remove the user {user_id} from the Nextcloud group {group_name} : ".format(
-                user_id=user_id, group_name=group_name
+            "The user {} does not have a Nextcloud account.".format(
+                get_localpart_from_id(self.creator)
             ),
             cm.output[0],
         )
 
-    def test_add_user_to_nextcloud_group_with_exception(self):
-        user_id = "@user1:test"
-        group_name = "room1"
-        self.handlers.add_user_to_nextcloud_group = simple_async_mock(
-            raises=HTTPError()
+        self.assertIn(
+            "The user {} does not have a Nextcloud account.".format(
+                get_localpart_from_id(self.inviter)
+            ),
+            cm.output[1],
         )
+
+    def test_add_user_to_nextcloud_group_with_exception(self):
+        self.nextcloud_client.add_user_to_group = simple_async_mock(raises=SynapseError)
 
         with self.assertLogs("synapse.handlers.room", level="WARN") as cm:
             self.get_success(
-                self.handlers.update_existing_nextcloud_share_for_user(
-                    user_id, group_name, "join"
+                self.watcha_room_nextcloud_mapping.add_room_users_to_nextcloud_group(
+                    self.room_id
                 )
             )
 
         self.assertIn(
-            "Unable to add the user {user_id} to the Nextcloud group {group_name} : ".format(
-                user_id=user_id, group_name=group_name
+            "Unable to add the user {username} to the Nextcloud group {group_name}.".format(
+                username=get_localpart_from_id(self.creator), group_name=self.room_id
+            ),
+            cm.output[0],
+        )
+
+        self.assertIn(
+            "Unable to add the user {username} to the Nextcloud group {group_name}.".format(
+                username=get_localpart_from_id(self.inviter), group_name=self.room_id
+            ),
+            cm.output[1],
+        )
+
+    def test_update_existing_nextcloud_share_on_invite_membership(self):
+        self.get_success(
+            self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user(
+                "@second_inviter:test", self.room_id, "invite"
+            )
+        )
+
+        self.keycloak_client.get_keycloak_user.assert_called_once()
+        self.nextcloud_client.add_user_to_group.assert_called_once()
+        self.nextcloud_client.remove_from_group.assert_not_called()
+
+    def test_update_existing_nextcloud_share_on_invite_membership(self):
+        self.get_success(
+            self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user(
+                "@second_inviter:test", self.room_id, "join"
+            )
+        )
+
+        self.keycloak_client.get_keycloak_user.assert_called_once()
+        self.nextcloud_client.add_user_to_group.assert_called_once()
+        self.nextcloud_client.remove_from_group.assert_not_called()
+
+    def test_update_existing_nextcloud_share_on_leave_membership(self):
+        self.get_success(
+            self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user(
+                "@second_inviter:test", self.room_id, "leave"
+            )
+        )
+
+        self.keycloak_client.get_keycloak_user.assert_called_once()
+        self.nextcloud_client.remove_from_group.assert_called_once()
+        self.nextcloud_client.add_user_to_group.assert_not_called()
+
+    def test_update_existing_nextcloud_share_on_kick_membership(self):
+        self.get_success(
+            self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user(
+                "@second_inviter:test", self.room_id, "kick"
+            )
+        )
+
+        self.keycloak_client.get_keycloak_user.assert_called_once()
+        self.nextcloud_client.remove_from_group.assert_called_once()
+        self.nextcloud_client.add_user_to_group.assert_not_called()
+
+    def test_update_existing_nextcloud_share_on_invite_membership_with_exception(self):
+        self.nextcloud_client.add_user_to_group = simple_async_mock(raises=SynapseError)
+        second_inviter = "@second_inviter:test"
+
+        with self.assertLogs("synapse.handlers.room", level="WARN") as cm:
+            self.get_success(
+                self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user(
+                    second_inviter, self.room_id, "invite"
+                )
+            )
+
+        self.assertIn(
+            "Unable to add the user {username} to the Nextcloud group {group_name}.".format(
+                username=second_inviter, group_name=self.room_id
+            ),
+            cm.output[0],
+        )
+
+    def test_update_existing_nextcloud_share_on_leave_membership_with_exception(self):
+        self.nextcloud_client.remove_from_group = simple_async_mock(raises=SynapseError)
+        second_inviter = "@second_inviter:test"
+
+        with self.assertLogs("synapse.handlers.room", level="WARN") as cm:
+            self.get_success(
+                self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user(
+                    second_inviter, self.room_id, "leave"
+                )
+            )
+
+        self.assertIn(
+            "Unable to remove the user {username} from the Nextcloud group {group_name}.".format(
+                username=second_inviter, group_name=self.room_id
             ),
             cm.output[0],
         )

@@ -232,7 +232,11 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     "kick",
                     "leave",
                 ]:
-                    user = requester.user.to_string() if membership in ["join", "leave"] else state_key
+                    user = (
+                        requester.user.to_string()
+                        if membership in ["join", "leave"]
+                        else state_key
+                    )
                     await self.handlers.watcha_room_nextcloud_mapping_handler.update_existing_nextcloud_share_for_user(
                         user, room_id, membership
                     )
@@ -298,7 +302,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     requester_id = requester.user.to_string()
 
                     if not nextcloud_url:
-                        await self.handlers.watcha_room_nextcloud_mapping_handler.delete_room_mapping_with_nextcloud_directory(
+                        await self.handlers.watcha_room_nextcloud_mapping_handler.delete_room_nextcloud_mapping(
                             room_id
                         )
                     else:
@@ -314,7 +318,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 
                         nextcloud_directory_path = url_query["dir"][0]
 
-                        await self.handlers.watcha_room_nextcloud_mapping_handler.update_nextcloud_mapping(
+                        await self.handlers.watcha_room_nextcloud_mapping_handler.update_room_nextcloud_mapping(
                             room_id, requester_id, nextcloud_directory_path
                         )
                 # +watcha
@@ -996,7 +1000,11 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             "kick",
             "leave",
         ]:
-            user = requester.user.to_string() if membership_action in ["join", "leave"] else content["user_id"]
+            user = (
+                requester.user.to_string()
+                if membership_action in ["join", "leave"]
+                else content["user_id"]
+            )
             await self.handlers.watcha_room_nextcloud_mapping_handler.update_existing_nextcloud_share_for_user(
                 user, room_id, membership_action
             )
