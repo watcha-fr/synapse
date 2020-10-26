@@ -926,7 +926,11 @@ class OidcHandler:
         elif synapse_role == "partner":
             optional_params["make_partner"] = True
         elif synapse_role is not None:
-            raise MappingException("synapse_role ({}) should be either administrator, partner or None".format(synapse_role))
+            raise MappingException(
+                "synapse_role ({}) must be either administrator, partner or None".format(
+                    synapse_role
+                )
+            )
         # +watcha
 
         # It's the first time this user is logging in and the mapped mxid was
