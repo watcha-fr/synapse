@@ -920,10 +920,13 @@ class OidcHandler:
             optional_params["bind_emails"] = [email]
 
         synapse_role = attributes["synapse_role"]
+        print("synapse_role:", synapse_role)
         if synapse_role == "administrator":
             optional_params["admin"] = True
         elif synapse_role == "partner":
             optional_params["make_partner"] = True
+        elif synapse_role is not None:
+            raise MappingException("synapse_role ({}) should be either administrator, partner or None".format(synapse_role))
         # +watcha
 
         # It's the first time this user is logging in and the mapped mxid was
