@@ -88,13 +88,13 @@ class TestMappingProvider(OidcMappingProvider):
         """ watcha!
         return {"localpart": userinfo["username"], "display_name": None}
         !watcha """
-        # watcha+
+        # watcha+ op525
         return {
             "localpart": userinfo["username"],
             "display_name": None,
-            "emails": [userinfo["email"]],
-            "is_admin": userinfo["is_admin"],
-            "is_partner": userinfo["is_partner"],
+            "email": None,
+            "synapse_role": None,
+            "locale": None,
         }
         # +watcha
 
@@ -607,11 +607,6 @@ class OidcHandlerTestCase(HomeserverTestCase):
         userinfo = {
             "sub": "test_user",
             "username": "test_user",
-            # watcha+
-            "email": "test_user@test.com",
-            "is_admin": True,
-            "is_partner": False,
-            # +watcha
         }
         # The token doesn't matter with the default user mapping provider.
         token = {}
@@ -626,11 +621,6 @@ class OidcHandlerTestCase(HomeserverTestCase):
         userinfo = {
             "sub": 1234,
             "username": "test_user_2",
-            # watcha+
-            "email": "test_user_2@test.com",
-            "is_admin": False,
-            "is_partner": True,
-            # +watcha
         }
         mxid = self.get_success(
             self.handler._map_userinfo_to_user(
@@ -638,3 +628,19 @@ class OidcHandlerTestCase(HomeserverTestCase):
             )
         )
         self.assertEqual(mxid, "@test_user_2:test")
+
+        # watcha+ op525
+        userinfo = {
+            "sub": "test_user_3",
+            "username": "test_user_3",
+            "email": "test_user@test.com",
+            "synapse_role": "administrator",
+            "locale": "fr",
+        }
+        mxid = self.get_success(
+            self.handler._map_userinfo_to_user(
+                userinfo, token, "user-agent", "10.10.10.10"
+            )
+        )
+        self.assertEqual(mxid, "@test_user_3:test")
+        # +watcha
