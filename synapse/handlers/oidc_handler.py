@@ -932,7 +932,7 @@ class OidcHandler:
             localpart=localpart,
             default_display_name=attributes["display_name"],
             user_agent_ips=(user_agent, ip_address),
-            **optional_params, # watcha+ op524 op525
+            **optional_params,  # watcha+ op524 op525
         )
 
         await self._datastore.record_user_external_id(
@@ -944,6 +944,7 @@ class OidcHandler:
 """ watcha! op524
 UserAttribute = TypedDict(
     "UserAttribute", {"localpart": str, "display_name": Optional[str]}
+)
 !watcha """
 # watcha+ op524
 UserAttribute = TypedDict(
@@ -953,9 +954,10 @@ UserAttribute = TypedDict(
         "display_name": Optional[str],
         "email": Optional[str],
         "synapse_role": Optional[str],
-    }
-# +watcha
+        "locale": Optional[str],
+    },
 )
+# +watcha
 C = TypeVar("C")
 
 
@@ -1092,11 +1094,13 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         # watcha+ op524 op525
         email = userinfo.get("email")  # type: Optional[str]
         synapse_role = userinfo.get("synapse_role")  # type: Optional[str]
+        locale = userinfo.get("locale")  # type: Optional[str]
 
         return UserAttribute(
             localpart=localpart,
             display_name=display_name,
             email=email,
-            synapse_role=synapse_role
+            synapse_role=synapse_role,
+            locale=locale,
         )
         # +watcha
