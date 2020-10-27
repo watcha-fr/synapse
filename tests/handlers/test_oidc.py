@@ -92,9 +92,9 @@ class TestMappingProvider(OidcMappingProvider):
         return {
             "localpart": userinfo["username"],
             "display_name": None,
-            "email": None,
-            "synapse_role": None,
-            "locale": None,
+            "email": userinfo.get("email"),
+            "synapse_role": userinfo.get("synapse_role"),
+            "locale": userinfo.get("locale"),
         }
         # +watcha
 
@@ -634,7 +634,6 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "sub": "test_user_3",
             "username": "test_user_3",
             "email": "test_user@test.com",
-            "synapse_role": "administrator",
             "locale": "fr",
         }
         mxid = self.get_success(
@@ -643,4 +642,40 @@ class OidcHandlerTestCase(HomeserverTestCase):
             )
         )
         self.assertEqual(mxid, "@test_user_3:test")
+
+        userinfo = {
+            "sub": "test_user_4",
+            "username": "test_user_4",
+            "synapse_role": "administrator",
+        }
+        mxid = self.get_success(
+            self.handler._map_userinfo_to_user(
+                userinfo, token, "user-agent", "10.10.10.10"
+            )
+        )
+        self.assertEqual(mxid, "@test_user_4:test")
+
+        userinfo = {
+            "sub": "test_user_5",
+            "username": "test_user_5",
+            "synapse_role": "partner",
+        }
+        mxid = self.get_success(
+            self.handler._map_userinfo_to_user(
+                userinfo, token, "user-agent", "10.10.10.10"
+            )
+        )
+        self.assertEqual(mxid, "@test_user_5:test")
+
+        userinfo = {
+            "sub": "test_user_6",
+            "username": "test_user_6",
+            "synapse_role": "erroneous",
+        }
+        self.get_failure(
+            self.handler._map_userinfo_to_user(
+                userinfo, token, "user-agent", "10.10.10.10"
+            ),
+            MappingException,
+        )
         # +watcha

@@ -920,7 +920,6 @@ class OidcHandler:
             optional_params["bind_emails"] = [email]
 
         synapse_role = attributes["synapse_role"]
-        print("synapse_role:", synapse_role)
         if synapse_role == "administrator":
             optional_params["admin"] = True
         elif synapse_role == "partner":
