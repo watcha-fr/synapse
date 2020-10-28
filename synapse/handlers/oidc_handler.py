@@ -937,22 +937,56 @@ class OidcHandler:
                 # This mxid is taken
                 raise MappingException("mxid '{}' is already taken".format(user_id))
         else:
+            # watcha+ op525
+            optional_params = {}
+
+            email = attributes["email"]
+            if email:
+                optional_params["bind_emails"] = [email]
+
+            synapse_role = attributes["synapse_role"]
+            if synapse_role == "administrator":
+                optional_params["admin"] = True
+            elif synapse_role == "partner":
+                optional_params["make_partner"] = True
+            elif synapse_role is not None:
+                raise MappingException(
+                    "synapse_role ({}) must be either administrator, partner or None".format(
+                        synapse_role
+                    )
+                )
+            # +watcha
+
             # It's the first time this user is logging in and the mapped mxid was
             # not taken, register the user
             registered_user_id = await self._registration_handler.register_user(
                 localpart=localpart,
                 default_display_name=attributes["display_name"],
                 user_agent_ips=(user_agent, ip_address),
+                **optional_params,  # watcha+ op524 op525
             )
         await self._datastore.record_user_external_id(
             self._auth_provider_id, remote_user_id, registered_user_id,
         )
         return registered_user_id
 
-
+""" watcha! op524
 UserAttribute = TypedDict(
     "UserAttribute", {"localpart": str, "display_name": Optional[str]}
 )
+!watcha """
+# watcha+ op524
+UserAttribute = TypedDict(
+    "UserAttribute",
+    {
+        "localpart": str,
+        "display_name": Optional[str],
+        "email": Optional[str],
+        "synapse_role": Optional[str],
+        "locale": Optional[str],
+    },
+)
+# +watcha
 C = TypeVar("C")
 
 
@@ -1113,7 +1147,23 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             if display_name == "":
                 display_name = None
 
+        """ watcha! op524
         return UserAttribute(localpart=localpart, display_name=display_name)
+        !watcha """
+
+        # watcha+ op524 op525
+        email = userinfo.get("email")  # type: Optional[str]
+        synapse_role = userinfo.get("synapse_role")  # type: Optional[str]
+        locale = userinfo.get("locale")  # type: Optional[str]
+
+        return UserAttribute(
+            localpart=localpart,
+            display_name=display_name,
+            email=email,
+            synapse_role=synapse_role,
+            locale=locale,
+        )
+        # +watcha
 
     async def get_extra_attributes(self, userinfo: UserInfo, token: Token) -> JsonDict:
         extras = {}  # type: Dict[str, str]
