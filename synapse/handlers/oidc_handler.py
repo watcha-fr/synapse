@@ -912,17 +912,33 @@ class OidcHandler:
                 "mxid '{}' is already taken".format(user_id.to_string())
             )
 
+        # watcha+ op525
+        optional_params = {}
+
+        email = attributes["email"]
+        if email:
+            optional_params["bind_emails"] = [email]
+
+        synapse_role = attributes["synapse_role"]
+        if synapse_role == "administrator":
+            optional_params["admin"] = True
+        elif synapse_role == "partner":
+            optional_params["make_partner"] = True
+        elif synapse_role is not None:
+            raise MappingException(
+                "synapse_role ({}) must be either administrator, partner or None".format(
+                    synapse_role
+                )
+            )
+        # +watcha
+
         # It's the first time this user is logging in and the mapped mxid was
         # not taken, register the user
         registered_user_id = await self._registration_handler.register_user(
             localpart=localpart,
             default_display_name=attributes["display_name"],
             user_agent_ips=(user_agent, ip_address),
-            # watcha+ op524
-            bind_emails=attributes["emails"],
-            admin=attributes["is_admin"],
-            make_partner=attributes["is_partner"],
-            # +watcha
+            **optional_params,  # watcha+ op524 op525
         )
 
         await self._datastore.record_user_external_id(
@@ -934,6 +950,7 @@ class OidcHandler:
 """ watcha! op524
 UserAttribute = TypedDict(
     "UserAttribute", {"localpart": str, "display_name": Optional[str]}
+)
 !watcha """
 # watcha+ op524
 UserAttribute = TypedDict(
@@ -941,12 +958,12 @@ UserAttribute = TypedDict(
     {
         "localpart": str,
         "display_name": Optional[str],
-        "emails": Optional[List[str]],
-        "is_admin": Optional[bool],
-        "is_partner": Optional[bool],
-    }
-# +watcha
+        "email": Optional[str],
+        "synapse_role": Optional[str],
+        "locale": Optional[str],
+    },
 )
+# +watcha
 C = TypeVar("C")
 
 
@@ -1079,19 +1096,17 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         """ watcha! op524
         return UserAttribute(localpart=localpart, display_name=display_name)
         !watcha """
-        # watcha+ op524
-        email = userinfo.get("email")
-        emails = [email] if email else []  # type: Optional[List[str]]
 
-        is_admin = userinfo.get("is_admin", False)  # type: Optional[bool]
-
-        is_partner = userinfo.get("is_partner", False)  # type: Optional[bool]
+        # watcha+ op524 op525
+        email = userinfo.get("email")  # type: Optional[str]
+        synapse_role = userinfo.get("synapse_role")  # type: Optional[str]
+        locale = userinfo.get("locale")  # type: Optional[str]
 
         return UserAttribute(
             localpart=localpart,
             display_name=display_name,
-            emails=emails,
-            is_admin=is_admin,
-            is_partner=is_partner,
+            email=email,
+            synapse_role=synapse_role,
+            locale=locale,
         )
         # +watcha
