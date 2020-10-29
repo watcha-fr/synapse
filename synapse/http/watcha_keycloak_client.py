@@ -1,4 +1,5 @@
 from typing import List
+from urllib.parse import urljoin
 
 from synapse.http.client import SimpleHttpClient
 
@@ -8,8 +9,7 @@ class WatchaKeycloakClient(SimpleHttpClient):
     """
 
     def __init__(self, hs):
-        super(WatchaKeycloakClient, self).__init__(hs)
-
+        super().__init__(hs)
         self.server_url = hs.config.keycloak_server
         self.realm_name = hs.config.keycloak_realm
         self.service_account_name = hs.config.service_account_name
@@ -24,9 +24,7 @@ class WatchaKeycloakClient(SimpleHttpClient):
         """
 
         response = await self.get_json(
-            "{server_url}/admin/realms/{realm_name}/users".format(
-                server_url=self.server_url, realm_name=self.realm_name
-            ),
+            self._get_endpoint("admin/realms/{}/users".format(self.realm_name)),
             headers=await self._get_header(),
             args={"username": localpart},
         )
@@ -40,9 +38,7 @@ class WatchaKeycloakClient(SimpleHttpClient):
         """
 
         response = await self.get_json(
-            "{server_url}/admin/realms/{realm_name}/users".format(
-                server_url=self.server_url, realm_name=self.realm_name
-            ),
+            self._get_endpoint("admin/realms/{}/users".format(self.realm_name)),
             headers=await self._get_header(),
         )
         return response
@@ -59,14 +55,17 @@ class WatchaKeycloakClient(SimpleHttpClient):
         """
 
         response = await self.post_urlencoded_get_json(
-            uri="{server_url}/realms/{realm_name}/protocol/openid-connect/token".format(
-                server_url=self.server_url, realm_name=self.realm_name
+            uri=self._get_endpoint(
+                "realms/{}/protocol/openid-connect/token".format(self.realm_name)
             ),
             args={
                 "client_id": "admin-cli",
+                "grant_type": "password",
                 "username": self.service_account_name,
                 "password": self.service_account_password,
-                "grant_type": "password",
             },
         )
         return response["access_token"]
+
+    def _get_endpoint(self, path):
+        return urljoin(self.server_url, path)
