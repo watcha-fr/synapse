@@ -2250,7 +2250,7 @@ class WatchaMembershipNextcloudSharingTestCase(unittest.HomeserverTestCase):
         self.keycloak_client = self.watcha_room_nextcloud_mapping.keycloak_client
         self.nextcloud_client = self.watcha_room_nextcloud_mapping.nextcloud_client
 
-        self.keycloak_client.get_keycloak_user = simple_async_mock(
+        self.keycloak_client.get_user = simple_async_mock(
             return_value={"id": "1234", "username": "creator"},
         )
         self.nextcloud_client.add_user_to_group = simple_async_mock()

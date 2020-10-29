@@ -65,8 +65,8 @@ if TYPE_CHECKING:
 from pathlib import Path
 from requests import get, post, delete, auth, HTTPError
 from requests.auth import HTTPBasicAuth
-from synapse.http.watcha_keycloak_api import WatchaKeycloakClient
-from synapse.http.watcha_nextcloud_api import WatchaNextcloudClient
+from synapse.http.watcha_keycloak_client import WatchaKeycloakClient
+from synapse.http.watcha_nextcloud_client import WatchaNextcloudClient
 from synapse.types import get_localpart_from_id
 from synapse.util.watcha import generate_password
 
@@ -1472,7 +1472,7 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
             nextcloud_directory_path: the directory path of the Nextcloud folder to link with the room.
         """
 
-        keycloak_user_representation = await self.keycloak_client.get_keycloak_user(
+        keycloak_user_representation = await self.keycloak_client.get_user(
             get_localpart_from_id(requester_id)
         )
         nextcloud_requester = keycloak_user_representation["id"]
@@ -1525,7 +1525,7 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
         users_localpart = [get_localpart_from_id(user_id) for user_id in users_id]
 
         keycloak_users_representation = (
-            await self.keycloak_client.get_all_keycloak_users()
+            await self.keycloak_client.get_users()
         )
 
         for keycloak_user in keycloak_users_representation:
@@ -1558,7 +1558,7 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
     async def update_existing_nextcloud_share_for_user(
         self, user_id, group_name, membership
     ):
-        keycloak_user_representation = await self.keycloak_client.get_keycloak_user(
+        keycloak_user_representation = await self.keycloak_client.get_user(
             get_localpart_from_id(user_id)
         )
         nextcloud_username = keycloak_user_representation["id"]

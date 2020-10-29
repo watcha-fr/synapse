@@ -3,7 +3,7 @@ from ._base import Config
 DEFAULT_CONFIG = """
 # Nextcloud Integration configuration
 #
-# 'keycloak_serveur' corresponds to the Keycloak server URL
+# 'keycloak_server' corresponds to the Keycloak server URL
 # use to handle authentification process.
 #
 # 'keycloak_realm' is the name of your Keycloak realm 
@@ -21,7 +21,7 @@ DEFAULT_CONFIG = """
 # a shared secret for the service account.
 #
 #nextcloud_integration:
-#   keycloak_serveur: "https://example.com/auth"
+#   keycloak_server: "https://example.com/auth/"
 #   keycloak_realm: "example.com"
 #   nextcloud_server: "https://example.com/nextcloud"
 #   nextcloud_shared_secret: "YOUR_SHARED_SECRET"
@@ -37,7 +37,7 @@ class NextcloudIntegrationConfig(Config):
     def __init__(self, *args):
         super(NextcloudIntegrationConfig, self).__init__(*args)
 
-        self.keycloak_serveur = None
+        self.keycloak_server = None
         self.keycloak_realm = None
         self.nextcloud_server = None
         self.nextcloud_shared_secret = None
@@ -46,7 +46,7 @@ class NextcloudIntegrationConfig(Config):
 
     def read_config(self, config, **kwargs):
         nextcloud_integration_config = config.get("nextcloud_integration", {})
-        self.keycloak_serveur = nextcloud_integration_config.get("keycloak_serveur")
+        self.keycloak_server = nextcloud_integration_config.get("keycloak_server")
         self.keycloak_realm = nextcloud_integration_config.get("keycloak_realm")
         self.nextcloud_server = nextcloud_integration_config.get("nextcloud_server")
         self.nextcloud_shared_secret = nextcloud_integration_config.get(

@@ -2,8 +2,8 @@ from .. import unittest
 from mock import Mock
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.http.watcha_keycloak_api import WatchaKeycloakClient
-from synapse.http.watcha_nextcloud_api import WatchaNextcloudClient
+from synapse.http.watcha_keycloak_client import WatchaKeycloakClient
+from synapse.http.watcha_nextcloud_client import WatchaNextcloudClient
 from synapse.rest.client.v1 import login, room
 from synapse.rest import admin
 from synapse.types import get_localpart_from_id
@@ -51,10 +51,10 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
         self.helper.join(self.room_id, self.inviter, tok=inviter_tok)
 
         # Mock Keycloak client functions :
-        self.keycloak_client.get_keycloak_user = simple_async_mock(
+        self.keycloak_client.get_user = simple_async_mock(
             return_value={"id": "1234", "username": "creator"},
         )
-        self.keycloak_client.get_all_keycloak_users = simple_async_mock(
+        self.keycloak_client.get_users = simple_async_mock(
             return_value=[
                 {"id": "1234", "username": "creator"},
                 {"id": "56789", "username": "inviter"},
@@ -87,9 +87,9 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
         )
 
         # Verify that mocked functions has called once :
-        self.keycloak_client.get_keycloak_user.assert_called_once()
+        self.keycloak_client.get_user.assert_called_once()
         self.nextcloud_client.add_group.assert_called_once()
-        self.keycloak_client.get_all_keycloak_users.assert_called_once()
+        self.keycloak_client.get_users.assert_called_once()
         self.nextcloud_client.create_all_permission_share_with_group.assert_called_once()
 
         # Verify that mocked functions has called twice :
@@ -223,7 +223,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.keycloak_client.get_keycloak_user.assert_called_once()
+        self.keycloak_client.get_user.assert_called_once()
         self.nextcloud_client.add_user_to_group.assert_called_once()
         self.nextcloud_client.remove_from_group.assert_not_called()
 
@@ -234,7 +234,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.keycloak_client.get_keycloak_user.assert_called_once()
+        self.keycloak_client.get_user.assert_called_once()
         self.nextcloud_client.add_user_to_group.assert_called_once()
         self.nextcloud_client.remove_from_group.assert_not_called()
 
@@ -245,7 +245,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.keycloak_client.get_keycloak_user.assert_called_once()
+        self.keycloak_client.get_user.assert_called_once()
         self.nextcloud_client.remove_from_group.assert_called_once()
         self.nextcloud_client.add_user_to_group.assert_not_called()
 
@@ -256,7 +256,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.keycloak_client.get_keycloak_user.assert_called_once()
+        self.keycloak_client.get_user.assert_called_once()
         self.nextcloud_client.remove_from_group.assert_called_once()
         self.nextcloud_client.add_user_to_group.assert_not_called()
 
