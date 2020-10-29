@@ -11,12 +11,13 @@ class WatchaNextcloudClient(SimpleHttpClient):
     """ Interface for talking with Nextcloud APIs : https://doc.owncloud.com/server/admin_manual/configuration/user/user_provisioning_api.html
     """
 
+    SERVICE_ACCOUNT_NAME = "watcha_service_account"
+
     def __init__(self, hs):
         super(WatchaNextcloudClient, self).__init__(hs)
 
         self.nextcloud_shared_secret = hs.config.nextcloud_shared_secret
         self.nextcloud_server = hs.config.nextcloud_server
-        self.service_account_name = hs.config.service_account_name
         self.service_account_password = hs.config.service_account_password
 
     def _set_headers(self, username, password):
@@ -54,7 +55,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         """
 
         headers = self._set_headers(
-            self.service_account_name, self.service_account_password
+            self.SERVICE_ACCOUNT_NAME, self.service_account_password
         )
         response = await self.post_json_get_json(
             uri="{}/ocs/v1.php/cloud/groups".format(self.nextcloud_server),
@@ -82,7 +83,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         """
 
         headers = self._set_headers(
-            self.service_account_name, self.service_account_password
+            self.SERVICE_ACCOUNT_NAME, self.service_account_password
         )
         response = await self.delete_get_json(
             uri="{nextcloud_server}/ocs/v1.php/cloud/groups/{group_name}".format(
@@ -112,7 +113,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         """
 
         headers = self._set_headers(
-            self.service_account_name, self.service_account_password
+            self.SERVICE_ACCOUNT_NAME, self.service_account_password
         )
         response = await self.post_json_get_json(
             uri="{nextcloud_server}/ocs/v1.php/cloud/users/{user_id}/groups".format(
@@ -143,7 +144,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         """
 
         headers = self._set_headers(
-            self.service_account_name, self.service_account_password
+            self.SERVICE_ACCOUNT_NAME, self.service_account_password
         )
         response = await self.delete_get_json(
             uri="{nextcloud_server}/ocs/v1.php/cloud/users/{user_id}/groups".format(
@@ -170,7 +171,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         """
 
         headers = self._set_headers(
-            self.service_account_name, self.service_account_password
+            self.SERVICE_ACCOUNT_NAME, self.service_account_password
         )
         response = await self.get_json(
             uri="{nextcloud_server}/ocs/v1.php/cloud/users/{user_id}".format(

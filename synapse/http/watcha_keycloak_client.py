@@ -8,11 +8,12 @@ class WatchaKeycloakClient(SimpleHttpClient):
     """ Interface for talking with Keycloak APIs
     """
 
+    SERVICE_ACCOUNT_NAME = "watcha_service_account"
+
     def __init__(self, hs):
         super().__init__(hs)
         self.server_url = hs.config.keycloak_server
         self.realm_name = hs.config.keycloak_realm
-        self.service_account_name = hs.config.service_account_name
         self.service_account_password = hs.config.service_account_password
 
     async def get_user(self, localpart) -> dict:
@@ -61,7 +62,7 @@ class WatchaKeycloakClient(SimpleHttpClient):
             args={
                 "client_id": "admin-cli",
                 "grant_type": "password",
-                "username": self.service_account_name,
+                "username": self.SERVICE_ACCOUNT_NAME,
                 "password": self.service_account_password,
             },
         )

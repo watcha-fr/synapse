@@ -14,7 +14,6 @@ DEFAULT_CONFIG = """
 # 'nextcloud_shared_secret' is the secret used to allow Synapse 
 # to logged as a user and to call Nextcloud APIs.
 #
-# 'service_account_name' is the name of the account service use to 
 # handle operations between keycloak, Synapse and Nextcloud.
 #
 # 'service_account_password' is the password or maybe more 
@@ -25,7 +24,6 @@ DEFAULT_CONFIG = """
 #   keycloak_realm: "example.com"
 #   nextcloud_server: "https://example.com/nextcloud"
 #   nextcloud_shared_secret: "YOUR_SHARED_SECRET"
-#   service_account_name: "example_account_service"
 #   service_account_password: "YOUR_SHARED_SECRET"
 """
 
@@ -41,7 +39,6 @@ class NextcloudIntegrationConfig(Config):
         self.keycloak_realm = None
         self.nextcloud_server = None
         self.nextcloud_shared_secret = None
-        self.service_account_name = None
         self.service_account_password = None
 
     def read_config(self, config, **kwargs):
@@ -51,9 +48,6 @@ class NextcloudIntegrationConfig(Config):
         self.nextcloud_server = nextcloud_integration_config.get("nextcloud_server")
         self.nextcloud_shared_secret = nextcloud_integration_config.get(
             "nextcloud_shared_secret"
-        )
-        self.service_account_name = nextcloud_integration_config.get(
-            "service_account_name"
         )
         self.service_account_password = nextcloud_integration_config.get(
             "service_account_password"
