@@ -87,6 +87,7 @@ class RoomCreationHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.config = hs.config
+        self.invite_partner_handler = hs.get_invite_partner_handler()  # watcha+
 
         # Room state based off defined presets
         self._presets_dict = {
@@ -835,9 +836,7 @@ class RoomCreationHandler(BaseHandler):
                 requester.device_id,
             )
 
-            invite_3pid[
-                "user_id"
-            ] = await self.hs.get_watcha_invite_external_handler.invite(
+            invite_3pid["user_id"] = await self.invite_partner_handler.invite(
                 room_id=room_id,
                 inviter=requester.user,
                 inviter_device_id=str(requester.device_id),
@@ -1524,9 +1523,7 @@ class NextcloudHandler(BaseHandler):
         users_id = await self.store.get_users_in_room(room_id)
         users_localpart = [get_localpart_from_id(user_id) for user_id in users_id]
 
-        keycloak_users_representation = (
-            await self.keycloak_client.get_users()
-        )
+        keycloak_users_representation = await self.keycloak_client.get_users()
 
         for keycloak_user in keycloak_users_representation:
             localpart = keycloak_user["username"]

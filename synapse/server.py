@@ -83,7 +83,6 @@ from synapse.handlers.room import (
     RoomContextHandler,
     RoomCreationHandler,
     RoomShutdownHandler,
-    NextcloudHandler,  # watcha+ op553
 )
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberMasterHandler
@@ -123,18 +122,18 @@ from synapse.util.distributor import Distributor
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import random_string
 
+# watcha+
+from synapse.handlers.watcha_administration import AdministrationHandler
+from synapse.handlers.watcha_invite_partner import InvitePartnerHandler
+from synapse.handlers.room import NextcloudHandler
+
+# +watcha
+
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from synapse.handlers.oidc_handler import OidcHandler
     from synapse.handlers.saml_handler import SamlHandler
-
-# watcha+
-from synapse.handlers.room import WatchaRoomNextcloudMappingHandler
-from synapse.handlers.watcha_admin_handler import WatchaAdminHandler
-from synapse.handlers.watcha_invite_external import WatchaInviteExternalHandler
-
-# +watcha
 
 T = TypeVar("T", bound=Callable[..., Any])
 
@@ -706,12 +705,12 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     # watcha+
     @cache_in_self
-    def get_watcha_invite_external_handler(self) -> WatchaInviteExternalHandler:
-        return WatchaInviteExternalHandler(self)
+    def get_administration_handler(self) -> AdministrationHandler:
+        return AdministrationHandler(self)
 
     @cache_in_self
-    def get_watcha_admin_handler(self) -> WatchaAdminHandler:
-        return WatchaAdminHandler(self)
+    def get_invite_partner_handler(self) -> InvitePartnerHandler:
+        return InvitePartnerHandler(self)
 
     @cache_in_self
     def get_nextcloud_handler(self) -> NextcloudHandler:

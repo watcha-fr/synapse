@@ -2,32 +2,22 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import Membership
 from synapse.api.errors import SynapseError
-from ._base import BaseHandler
+from synapse.types import UserID, create_requester
 from synapse.util.watcha import (
-    generate_password,
-    send_registration_email,
     compute_registration_token,
     create_display_inviter_name,
+    generate_password,
+    send_registration_email,
 )
-from synapse.types import UserID, create_requester
-from synapse.api.constants import Membership
+
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
 
-class WatchaInviteExternalHandler(BaseHandler):
-
-    # convert an email address into a user_id in a deterministic way
-    def _gen_user_id_from_email(self, email):
-        # user_id must be lowercase (and it's OK to consider email as case-insensitive)
-        local_part, domain = email.lower().split("@")
-        user_id = local_part.replace('+', '//') + "/" + domain
-        logger.debug(
-            "gen_user_id_from_email: email=%s leads to user_id=%s", email, user_id
-        )
-        return user_id
+class InvitePartnerHandler(BaseHandler):
 
     async def invite(self, room_id, inviter, inviter_device_id, invitee):
 
@@ -114,7 +104,7 @@ class WatchaInviteExternalHandler(BaseHandler):
                     raise SynapseError(400, "Registration error: {0}".format(detail))
 
         # log invitation in DB
-        await  self.store.insert_partner_invitation(
+        await self.store.insert_partner_invitation(
             partner_user_id=full_user_id,
             inviter_user_id=inviter,
             inviter_device_id=inviter_device_id,
@@ -144,7 +134,17 @@ class WatchaInviteExternalHandler(BaseHandler):
             template_name=template_name,
             token=token,
             inviter_name=inviter_name,
-            full_name=None
+            full_name=None,
         )
 
         return full_user_id
+
+    # convert an email address into a user_id in a deterministic way
+    def _gen_user_id_from_email(self, email):
+        # user_id must be lowercase (and it's OK to consider email as case-insensitive)
+        local_part, domain = email.lower().split("@")
+        user_id = local_part.replace("+", "//") + "/" + domain
+        logger.debug(
+            "gen_user_id_from_email: email=%s leads to user_id=%s", email, user_id
+        )
+        return user_id

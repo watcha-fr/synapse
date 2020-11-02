@@ -874,6 +874,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         self.auth = hs.get_auth()
         # watcha+
         self.store = hs.get_datastore()
+        self.invite_partner_handler = hs.get_invite_partner_handler()
         self.nextcloud_handler = hs.get_nextcloud_handler()
         # +watcha
 
@@ -943,7 +944,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 requester.device_id,
             )
 
-            content["user_id"] = await self.watcha_invite_external_handler.invite(
+            content["user_id"] = await self.invite_partner_handler.invite(
                 room_id=room_id,
                 inviter=requester.user,
                 inviter_device_id=str(requester.device_id),
