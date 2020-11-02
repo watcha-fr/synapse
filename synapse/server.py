@@ -83,6 +83,7 @@ from synapse.handlers.room import (
     RoomContextHandler,
     RoomCreationHandler,
     RoomShutdownHandler,
+    NextcloudHandler,  # watcha+ op553
 )
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberMasterHandler
@@ -713,7 +714,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return WatchaAdminHandler(self)
 
     @cache_in_self
-    def get_watcha_room_nextcloud_mapping_handler(self) -> WatchaRoomNextcloudMappingHandler:
-        return WatchaRoomNextcloudMappingHandler(self)
+    def get_nextcloud_handler(self) -> NextcloudHandler:
+        return NextcloudHandler(self)
 
     # +watcha

@@ -1,4 +1,3 @@
-from .. import unittest
 from mock import Mock
 
 from synapse.api.errors import Codes, SynapseError
@@ -7,6 +6,7 @@ from synapse.http.watcha_nextcloud_client import WatchaNextcloudClient
 from synapse.rest.client.v1 import login, room
 from synapse.rest import admin
 from synapse.types import get_localpart_from_id
+from tests.unittest import HomeserverTestCase
 
 
 def simple_async_mock(return_value=None, raises=None):
@@ -19,9 +19,7 @@ def simple_async_mock(return_value=None, raises=None):
     return Mock(side_effect=cb)
 
 
-class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
-    """ Tests the WatchaRoomNextcloudMappingHandler. """
-
+class NextcloudHandlerTestCase(HomeserverTestCase):
     servlets = [
         admin.register_servlets,
         login.register_servlets,
@@ -30,12 +28,10 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
-        self.watcha_room_nextcloud_mapping = (
-            hs.get_watcha_room_nextcloud_mapping_handler()
-        )
+        self.nextcloud_handler = hs.get_nextcloud_handler()
 
-        self.keycloak_client = self.watcha_room_nextcloud_mapping.keycloak_client
-        self.nextcloud_client = self.watcha_room_nextcloud_mapping.nextcloud_client
+        self.keycloak_client = self.nextcloud_handler.keycloak_client
+        self.nextcloud_client = self.nextcloud_handler.nextcloud_client
 
         # Create a room with two users :
         self.creator = self.register_user("creator", "pass", admin=True)
@@ -77,7 +73,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
 
     def test_set_new_room_nextcloud_mapping(self):
         self.get_success(
-            self.watcha_room_nextcloud_mapping.update_room_nextcloud_mapping(
+            self.nextcloud_handler.update_room_nextcloud_mapping(
                 self.room_id, self.creator, "/directory"
             )
         )
@@ -116,7 +112,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
         self.assertEqual(old_mapped_directory, "/directory")
 
         self.get_success(
-            self.watcha_room_nextcloud_mapping.update_room_nextcloud_mapping(
+            self.nextcloud_handler.update_room_nextcloud_mapping(
                 self.room_id, self.creator, "/directory2"
             )
         )
@@ -143,7 +139,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
         )
 
         self.get_failure(
-            self.watcha_room_nextcloud_mapping.update_room_nextcloud_mapping(
+            self.nextcloud_handler.update_room_nextcloud_mapping(
                 self.room_id, self.creator, "/directory2"
             ),
             SynapseError,
@@ -156,9 +152,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
             )
         )
         self.get_success(
-            self.watcha_room_nextcloud_mapping.delete_room_nextcloud_mapping(
-                self.room_id
-            )
+            self.nextcloud_handler.delete_room_nextcloud_mapping(self.room_id)
         )
 
         mapped_directory = self.get_success(
@@ -173,9 +167,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
 
         with self.assertLogs("synapse.handlers.room", level="WARN") as cm:
             self.get_success(
-                self.watcha_room_nextcloud_mapping.add_room_users_to_nextcloud_group(
-                    self.room_id
-                )
+                self.nextcloud_handler.add_room_users_to_nextcloud_group(self.room_id)
             )
 
         self.assertIn(
@@ -197,9 +189,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
 
         with self.assertLogs("synapse.handlers.room", level="WARN") as cm:
             self.get_success(
-                self.watcha_room_nextcloud_mapping.add_room_users_to_nextcloud_group(
-                    self.room_id
-                )
+                self.nextcloud_handler.add_room_users_to_nextcloud_group(self.room_id)
             )
 
         self.assertIn(
@@ -218,7 +208,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
 
     def test_update_existing_nextcloud_share_on_invite_membership(self):
         self.get_success(
-            self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user(
+            self.nextcloud_handler.update_existing_nextcloud_share_for_user(
                 "@second_inviter:test", self.room_id, "invite"
             )
         )
@@ -227,9 +217,9 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
         self.nextcloud_client.add_user_to_group.assert_called_once()
         self.nextcloud_client.remove_from_group.assert_not_called()
 
-    def test_update_existing_nextcloud_share_on_invite_membership(self):
+    def test_update_existing_nextcloud_share_on_join_membership(self):
         self.get_success(
-            self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user(
+            self.nextcloud_handler.update_existing_nextcloud_share_for_user(
                 "@second_inviter:test", self.room_id, "join"
             )
         )
@@ -240,7 +230,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
 
     def test_update_existing_nextcloud_share_on_leave_membership(self):
         self.get_success(
-            self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user(
+            self.nextcloud_handler.update_existing_nextcloud_share_for_user(
                 "@second_inviter:test", self.room_id, "leave"
             )
         )
@@ -251,7 +241,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
 
     def test_update_existing_nextcloud_share_on_kick_membership(self):
         self.get_success(
-            self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user(
+            self.nextcloud_handler.update_existing_nextcloud_share_for_user(
                 "@second_inviter:test", self.room_id, "kick"
             )
         )
@@ -266,7 +256,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
 
         with self.assertLogs("synapse.handlers.room", level="WARN") as cm:
             self.get_success(
-                self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user(
+                self.nextcloud_handler.update_existing_nextcloud_share_for_user(
                     second_inviter, self.room_id, "invite"
                 )
             )
@@ -284,7 +274,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
 
         with self.assertLogs("synapse.handlers.room", level="WARN") as cm:
             self.get_success(
-                self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user(
+                self.nextcloud_handler.update_existing_nextcloud_share_for_user(
                     second_inviter, self.room_id, "leave"
                 )
             )

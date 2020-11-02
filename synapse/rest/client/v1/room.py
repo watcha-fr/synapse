@@ -105,9 +105,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         self.auth = hs.get_auth()
         # watcha+
         self.store = hs.get_datastore()
-        self.watcha_room_nextcloud_mapping_handler = (
-            hs.get_watcha_room_nextcloud_mapping_handler()
-        )
+        self.nextcloud_handler = hs.get_nextcloud_handler()
         # +watcha
 
     def register(self, http_server):
@@ -224,7 +222,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                         if membership in ["join", "leave"]
                         else state_key
                     )
-                    await self.watcha_room_nextcloud_mapping_handler.update_existing_nextcloud_share_for_user(
+                    await self.nextcloud_handler.update_existing_nextcloud_share_for_user(
                         user, room_id, membership
                     )
                 # +watcha
@@ -289,7 +287,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     requester_id = requester.user.to_string()
 
                     if not nextcloud_url:
-                        await self.watcha_room_nextcloud_mapping_handler.delete_room_nextcloud_mapping(
+                        await self.nextcloud_handler.delete_room_nextcloud_mapping(
                             room_id
                         )
                     else:
@@ -305,7 +303,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 
                         nextcloud_directory_path = url_query["dir"][0]
 
-                        await self.watcha_room_nextcloud_mapping_handler.update_room_nextcloud_mapping(
+                        await self.nextcloud_handler.update_room_nextcloud_mapping(
                             room_id, requester_id, nextcloud_directory_path
                         )
                 # +watcha
@@ -390,9 +388,7 @@ class JoinRoomAliasServlet(TransactionRestServlet):
         self.auth = hs.get_auth()
         # watcha+
         self.store = hs.get_datastore()
-        self.watcha_room_nextcloud_mapping_handler = (
-            hs.get_watcha_room_nextcloud_mapping_handler()
-        )
+        self.nextcloud_handler = hs.get_nextcloud_handler()
         # +watcha
 
     def register(self, http_server):
@@ -451,7 +447,7 @@ class JoinRoomAliasServlet(TransactionRestServlet):
             room_id
         )
         if mapped_directory:
-            await self.watcha_room_nextcloud_mapping_handler.update_existing_nextcloud_share_for_user(
+            await self.nextcloud_handler.update_existing_nextcloud_share_for_user(
                 requester.user.to_string(), room_id, "join"
             )
         # +watcha
@@ -877,11 +873,8 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
         # watcha+
-        self.watcha_invite_external_handler = hs.get_watcha_invite_external_handler()
-        self.watcha_room_nextcloud_mapping_handler = (
-            hs.get_watcha_room_nextcloud_mapping_handler()
-        )
         self.store = hs.get_datastore()
+        self.nextcloud_handler = hs.get_nextcloud_handler()
         # +watcha
 
     def register(self, http_server):
@@ -1002,7 +995,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 if membership_action in ["join", "leave"]
                 else content["user_id"]
             )
-            await self.watcha_room_nextcloud_mapping_handler.update_existing_nextcloud_share_for_user(
+            await self.nextcloud_handler.update_existing_nextcloud_share_for_user(
                 user, room_id, membership_action
             )
         # +watcha
