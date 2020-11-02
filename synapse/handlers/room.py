@@ -1468,7 +1468,7 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
 
         if mapped_directory_path:
             all_shares = await self.nextcloud_client.get_all_shares(
-                nextcloud_requester, {"path": mapped_directory_path, "reshares": "true"}
+                nextcloud_requester, mapped_directory_path
             )
 
             share_id = ""

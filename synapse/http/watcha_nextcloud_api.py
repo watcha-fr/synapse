@@ -185,12 +185,12 @@ class WatchaNextcloudClient(SimpleHttpClient):
 
         return response["ocs"]["data"]
 
-    async def get_all_shares(self, requester, args={}):
-        """ Get informations about a known share
+    async def get_all_shares(self, requester, path):
+        """ Get informations about all shares and reshares on a folder
         
         Args:
             requester: the user who want to remove the share
-            args: request attributes to filter the search.
+            path: folder's path.
 
         Status codes:
             100: successful
@@ -199,11 +199,14 @@ class WatchaNextcloudClient(SimpleHttpClient):
             997: Unauthorised
         """
 
-        headers = self._set_headers(requester, self.nextcloud_shared_secret)
+        headers = self._set_headers(
+            self.service_account_name, self.service_account_password
+        )
         response = await self.get_json(
-            uri="{nextcloud_server}/ocs/v2.php/apps/files_sharing/api/v1/shares/".format(
+            uri="{nextcloud_server}/ocs/v2.php/apps/watcha_integrator/api/v1/shares".format(
                 nextcloud_server=self.nextcloud_server
             ),
+            args={"requester": requester, "path": path, "reshare": "true",},
             headers=headers,
         )
 
@@ -227,9 +230,11 @@ class WatchaNextcloudClient(SimpleHttpClient):
             404: File or folder couldn’t be shared
         """
 
-        headers = self._set_headers(requester, self.nextcloud_shared_secret)
+        headers = self._set_headers(
+            self.service_account_name, self.service_account_password
+        )
         response = await self.post_json_get_json(
-            uri="{}/ocs/v2.php/apps/files_sharing/api/v1/shares".format(
+            uri="{}/ocs/v2.php/apps/watcha_integrator/api/v1/shares".format(
                 self.nextcloud_server
             ),
             headers=headers,
@@ -238,6 +243,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
                 "shareType": 1,
                 "shareWith": group_name,
                 "permissions": 31,
+                "requester": requester,
             },
         )
 
@@ -257,12 +263,15 @@ class WatchaNextcloudClient(SimpleHttpClient):
             404: Share couldn’t be deleted.
         """
 
-        headers = self._set_headers(requester, self.nextcloud_shared_secret)
+        headers = self._set_headers(
+            self.service_account_name, self.service_account_password
+        )
         response = await self.delete_get_json(
-            uri="{nextcloud_server}/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}".format(
+            uri="{nextcloud_server}/ocs/v2.php/apps/watcha_integrator/api/v1/shares/{share_id}".format(
                 nextcloud_server=self.nextcloud_server, share_id=share_id
             ),
             headers=headers,
+            json_body={"requester": requester},
         )
 
         self._raise_for_status(
