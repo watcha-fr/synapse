@@ -1,1 +1,1 @@
-ALTER TABLE room_nextcloud_mapping ADD COLUMN share_id INTEGER;
+ALTER TABLE room_nextcloud_mapping ADD COLUMN share_id INTEGER NOT NULL;
