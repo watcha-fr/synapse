@@ -252,6 +252,8 @@ class WatchaNextcloudClient(SimpleHttpClient):
             response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_CREATE_NEW_SHARE
         )
 
+        return response["ocs"]["data"]["id"]
+
     async def delete_share(self, requester, share_id):
         """Remove a given Nextcloud share
 
