@@ -176,34 +176,6 @@ class WatchaNextcloudClient(SimpleHttpClient):
 
         return response["ocs"]["data"]
 
-    async def get_all_shares(self, requester, path):
-        """ Get informations about all shares and reshares on a folder
-        
-        Args:
-            requester: the user who want to remove the share
-            path: folder's path.
-
-        Status codes:
-            100: successful
-            400: Not a directory
-            404: Couldn’t fetch shares or file doesn’t exist
-            997: Unauthorised
-        """
-
-        response = await self.get_json(
-            uri="{nextcloud_server}/ocs/v2.php/apps/watcha_integrator/api/v1/shares".format(
-                nextcloud_server=self.nextcloud_server
-            ),
-            args={"requester": requester, "path": path, "reshare": "true",},
-            headers=self._headers,
-        )
-
-        self._raise_for_status(
-            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_GET_SHARES
-        )
-
-        return response["ocs"]["data"]
-
     async def create_all_permission_share_with_group(self, requester, path, group_name):
         """ Share an existing file or folder with all permissions for a group.
 
