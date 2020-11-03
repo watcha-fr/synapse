@@ -173,11 +173,12 @@ class WatchaRoomEventsStoreTestCase(unittest.HomeserverTestCase):
         self.store = hs.get_datastore()
         self.room_id = "room1"
         self.directory_path = "/directory"
+        self.share_id = 1
 
         # Set mapping between a room and a nextcloud directory :
         yield defer.ensureDeferred(
             self.store.set_room_mapping_with_nextcloud_directory(
-                self.room_id, self.directory_path
+                self.room_id, self.directory_path, self.share_id
             )
         )
 
@@ -189,9 +190,13 @@ class WatchaRoomEventsStoreTestCase(unittest.HomeserverTestCase):
         mapped_room = yield defer.ensureDeferred(
             self.store.get_roomID_from_nextcloud_directory_path(self.directory_path)
         )
+        share_id = yield defer.ensureDeferred(
+            self.store.get_nextcloud_share_id_from_roomID(self.room_id)
+        )
 
         self.assertEquals(mapped_directory, self.directory_path)
         self.assertEquals(mapped_room, self.room_id)
+        self.assertEquals(share_id, self.share_id)
 
     @defer.inlineCallbacks
     def test_delete_room_nextcloud_mapping(self):
@@ -204,12 +209,20 @@ class WatchaRoomEventsStoreTestCase(unittest.HomeserverTestCase):
 
         self.assertIsNone(mapped_directory)
 
+        share_id = yield defer.ensureDeferred(
+            self.store.get_nextcloud_share_id_from_roomID(self.room_id)
+        )
+
+        self.assertIsNone(share_id)
+
     @defer.inlineCallbacks
     def test_update_room_mapping_with_nextcloud_directory(self):
         new_directory_path = "/directory2"
+        new_share_id = 2
+
         yield defer.ensureDeferred(
             self.store.set_room_mapping_with_nextcloud_directory(
-                self.room_id, new_directory_path
+                self.room_id, new_directory_path, new_share_id
             )
         )
         mapped_directory = yield defer.ensureDeferred(
@@ -217,6 +230,12 @@ class WatchaRoomEventsStoreTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEquals(mapped_directory, new_directory_path)
+
+        share_id = yield defer.ensureDeferred(
+            self.store.get_nextcloud_share_id_from_roomID(self.room_id)
+        )
+
+        self.assertEquals(share_id, new_share_id)
 
 
 # +watcha
