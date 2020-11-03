@@ -64,15 +64,12 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
         # Mock Nextcloud client functions :
         self.nextcloud_client.add_group = simple_async_mock()
         self.nextcloud_client.delete_group = simple_async_mock()
-        self.nextcloud_client.get_all_shares = simple_async_mock(
-            return_value=[{"id": "share1", "share_with": self.room_id}]
-        )
         self.nextcloud_client.get_user = simple_async_mock()
         self.nextcloud_client.add_user_to_group = simple_async_mock()
         self.nextcloud_client.remove_from_group = simple_async_mock()
         self.nextcloud_client.delete_share = simple_async_mock()
-        self.nextcloud_client.create_all_permission_share_with_group = (
-            simple_async_mock()
+        self.nextcloud_client.create_all_permission_share_with_group = simple_async_mock(
+            return_value=1
         )
 
     def test_set_new_room_nextcloud_mapping(self):
@@ -86,6 +83,10 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
             self.store.get_nextcloud_directory_path_from_roomID(self.room_id)
         )
 
+        share_id = self.get_success(
+            self.store.get_nextcloud_share_id_from_roomID(self.room_id)
+        )
+
         # Verify that mocked functions has called once :
         self.keycloak_client.get_keycloak_user.assert_called_once()
         self.nextcloud_client.add_group.assert_called_once()
@@ -97,15 +98,15 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
         self.assertEquals(self.nextcloud_client.add_user_to_group.call_count, 2)
 
         # Verify that mocked functions has not called :
-        self.nextcloud_client.get_all_shares.assert_not_called()
         self.nextcloud_client.delete_share.assert_not_called()
 
         self.assertEqual(mapped_directory, "/directory")
+        self.assertEqual(share_id, 1)
 
     def test_update_existing_room_nextcloud_mapping(self):
         self.get_success(
             self.store.set_room_mapping_with_nextcloud_directory(
-                self.room_id, "/directory"
+                self.room_id, "/directory", 2
             )
         )
 
@@ -113,7 +114,12 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
             self.store.get_nextcloud_directory_path_from_roomID(self.room_id)
         )
 
+        old_share_id = self.get_success(
+            self.store.get_nextcloud_share_id_from_roomID(self.room_id)
+        )
+
         self.assertEqual(old_mapped_directory, "/directory")
+        self.assertEqual(old_share_id, 2)
 
         self.get_success(
             self.watcha_room_nextcloud_mapping.update_room_nextcloud_mapping(
@@ -125,34 +131,20 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
             self.store.get_nextcloud_directory_path_from_roomID(self.room_id)
         )
 
+        new_share_id = self.get_success(
+            self.store.get_nextcloud_share_id_from_roomID(self.room_id)
+        )
+
         # Verify that mocked functions has called :
-        self.nextcloud_client.get_all_shares.assert_called()
         self.nextcloud_client.delete_share.assert_called()
 
         self.assertEqual(mapped_directory, "/directory2")
-
-    def test_update_existing_room_nextcloud_mapping_with_no_existing_share(self):
-        self.get_success(
-            self.store.set_room_mapping_with_nextcloud_directory(
-                self.room_id, "/directory"
-            )
-        )
-
-        self.nextcloud_client.get_all_shares = simple_async_mock(
-            return_value=[{"id": "share1", "share_with": "room1"}]
-        )
-
-        self.get_failure(
-            self.watcha_room_nextcloud_mapping.update_room_nextcloud_mapping(
-                self.room_id, self.creator, "/directory2"
-            ),
-            SynapseError,
-        )
+        self.assertEqual(new_share_id, 1)
 
     def test_delete_existing_room_nextcloud_mapping(self):
         self.get_success(
             self.store.set_room_mapping_with_nextcloud_directory(
-                self.room_id, "/directory"
+                self.room_id, "/directory", 2
             )
         )
         self.get_success(
@@ -165,8 +157,13 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
             self.store.get_nextcloud_directory_path_from_roomID(self.room_id)
         )
 
+        share_id = self.get_success(
+            self.store.get_nextcloud_share_id_from_roomID(self.room_id)
+        )
+
         self.nextcloud_client.delete_group.assert_called()
         self.assertIsNone(mapped_directory)
+        self.assertIsNone(share_id)
 
     def test_add_user_to_nextcloud_group_without_nextcloud_account(self):
         self.nextcloud_client.get_user = simple_async_mock(raises=SynapseError)
