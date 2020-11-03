@@ -1472,7 +1472,7 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
         )
 
         await self.store.set_room_mapping_with_nextcloud_directory(
-            room_id, nextcloud_directory_path, share_id
+            room_id, nextcloud_directory_path, new_share_id
         )
 
     async def add_room_users_to_nextcloud_group(self, room_id):
