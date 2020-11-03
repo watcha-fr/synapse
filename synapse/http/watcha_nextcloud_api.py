@@ -20,7 +20,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         self.service_account_password = hs.config.service_account_password
 
     @property
-    def _headers(self, username, password):
+    def _headers(self):
         return {
             "OCS-APIRequest": ["true"],
             "Authorization": [
