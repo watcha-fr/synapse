@@ -1481,37 +1481,17 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
 
         await self.add_room_users_to_nextcloud_group(room_id)
 
-        mapped_directory_path = await self.store.get_nextcloud_directory_path_from_roomID(
-            room_id
-        )
+        old_share_id = await self.store.get_nextcloud_share_id_from_roomID(room_id)
 
-        if mapped_directory_path:
-            all_shares = await self.nextcloud_client.get_all_shares(
-                nextcloud_requester, mapped_directory_path
-            )
+        if old_share_id:
+            await self.nextcloud_client.delete_share(nextcloud_requester, old_share_id)
 
-            share_id = ""
-            for share in all_shares:
-                if share["share_with"] == room_id:
-                    share_id = share["id"]
-                    break
-
-            if not share_id:
-                raise SynapseError(
-                    400,
-                    "Unable to retrieve share id between Nextcloud group {group_name} and Nextcloud directory {directory_path}".format(
-                        group_name=room_id, directory_path=mapped_directory_path
-                    ),
-                )
-
-            await self.nextcloud_client.delete_share(nextcloud_requester, share_id)
-
-        await self.nextcloud_client.create_all_permission_share_with_group(
+        new_share_id = await self.nextcloud_client.create_all_permission_share_with_group(
             nextcloud_requester, nextcloud_directory_path, room_id
         )
 
         await self.store.set_room_mapping_with_nextcloud_directory(
-            room_id, nextcloud_directory_path
+            room_id, nextcloud_directory_path, share_id
         )
 
     async def add_room_users_to_nextcloud_group(self, room_id):
