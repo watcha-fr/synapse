@@ -43,7 +43,10 @@ class ModuleApi:
         self._auth = hs.get_auth()
         self._auth_handler = auth_handler
 
+    """ watcha!
     def get_user_by_req(self, req, allow_guest=False):
+    !watcha """
+    def get_user_by_req(self, req, allow_guest=False, allow_partner=False): # watcha+
         """Check the access_token provided for a request
 
         Args:
@@ -51,6 +54,7 @@ class ModuleApi:
             allow_guest (bool): True if guest users should be allowed. If this
                 is False, and the access token is for a guest user, an
                 AuthError will be thrown
+            allow_partner (bool): True if partner users should be allowed. # watcha+
         Returns:
             twisted.internet.defer.Deferred[synapse.types.Requester]:
                 the requester for this request
@@ -58,7 +62,10 @@ class ModuleApi:
             synapse.api.errors.AuthError: if no user by that token exists,
                 or the token is invalid.
         """
+        """ watcha!
         return self._auth.get_user_by_req(req, allow_guest)
+        !watcha """
+        return self._auth.get_user_by_req(req, allow_guest, allow_partner) # watcha+
 
     def get_qualified_user_id(self, username):
         """Qualify a user id, if necessary

@@ -63,6 +63,7 @@ MutableStateMap = MutableMapping[StateKey, T]
 JsonDict = Dict[str, Any]
 
 
+""" watcha!
 class Requester(
     namedtuple(
         "Requester",
@@ -76,6 +77,23 @@ class Requester(
         ],
     )
 ):
+!watcha """
+# watcha+
+class Requester(
+    namedtuple(
+        "Requester",
+        [
+            "user",
+            "access_token_id",
+            "is_guest",
+            "shadow_banned",
+            "device_id",
+            "is_partner",
+            "app_service",
+        ],
+    )
+):
+# +watcha
     """
     Represents the user making a request
 
@@ -102,6 +120,7 @@ class Requester(
             "is_guest": self.is_guest,
             "shadow_banned": self.shadow_banned,
             "device_id": self.device_id,
+            "is_partner": self.is_partner,  # watcha+
             "app_server_id": self.app_service.id if self.app_service else None,
         }
 
@@ -127,6 +146,7 @@ class Requester(
             is_guest=input["is_guest"],
             shadow_banned=input["shadow_banned"],
             device_id=input["device_id"],
+            is_partner=input["is_partner"],  # watcha+
             app_service=appservice,
         )
 
@@ -137,6 +157,7 @@ def create_requester(
     is_guest=False,
     shadow_banned=False,
     device_id=None,
+    is_partner=False,  # watcha+
     app_service=None,
 ):
     """
@@ -156,9 +177,22 @@ def create_requester(
     """
     if not isinstance(user_id, UserID):
         user_id = UserID.from_string(user_id)
+    """ watcha!
     return Requester(
         user_id, access_token_id, is_guest, shadow_banned, device_id, app_service
     )
+    !watcha """
+    # watcha+
+    return Requester(
+        user_id,
+        access_token_id,
+        is_guest,
+        shadow_banned,
+        device_id,
+        is_partner,
+        app_service,
+    )  
+    # +watcha
 
 
 def get_domain_from_id(string):

@@ -35,6 +35,8 @@ from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import JsonDict, UserID
 from synapse.util.threepids import canonicalise_email
 
+from synapse.http.server import set_cors_headers # watcha+ op479
+
 logger = logging.getLogger(__name__)
 
 
@@ -189,6 +191,22 @@ class LoginRestServlet(RestServlet):
             login_submission.get("user"),
         )
         identifier = convert_client_dict_legacy_fields_to_identifier(login_submission)
+
+        # watcha+
+        # added temporarly for watcha op322:
+        # the iOS app (and android also ?) sends email as user identifier
+        import re
+        if (identifier["type"] == "m.id.user" and
+            "user" in identifier and
+            re.match('[^@]+@[^@]+\.[^@]+', identifier["user"])):
+            logger.info("Converting user login into third-party for Watcha")
+            login_submission["identifier"] = {
+                "type": "m.id.thirdparty",
+                "medium": "email",
+                "address": identifier["user"],
+            }
+            identifier = login_submission["identifier"]
+        # +watcha
 
         # convert phone type identifiers to generic threepids
         if identifier["type"] == "m.id.phone":
@@ -394,6 +412,7 @@ class BaseSSORedirectServlet(RestServlet):
     PATTERNS = client_patterns("/login/(cas|sso)/redirect", v1=True)
 
     async def on_GET(self, request: SynapseRequest):
+        set_cors_headers(request) # watcha+ op479
         args = request.args
         if b"redirectUrl" not in args:
             return 400, "Redirect URL not specified for SSO auth"
