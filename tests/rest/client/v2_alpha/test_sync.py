@@ -386,6 +386,14 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self._check_unread_count(0)
 
         # Join the new user and check that this doesn't increase the unread count.
+        # watcha+
+        self.helper.invite(
+            self.room_id,
+            self.user_id,
+            self.user2,
+            tok=self.tok,
+        )
+        # +watcha
         self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
         self._check_unread_count(0)
 
