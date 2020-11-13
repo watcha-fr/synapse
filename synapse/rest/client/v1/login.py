@@ -69,7 +69,6 @@ class LoginRestServlet(RestServlet):
 
         self.auth_handler = self.hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
-        self.handlers = hs.get_handlers()
         self._well_known_builder = WellKnownBuilder(hs)
         self._address_ratelimiter = Ratelimiter(
             clock=hs.get_clock(),
@@ -112,6 +111,8 @@ class LoginRestServlet(RestServlet):
         flows.extend(
             ({"type": t} for t in self.auth_handler.get_supported_login_types())
         )
+
+        flows.append({"type": LoginRestServlet.APPSERVICE_TYPE})
 
         return 200, {"flows": flows}
 

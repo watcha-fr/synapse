@@ -116,11 +116,11 @@ class RoomCreateRestServlet(TransactionRestServlet):
 class RoomStateEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
         super().__init__(hs)
-        self.handlers = hs.get_handlers()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.message_handler = hs.get_message_handler()
         self.auth = hs.get_auth()
+        self.watcha_room_handler = hs.get_watcha_room_handler() # watcha+
 
     def register(self, http_server):
         # /room/$roomid/state/$eventtype
@@ -282,11 +282,11 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     requester_id = requester.user.to_string()
 
                     if not nextcloud_URL:
-                        await self.handlers.watcha_room_handler.delete_room_mapping_with_nextcloud_directory(
+                        await self.watcha_room_handler.delete_room_mapping_with_nextcloud_directory(
                             room_id, requester_id
                         )
                     else:
-                        await self.handlers.watcha_room_handler.add_room_mapping_with_nextcloud_directory(
+                        await self.watcha_room_handler.add_room_mapping_with_nextcloud_directory(
                             room_id, requester_id, nextcloud_URL
                         )
                 # +watcha
@@ -841,7 +841,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         super().__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
-        self.handlers = hs.get_handlers()  # watcha+
+        self.watcha_invite_external_handler = hs.get_watcha_invite_external_handler()  # watcha+
 
     def register(self, http_server):
         # /rooms/$roomid/[invite|join|leave]
@@ -909,7 +909,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 requester.device_id,
             )
 
-            content["user_id"] = await self.handlers.invite_external_handler.invite(
+            content["user_id"] = await self.watcha_invite_external_handler.invite(
                 room_id=room_id,
                 inviter=requester.user,
                 inviter_device_id=str(requester.device_id),
@@ -970,7 +970,6 @@ class RoomMembershipRestServlet(TransactionRestServlet):
 class RoomRedactEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
         super().__init__(hs)
-        self.handlers = hs.get_handlers()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
 
@@ -1082,7 +1081,7 @@ class RoomAliasListServlet(RestServlet):
     def __init__(self, hs: "synapse.server.HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.directory_handler = hs.get_handlers().directory_handler
+        self.directory_handler = hs.get_directory_handler()
 
     async def on_GET(self, request, room_id):
         requester = await self.auth.get_user_by_req(request)
@@ -1099,7 +1098,7 @@ class SearchRestServlet(RestServlet):
 
     def __init__(self, hs):
         super().__init__()
-        self.handlers = hs.get_handlers()
+        self.search_handler = hs.get_search_handler()
         self.auth = hs.get_auth()
 
     async def on_POST(self, request):
@@ -1108,9 +1107,7 @@ class SearchRestServlet(RestServlet):
         content = parse_json_object_from_request(request)
 
         batch = parse_string(request, "next_batch")
-        results = await self.handlers.search_handler.search(
-            requester.user, content, batch
-        )
+        results = await self.search_handler.search(requester.user, content, batch)
 
         return 200, results
 
