@@ -48,7 +48,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
             federation_registry=self.mock_registry,
         )
 
-        self.handler = hs.get_handlers().directory_handler
+        self.handler = hs.get_directory_handler()
 
         self.store = hs.get_datastore()
 
@@ -110,7 +110,7 @@ class TestCreateAlias(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        self.handler = hs.get_handlers().directory_handler
+        self.handler = hs.get_directory_handler()
 
         # Create user
         self.admin_user = self.register_user("admin", "pass", admin=True)
@@ -177,7 +177,7 @@ class TestDeleteAlias(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
-        self.handler = hs.get_handlers().directory_handler
+        self.handler = hs.get_directory_handler()
         self.state_handler = hs.get_state_handler()
 
         # Create user
@@ -297,7 +297,7 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
-        self.handler = hs.get_handlers().directory_handler
+        self.handler = hs.get_directory_handler()
         self.state_handler = hs.get_state_handler()
 
         # Create user
@@ -450,7 +450,7 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code, channel.result)
 
         self.room_list_handler = hs.get_room_list_handler()
-        self.directory_handler = hs.get_handlers().directory_handler
+        self.directory_handler = hs.get_directory_handler()
 
         return hs
 
