@@ -94,6 +94,5 @@ class HomeServerConfig(RootConfig):
         TracerConfig,
         WorkerConfig,
         RedisConfig,
-        FederationConfig,
         NextcloudIntegrationConfig # watcha+ op544
     ]

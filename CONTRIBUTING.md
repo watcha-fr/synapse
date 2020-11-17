@@ -17,9 +17,9 @@ https://help.github.com/articles/using-pull-requests/) to ask us to pull your
 changes into our repo.
 
 Some other points to follow:
- 
+
  * Please base your changes on the `develop` branch.
-  
+
  * Please follow the [code style requirements](#code-style).
 
  * Please include a [changelog entry](#changelog) with each PR.
@@ -46,7 +46,7 @@ locally. You'll need python 3.6 or later, and to install a number of tools:
 
 ```
 # Install the dependencies
-pip install -U black flake8 flake8-comprehensions isort
+pip install -e ".[lint]"
 
 # Run the linter script
 ./scripts-dev/lint.sh
@@ -62,6 +62,10 @@ run-time:
 ```
 ./scripts-dev/lint.sh path/to/file1.py path/to/file2.py path/to/folder
 ```
+
+You can also provided the `-d` option, which will lint the files that have been
+changed since the last git commit. This will often be significantly faster than
+linting the whole codebase.
 
 Before pushing new changes, ensure they don't produce linting errors. Commit any
 files that were corrected.

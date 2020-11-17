@@ -47,14 +47,14 @@ room_keys = {
 
 class E2eRoomKeysHandlerTestCase(unittest.TestCase):
     def __init__(self, *args, **kwargs):
-        super(E2eRoomKeysHandlerTestCase, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.hs = None  # type: synapse.server.HomeServer
         self.handler = None  # type: synapse.handlers.e2e_keys.E2eRoomKeysHandler
 
     @defer.inlineCallbacks
     def setUp(self):
         self.hs = yield utils.setup_test_homeserver(
-            self.addCleanup, handlers=None, replication_layer=mock.Mock()
+            self.addCleanup, replication_layer=mock.Mock()
         )
         self.handler = synapse.handlers.e2e_room_keys.E2eRoomKeysHandler(self.hs)
         self.local_user = "@boris:" + self.hs.hostname

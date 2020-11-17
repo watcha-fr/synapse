@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 
 class TransactionRestServlet(RestServlet):
     def __init__(self, hs):
-        super(TransactionRestServlet, self).__init__()
+        super().__init__()
         self.txns = HttpTransactionCache(hs)
 
 
@@ -65,7 +65,7 @@ class RoomCreateRestServlet(TransactionRestServlet):
     # No PATTERN; we have custom dispatch rules here
 
     def __init__(self, hs):
-        super(RoomCreateRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self._room_creation_handler = hs.get_room_creation_handler()
         self.auth = hs.get_auth()
 
@@ -115,12 +115,12 @@ class RoomCreateRestServlet(TransactionRestServlet):
 # TODO: Needs unit testing for generic events
 class RoomStateEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
-        super(RoomStateEventRestServlet, self).__init__(hs)
-        self.handlers = hs.get_handlers()
+        super().__init__(hs)
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.message_handler = hs.get_message_handler()
         self.auth = hs.get_auth()
+        self.watcha_room_handler = hs.get_watcha_room_handler() # watcha+
 
     def register(self, http_server):
         # /room/$roomid/state/$eventtype
@@ -282,7 +282,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     requester_id = requester.user.to_string()
 
                     if not nextcloud_url:
-                        await self.handlers.watcha_room_handler.delete_room_mapping_with_nextcloud_directory(
+                        await self.watcha_room_handler.delete_room_mapping_with_nextcloud_directory(
                             room_id
                         )
                     else:
@@ -296,7 +296,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 
                         nextcloud_directory_path = url_query["dir"][0]
 
-                        await self.handlers.watcha_room_handler.update_nextcloud_mapping(
+                        await self.watcha_room_handler.update_nextcloud_mapping(
                             room_id, requester_id, nextcloud_directory_path
                         )
                 # +watcha
@@ -318,7 +318,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 # TODO: Needs unit testing for generic events + feedback
 class RoomSendEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
-        super(RoomSendEventRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
 
@@ -376,7 +376,7 @@ class RoomSendEventRestServlet(TransactionRestServlet):
 # TODO: Needs unit testing for room ID + alias joins
 class JoinRoomAliasServlet(TransactionRestServlet):
     def __init__(self, hs):
-        super(JoinRoomAliasServlet, self).__init__(hs)
+        super().__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
 
@@ -446,7 +446,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
     PATTERNS = client_patterns("/publicRooms$", v1=True)
 
     def __init__(self, hs):
-        super(PublicRoomListRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self.hs = hs
         self.auth = hs.get_auth()
 
@@ -561,9 +561,10 @@ class RoomMemberListRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/members$", v1=True)
 
     def __init__(self, hs):
-        super(RoomMemberListRestServlet, self).__init__()
+        super().__init__()
         self.message_handler = hs.get_message_handler()
         self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
 
     async def on_GET(self, request, room_id):
         # TODO support Pagination stream API (limit/tokens)
@@ -578,7 +579,7 @@ class RoomMemberListRestServlet(RestServlet):
         if at_token_string is None:
             at_token = None
         else:
-            at_token = StreamToken.from_string(at_token_string)
+            at_token = await StreamToken.from_string(self.store, at_token_string)
 
         # let you filter down on particular memberships.
         # XXX: this may not be the best shape for this API - we could pass in a filter
@@ -612,7 +613,7 @@ class JoinedRoomMemberListRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/joined_members$", v1=True)
 
     def __init__(self, hs):
-        super(JoinedRoomMemberListRestServlet, self).__init__()
+        super().__init__()
         self.message_handler = hs.get_message_handler()
         self.auth = hs.get_auth()
 
@@ -631,9 +632,10 @@ class RoomMessageListRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/messages$", v1=True)
 
     def __init__(self, hs):
-        super(RoomMessageListRestServlet, self).__init__()
+        super().__init__()
         self.pagination_handler = hs.get_pagination_handler()
         self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
 
     async def on_GET(self, request, room_id):
         """ watcha!
@@ -644,7 +646,9 @@ class RoomMessageListRestServlet(RestServlet):
             request, allow_guest=True, allow_partner=True
         )
         # +watcha
-        pagination_config = PaginationConfig.from_request(request, default_limit=10)
+        pagination_config = await PaginationConfig.from_request(
+            self.store, request, default_limit=10
+        )
         as_client_event = b"raw" not in request.args
         filter_str = parse_string(request, b"filter", encoding="utf-8")
         if filter_str:
@@ -677,7 +681,7 @@ class RoomStateRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/state$", v1=True)
 
     def __init__(self, hs):
-        super(RoomStateRestServlet, self).__init__()
+        super().__init__()
         self.message_handler = hs.get_message_handler()
         self.auth = hs.get_auth()
 
@@ -705,9 +709,10 @@ class RoomInitialSyncRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/initialSync$", v1=True)
 
     def __init__(self, hs):
-        super(RoomInitialSyncRestServlet, self).__init__()
+        super().__init__()
         self.initial_sync_handler = hs.get_initial_sync_handler()
         self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
 
     async def on_GET(self, request, room_id):
         """ watcha!
@@ -718,7 +723,7 @@ class RoomInitialSyncRestServlet(RestServlet):
             request, allow_guest=True, allow_partner=True
         )
         # +watcha
-        pagination_config = PaginationConfig.from_request(request)
+        pagination_config = await PaginationConfig.from_request(self.store, request)
         content = await self.initial_sync_handler.room_initial_sync(
             room_id=room_id, requester=requester, pagin_config=pagination_config
         )
@@ -731,7 +736,7 @@ class RoomEventServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(RoomEventServlet, self).__init__()
+        super().__init__()
         self.clock = hs.get_clock()
         self.event_handler = hs.get_event_handler()
         self._event_serializer = hs.get_event_client_serializer()
@@ -763,7 +768,7 @@ class RoomEventContextServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(RoomEventContextServlet, self).__init__()
+        super().__init__()
         self.clock = hs.get_clock()
         self.room_context_handler = hs.get_room_context_handler()
         self._event_serializer = hs.get_event_client_serializer()
@@ -817,7 +822,7 @@ class RoomEventContextServlet(RestServlet):
 
 class RoomForgetRestServlet(TransactionRestServlet):
     def __init__(self, hs):
-        super(RoomForgetRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
 
@@ -843,10 +848,10 @@ class RoomForgetRestServlet(TransactionRestServlet):
 # TODO: Needs unit testing
 class RoomMembershipRestServlet(TransactionRestServlet):
     def __init__(self, hs):
-        super(RoomMembershipRestServlet, self).__init__(hs)
+        super().__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
-        self.handlers = hs.get_handlers()  # watcha+
+        self.watcha_invite_external_handler = hs.get_watcha_invite_external_handler()  # watcha+
 
     def register(self, http_server):
         # /rooms/$roomid/[invite|join|leave]
@@ -914,7 +919,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 requester.device_id,
             )
 
-            content["user_id"] = await self.handlers.invite_external_handler.invite(
+            content["user_id"] = await self.watcha_invite_external_handler.invite(
                 room_id=room_id,
                 inviter=requester.user,
                 inviter_device_id=str(requester.device_id),
@@ -974,8 +979,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
 
 class RoomRedactEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
-        super(RoomRedactEventRestServlet, self).__init__(hs)
-        self.handlers = hs.get_handlers()
+        super().__init__(hs)
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
 
@@ -1023,7 +1027,7 @@ class RoomTypingRestServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(RoomTypingRestServlet, self).__init__()
+        super().__init__()
         self.presence_handler = hs.get_presence_handler()
         self.typing_handler = hs.get_typing_handler()
         self.auth = hs.get_auth()
@@ -1087,7 +1091,7 @@ class RoomAliasListServlet(RestServlet):
     def __init__(self, hs: "synapse.server.HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.directory_handler = hs.get_handlers().directory_handler
+        self.directory_handler = hs.get_directory_handler()
 
     async def on_GET(self, request, room_id):
         requester = await self.auth.get_user_by_req(request)
@@ -1103,8 +1107,8 @@ class SearchRestServlet(RestServlet):
     PATTERNS = client_patterns("/search$", v1=True)
 
     def __init__(self, hs):
-        super(SearchRestServlet, self).__init__()
-        self.handlers = hs.get_handlers()
+        super().__init__()
+        self.search_handler = hs.get_search_handler()
         self.auth = hs.get_auth()
 
     async def on_POST(self, request):
@@ -1113,9 +1117,7 @@ class SearchRestServlet(RestServlet):
         content = parse_json_object_from_request(request)
 
         batch = parse_string(request, "next_batch")
-        results = await self.handlers.search_handler.search(
-            requester.user, content, batch
-        )
+        results = await self.search_handler.search(requester.user, content, batch)
 
         return 200, results
 
@@ -1124,7 +1126,7 @@ class JoinedRoomsRestServlet(RestServlet):
     PATTERNS = client_patterns("/joined_rooms$", v1=True)
 
     def __init__(self, hs):
-        super(JoinedRoomsRestServlet, self).__init__()
+        super().__init__()
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 
