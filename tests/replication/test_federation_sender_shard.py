@@ -45,7 +45,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         new event.
         """
         mock_client = Mock(spec=["put_json"])
-        mock_client.put_json.side_effect = lambda *_, **__: make_awaitable({})
+        mock_client.put_json.return_value = make_awaitable({})
 
         self.make_worker_hs(
             "synapse.app.federation_sender",
@@ -73,7 +73,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         new events.
         """
         mock_client1 = Mock(spec=["put_json"])
-        mock_client1.put_json.side_effect = lambda *_, **__: make_awaitable({})
+        mock_client1.put_json.return_value = make_awaitable({})
         self.make_worker_hs(
             "synapse.app.federation_sender",
             {
@@ -85,7 +85,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         )
 
         mock_client2 = Mock(spec=["put_json"])
-        mock_client2.put_json.side_effect = lambda *_, **__: make_awaitable({})
+        mock_client2.put_json.return_value = make_awaitable({})
         self.make_worker_hs(
             "synapse.app.federation_sender",
             {
@@ -136,7 +136,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         new typing EDUs.
         """
         mock_client1 = Mock(spec=["put_json"])
-        mock_client1.put_json.side_effect = lambda *_, **__: make_awaitable({})
+        mock_client1.put_json.return_value = make_awaitable({})
         self.make_worker_hs(
             "synapse.app.federation_sender",
             {
@@ -148,7 +148,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         )
 
         mock_client2 = Mock(spec=["put_json"])
-        mock_client2.put_json.side_effect = lambda *_, **__: make_awaitable({})
+        mock_client2.put_json.return_value = make_awaitable({})
         self.make_worker_hs(
             "synapse.app.federation_sender",
             {
@@ -207,7 +207,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
     def create_room_with_remote_server(self, user, token, remote_server="other_server"):
         room = self.helper.create_room_as(user, tok=token)
         store = self.hs.get_datastore()
-        federation = self.hs.get_handlers().federation_handler
+        federation = self.hs.get_federation_handler()
 
         prev_event_ids = self.get_success(store.get_latest_event_ids_in_room(room))
         room_version = self.get_success(store.get_room_version(room))
@@ -226,7 +226,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         }
 
         builder = factory.for_room_version(room_version, event_dict)
-        join_event = self.get_success(builder.build(prev_event_ids))
+        join_event = self.get_success(builder.build(prev_event_ids, None))
 
         self.get_success(federation.on_send_join_request(remote_server, join_event))
         self.replicate()

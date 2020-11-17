@@ -38,7 +38,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
     SHARE_PRIVATE_WORKING_SET = 500
 
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(UserDirectoryBackgroundUpdateStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self.server_name = hs.hostname
 
@@ -559,21 +559,16 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             user_id_tuples: iterable of 2-tuple of user IDs.
         """
 
-        def _add_users_who_share_room_txn(txn):
-            self.db_pool.simple_upsert_many_txn(
-                txn,
-                table="users_who_share_private_rooms",
-                key_names=["user_id", "other_user_id", "room_id"],
-                key_values=[
-                    (user_id, other_user_id, room_id)
-                    for user_id, other_user_id in user_id_tuples
-                ],
-                value_names=(),
-                value_values=None,
-            )
-
-        await self.db_pool.runInteraction(
-            "add_users_who_share_room", _add_users_who_share_room_txn
+        await self.db_pool.simple_upsert_many(
+            table="users_who_share_private_rooms",
+            key_names=["user_id", "other_user_id", "room_id"],
+            key_values=[
+                (user_id, other_user_id, room_id)
+                for user_id, other_user_id in user_id_tuples
+            ],
+            value_names=(),
+            value_values=None,
+            desc="add_users_who_share_room",
         )
 
     async def add_users_in_public_rooms(
@@ -587,19 +582,13 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             user_ids
         """
 
-        def _add_users_in_public_rooms_txn(txn):
-
-            self.db_pool.simple_upsert_many_txn(
-                txn,
-                table="users_in_public_rooms",
-                key_names=["user_id", "room_id"],
-                key_values=[(user_id, room_id) for user_id in user_ids],
-                value_names=(),
-                value_values=None,
-            )
-
-        await self.db_pool.runInteraction(
-            "add_users_in_public_rooms", _add_users_in_public_rooms_txn
+        await self.db_pool.simple_upsert_many(
+            table="users_in_public_rooms",
+            key_names=["user_id", "room_id"],
+            key_values=[(user_id, room_id) for user_id in user_ids],
+            value_names=(),
+            value_values=None,
+            desc="add_users_in_public_rooms",
         )
 
     async def delete_all_from_user_dir(self) -> None:
@@ -643,7 +632,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
     SHARE_PRIVATE_WORKING_SET = 500
 
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(UserDirectoryStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
     async def remove_from_user_dir(self, user_id: str) -> None:
         def _remove_from_user_dir_txn(txn):

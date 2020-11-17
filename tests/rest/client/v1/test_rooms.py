@@ -32,6 +32,7 @@ from synapse.types import JsonDict, RoomAlias, UserID
 from synapse.util.stringutils import random_string
 
 from tests import unittest
+from tests.test_utils import make_awaitable
 
 from synapse.api.errors import SynapseError  # watcha+
 
@@ -49,7 +50,10 @@ class RoomBase(unittest.HomeserverTestCase):
             "red", http_client=None, federation_client=Mock(),
         )
 
-        self.hs.get_federation_handler = Mock(return_value=Mock())
+        self.hs.get_federation_handler = Mock()
+        self.hs.get_federation_handler.return_value.maybe_backfill = Mock(
+            return_value=make_awaitable(None)
+        )
 
         async def _insert_client_ip(*args, **kwargs):
             return None
@@ -907,6 +911,7 @@ class RoomMessageListTestCase(RoomBase):
         first_token = self.get_success(
             store.get_topological_token_for_event(first_event_id)
         )
+        first_token_str = self.get_success(first_token.to_string(store))
 
         # Send a second message in the room, which won't be removed, and which we'll
         # use as the marker to purge events before.
@@ -914,6 +919,7 @@ class RoomMessageListTestCase(RoomBase):
         second_token = self.get_success(
             store.get_topological_token_for_event(second_event_id)
         )
+        second_token_str = self.get_success(second_token.to_string(store))
 
         # Send a third event in the room to ensure we don't fall under any edge case
         # due to our marker being the latest forward extremity in the room.
@@ -923,7 +929,11 @@ class RoomMessageListTestCase(RoomBase):
         request, channel = self.make_request(
             "GET",
             "/rooms/%s/messages?access_token=x&from=%s&dir=b&filter=%s"
-            % (self.room_id, second_token, json.dumps({"types": [EventTypes.Message]})),
+            % (
+                self.room_id,
+                second_token_str,
+                json.dumps({"types": [EventTypes.Message]}),
+            ),
         )
         self.render(request)
         self.assertEqual(channel.code, 200, channel.json_body)
@@ -938,7 +948,7 @@ class RoomMessageListTestCase(RoomBase):
             pagination_handler._purge_history(
                 purge_id=purge_id,
                 room_id=self.room_id,
-                token=second_token,
+                token=second_token_str,
                 delete_local_events=True,
             )
         )
@@ -948,7 +958,11 @@ class RoomMessageListTestCase(RoomBase):
         request, channel = self.make_request(
             "GET",
             "/rooms/%s/messages?access_token=x&from=%s&dir=b&filter=%s"
-            % (self.room_id, second_token, json.dumps({"types": [EventTypes.Message]})),
+            % (
+                self.room_id,
+                second_token_str,
+                json.dumps({"types": [EventTypes.Message]}),
+            ),
         )
         self.render(request)
         self.assertEqual(channel.code, 200, channel.json_body)
@@ -962,7 +976,11 @@ class RoomMessageListTestCase(RoomBase):
         request, channel = self.make_request(
             "GET",
             "/rooms/%s/messages?access_token=x&from=%s&dir=b&filter=%s"
-            % (self.room_id, first_token, json.dumps({"types": [EventTypes.Message]})),
+            % (
+                self.room_id,
+                first_token_str,
+                json.dumps({"types": [EventTypes.Message]}),
+            ),
         )
         self.render(request)
         self.assertEqual(channel.code, 200, channel.json_body)
@@ -2108,9 +2126,15 @@ class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
             self.room_owner, tok=self.room_owner_tok
         )
 
-        self.handlers = hs.get_handlers().watcha_room_nextcloud_mapping_handler
-        self.handlers.update_room_nextcloud_mapping = simple_async_mock()
-        self.handlers.delete_room_nextcloud_mapping = simple_async_mock()
+        self.watcha_room_nextcloud_mapping = (
+            hs.get_watcha_room_nextcloud_mapping_handler()
+        )
+        self.watcha_room_nextcloud_mapping.update_room_nextcloud_mapping = (
+            simple_async_mock()
+        )
+        self.watcha_room_nextcloud_mapping.delete_room_nextcloud_mapping = (
+            simple_async_mock()
+        )
         self.nextcloud_directory_url = (
             "https://test/nextcloud/apps/files/?dir=/directory"
         )
@@ -2131,7 +2155,9 @@ class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
             {"nextcloudShare": self.nextcloud_directory_url}
         )
 
-        self.assertTrue(self.handlers.update_room_nextcloud_mapping.called)
+        self.assertTrue(
+            self.watcha_room_nextcloud_mapping.update_room_nextcloud_mapping.called
+        )
         self.assertEquals(200, channel.code)
 
     def test_delete_existing_room_nextcloud_mapping(self):
@@ -2141,7 +2167,7 @@ class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
         channel = self.send_room_nextcloud_mapping_event({"nextcloudShare": ""})
 
         self.assertTrue(
-            self.handlers.delete_room_nextcloud_mapping.called
+            self.watcha_room_nextcloud_mapping.delete_room_nextcloud_mapping.called
         )
         self.assertEquals(200, channel.code)
 
@@ -2153,7 +2179,9 @@ class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
             {"nextcloudShare": "https://test/nextcloud/apps/files/?dir=/directory2"}
         )
 
-        self.assertTrue(self.handlers.update_room_nextcloud_mapping.called)
+        self.assertTrue(
+            self.watcha_room_nextcloud_mapping.update_room_nextcloud_mapping.called
+        )
         self.assertEquals(200, channel.code)
 
     def test_create_new_room_nextcloud_mapping_without_nextcloudShare_attribute(self):
@@ -2161,7 +2189,9 @@ class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
             {"nextcloud": self.nextcloud_directory_url}
         )
 
-        self.assertFalse(self.handlers.update_room_nextcloud_mapping.called)
+        self.assertFalse(
+            self.watcha_room_nextcloud_mapping.update_room_nextcloud_mapping.called
+        )
         self.assertRaises(SynapseError)
         self.assertEquals(400, channel.code)
         self.assertEquals(
@@ -2174,7 +2204,9 @@ class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
             {"nextcloudShare": "https://test/nextcloud/apps/files/?file=brandbook.pdf"}
         )
 
-        self.assertFalse(self.handlers.update_room_nextcloud_mapping.called)
+        self.assertFalse(
+            self.watcha_room_nextcloud_mapping.update_room_nextcloud_mapping.called
+        )
         self.assertRaises(SynapseError)
         self.assertEquals(400, channel.code)
         self.assertEquals(
@@ -2212,7 +2244,7 @@ class WatchaMembershipNextcloudSharingTestCase(unittest.HomeserverTestCase):
 
         # mock some functions of WatchaRoomNextcloudMappingHandler
         self.watcha_room_nextcloud_mapping = (
-            hs.get_handlers().watcha_room_nextcloud_mapping_handler
+            hs.get_watcha_room_nextcloud_mapping_handler()
         )
 
         self.keycloak_client = self.watcha_room_nextcloud_mapping.keycloak_client
@@ -2274,14 +2306,14 @@ class WatchaMembershipNextcloudSharingTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, channel.code)
 
     def test_update_nextcloud_share_with_an_unmapped_room(self):
-        self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user = simple_async_mock()
-        
+        self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user = (
+            simple_async_mock()
+        )
+
         room_id = self.helper.create_room_as(self.creator, tok=self.creator_tok)
 
-        self.helper.invite(
-            room_id, self.creator, self.inviter, tok=self.creator_tok
-        )
-        
+        self.helper.invite(room_id, self.creator, self.inviter, tok=self.creator_tok)
+
         self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user.assert_not_called()
 
 

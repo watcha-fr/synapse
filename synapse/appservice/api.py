@@ -14,12 +14,13 @@
 # limitations under the License.
 import logging
 import urllib
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from prometheus_client import Counter
 
 from synapse.api.constants import EventTypes, ThirdPartyEntityKind
 from synapse.api.errors import CodeMessageException
+from synapse.events import EventBase
 from synapse.events.utils import serialize_event
 from synapse.http.client import SimpleHttpClient
 from synapse.types import JsonDict, ThirdPartyInstanceID
@@ -88,12 +89,12 @@ class ApplicationServiceApi(SimpleHttpClient):
     """
 
     def __init__(self, hs):
-        super(ApplicationServiceApi, self).__init__(hs)
+        super().__init__(hs)
         self.clock = hs.get_clock()
 
         self.protocol_meta_cache = ResponseCache(
             hs, "as_protocol_meta", timeout_ms=HOUR_IN_MS
-        )
+        )  # type: ResponseCache[Tuple[str, str]]
 
     async def query_user(self, service, user_id):
         if service.url is None:
@@ -178,7 +179,7 @@ class ApplicationServiceApi(SimpleHttpClient):
                 urllib.parse.quote(protocol),
             )
             try:
-                info = await self.get_json(uri, {})
+                info = await self.get_json(uri)
 
                 if not _is_valid_3pe_metadata(info):
                     logger.warning(
@@ -201,7 +202,13 @@ class ApplicationServiceApi(SimpleHttpClient):
         key = (service.id, protocol)
         return await self.protocol_meta_cache.wrap(key, _get)
 
-    async def push_bulk(self, service, events, txn_id=None):
+    async def push_bulk(
+        self,
+        service: "ApplicationService",
+        events: List[EventBase],
+        ephemeral: List[JsonDict],
+        txn_id: Optional[int] = None,
+    ):
         if service.url is None:
             return True
 
@@ -211,15 +218,19 @@ class ApplicationServiceApi(SimpleHttpClient):
             logger.warning(
                 "push_bulk: Missing txn ID sending events to %s", service.url
             )
-            txn_id = str(0)
-        txn_id = str(txn_id)
+            txn_id = 0
 
-        uri = service.url + ("/transactions/%s" % urllib.parse.quote(txn_id))
+        uri = service.url + ("/transactions/%s" % urllib.parse.quote(str(txn_id)))
+
+        # Never send ephemeral events to appservices that do not support it
+        if service.supports_ephemeral:
+            body = {"events": events, "de.sorunome.msc2409.ephemeral": ephemeral}
+        else:
+            body = {"events": events}
+
         try:
             await self.put_json(
-                uri=uri,
-                json_body={"events": events},
-                args={"access_token": service.hs_token},
+                uri=uri, json_body=body, args={"access_token": service.hs_token},
             )
             sent_transactions_counter.labels(service.id).inc()
             sent_events_counter.labels(service.id).inc(len(events))

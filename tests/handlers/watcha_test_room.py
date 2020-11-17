@@ -31,7 +31,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
         self.watcha_room_nextcloud_mapping = (
-            hs.get_handlers().watcha_room_nextcloud_mapping_handler
+            hs.get_watcha_room_nextcloud_mapping_handler()
         )
 
         self.keycloak_client = self.watcha_room_nextcloud_mapping.keycloak_client
