@@ -1477,7 +1477,9 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
         )
         nextcloud_requester = keycloak_user_representation["id"]
 
-        await self.nextcloud_client.add_group(room_id)
+        # A pattern is added in front of room_id in order to recognized easily Watcha groups on NC.
+        # This pattern correspond to the stdout of (echo -n watcha | md5sum) command
+        await self.nextcloud_client.add_group("c4d96a06b758a7ed12f897690828e414_{}".format(room_id))
 
         await self.add_room_users_to_nextcloud_group(room_id)
 
