@@ -22,7 +22,7 @@ import synapse.rest.admin
 from synapse.api.constants import EventTypes
 from synapse.rest.client.v1 import login, room
 from synapse.storage import prepare_database
-from synapse.types import Requester, UserID
+from synapse.types import UserID, create_requester
 
 from tests.unittest import HomeserverTestCase
 
@@ -38,10 +38,7 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
 
         # Create a test user and room
         self.user = UserID("alice", "test")
-        """ watcha!
-        self.requester = Requester(self.user, None, False, False, None, None)
-        !watcha """
-        self.requester = Requester(self.user, None, False, False, None, False, None) # watcha+
+        self.requester = create_requester(self.user)
         info, _ = self.get_success(self.room_creator.create_room(self.requester, {}))
         self.room_id = info["room_id"]
 
@@ -269,10 +266,7 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         self.user = UserID.from_string(self.user1)
         # +watcha
         self.token1 = self.login("user1", "password")
-        """ watcha!
-        self.requester = Requester(self.user, None, False, False, None, None)
-        !watcha """
-        self.requester = Requester(self.user, None, False, False, None, False, None)  # watcha+
+        self.requester = create_requester(self.user)
         info, _ = self.get_success(self.room_creator.create_room(self.requester, {}))
         self.room_id = info["room_id"]
         self.event_creator = homeserver.get_event_creation_handler()

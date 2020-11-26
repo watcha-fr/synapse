@@ -44,7 +44,7 @@ from synapse.logging.context import (
     set_current_context,
 )
 from synapse.server import HomeServer
-from synapse.types import Requester, UserID, create_requester
+from synapse.types import UserID, create_requester
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 from tests.server import (
@@ -54,7 +54,7 @@ from tests.server import (
     render,
     setup_test_homeserver,
 )
-from tests.test_utils import event_injection
+from tests.test_utils import event_injection, setup_awaitable_errors
 from tests.test_utils.logging_setup import setup_logging
 from tests.utils import default_config, setupdb
 
@@ -118,6 +118,10 @@ class TestCase(unittest.TestCase):
                     return ret
 
                 logging.getLogger().setLevel(level)
+
+            # Trial messes with the warnings configuration, thus this has to be
+            # done in the context of an individual TestCase.
+            self.addCleanup(setup_awaitable_errors())
 
             return orig()
 
@@ -546,20 +550,35 @@ class HomeserverTestCase(TestCase):
         return result
 
     """ watcha!
-    def register_user(self, username, password, admin=False):
+    def register_user(
+        self,
+        username: str,
+        password: str,
+        admin: Optional[bool] = False,
+        displayname: Optional[str] = None,
+    ) -> str:
     !watcha """
-    def register_user(self, username, password, admin=False, is_partner=False): # watcha+
+    # watcha+
+    def register_user(
+        self,
+        username: str,
+        password: str,
+        admin: Optional[bool] = False,
+        displayname: Optional[str] = None,
+        is_partner: Optional[bool] = False, # watcha+
+    ) -> str:
+    # +watcha
         """
         Register a user. Requires the Admin API be registered.
 
         Args:
-            username (bytes/unicode): The user part of the new user.
-            password (bytes/unicode): The password of the new user.
-            admin (bool): Whether the user should be created as an admin
-            or not.
+            username: The user part of the new user.
+            password: The password of the new user.
+            admin: Whether the user should be created as an admin or not.
+            displayname: The displayname of the new user.
 
         Returns:
-            The MXID of the new user (unicode).
+            The MXID of the new user.
         """
         self.hs.config.registration_shared_secret = "shared"
 
@@ -583,6 +602,7 @@ class HomeserverTestCase(TestCase):
             {
                 "nonce": nonce,
                 "username": username,
+                "displayname": displayname,
                 "password": password,
                 "admin": admin,
                 "mac": want_mac,
@@ -634,10 +654,7 @@ class HomeserverTestCase(TestCase):
         """
         event_creator = self.hs.get_event_creation_handler()
         secrets = self.hs.get_secrets()
-        """ watcha!
-        requester = Requester(user, None, False, False, None, None)
-        !watcha """
-        requester = Requester(user, None, False, False, None, False, None) # watcha+
+        requester = create_requester(user)
 
         event, context = self.get_success(
             event_creator.create_event(
