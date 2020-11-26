@@ -27,6 +27,8 @@ from tests.utils import mock_getRawHeaders
 
 from .. import unittest
 
+from ..utils import setup_test_homeserver # watcha+ op251
+
 
 class RegistrationTestCase(unittest.HomeserverTestCase):
     """ Tests the RegistrationHandler. """
@@ -569,3 +571,71 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             )
 
         return user_id, token
+
+# watcha+
+class WatchaRegistrationTestCase(unittest.HomeserverTestCase):
+    def make_homeserver(self, reactor, clock):
+        hs_config = self.default_config()
+        return self.setup_test_homeserver(config=hs_config)
+
+    def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastore()
+        self.auth_handler = hs.get_auth_handler()
+        self.registration_handler = hs.get_registration_handler()
+        self.time = int(hs.get_clock().time_msec())
+        self.user_locapart = "owner"
+        self.user_threepid = "example@example.com"
+        self.user_id = self.get_success(
+            self.registration_handler.register_user(localpart=self.user_locapart)
+        )
+        self.get_success(
+            self.auth_handler.add_threepid(
+                self.user_id, "email", self.user_threepid, self.time,
+            )
+        )
+
+    def test_email_is_correctly_insert_on_DB(self):
+        email = self.get_success(
+            self.store.db_pool.simple_select_one_onecol(
+                table="user_threepids",
+                keyvalues={"user_id": self.user_id},
+                retcol="address",
+            )
+        )
+        self.assertEqual(email, self.user_threepid)
+
+    def test_email_is_correctly_insert_on_DB_after_two_same_registration(self):
+        user_id = self.get_failure(
+            self.registration_handler.register_user(localpart=self.user_locapart),
+            SynapseError,
+        )
+        self.get_failure(
+            self.auth_handler.add_threepid(
+                user_id, "email", self.user_threepid, self.time,
+            ),
+            SynapseError,
+        )
+
+        email = self.get_success(
+            self.store.db_pool.simple_select_one_onecol(
+                "user_threepids", {"user_id": self.user_id}, "address"
+            )
+        )
+        self.assertEqual(email, "example@example.com")
+
+    def test_email_cannot_used_two_times_with_same_value(self):
+        user_id = self.get_success(
+            self.registration_handler.register_user(localpart="user")
+        )
+        error = self.get_failure(
+            self.auth_handler.add_threepid(
+                user_id, "email", self.user_threepid, self.time,
+            ),
+            SynapseError,
+        ).value
+
+        self.assertEqual(error.code, 400)
+        self.assertEqual(
+            error.msg, "This email is already attached to another user account."
+        )
+# +watcha
