@@ -69,7 +69,7 @@ class HTTPPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastore().get_user_by_access_token(access_token)
         )
-        token_id = user_tuple["token_id"]
+        token_id = user_tuple.token_id
 
         self.get_success(
             self.hs.get_pusherpool().add_pusher(
@@ -198,7 +198,7 @@ class HTTPPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastore().get_user_by_access_token(access_token)
         )
-        token_id = user_tuple["token_id"]
+        token_id = user_tuple.token_id
 
         self.get_success(
             self.hs.get_pusherpool().add_pusher(
@@ -322,7 +322,7 @@ class HTTPPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastore().get_user_by_access_token(access_token)
         )
-        token_id = user_tuple["token_id"]
+        token_id = user_tuple.token_id
 
         self.get_success(
             self.hs.get_pusherpool().add_pusher(
@@ -413,7 +413,7 @@ class HTTPPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastore().get_user_by_access_token(access_token)
         )
-        token_id = user_tuple["token_id"]
+        token_id = user_tuple.token_id
 
         self.get_success(
             self.hs.get_pusherpool().add_pusher(
@@ -494,7 +494,7 @@ class HTTPPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastore().get_user_by_access_token(access_token)
         )
-        token_id = user_tuple["token_id"]
+        token_id = user_tuple.token_id
 
         self.get_success(
             self.hs.get_pusherpool().add_pusher(

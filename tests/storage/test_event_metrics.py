@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from synapse.metrics import REGISTRY, generate_latest
-from synapse.types import Requester, UserID
+from synapse.types import UserID, create_requester
 
 from tests.unittest import HomeserverTestCase
 
@@ -27,10 +27,7 @@ class ExtremStatisticsTestCase(HomeserverTestCase):
         room_creator = self.hs.get_room_creation_handler()
 
         user = UserID("alice", "test")
-        """ watcha!
-        requester = Requester(user, None, False, False, None, None)
-        !watcha """
-        requester = Requester(user, None, False, False, None, False, None) # watcha+
+        requester = create_requester(user)
 
         # Real events, forward extremities
         events = [(3, 2), (6, 2), (4, 6)]

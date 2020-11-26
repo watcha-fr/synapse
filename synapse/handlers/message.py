@@ -50,9 +50,8 @@ from synapse.replication.http.send_event import ReplicationSendEventRestServlet
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.state import StateFilter
 from synapse.types import Requester, RoomAlias, StreamToken, UserID, create_requester
-from synapse.util import json_decoder
+from synapse.util import json_decoder, json_encoder
 from synapse.util.async_helpers import Linearizer
-from synapse.util.frozenutils import frozendict_json_encoder
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_events_for_client
 
@@ -657,7 +656,7 @@ class EventCreationHandler:
             context: The event context.
 
         Returns:
-            The previous verion of the event is returned, if it is found in the
+            The previous version of the event is returned, if it is found in the
             event context. Otherwise, None is returned.
         """
         prev_state_ids = await context.get_prev_state_ids()
@@ -928,7 +927,7 @@ class EventCreationHandler:
 
         # Ensure that we can round trip before trying to persist in db
         try:
-            dump = frozendict_json_encoder.encode(event.content)
+            dump = json_encoder.encode(event.content)
             json_decoder.decode(dump)
         except Exception:
             logger.exception("Failed to encode content: %r", event.content)
@@ -1100,34 +1099,13 @@ class EventCreationHandler:
 
         if event.type == EventTypes.Member:
             if event.content["membership"] == Membership.INVITE:
-
-                def is_inviter_member_event(e):
-                    return e.type == EventTypes.Member and e.sender == event.sender
-
-                current_state_ids = await context.get_current_state_ids()
-
-                # We know this event is not an outlier, so this must be
-                # non-None.
-                assert current_state_ids is not None
-
-                state_to_include_ids = [
-                    e_id
-                    for k, e_id in current_state_ids.items()
-                    if k[0] in self.room_invite_state_types
-                    or k == (EventTypes.Member, event.sender)
-                ]
-
-                state_to_include = await self.store.get_events(state_to_include_ids)
-
-                event.unsigned["invite_room_state"] = [
-                    {
-                        "type": e.type,
-                        "state_key": e.state_key,
-                        "content": e.content,
-                        "sender": e.sender,
-                    }
-                    for e in state_to_include.values()
-                ]
+                event.unsigned[
+                    "invite_room_state"
+                ] = await self.store.get_stripped_room_state_from_event_context(
+                    context,
+                    self.room_invite_state_types,
+                    membership_user_id=event.sender,
+                )
 
                 invitee = UserID.from_string(event.state_key)
                 if not self.hs.is_mine(invitee):
@@ -1159,6 +1137,9 @@ class EventCreationHandler:
 
                 if original_event.room_id != event.room_id:
                     raise SynapseError(400, "Cannot redact event from a different room")
+
+                if original_event.type == EventTypes.ServerACL:
+                    raise AuthError(403, "Redacting server ACL events is not permitted")
 
             prev_state_ids = await context.get_prev_state_ids()
             auth_events_ids = self.auth.compute_auth_events(
