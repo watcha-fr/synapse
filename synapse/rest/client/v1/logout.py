@@ -25,13 +25,10 @@ class LogoutRestServlet(RestServlet):
     PATTERNS = client_patterns("/logout$", v1=True)
 
     def __init__(self, hs):
-        super(LogoutRestServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
-
-    def on_OPTIONS(self, request):
-        return 200, {}
 
     async def on_POST(self, request):
         requester = await self.auth.get_user_by_req(request, allow_expired=True)
@@ -53,13 +50,10 @@ class LogoutAllRestServlet(RestServlet):
     PATTERNS = client_patterns("/logout/all$", v1=True)
 
     def __init__(self, hs):
-        super(LogoutAllRestServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
-
-    def on_OPTIONS(self, request):
-        return 200, {}
 
     async def on_POST(self, request):
         requester = await self.auth.get_user_by_req(request, allow_expired=True)

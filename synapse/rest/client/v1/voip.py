@@ -25,7 +25,7 @@ class VoipRestServlet(RestServlet):
     PATTERNS = client_patterns("/voip/turnServer$", v1=True)
 
     def __init__(self, hs):
-        super(VoipRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
 
@@ -75,9 +75,6 @@ class VoipRestServlet(RestServlet):
                 "uris": turnUris,
             },
         )
-
-    def on_OPTIONS(self, request):
-        return 200, {}
 
 
 def register_servlets(hs, http_server):

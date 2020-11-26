@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 class AdminHandler(BaseHandler):
     def __init__(self, hs):
-        super(AdminHandler, self).__init__(hs)
+        super().__init__(hs)
 
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
@@ -88,7 +88,7 @@ class AdminHandler(BaseHandler):
 
         # We only try and fetch events for rooms the user has been in. If
         # they've been e.g. invited to a room without joining then we handle
-        # those seperately.
+        # those separately.
         rooms_user_has_been_in = await self.store.get_rooms_user_has_been_in(user_id)
 
         for index, room in enumerate(rooms):
@@ -125,8 +125,8 @@ class AdminHandler(BaseHandler):
             else:
                 stream_ordering = room.stream_ordering
 
-            from_key = str(RoomStreamToken(0, 0))
-            to_key = str(RoomStreamToken(None, stream_ordering))
+            from_key = RoomStreamToken(0, 0)
+            to_key = RoomStreamToken(None, stream_ordering)
 
             written_events = set()  # Events that we've processed in this room
 
@@ -226,7 +226,7 @@ class ExfiltrationWriter:
         """
 
     def finished(self):
-        """Called when all data has succesfully been exported and written.
+        """Called when all data has successfully been exported and written.
 
         This functions return value is passed to the caller of
         `export_user_data`.

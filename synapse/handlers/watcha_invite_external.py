@@ -17,7 +17,7 @@ from synapse.api.constants import Membership
 logger = logging.getLogger(__name__)
 
 
-class InviteExternalHandler(BaseHandler):
+class WatchaInviteExternalHandler(BaseHandler):
 
     # convert an email address into a user_id in a deterministic way
     def _gen_user_id_from_email(self, email):

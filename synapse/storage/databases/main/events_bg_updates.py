@@ -29,7 +29,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
     DELETE_SOFT_FAILED_EXTREMITIES = "delete_soft_failed_extremities"
 
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(EventsBackgroundUpdatesStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self.db_pool.updates.register_background_update_handler(
             self.EVENT_ORIGIN_SERVER_TS_NAME, self._background_reindex_origin_server_ts
@@ -90,6 +90,13 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             table="redactions",
             columns=["received_ts"],
             where_clause="NOT have_censored",
+        )
+
+        self.db_pool.updates.register_background_index_update(
+            "users_have_local_media",
+            index_name="users_have_local_media",
+            table="local_media_repository",
+            columns=["user_id", "created_ts"],
         )
 
     async def _background_reindex_fields_sender(self, progress, batch_size):

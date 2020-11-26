@@ -17,12 +17,14 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
 
+BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD = (
+    "media_repository_drop_index_wo_method"
+)
+
 
 class MediaRepositoryBackgroundUpdateStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(MediaRepositoryBackgroundUpdateStore, self).__init__(
-            database, db_conn, hs
-        )
+        super().__init__(database, db_conn, hs)
 
         self.db_pool.updates.register_background_index_update(
             update_name="local_media_repository_url_idx",
@@ -32,12 +34,66 @@ class MediaRepositoryBackgroundUpdateStore(SQLBaseStore):
             where_clause="url_cache IS NOT NULL",
         )
 
+        # The following the updates add the method to the unique constraint of
+        # the thumbnail databases. That fixes an issue, where thumbnails of the
+        # same resolution, but different methods could overwrite one another.
+        # This can happen with custom thumbnail configs or with dynamic thumbnailing.
+        self.db_pool.updates.register_background_index_update(
+            update_name="local_media_repository_thumbnails_method_idx",
+            index_name="local_media_repository_thumbn_media_id_width_height_method_key",
+            table="local_media_repository_thumbnails",
+            columns=[
+                "media_id",
+                "thumbnail_width",
+                "thumbnail_height",
+                "thumbnail_type",
+                "thumbnail_method",
+            ],
+            unique=True,
+        )
+
+        self.db_pool.updates.register_background_index_update(
+            update_name="remote_media_repository_thumbnails_method_idx",
+            index_name="remote_media_repository_thumbn_media_origin_id_width_height_method_key",
+            table="remote_media_cache_thumbnails",
+            columns=[
+                "media_origin",
+                "media_id",
+                "thumbnail_width",
+                "thumbnail_height",
+                "thumbnail_type",
+                "thumbnail_method",
+            ],
+            unique=True,
+        )
+
+        self.db_pool.updates.register_background_update_handler(
+            BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD,
+            self._drop_media_index_without_method,
+        )
+
+    async def _drop_media_index_without_method(self, progress, batch_size):
+        def f(txn):
+            txn.execute(
+                "ALTER TABLE local_media_repository_thumbnails DROP CONSTRAINT IF EXISTS local_media_repository_thumbn_media_id_thumbnail_width_thum_key"
+            )
+            txn.execute(
+                "ALTER TABLE remote_media_cache_thumbnails DROP CONSTRAINT IF EXISTS remote_media_repository_thumbn_media_id_thumbnail_width_thum_key"
+            )
+
+        await self.db_pool.runInteraction("drop_media_indices_without_method", f)
+        await self.db_pool.updates._end_background_update(
+            BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD
+        )
+        return 1
+
 
 class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
     """Persistence for attachments and avatars"""
 
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(MediaRepositoryStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
+        self.server_name = hs.hostname
 
     async def get_local_media(self, media_id: str) -> Optional[Dict[str, Any]]:
         """Get the metadata for a local piece of media
@@ -58,6 +114,109 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             ),
             allow_none=True,
             desc="get_local_media",
+        )
+
+    async def get_local_media_by_user_paginate(
+        self, start: int, limit: int, user_id: str
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """Get a paginated list of metadata for a local piece of media
+        which an user_id has uploaded
+
+        Args:
+            start: offset in the list
+            limit: maximum amount of media_ids to retrieve
+            user_id: fully-qualified user id
+        Returns:
+            A paginated list of all metadata of user's media,
+            plus the total count of all the user's media
+        """
+
+        def get_local_media_by_user_paginate_txn(txn):
+
+            args = [user_id]
+            sql = """
+                SELECT COUNT(*) as total_media
+                FROM local_media_repository
+                WHERE user_id = ?
+            """
+            txn.execute(sql, args)
+            count = txn.fetchone()[0]
+
+            sql = """
+                SELECT
+                    "media_id",
+                    "media_type",
+                    "media_length",
+                    "upload_name",
+                    "created_ts",
+                    "last_access_ts",
+                    "quarantined_by",
+                    "safe_from_quarantine"
+                FROM local_media_repository
+                WHERE user_id = ?
+                ORDER BY created_ts DESC, media_id DESC
+                LIMIT ? OFFSET ?
+            """
+
+            args += [limit, start]
+            txn.execute(sql, args)
+            media = self.db_pool.cursor_to_dict(txn)
+            return media, count
+
+        return await self.db_pool.runInteraction(
+            "get_local_media_by_user_paginate_txn", get_local_media_by_user_paginate_txn
+        )
+
+    async def get_local_media_before(
+        self, before_ts: int, size_gt: int, keep_profiles: bool,
+    ) -> Optional[List[str]]:
+
+        # to find files that have never been accessed (last_access_ts IS NULL)
+        # compare with `created_ts`
+        sql = """
+            SELECT media_id
+            FROM local_media_repository AS lmr
+            WHERE
+                ( last_access_ts < ?
+                OR ( created_ts < ? AND last_access_ts IS NULL ) )
+                AND media_length > ?
+        """
+
+        if keep_profiles:
+            sql_keep = """
+                AND (
+                    NOT EXISTS
+                        (SELECT 1
+                         FROM profiles
+                         WHERE profiles.avatar_url = '{media_prefix}' || lmr.media_id)
+                    AND NOT EXISTS
+                        (SELECT 1
+                         FROM groups
+                         WHERE groups.avatar_url = '{media_prefix}' || lmr.media_id)
+                    AND NOT EXISTS
+                        (SELECT 1
+                         FROM room_memberships
+                         WHERE room_memberships.avatar_url = '{media_prefix}' || lmr.media_id)
+                    AND NOT EXISTS
+                        (SELECT 1
+                         FROM user_directory
+                         WHERE user_directory.avatar_url = '{media_prefix}' || lmr.media_id)
+                    AND NOT EXISTS
+                        (SELECT 1
+                         FROM room_stats_state
+                         WHERE room_stats_state.avatar = '{media_prefix}' || lmr.media_id)
+                )
+            """.format(
+                media_prefix="mxc://%s/" % (self.server_name,),
+            )
+            sql += sql_keep
+
+        def _get_local_media_before_txn(txn):
+            txn.execute(sql, (before_ts, before_ts, size_gt))
+            return [row[0] for row in txn]
+
+        return await self.db_pool.runInteraction(
+            "get_local_media_before", _get_local_media_before_txn
         )
 
     async def store_local_media(
@@ -291,6 +450,33 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                 "filesystem_id",
             ),
             desc="get_remote_media_thumbnails",
+        )
+
+    async def get_remote_media_thumbnail(
+        self, origin: str, media_id: str, t_width: int, t_height: int, t_type: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Fetch the thumbnail info of given width, height and type.
+        """
+
+        return await self.db_pool.simple_select_one(
+            table="remote_media_cache_thumbnails",
+            keyvalues={
+                "media_origin": origin,
+                "media_id": media_id,
+                "thumbnail_width": t_width,
+                "thumbnail_height": t_height,
+                "thumbnail_type": t_type,
+            },
+            retcols=(
+                "thumbnail_width",
+                "thumbnail_height",
+                "thumbnail_method",
+                "thumbnail_type",
+                "thumbnail_length",
+                "filesystem_id",
+            ),
+            allow_none=True,
+            desc="get_remote_media_thumbnail",
         )
 
     async def store_remote_media_thumbnail(

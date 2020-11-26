@@ -39,11 +39,11 @@ class WatchaUserlistRestServlet(RestServlet):
     def __init__(self, hs):
         super(WatchaUserlistRestServlet, self).__init__()
         self.auth = hs.get_auth()
-        self.handlers = hs.get_handlers()
+        self.watcha_admin_handler = hs.get_watcha_admin_handler()
 
     async def on_GET(self, request):
         await _check_admin(self.auth, request)
-        ret = await self.handlers.watcha_admin_handler.watcha_user_list()
+        ret = await self.watcha_admin_handler.watcha_user_list()
         return 200, ret
 
 
@@ -54,11 +54,11 @@ class WatchaRoomMembershipRestServlet(RestServlet):
     def __init__(self, hs):
         super(WatchaRoomMembershipRestServlet, self).__init__()
         self.auth = hs.get_auth()
-        self.handlers = hs.get_handlers()
+        self.watcha_admin_handler = hs.get_watcha_admin_handler()
 
     async def on_GET(self, request):
         await _check_admin(self.auth, request)
-        ret = await self.handlers.watcha_admin_handler.watcha_room_membership()
+        ret = await self.watcha_admin_handler.watcha_room_membership()
         return 200, ret
 
 
@@ -70,7 +70,9 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
-        self.handler = hs.get_handlers()
+        self.watcha_room_nextcloud_mapping_handler = (
+            hs.get_watcha_room_nextcloud_mapping_handler()
+        )
 
     async def on_POST(self, request):
         await _check_admin(
@@ -125,7 +127,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
                 continue
 
             try:
-                rooms = await self.handler.watcha_room_nextcloud_mapping_handler.get_room_list_to_send_nextcloud_notification(
+                rooms = await self.watcha_room_nextcloud_mapping_handler.get_room_list_to_send_nextcloud_notification(
                     notification["directory"],
                     notification["limit_of_notification_propagation"],
                 )
@@ -134,7 +136,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
                 continue
 
             try:
-                notification_sent = await self.handler.watcha_room_nextcloud_mapping_handler.send_nextcloud_notification_to_rooms(
+                notification_sent = await self.watcha_room_nextcloud_mapping_handler.send_nextcloud_notification_to_rooms(
                     rooms, file_name, file_url, file_operation
                 )
             except SynapseError as e:
@@ -153,11 +155,11 @@ class WatchaDisplayNameRestServlet(RestServlet):
     def __init__(self, hs):
         super(WatchaDisplayNameRestServlet, self).__init__()
         self.auth = hs.get_auth()
-        self.handlers = hs.get_handlers()
+        self.watcha_admin_handler = hs.get_watcha_admin_handler()
 
     async def on_GET(self, request):
         await _check_admin(self.auth, request)
-        ret = await self.handlers.watcha_admin_handler.watcha_display_name()
+        ret = await self.watcha_admin_handler.watcha_display_name()
         return 200, ret
 
 
@@ -167,11 +169,11 @@ class WatchaRoomListRestServlet(RestServlet):
     def __init__(self, hs):
         super(WatchaRoomListRestServlet, self).__init__()
         self.auth = hs.get_auth()
-        self.handlers = hs.get_handlers()
+        self.watcha_admin_handler = hs.get_watcha_admin_handler()
 
     async def on_GET(self, request):
         await _check_admin(self.auth, request)
-        ret = await self.handlers.watcha_admin_handler.watcha_room_list()
+        ret = await self.watcha_admin_handler.watcha_room_list()
         return 200, ret
 
 
@@ -184,7 +186,7 @@ class WatchaUpdateMailRestServlet(RestServlet):
         super(WatchaUpdateMailRestServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
-        self.handlers = hs.get_handlers()
+        self.admin_handler = hs.get_admin_handler()
         self.auth_handler = hs.get_auth_handler()
         self.account_activity_handler = hs.get_account_validity_handler()
 
@@ -196,7 +198,7 @@ class WatchaUpdateMailRestServlet(RestServlet):
         if not new_email:
             raise SynapseError(400, "Missing 'new_email' arg")
 
-        users = await self.handlers.admin_handler.get_users()
+        users = await self.admin_handler.get_users()
         if not target_user_id in [user["name"] for user in users]:
             raise SynapseError(
                 400, "The target user is not registered in this homeserver."
@@ -228,8 +230,8 @@ class WatchaUpdateUserRoleRestServlet(RestServlet):
     def __init__(self, hs):
         super(WatchaUpdateUserRoleRestServlet, self).__init__()
         self.auth = hs.get_auth()
-        self.handlers = hs.get_handlers()
-        self.admin_handler = hs.get_handlers().admin_handler
+        self.watcha_admin_handler = hs.get_watcha_admin_handler()
+        self.admin_handler = hs.get_admin_handler()
 
     async def on_PUT(self, request, target_user_id):
         await _check_admin(self.auth, request)
@@ -245,7 +247,7 @@ class WatchaUpdateUserRoleRestServlet(RestServlet):
         if role not in ["partner", "collaborator", "admin"]:
             raise SynapseError(400, "%s is not a defined role." % role)
 
-        result = await self.handlers.watcha_admin_handler.watcha_update_user_role(
+        result = await self.watcha_admin_handler.watcha_update_user_role(
             target_user_id, role
         )
         return 200, {"new_role": result}
@@ -268,11 +270,11 @@ class WatchaAdminStatsRestServlet(RestServlet):
         self.hs = hs
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
-        self.handlers = hs.get_handlers()
+        self.watcha_admin_handler = hs.get_watcha_admin_handler()
 
     async def on_GET(self, request):
         await _check_admin(self.auth, request)
-        ret = await self.handlers.watcha_admin_handler.watcha_admin_stat()
+        ret = await self.watcha_admin_handler.watcha_admin_stat()
         return 200, ret
 
 
@@ -285,11 +287,11 @@ class WatchaUserIp(RestServlet):
         self.hs = hs
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
-        self.handlers = hs.get_handlers()
+        self.watcha_admin_handler = hs.get_watcha_admin_handler()
 
     async def on_GET(self, request, target_user_id):
         await _check_admin(self.auth, request)
-        ret = await self.handlers.watcha_admin_handler.watcha_user_ip(target_user_id)
+        ret = await self.watcha_admin_handler.watcha_user_ip(target_user_id)
         return 200, ret
 
 
@@ -401,7 +403,7 @@ class WatchaResetPasswordRestServlet(RestServlet):
     def __init__(self, hs):
         super(WatchaResetPasswordRestServlet, self).__init__()
         self.hs = hs
-        self.handlers = hs.get_handlers()
+        self.watcha_admin_handler = hs.get_watcha_admin_handler()
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self.account_activity_handler = hs.get_account_validity_handler()
@@ -429,7 +431,7 @@ class WatchaResetPasswordRestServlet(RestServlet):
         await self.hs.get_set_password_handler().set_password(
             user_id, password_hash, requester
         )
-        await self.handlers.watcha_admin_handler.watcha_reactivate_account(user_id)
+        await self.watcha_admin_handler.watcha_reactivate_account(user_id)
 
         try:
             display_name = await self.hs.profile_handler.get_displayname(user)

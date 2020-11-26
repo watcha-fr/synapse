@@ -265,16 +265,16 @@ Response:
 Once the `next_token` parameter is no longer present, we know we've reached the
 end of the list.
 
-# DRAFT: Room Details API
+# Room Details API
 
 The Room Details admin API allows server admins to get all details of a room.
-
-This API is still a draft and details might change!
 
 The following fields are possible in the JSON response body:
 
 * `room_id` - The ID of the room.
 * `name` - The name of the room.
+* `topic` - The topic of the room.
+* `avatar` - The `mxc` URI to the avatar of the room.
 * `canonical_alias` - The canonical (main) alias address of the room.
 * `joined_members` - How many users are currently in the room.
 * `joined_local_members` - How many local users are currently in the room.
@@ -304,6 +304,8 @@ Response:
 {
   "room_id": "!mscvqgqpHYjBGDxNym:matrix.org",
   "name": "Music Theory",
+  "avatar": "mxc://matrix.org/AQDaVFlbkQoErdOgqWRgiGSV",
+  "topic": "Theory, Composition, Notation, Analysis",
   "canonical_alias": "#musictheory:matrix.org",
   "joined_members": 127
   "joined_local_members": 2,

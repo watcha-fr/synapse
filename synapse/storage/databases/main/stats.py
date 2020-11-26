@@ -16,15 +16,18 @@
 
 import logging
 from collections import Counter
+from enum import Enum
 from itertools import chain
 from typing import Any, Dict, List, Optional, Tuple
 
 from twisted.internet.defer import DeferredLock
 
 from synapse.api.constants import EventTypes, Membership
+from synapse.api.errors import StoreError
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.state_deltas import StateDeltasStore
 from synapse.storage.engines import PostgresEngine
+from synapse.types import JsonDict
 from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
@@ -59,9 +62,26 @@ TYPE_TO_TABLE = {"room": ("room_stats", "room_id"), "user": ("user_stats", "user
 TYPE_TO_ORIGIN_TABLE = {"room": ("rooms", "room_id"), "user": ("users", "name")}
 
 
+class UserSortOrder(Enum):
+    """
+    Enum to define the sorting method used when returning users
+    with get_users_media_usage_paginate
+
+    MEDIA_LENGTH = ordered by size of uploaded media. Smallest to largest.
+    MEDIA_COUNT = ordered by number of uploaded media. Smallest to largest.
+    USER_ID = ordered alphabetically by `user_id`.
+    DISPLAYNAME = ordered alphabetically by `displayname`
+    """
+
+    MEDIA_LENGTH = "media_length"
+    MEDIA_COUNT = "media_count"
+    USER_ID = "user_id"
+    DISPLAYNAME = "displayname"
+
+
 class StatsStore(StateDeltasStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(StatsStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self.server_name = hs.hostname
         self.clock = self.hs.get_clock()
@@ -72,9 +92,6 @@ class StatsStore(StateDeltasStore):
 
         self.db_pool.updates.register_background_update_handler(
             "populate_stats_process_rooms", self._populate_stats_process_rooms
-        )
-        self.db_pool.updates.register_background_update_handler(
-            "populate_stats_process_rooms_2", self._populate_stats_process_rooms_2
         )
         self.db_pool.updates.register_background_update_handler(
             "populate_stats_process_users", self._populate_stats_process_users
@@ -148,31 +165,10 @@ class StatsStore(StateDeltasStore):
         return len(users_to_work_on)
 
     async def _populate_stats_process_rooms(self, progress, batch_size):
-        """
-        This was a background update which regenerated statistics for rooms.
-
-        It has been replaced by StatsStore._populate_stats_process_rooms_2. This background
-        job has been scheduled to run as part of Synapse v1.0.0, and again now. To ensure
-        someone upgrading from <v1.0.0, this background task has been turned into a no-op
-        so that the potentially expensive task is not run twice.
-
-        Further context: https://github.com/matrix-org/synapse/pull/7977
-        """
-        await self.db_pool.updates._end_background_update(
-            "populate_stats_process_rooms"
-        )
-        return 1
-
-    async def _populate_stats_process_rooms_2(self, progress, batch_size):
-        """
-        This is a background update which regenerates statistics for rooms.
-
-        It replaces StatsStore._populate_stats_process_rooms. See its docstring for the
-        reasoning.
-        """
+        """This is a background update which regenerates statistics for rooms."""
         if not self.stats_enabled:
             await self.db_pool.updates._end_background_update(
-                "populate_stats_process_rooms_2"
+                "populate_stats_process_rooms"
             )
             return 1
 
@@ -189,13 +185,13 @@ class StatsStore(StateDeltasStore):
             return [r for r, in txn]
 
         rooms_to_work_on = await self.db_pool.runInteraction(
-            "populate_stats_rooms_2_get_batch", _get_next_batch
+            "populate_stats_rooms_get_batch", _get_next_batch
         )
 
         # No more rooms -- complete the transaction.
         if not rooms_to_work_on:
             await self.db_pool.updates._end_background_update(
-                "populate_stats_process_rooms_2"
+                "populate_stats_process_rooms"
             )
             return 1
 
@@ -204,9 +200,9 @@ class StatsStore(StateDeltasStore):
             progress["last_room_id"] = room_id
 
         await self.db_pool.runInteraction(
-            "_populate_stats_process_rooms_2",
+            "_populate_stats_process_rooms",
             self.db_pool.updates._background_update_progress_txn,
-            "populate_stats_process_rooms_2",
+            "populate_stats_process_rooms",
             progress,
         )
 
@@ -234,6 +230,7 @@ class StatsStore(StateDeltasStore):
         * topic
         * avatar
         * canonical_alias
+        * guest_access
 
         A is_federatable key can also be included with a boolean value.
 
@@ -258,6 +255,7 @@ class StatsStore(StateDeltasStore):
             "topic",
             "avatar",
             "canonical_alias",
+            "guest_access",
         ):
             field = fields.get(col, sentinel)
             if field is not sentinel and (not isinstance(field, str) or "\0" in field):
@@ -903,4 +901,111 @@ class StatsStore(StateDeltasStore):
             fields={},
             complete_with_stream_id=pos,
             absolute_field_overrides={"joined_rooms": joined_rooms},
+        )
+
+    async def get_users_media_usage_paginate(
+        self,
+        start: int,
+        limit: int,
+        from_ts: Optional[int] = None,
+        until_ts: Optional[int] = None,
+        order_by: Optional[UserSortOrder] = UserSortOrder.USER_ID.value,
+        direction: Optional[str] = "f",
+        search_term: Optional[str] = None,
+    ) -> Tuple[List[JsonDict], Dict[str, int]]:
+        """Function to retrieve a paginated list of users and their uploaded local media
+        (size and number). This will return a json list of users and the
+        total number of users matching the filter criteria.
+
+        Args:
+            start: offset to begin the query from
+            limit: number of rows to retrieve
+            from_ts: request only media that are created later than this timestamp (ms)
+            until_ts: request only media that are created earlier than this timestamp (ms)
+            order_by: the sort order of the returned list
+            direction: sort ascending or descending
+            search_term: a string to filter user names by
+        Returns:
+            A list of user dicts and an integer representing the total number of
+            users that exist given this query
+        """
+
+        def get_users_media_usage_paginate_txn(txn):
+            filters = []
+            args = [self.hs.config.server_name]
+
+            if search_term:
+                filters.append("(lmr.user_id LIKE ? OR displayname LIKE ?)")
+                args.extend(["@%" + search_term + "%:%", "%" + search_term + "%"])
+
+            if from_ts:
+                filters.append("created_ts >= ?")
+                args.extend([from_ts])
+            if until_ts:
+                filters.append("created_ts <= ?")
+                args.extend([until_ts])
+
+            # Set ordering
+            if UserSortOrder(order_by) == UserSortOrder.MEDIA_LENGTH:
+                order_by_column = "media_length"
+            elif UserSortOrder(order_by) == UserSortOrder.MEDIA_COUNT:
+                order_by_column = "media_count"
+            elif UserSortOrder(order_by) == UserSortOrder.USER_ID:
+                order_by_column = "lmr.user_id"
+            elif UserSortOrder(order_by) == UserSortOrder.DISPLAYNAME:
+                order_by_column = "displayname"
+            else:
+                raise StoreError(
+                    500, "Incorrect value for order_by provided: %s" % order_by
+                )
+
+            if direction == "b":
+                order = "DESC"
+            else:
+                order = "ASC"
+
+            where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
+
+            sql_base = """
+                FROM local_media_repository as lmr
+                LEFT JOIN profiles AS p ON lmr.user_id = '@' || p.user_id || ':' || ?
+                {}
+                GROUP BY lmr.user_id, displayname
+            """.format(
+                where_clause
+            )
+
+            # SQLite does not support SELECT COUNT(*) OVER()
+            sql = """
+                SELECT COUNT(*) FROM (
+                    SELECT lmr.user_id
+                    {sql_base}
+                ) AS count_user_ids
+            """.format(
+                sql_base=sql_base,
+            )
+            txn.execute(sql, args)
+            count = txn.fetchone()[0]
+
+            sql = """
+                SELECT
+                    lmr.user_id,
+                    displayname,
+                    COUNT(lmr.user_id) as media_count,
+                    SUM(media_length) as media_length
+                    {sql_base}
+                ORDER BY {order_by_column} {order}
+                LIMIT ? OFFSET ?
+            """.format(
+                sql_base=sql_base, order_by_column=order_by_column, order=order,
+            )
+
+            args += [limit, start]
+            txn.execute(sql, args)
+            users = self.db_pool.cursor_to_dict(txn)
+
+            return users, count
+
+        return await self.db_pool.runInteraction(
+            "get_users_media_usage_paginate_txn", get_users_media_usage_paginate_txn
         )

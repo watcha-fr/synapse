@@ -19,11 +19,15 @@ from typing import TYPE_CHECKING, Dict, Union
 
 from prometheus_client import Gauge
 
-from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.metrics.background_process_metrics import (
+    run_as_background_process,
+    wrap_as_background_process,
+)
 from synapse.push import PusherConfigException
 from synapse.push.emailpusher import EmailPusher
 from synapse.push.httppusher import HttpPusher
 from synapse.push.pusher import PusherFactory
+from synapse.types import RoomStreamToken
 from synapse.util.async_helpers import concurrently_execute
 
 if TYPE_CHECKING:
@@ -60,9 +64,17 @@ class PusherPool:
         self.store = self.hs.get_datastore()
         self.clock = self.hs.get_clock()
 
+        self._account_validity = hs.config.account_validity
+
         # We shard the handling of push notifications by user ID.
         self._pusher_shard_config = hs.config.push.pusher_shard_config
         self._instance_name = hs.get_instance_name()
+
+        # Record the last stream ID that we were poked about so we can get
+        # changes since then. We set this to the current max stream ID on
+        # startup as every individual pusher will have checked for changes on
+        # startup.
+        self._last_room_stream_id_seen = self.store.get_room_max_stream_ordering()
 
         # map from user id to app_id:pushkey to pusher
         self.pushers = {}  # type: Dict[str, Dict[str, Union[HttpPusher, EmailPusher]]]
@@ -191,20 +203,51 @@ class PusherPool:
                 )
                 await self.remove_pusher(p["app_id"], p["pushkey"], p["user_name"])
 
-    async def on_new_notifications(self, min_stream_id, max_stream_id):
+    def on_new_notifications(self, max_token: RoomStreamToken):
         if not self.pushers:
             # nothing to do here.
             return
 
+        # We just use the minimum stream ordering and ignore the vector clock
+        # component. This is safe to do as long as we *always* ignore the vector
+        # clock components.
+        max_stream_id = max_token.stream
+
+        if max_stream_id < self._last_room_stream_id_seen:
+            # Nothing to do
+            return
+
+        # We only start a new background process if necessary rather than
+        # optimistically (to cut down on overhead).
+        self._on_new_notifications(max_token)
+
+    @wrap_as_background_process("on_new_notifications")
+    async def _on_new_notifications(self, max_token: RoomStreamToken):
+        # We just use the minimum stream ordering and ignore the vector clock
+        # component. This is safe to do as long as we *always* ignore the vector
+        # clock components.
+        max_stream_id = max_token.stream
+
+        prev_stream_id = self._last_room_stream_id_seen
+        self._last_room_stream_id_seen = max_stream_id
+
         try:
             users_affected = await self.store.get_push_action_users_in_range(
-                min_stream_id, max_stream_id
+                prev_stream_id, max_stream_id
             )
 
             for u in users_affected:
+                # Don't push if the user account has expired
+                if self._account_validity.enabled:
+                    expired = await self.store.is_account_expired(
+                        u, self.clock.time_msec()
+                    )
+                    if expired:
+                        continue
+
                 if u in self.pushers:
                     for p in self.pushers[u].values():
-                        p.on_new_notifications(min_stream_id, max_stream_id)
+                        p.on_new_notifications(max_token)
 
         except Exception:
             logger.exception("Exception in pusher on_new_notifications")
@@ -222,6 +265,14 @@ class PusherPool:
             )
 
             for u in users_affected:
+                # Don't push if the user account has expired
+                if self._account_validity.enabled:
+                    expired = await self.store.is_account_expired(
+                        u, self.clock.time_msec()
+                    )
+                    if expired:
+                        continue
+
                 if u in self.pushers:
                     for p in self.pushers[u].values():
                         p.on_new_receipts(min_stream_id, max_stream_id)

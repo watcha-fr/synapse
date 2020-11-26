@@ -30,7 +30,7 @@ class PresenceStatusRestServlet(RestServlet):
     PATTERNS = client_patterns("/presence/(?P<user_id>[^/]*)/status", v1=True)
 
     def __init__(self, hs):
-        super(PresenceStatusRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.presence_handler = hs.get_presence_handler()
         self.clock = hs.get_clock()
@@ -87,9 +87,6 @@ class PresenceStatusRestServlet(RestServlet):
         if self.hs.config.use_presence:
             await self.presence_handler.set_state(user, state)
 
-        return 200, {}
-
-    def on_OPTIONS(self, request):
         return 200, {}
 
 

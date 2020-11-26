@@ -45,7 +45,7 @@ class NotRetryingDestination(Exception):
         """
 
         msg = "Not retrying server %s." % (destination,)
-        super(NotRetryingDestination, self).__init__(msg)
+        super().__init__(msg)
 
         self.retry_last_ts = retry_last_ts
         self.retry_interval = retry_interval
@@ -110,7 +110,7 @@ async def get_retry_limiter(destination, clock, store, ignore_backoff=False, **k
         failure_ts,
         retry_interval,
         backoff_on_failure=backoff_on_failure,
-        **kwargs
+        **kwargs,
     )
 
 

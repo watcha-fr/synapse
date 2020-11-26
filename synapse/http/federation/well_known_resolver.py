@@ -172,7 +172,7 @@ class WellKnownResolver:
         had_valid_well_known = self._had_valid_well_known_cache.get(server_name, False)
 
         # We do this in two steps to differentiate between possibly transient
-        # errors (e.g. can't connect to host, 503 response) and more permenant
+        # errors (e.g. can't connect to host, 503 response) and more permanent
         # errors (such as getting a 404 response).
         response, body = await self._make_well_known_request(
             server_name, retry=had_valid_well_known
@@ -311,7 +311,7 @@ def _parse_cache_control(headers: Headers) -> Dict[bytes, Optional[bytes]]:
     return cache_controls
 
 
-@attr.s()
+@attr.s(slots=True)
 class _FetchWellKnownFailure(Exception):
     # True if we didn't get a non-5xx HTTP response, i.e. this may or may not be
     # a temporary failure.

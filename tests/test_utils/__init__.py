@@ -17,7 +17,10 @@
 """
 Utilities for running the unit tests
 """
-from typing import Any, Awaitable, TypeVar
+import sys
+import warnings
+from asyncio import Future
+from typing import Any, Awaitable, Callable, TypeVar
 
 TV = TypeVar("TV")
 
@@ -38,6 +41,42 @@ def get_awaitable_result(awaitable: Awaitable[TV]) -> TV:
     raise Exception("awaitable has not yet completed")
 
 
-async def make_awaitable(result: Any):
-    """Create an awaitable that just returns a result."""
-    return result
+def make_awaitable(result: Any) -> Awaitable[Any]:
+    """
+    Makes an awaitable, suitable for mocking an `async` function.
+    This uses Futures as they can be awaited multiple times so can be returned
+    to multiple callers.
+    """
+    future = Future()  # type: ignore
+    future.set_result(result)
+    return future
+
+
+def setup_awaitable_errors() -> Callable[[], None]:
+    """
+    Convert warnings from a non-awaited coroutines into errors.
+    """
+    warnings.simplefilter("error", RuntimeWarning)
+
+    # unraisablehook was added in Python 3.8.
+    if not hasattr(sys, "unraisablehook"):
+        return lambda: None
+
+    # State shared between unraisablehook and check_for_unraisable_exceptions.
+    unraisable_exceptions = []
+    orig_unraisablehook = sys.unraisablehook  # type: ignore
+
+    def unraisablehook(unraisable):
+        unraisable_exceptions.append(unraisable.exc_value)
+
+    def cleanup():
+        """
+        A method to be used as a clean-up that fails a test-case if there are any new unraisable exceptions.
+        """
+        sys.unraisablehook = orig_unraisablehook  # type: ignore
+        if unraisable_exceptions:
+            raise unraisable_exceptions.pop()
+
+    sys.unraisablehook = unraisablehook  # type: ignore
+
+    return cleanup

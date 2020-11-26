@@ -29,6 +29,7 @@ from synapse.replication.tcp.streams.events import (
     EventsStreamEventRow,
     EventsStreamRow,
 )
+from synapse.types import PersistedEventPosition, UserID
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.metrics import Measure
 
@@ -98,7 +99,6 @@ class ReplicationDataHandler:
 
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
-        self.pusher_pool = hs.get_pusherpool()
         self.notifier = hs.get_notifier()
         self._reactor = hs.get_reactor()
         self._clock = hs.get_clock()
@@ -141,20 +141,26 @@ class ReplicationDataHandler:
                 if row.type != EventsStreamEventRow.TypeId:
                     continue
                 assert isinstance(row, EventsStreamRow)
+                assert isinstance(row.data, EventsStreamEventRow)
 
-                event = await self.store.get_event(
-                    row.data.event_id, allow_rejected=True
-                )
-                if event.rejected_reason:
+                if row.data.rejected:
                     continue
 
-                extra_users = ()  # type: Tuple[str, ...]
-                if event.type == EventTypes.Member:
-                    extra_users = (event.state_key,)
-                max_token = self.store.get_room_max_stream_ordering()
-                self.notifier.on_new_room_event(event, token, max_token, extra_users)
+                extra_users = ()  # type: Tuple[UserID, ...]
+                if row.data.type == EventTypes.Member and row.data.state_key:
+                    extra_users = (UserID.from_string(row.data.state_key),)
 
-            await self.pusher_pool.on_new_notifications(token, token)
+                max_token = self.store.get_room_max_token()
+                event_pos = PersistedEventPosition(instance_name, token)
+                self.notifier.on_new_room_event_args(
+                    event_pos=event_pos,
+                    max_room_stream_token=max_token,
+                    extra_users=extra_users,
+                    room_id=row.data.room_id,
+                    event_type=row.data.type,
+                    state_key=row.data.state_key,
+                    membership=row.data.membership,
+                )
 
         # Notify any waiting deferreds. The list is ordered by position so we
         # just iterate through the list until we reach a position that is
@@ -188,6 +194,10 @@ class ReplicationDataHandler:
 
     async def on_position(self, stream_name: str, instance_name: str, token: int):
         self.store.process_replication_rows(stream_name, instance_name, token, [])
+
+        # We poke the generic "replication" notifier to wake anything up that
+        # may be streaming.
+        self.notifier.notify_replication()
 
     def on_remote_server_up(self, server: str):
         """Called when get a new REMOTE_SERVER_UP command."""

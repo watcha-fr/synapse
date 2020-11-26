@@ -28,6 +28,7 @@ from typing import (
     Union,
 )
 
+import attr
 from prometheus_client import Counter
 
 from twisted.internet import defer
@@ -40,9 +41,14 @@ from synapse.handlers.presence import format_user_presence_state
 from synapse.logging.context import PreserveLoggingContext
 from synapse.logging.utils import log_function
 from synapse.metrics import LaterGauge
-from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.streams.config import PaginationConfig
-from synapse.types import Collection, StreamToken, UserID
+from synapse.types import (
+    Collection,
+    PersistedEventPosition,
+    RoomStreamToken,
+    StreamToken,
+    UserID,
+)
 from synapse.util.async_helpers import ObservableDeferred, timeout_deferred
 from synapse.util.metrics import Measure
 from synapse.visibility import filter_events_for_client
@@ -112,7 +118,9 @@ class _NotifierUserStream:
         with PreserveLoggingContext():
             self.notify_deferred = ObservableDeferred(defer.Deferred())
 
-    def notify(self, stream_key: str, stream_id: int, time_now_ms: int):
+    def notify(
+        self, stream_key: str, stream_id: Union[int, RoomStreamToken], time_now_ms: int,
+    ):
         """Notify any listeners for this user of a new event from an
         event source.
         Args:
@@ -155,17 +163,26 @@ class _NotifierUserStream:
         """
         # Immediately wake up stream if something has already since happened
         # since their last token.
-        if self.last_notified_token.is_after(token):
+        if self.last_notified_token != token:
             return _NotificationListener(defer.succeed(self.current_token))
         else:
             return _NotificationListener(self.notify_deferred.observe())
 
 
 class EventStreamResult(namedtuple("EventStreamResult", ("events", "tokens"))):
-    def __nonzero__(self):
+    def __bool__(self):
         return bool(self.events)
 
-    __bool__ = __nonzero__  # python3
+
+@attr.s(slots=True, frozen=True)
+class _PendingRoomEventEntry:
+    event_pos = attr.ib(type=PersistedEventPosition)
+    extra_users = attr.ib(type=Collection[UserID])
+
+    room_id = attr.ib(type=str)
+    type = attr.ib(type=str)
+    state_key = attr.ib(type=Optional[str])
+    membership = attr.ib(type=Optional[str])
 
 
 class Notifier:
@@ -185,9 +202,7 @@ class Notifier:
         self.storage = hs.get_storage()
         self.event_sources = hs.get_event_sources()
         self.store = hs.get_datastore()
-        self.pending_new_room_events = (
-            []
-        )  # type: List[Tuple[int, EventBase, Collection[Union[str, UserID]]]]
+        self.pending_new_room_events = []  # type: List[_PendingRoomEventEntry]
 
         # Called when there are new things to stream over replication
         self.replication_callbacks = []  # type: List[Callable[[], None]]
@@ -198,6 +213,7 @@ class Notifier:
 
         self.clock = hs.get_clock()
         self.appservice_handler = hs.get_application_service_handler()
+        self._pusher_pool = hs.get_pusherpool()
 
         self.federation_sender = None
         if hs.should_send_federation():
@@ -245,11 +261,33 @@ class Notifier:
     def on_new_room_event(
         self,
         event: EventBase,
-        room_stream_id: int,
-        max_room_stream_id: int,
-        extra_users: Collection[Union[str, UserID]] = [],
+        event_pos: PersistedEventPosition,
+        max_room_stream_token: RoomStreamToken,
+        extra_users: Collection[UserID] = [],
     ):
-        """ Used by handlers to inform the notifier something has happened
+        """Unwraps event and calls `on_new_room_event_args`.
+        """
+        self.on_new_room_event_args(
+            event_pos=event_pos,
+            room_id=event.room_id,
+            event_type=event.type,
+            state_key=event.get("state_key"),
+            membership=event.content.get("membership"),
+            max_room_stream_token=max_room_stream_token,
+            extra_users=extra_users,
+        )
+
+    def on_new_room_event_args(
+        self,
+        room_id: str,
+        event_type: str,
+        state_key: Optional[str],
+        membership: Optional[str],
+        event_pos: PersistedEventPosition,
+        max_room_stream_token: RoomStreamToken,
+        extra_users: Collection[UserID] = [],
+    ):
+        """Used by handlers to inform the notifier something has happened
         in the room, room event wise.
 
         This triggers the notifier to wake up any listeners that are
@@ -260,60 +298,97 @@ class Notifier:
         until all previous events have been persisted before notifying
         the client streams.
         """
-        self.pending_new_room_events.append((room_stream_id, event, extra_users))
-        self._notify_pending_new_room_events(max_room_stream_id)
+        self.pending_new_room_events.append(
+            _PendingRoomEventEntry(
+                event_pos=event_pos,
+                extra_users=extra_users,
+                room_id=room_id,
+                type=event_type,
+                state_key=state_key,
+                membership=membership,
+            )
+        )
+        self._notify_pending_new_room_events(max_room_stream_token)
 
         self.notify_replication()
 
-    def _notify_pending_new_room_events(self, max_room_stream_id: int):
+    def _notify_pending_new_room_events(self, max_room_stream_token: RoomStreamToken):
         """Notify for the room events that were queued waiting for a previous
         event to be persisted.
         Args:
-            max_room_stream_id: The highest stream_id below which all
+            max_room_stream_token: The highest stream_id below which all
                 events have been persisted.
         """
         pending = self.pending_new_room_events
         self.pending_new_room_events = []
-        for room_stream_id, event, extra_users in pending:
-            if room_stream_id > max_room_stream_id:
-                self.pending_new_room_events.append(
-                    (room_stream_id, event, extra_users)
-                )
-            else:
-                self._on_new_room_event(event, room_stream_id, extra_users)
 
-    def _on_new_room_event(
-        self,
-        event: EventBase,
-        room_stream_id: int,
-        extra_users: Collection[Union[str, UserID]] = [],
-    ):
-        """Notify any user streams that are interested in this room event"""
+        users = set()  # type: Set[UserID]
+        rooms = set()  # type: Set[str]
+
+        for entry in pending:
+            if entry.event_pos.persisted_after(max_room_stream_token):
+                self.pending_new_room_events.append(entry)
+            else:
+                if (
+                    entry.type == EventTypes.Member
+                    and entry.membership == Membership.JOIN
+                    and entry.state_key
+                ):
+                    self._user_joined_room(entry.state_key, entry.room_id)
+
+                users.update(entry.extra_users)
+                rooms.add(entry.room_id)
+
+        if users or rooms:
+            self.on_new_event(
+                "room_key", max_room_stream_token, users=users, rooms=rooms,
+            )
+            self._on_updated_room_token(max_room_stream_token)
+
+    def _on_updated_room_token(self, max_room_stream_token: RoomStreamToken):
+        """Poke services that might care that the room position has been
+        updated.
+        """
+
         # poke any interested application service.
-        run_as_background_process(
-            "notify_app_services", self._notify_app_services, room_stream_id
-        )
+        self._notify_app_services(max_room_stream_token)
+        self._notify_pusher_pool(max_room_stream_token)
 
         if self.federation_sender:
-            self.federation_sender.notify_new_events(room_stream_id)
+            self.federation_sender.notify_new_events(max_room_stream_token)
 
-        if event.type == EventTypes.Member and event.membership == Membership.JOIN:
-            self._user_joined_room(event.state_key, event.room_id)
-
-        self.on_new_event(
-            "room_key", room_stream_id, users=extra_users, rooms=[event.room_id]
-        )
-
-    async def _notify_app_services(self, room_stream_id: int):
+    def _notify_app_services(self, max_room_stream_token: RoomStreamToken):
         try:
-            await self.appservice_handler.notify_interested_services(room_stream_id)
+            self.appservice_handler.notify_interested_services(max_room_stream_token)
         except Exception:
             logger.exception("Error notifying application services of event")
+
+    def _notify_app_services_ephemeral(
+        self,
+        stream_key: str,
+        new_token: Union[int, RoomStreamToken],
+        users: Collection[Union[str, UserID]] = [],
+    ):
+        try:
+            stream_token = None
+            if isinstance(new_token, int):
+                stream_token = new_token
+            self.appservice_handler.notify_interested_services_ephemeral(
+                stream_key, stream_token, users
+            )
+        except Exception:
+            logger.exception("Error notifying application services of event")
+
+    def _notify_pusher_pool(self, max_room_stream_token: RoomStreamToken):
+        try:
+            self._pusher_pool.on_new_notifications(max_room_stream_token)
+        except Exception:
+            logger.exception("Error pusher pool of event")
 
     def on_new_event(
         self,
         stream_key: str,
-        new_token: int,
+        new_token: Union[int, RoomStreamToken],
         users: Collection[Union[str, UserID]] = [],
         rooms: Collection[str] = [],
     ):
@@ -342,8 +417,13 @@ class Notifier:
 
                 self.notify_replication()
 
+                # Notify appservices
+                self._notify_app_services_ephemeral(
+                    stream_key, new_token, users,
+                )
+
     def on_new_replication_data(self) -> None:
-        """Used to inform replication listeners that something has happend
+        """Used to inform replication listeners that something has happened
         without waking up any of the normal user event streams"""
         self.notify_replication()
 
@@ -432,8 +512,9 @@ class Notifier:
         If explicit_room_id is set, that room will be polled for events only if
         it is world readable or the user has joined the room.
         """
-        from_token = pagination_config.from_token
-        if not from_token:
+        if pagination_config.from_token:
+            from_token = pagination_config.from_token
+        else:
             from_token = self.event_sources.get_current_token()
 
         limit = pagination_config.limit
@@ -444,7 +525,7 @@ class Notifier:
         async def check_for_updates(
             before_token: StreamToken, after_token: StreamToken
         ) -> EventStreamResult:
-            if not after_token.is_after(before_token):
+            if after_token == before_token:
                 return EventStreamResult([], (from_token, from_token))
 
             events = []  # type: List[EventBase]

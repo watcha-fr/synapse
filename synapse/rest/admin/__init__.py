@@ -16,13 +16,13 @@
 
 import logging
 import platform
-import re
 
 import synapse
 from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.server import JsonResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.rest.admin._base import (
+    admin_patterns,
     assert_requester_is_admin,
     historical_admin_path_patterns,
 )
@@ -30,6 +30,10 @@ from synapse.rest.admin.devices import (
     DeleteDevicesRestServlet,
     DeviceRestServlet,
     DevicesRestServlet,
+)
+from synapse.rest.admin.event_reports import (
+    EventReportDetailRestServlet,
+    EventReportsRestServlet,
 )
 from synapse.rest.admin.groups import DeleteGroupAdminRestServlet
 from synapse.rest.admin.media import ListMediaInRoom, register_servlets_for_media_repo
@@ -43,25 +47,30 @@ from synapse.rest.admin.rooms import (
     ShutdownRoomRestServlet,
 )
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
+from synapse.rest.admin.statistics import UserMediaStatisticsRestServlet
 from synapse.rest.admin.users import (
     AccountValidityRenewServlet,
     DeactivateAccountRestServlet,
+    PushersRestServlet,
     ResetPasswordRestServlet,
     SearchUsersRestServlet,
     UserAdminServlet,
+    UserMediaRestServlet,
+    UserMembershipRestServlet,
     UserRegisterServlet,
     UserRestServletV2,
     UsersRestServlet,
     UsersRestServletV2,
     WhoisRestServlet,
 )
+from synapse.types import RoomStreamToken
 from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger(__name__)
 
 
 class VersionServlet(RestServlet):
-    PATTERNS = (re.compile("^/_synapse/admin/v1/server_version$"),)
+    PATTERNS = admin_patterns("/server_version$")
 
     def __init__(self, hs):
         self.res = {
@@ -107,7 +116,10 @@ class PurgeHistoryRestServlet(RestServlet):
             if event.room_id != room_id:
                 raise SynapseError(400, "Event is for wrong room.")
 
-            token = await self.store.get_topological_token_for_event(event_id)
+            room_token = RoomStreamToken(
+                event.depth, event.internal_metadata.stream_ordering
+            )
+            token = await room_token.to_string(self.store)
 
             logger.info("[purge] purging up to token %s (event_id %s)", token, event_id)
         elif "purge_up_to_ts" in body:
@@ -209,11 +221,17 @@ def register_servlets(hs, http_server):
     SendServerNoticeServlet(hs).register(http_server)
     VersionServlet(hs).register(http_server)
     UserAdminServlet(hs).register(http_server)
+    UserMediaRestServlet(hs).register(http_server)
+    UserMembershipRestServlet(hs).register(http_server)
     UserRestServletV2(hs).register(http_server)
     UsersRestServletV2(hs).register(http_server)
     DeviceRestServlet(hs).register(http_server)
     DevicesRestServlet(hs).register(http_server)
     DeleteDevicesRestServlet(hs).register(http_server)
+    UserMediaStatisticsRestServlet(hs).register(http_server)
+    EventReportDetailRestServlet(hs).register(http_server)
+    EventReportsRestServlet(hs).register(http_server)
+    PushersRestServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(hs, http_server):

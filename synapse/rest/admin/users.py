@@ -15,8 +15,8 @@
 import hashlib
 import hmac
 import logging
-import re
 from http import HTTPStatus
+from typing import Tuple
 
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, NotFoundError, SynapseError
@@ -28,14 +28,27 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import (
+    admin_patterns,
     assert_requester_is_admin,
     assert_user_is_admin,
     historical_admin_path_patterns,
 )
-from synapse.types import UserID
+from synapse.types import JsonDict, UserID
 
 logger = logging.getLogger(__name__)
+
+_GET_PUSHERS_ALLOWED_KEYS = {
+    "app_display_name",
+    "app_id",
+    "data",
+    "device_display_name",
+    "kind",
+    "lang",
+    "profile_tag",
+    "pushkey",
+}
 
 
 class UsersRestServlet(RestServlet):
@@ -45,7 +58,7 @@ class UsersRestServlet(RestServlet):
         self.hs = hs
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
-        self.admin_handler = hs.get_handlers().admin_handler
+        self.admin_handler = hs.get_admin_handler()
 
     async def on_GET(self, request, user_id):
         target_user = UserID.from_string(user_id)
@@ -60,7 +73,7 @@ class UsersRestServlet(RestServlet):
 
 
 class UsersRestServletV2(RestServlet):
-    PATTERNS = (re.compile("^/_synapse/admin/v2/users$"),)
+    PATTERNS = admin_patterns("/users$", "v2")
 
     """Get request to list all local users.
     This needs user to have administrator access in Synapse.
@@ -82,7 +95,7 @@ class UsersRestServletV2(RestServlet):
         self.hs = hs
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
-        self.admin_handler = hs.get_handlers().admin_handler
+        self.admin_handler = hs.get_admin_handler()
 
     async def on_GET(self, request):
         await assert_requester_is_admin(self.auth, request)
@@ -105,7 +118,7 @@ class UsersRestServletV2(RestServlet):
 
 
 class UserRestServletV2(RestServlet):
-    PATTERNS = (re.compile("^/_synapse/admin/v2/users/(?P<user_id>[^/]+)$"),)
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]+)$", "v2")
 
     """Get request to list user details.
     This needs user to have administrator access in Synapse.
@@ -135,7 +148,7 @@ class UserRestServletV2(RestServlet):
     def __init__(self, hs):
         self.hs = hs
         self.auth = hs.get_auth()
-        self.admin_handler = hs.get_handlers().admin_handler
+        self.admin_handler = hs.get_admin_handler()
         self.store = hs.get_datastore()
         self.auth_handler = hs.get_auth_handler()
         self.profile_handler = hs.get_profile_handler()
@@ -400,6 +413,7 @@ class UserRegisterServlet(RestServlet):
         is_partner = body.get("is_partner", False) # watcha+
         admin = body.get("admin", None)
         user_type = body.get("user_type", None)
+        displayname = body.get("displayname", None)
 
         if user_type is not None and user_type not in UserTypes.ALL_USER_TYPES:
             raise SynapseError(400, "Invalid user type")
@@ -436,6 +450,7 @@ class UserRegisterServlet(RestServlet):
             password_hash=password_hash,
             admin=bool(admin),
             user_type=user_type,
+            default_display_name=displayname,
             by_admin=True,
             make_partner=is_partner, # watcha+
         )
@@ -450,7 +465,7 @@ class WhoisRestServlet(RestServlet):
     def __init__(self, hs):
         self.hs = hs
         self.auth = hs.get_auth()
-        self.handlers = hs.get_handlers()
+        self.admin_handler = hs.get_admin_handler()
 
     async def on_GET(self, request, user_id):
         target_user = UserID.from_string(user_id)
@@ -463,7 +478,7 @@ class WhoisRestServlet(RestServlet):
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Can only whois a local user")
 
-        ret = await self.handlers.admin_handler.get_whois(target_user)
+        ret = await self.admin_handler.get_whois(target_user)
 
         return 200, ret
 
@@ -593,7 +608,6 @@ class SearchUsersRestServlet(RestServlet):
         self.hs = hs
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
-        self.handlers = hs.get_handlers()
 
     async def on_GET(self, request, target_user_id):
         """Get request to search user table for specific users according to
@@ -614,7 +628,7 @@ class SearchUsersRestServlet(RestServlet):
         term = parse_string(request, "term", required=True)
         logger.info("term: %s ", term)
 
-        ret = await self.handlers.store.search_users(term)
+        ret = await self.store.search_users(term)
         return 200, ret
 
 
@@ -644,7 +658,7 @@ class UserAdminServlet(RestServlet):
                 {}
     """
 
-    PATTERNS = (re.compile("^/_synapse/admin/v1/users/(?P<user_id>[^/]*)/admin$"),)
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/admin$")
 
     def __init__(self, hs):
         self.hs = hs
@@ -685,3 +699,134 @@ class UserAdminServlet(RestServlet):
         await self.store.set_server_admin(target_user, set_admin_to)
 
         return 200, {}
+
+
+class UserMembershipRestServlet(RestServlet):
+    """
+    Get room list of an user.
+    """
+
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]+)/joined_rooms$")
+
+    def __init__(self, hs):
+        self.is_mine = hs.is_mine
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+
+    async def on_GET(self, request, user_id):
+        await assert_requester_is_admin(self.auth, request)
+
+        if not self.is_mine(UserID.from_string(user_id)):
+            raise SynapseError(400, "Can only lookup local users")
+
+        user = await self.store.get_user_by_id(user_id)
+        if user is None:
+            raise NotFoundError("Unknown user")
+
+        room_ids = await self.store.get_rooms_for_user(user_id)
+        ret = {"joined_rooms": list(room_ids), "total": len(room_ids)}
+        return 200, ret
+
+
+class PushersRestServlet(RestServlet):
+    """
+    Gets information about all pushers for a specific `user_id`.
+
+    Example:
+        http://localhost:8008/_synapse/admin/v1/users/
+        @user:server/pushers
+
+    Returns:
+        pushers: Dictionary containing pushers information.
+        total: Number of pushers in dictonary `pushers`.
+    """
+
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/pushers$")
+
+    def __init__(self, hs):
+        self.is_mine = hs.is_mine
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self.auth, request)
+
+        if not self.is_mine(UserID.from_string(user_id)):
+            raise SynapseError(400, "Can only lookup local users")
+
+        if not await self.store.get_user_by_id(user_id):
+            raise NotFoundError("User not found")
+
+        pushers = await self.store.get_pushers_by_user_id(user_id)
+
+        filtered_pushers = [
+            {k: v for k, v in p.items() if k in _GET_PUSHERS_ALLOWED_KEYS}
+            for p in pushers
+        ]
+
+        return 200, {"pushers": filtered_pushers, "total": len(filtered_pushers)}
+
+
+class UserMediaRestServlet(RestServlet):
+    """
+    Gets information about all uploaded local media for a specific `user_id`.
+
+    Example:
+        http://localhost:8008/_synapse/admin/v1/users/
+        @user:server/media
+
+    Args:
+        The parameters `from` and `limit` are required for pagination.
+        By default, a `limit` of 100 is used.
+    Returns:
+        A list of media and an integer representing the total number of
+        media that exist given for this user
+    """
+
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]+)/media$")
+
+    def __init__(self, hs):
+        self.is_mine = hs.is_mine
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self.auth, request)
+
+        if not self.is_mine(UserID.from_string(user_id)):
+            raise SynapseError(400, "Can only lookup local users")
+
+        user = await self.store.get_user_by_id(user_id)
+        if user is None:
+            raise NotFoundError("Unknown user")
+
+        start = parse_integer(request, "from", default=0)
+        limit = parse_integer(request, "limit", default=100)
+
+        if start < 0:
+            raise SynapseError(
+                400,
+                "Query parameter from must be a string representing a positive integer.",
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        if limit < 0:
+            raise SynapseError(
+                400,
+                "Query parameter limit must be a string representing a positive integer.",
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        media, total = await self.store.get_local_media_by_user_paginate(
+            start, limit, user_id
+        )
+
+        ret = {"media": media, "total": total}
+        if (start + limit) < total:
+            ret["next_token"] = start + len(media)
+
+        return 200, ret

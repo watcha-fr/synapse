@@ -15,12 +15,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import glob
 import os
-from setuptools import setup, find_packages, Command
-import sys
 
+from setuptools import Command, find_packages, setup
 
 here = os.path.abspath(os.path.dirname(__file__))
 
@@ -94,6 +92,24 @@ ALL_OPTIONAL_REQUIREMENTS = dependencies["ALL_OPTIONAL_REQUIREMENTS"]
 # Make `pip install matrix-synapse[all]` install all the optional dependencies.
 CONDITIONAL_REQUIREMENTS["all"] = list(ALL_OPTIONAL_REQUIREMENTS)
 
+# Developer dependencies should not get included in "all".
+#
+# We pin black so that our tests don't start failing on new releases.
+CONDITIONAL_REQUIREMENTS["lint"] = [
+    "isort==5.0.3",
+    "black==19.10b0",
+    "flake8-comprehensions",
+    "flake8",
+]
+
+CONDITIONAL_REQUIREMENTS["mypy"] = ["mypy==0.790", "mypy-zope==0.2.8"]
+
+# Dependencies which are exclusively required by unit test code. This is
+# NOT a list of all modules that are necessary to run the unit tests.
+# Tests assume that all optional dependencies are installed.
+#
+# parameterized_class decorator was introduced in parameterized 0.7.0
+CONDITIONAL_REQUIREMENTS["test"] = ["mock>=2.0", "parameterized>=0.7.0"]
 
 setup(
     name="matrix-synapse",
@@ -115,6 +131,7 @@ setup(
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
     ],
     scripts=["synctl"] + glob.glob("scripts/*"),
     cmdclass={"test": TestCommand},

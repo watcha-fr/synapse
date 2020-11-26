@@ -44,7 +44,7 @@ class PushersRestServlet(RestServlet):
     PATTERNS = client_patterns("/pushers$", v1=True)
 
     def __init__(self, hs):
-        super(PushersRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
 
@@ -60,15 +60,12 @@ class PushersRestServlet(RestServlet):
 
         return 200, {"pushers": filtered_pushers}
 
-    def on_OPTIONS(self, _):
-        return 200, {}
-
 
 class PushersSetRestServlet(RestServlet):
     PATTERNS = client_patterns("/pushers/set$", v1=True)
 
     def __init__(self, hs):
-        super(PushersSetRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.notifier = hs.get_notifier()
@@ -140,9 +137,6 @@ class PushersSetRestServlet(RestServlet):
 
         return 200, {}
 
-    def on_OPTIONS(self, _):
-        return 200, {}
-
 
 class PushersRemoveRestServlet(RestServlet):
     """
@@ -153,7 +147,7 @@ class PushersRemoveRestServlet(RestServlet):
     SUCCESS_HTML = b"<html><body>You have been unsubscribed</body><html>"
 
     def __init__(self, hs):
-        super(PushersRemoveRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.notifier = hs.get_notifier()
         self.auth = hs.get_auth()
@@ -181,9 +175,6 @@ class PushersRemoveRestServlet(RestServlet):
             request, 200, PushersRemoveRestServlet.SUCCESS_HTML,
         )
         return None
-
-    def on_OPTIONS(self, _):
-        return 200, {}
 
 
 def register_servlets(hs, http_server):

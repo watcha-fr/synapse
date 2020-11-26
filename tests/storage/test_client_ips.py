@@ -154,7 +154,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         user_id = "@user:server"
 
         self.store.get_monthly_active_count = Mock(
-            side_effect=lambda: make_awaitable(lots_of_users)
+            return_value=make_awaitable(lots_of_users)
         )
         self.get_success(
             self.store.insert_client_ip(
@@ -412,7 +412,7 @@ class ClientIpAuthTestCase(unittest.HomeserverTestCase):
             "GET",
             "/_matrix/client/r0/admin/users/" + self.user_id,
             access_token=access_token,
-            **make_request_args
+            **make_request_args,
         )
         request.requestHeaders.addRawHeader(b"User-Agent", b"Mozzila pizza")
 

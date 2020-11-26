@@ -52,6 +52,7 @@ class MediaStorage:
         storage_providers: Sequence["StorageProviderWrapper"],
     ):
         self.hs = hs
+        self.reactor = hs.get_reactor()
         self.local_media_directory = local_media_directory
         self.filepaths = filepaths
         self.storage_providers = storage_providers
@@ -70,12 +71,15 @@ class MediaStorage:
 
         with self.store_into_file(file_info) as (f, fname, finish_cb):
             # Write to the main repository
-            await defer_to_thread(
-                self.hs.get_reactor(), _write_file_synchronously, source, f
-            )
+            await self.write_to_file(source, f)
             await finish_cb()
 
         return fname
+
+    async def write_to_file(self, source: IO, output: IO):
+        """Asynchronously write the `source` to `output`.
+        """
+        await defer_to_thread(self.reactor, _write_file_synchronously, source, output)
 
     @contextlib.contextmanager
     def store_into_file(self, file_info: FileInfo):
@@ -112,14 +116,20 @@ class MediaStorage:
 
         finished_called = [False]
 
-        async def finish():
-            for provider in self.storage_providers:
-                await provider.store_file(path, file_info)
-
-            finished_called[0] = True
-
         try:
             with open(fname, "wb") as f:
+
+                async def finish():
+                    # Ensure that all writes have been flushed and close the
+                    # file.
+                    f.flush()
+                    f.close()
+
+                    for provider in self.storage_providers:
+                        await provider.store_file(path, file_info)
+
+                    finished_called[0] = True
+
                 yield f, fname, finish
         except Exception:
             try:
@@ -141,17 +151,34 @@ class MediaStorage:
         Returns:
             Returns a Responder if the file was found, otherwise None.
         """
+        paths = [self._file_info_to_path(file_info)]
 
-        path = self._file_info_to_path(file_info)
-        local_path = os.path.join(self.local_media_directory, path)
-        if os.path.exists(local_path):
-            return FileResponder(open(local_path, "rb"))
+        # fallback for remote thumbnails with no method in the filename
+        if file_info.thumbnail and file_info.server_name:
+            paths.append(
+                self.filepaths.remote_media_thumbnail_rel_legacy(
+                    server_name=file_info.server_name,
+                    file_id=file_info.file_id,
+                    width=file_info.thumbnail_width,
+                    height=file_info.thumbnail_height,
+                    content_type=file_info.thumbnail_type,
+                )
+            )
+
+        for path in paths:
+            local_path = os.path.join(self.local_media_directory, path)
+            if os.path.exists(local_path):
+                logger.debug("responding with local file %s", local_path)
+                return FileResponder(open(local_path, "rb"))
+            logger.debug("local file %s did not exist", local_path)
 
         for provider in self.storage_providers:
-            res = await provider.fetch(path, file_info)  # type: Any
-            if res:
-                logger.debug("Streaming %s from %s", path, provider)
-                return res
+            for path in paths:
+                res = await provider.fetch(path, file_info)  # type: Any
+                if res:
+                    logger.debug("Streaming %s from %s", path, provider)
+                    return res
+                logger.debug("%s not found on %s", path, provider)
 
         return None
 
@@ -170,6 +197,20 @@ class MediaStorage:
         if os.path.exists(local_path):
             return local_path
 
+        # Fallback for paths without method names
+        # Should be removed in the future
+        if file_info.thumbnail and file_info.server_name:
+            legacy_path = self.filepaths.remote_media_thumbnail_rel_legacy(
+                server_name=file_info.server_name,
+                file_id=file_info.file_id,
+                width=file_info.thumbnail_width,
+                height=file_info.thumbnail_height,
+                content_type=file_info.thumbnail_type,
+            )
+            legacy_local_path = os.path.join(self.local_media_directory, legacy_path)
+            if os.path.exists(legacy_local_path):
+                return legacy_local_path
+
         dirname = os.path.dirname(local_path)
         if not os.path.exists(dirname):
             os.makedirs(dirname)
@@ -179,7 +220,7 @@ class MediaStorage:
             if res:
                 with res:
                     consumer = BackgroundFileConsumer(
-                        open(local_path, "wb"), self.hs.get_reactor()
+                        open(local_path, "wb"), self.reactor
                     )
                     await res.write_to_consumer(consumer)
                     await consumer.wait()

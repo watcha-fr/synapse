@@ -50,7 +50,7 @@ async def inject_member_event(
         sender=sender,
         state_key=target,
         content=content,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -71,7 +71,10 @@ async def inject_event(
     """
     event, context = await create_event(hs, room_version, prev_event_ids, **kwargs)
 
-    await hs.get_storage().persistence.persist_event(event, context)
+    persistence = hs.get_storage().persistence
+    assert persistence is not None
+
+    await persistence.persist_event(event, context)
 
     return event
 

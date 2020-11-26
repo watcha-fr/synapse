@@ -2,7 +2,7 @@ import json, logging
 
 from synapse.rest import admin
 from synapse.rest.client.v1 import watcha, login, room
-from synapse.types import Requester, UserID
+from synapse.types import UserID, create_requester
 from tests import unittest
 from tests.test_utils import get_awaitable_result
 from tests.utils import setup_test_homeserver
@@ -383,7 +383,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
         )
 
     def _create_room(self):
-        requester = Requester(self.user, None, False, False, None, False, None)
+        requester = create_requester(self.user)
 
         return self.get_success(self.room_creator.create_room(requester, {}))[0][
             "room_id"

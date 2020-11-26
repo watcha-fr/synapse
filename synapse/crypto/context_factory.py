@@ -45,7 +45,11 @@ _TLS_VERSION_MAP = {
 
 class ServerContextFactory(ContextFactory):
     """Factory for PyOpenSSL SSL contexts that are used to handle incoming
-    connections."""
+    connections.
+
+    TODO: replace this with an implementation of IOpenSSLServerConnectionCreator,
+    per https://github.com/matrix-org/synapse/issues/1691
+    """
 
     def __init__(self, config):
         # TODO: once pyOpenSSL exposes TLS_METHOD and SSL_CTX_set_min_proto_version,
@@ -145,7 +149,7 @@ class FederationPolicyForHTTPS:
         return SSLClientConnectionCreator(host, ssl_context, should_verify)
 
     def creatorForNetloc(self, hostname, port):
-        """Implements the IPolicyForHTTPS interace so that this can be passed
+        """Implements the IPolicyForHTTPS interface so that this can be passed
         directly to agents.
         """
         return self.get_options(hostname)

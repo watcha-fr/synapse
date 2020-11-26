@@ -69,6 +69,23 @@ class MediaFilePaths:
 
     local_media_thumbnail = _wrap_in_base_path(local_media_thumbnail_rel)
 
+    def local_media_thumbnail_dir(self, media_id: str) -> str:
+        """
+        Retrieve the local store path of thumbnails of a given media_id
+
+        Args:
+            media_id: The media ID to query.
+        Returns:
+            Path of local_thumbnails from media_id
+        """
+        return os.path.join(
+            self.base_path,
+            "local_thumbnails",
+            media_id[0:2],
+            media_id[2:4],
+            media_id[4:],
+        )
+
     def remote_media_filepath_rel(self, server_name, file_id):
         return os.path.join(
             "remote_content", server_name, file_id[0:2], file_id[2:4], file_id[4:]
@@ -80,7 +97,7 @@ class MediaFilePaths:
         self, server_name, file_id, width, height, content_type, method
     ):
         top_level_type, sub_type = content_type.split("/")
-        file_name = "%i-%i-%s-%s" % (width, height, top_level_type, sub_type)
+        file_name = "%i-%i-%s-%s-%s" % (width, height, top_level_type, sub_type, method)
         return os.path.join(
             "remote_thumbnail",
             server_name,
@@ -91,6 +108,23 @@ class MediaFilePaths:
         )
 
     remote_media_thumbnail = _wrap_in_base_path(remote_media_thumbnail_rel)
+
+    # Legacy path that was used to store thumbnails previously.
+    # Should be removed after some time, when most of the thumbnails are stored
+    # using the new path.
+    def remote_media_thumbnail_rel_legacy(
+        self, server_name, file_id, width, height, content_type
+    ):
+        top_level_type, sub_type = content_type.split("/")
+        file_name = "%i-%i-%s-%s" % (width, height, top_level_type, sub_type)
+        return os.path.join(
+            "remote_thumbnail",
+            server_name,
+            file_id[0:2],
+            file_id[2:4],
+            file_id[4:],
+            file_name,
+        )
 
     def remote_media_thumbnail_dir(self, server_name, file_id):
         return os.path.join(

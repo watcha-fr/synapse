@@ -45,6 +45,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.metrics import threepid_send_requests
 from synapse.push.mailer import Mailer
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
@@ -76,9 +77,9 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(EmailRegisterRequestTokenRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
-        self.identity_handler = hs.get_handlers().identity_handler
+        self.identity_handler = hs.get_identity_handler()
         self.config = hs.config
 
         if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
@@ -163,6 +164,10 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             # Wrap the session id in a JSON object
             ret = {"sid": sid}
 
+        threepid_send_requests.labels(type="email", reason="register").observe(
+            send_attempt
+        )
+
         return 200, ret
 
 
@@ -174,9 +179,9 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(MsisdnRegisterRequestTokenRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
-        self.identity_handler = hs.get_handlers().identity_handler
+        self.identity_handler = hs.get_identity_handler()
 
     async def on_POST(self, request):
         body = parse_json_object_from_request(request)
@@ -234,6 +239,10 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
             next_link,
         )
 
+        threepid_send_requests.labels(type="msisdn", reason="register").observe(
+            send_attempt
+        )
+
         return 200, ret
 
 
@@ -249,7 +258,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(RegistrationSubmitTokenServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.config = hs.config
@@ -319,7 +328,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(UsernameAvailabilityRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.registration_handler = hs.get_registration_handler()
         self.ratelimiter = FederationRateLimiter(
@@ -363,14 +372,14 @@ class RegisterRestServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(RegisterRestServlet, self).__init__()
+        super().__init__()
 
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
-        self.identity_handler = hs.get_handlers().identity_handler
+        self.identity_handler = hs.get_identity_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.macaroon_gen = hs.get_macaroon_generator()
         self.ratelimiter = hs.get_registration_ratelimiter()
@@ -431,11 +440,14 @@ class RegisterRestServlet(RestServlet):
 
             access_token = self.auth.get_access_token_from_request(request)
 
-            if isinstance(desired_username, str):
-                result = await self._do_appservice_registration(
-                    desired_username, access_token, body
-                )
-            return 200, result  # we throw for non 200 responses
+            if not isinstance(desired_username, str):
+                raise SynapseError(400, "Desired Username is missing or not a string")
+
+            result = await self._do_appservice_registration(
+                desired_username, access_token, body
+            )
+
+            return 200, result
 
         # == Normal User Registration == (everyone else)
         if not self._registration_enabled:
@@ -638,9 +650,6 @@ class RegisterRestServlet(RestServlet):
             )
 
         return 200, return_dict
-
-    def on_OPTIONS(self, _):
-        return 200, {}
 
     async def _do_appservice_registration(self, username, as_token, body):
         user_id = await self.registration_handler.appservice_register(
