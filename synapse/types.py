@@ -29,6 +29,7 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
+    Union,
 )
 
 import attr
@@ -38,6 +39,7 @@ from unpaddedbase64 import decode_base64
 from synapse.api.errors import Codes, SynapseError
 
 if TYPE_CHECKING:
+    from synapse.appservice.api import ApplicationService
     from synapse.storage.databases.main import DataStore
 
 # define a version of typing.Collection that works on python 3.5
@@ -75,6 +77,7 @@ class Requester(
             "shadow_banned",
             "device_id",
             "app_service",
+            "authenticated_entity",
         ],
     )
 ):
@@ -89,8 +92,9 @@ class Requester(
             "is_guest",
             "shadow_banned",
             "device_id",
-            "is_partner",
             "app_service",
+            "authenticated_entity",
+            "is_partner",
         ],
     )
 ):
@@ -121,8 +125,9 @@ class Requester(
             "is_guest": self.is_guest,
             "shadow_banned": self.shadow_banned,
             "device_id": self.device_id,
-            "is_partner": self.is_partner,  # watcha+
             "app_server_id": self.app_service.id if self.app_service else None,
+            "authenticated_entity": self.authenticated_entity,
+            "is_partner": self.is_partner,  # watcha+
         }
 
     @staticmethod
@@ -147,19 +152,21 @@ class Requester(
             is_guest=input["is_guest"],
             shadow_banned=input["shadow_banned"],
             device_id=input["device_id"],
-            is_partner=input["is_partner"],  # watcha+
             app_service=appservice,
+            authenticated_entity=input["authenticated_entity"],
+            is_partner=input["is_partner"],  # watcha+
         )
 
 
 def create_requester(
-    user_id,
-    access_token_id=None,
-    is_guest=False,
-    shadow_banned=False,
-    device_id=None,
-    is_partner=False,  # watcha+
-    app_service=None,
+    user_id: Union[str, "UserID"],
+    access_token_id: Optional[int] = None,
+    is_guest: Optional[bool] = False,
+    shadow_banned: Optional[bool] = False,
+    device_id: Optional[str] = None,
+    app_service: Optional["ApplicationService"] = None,
+    authenticated_entity: Optional[str] = None,
+    is_partner: Optional[bool] = False,  # watcha+
 ):
     """
     Create a new ``Requester`` object
@@ -172,15 +179,28 @@ def create_requester(
         shadow_banned (bool):  True if the user making this request is shadow-banned.
         device_id (str|None):  device_id which was set at authentication time
         app_service (ApplicationService|None):  the AS requesting on behalf of the user
+        authenticated_entity: The entity that authenticated when making the request.
+            This is different to the user_id when an admin user or the server is
+            "puppeting" the user.
 
     Returns:
         Requester
     """
     if not isinstance(user_id, UserID):
         user_id = UserID.from_string(user_id)
+
+    if authenticated_entity is None:
+        authenticated_entity = user_id.to_string()
+
     """ watcha!
     return Requester(
-        user_id, access_token_id, is_guest, shadow_banned, device_id, app_service
+        user_id,
+        access_token_id,
+        is_guest,
+        shadow_banned,
+        device_id,
+        app_service,
+        authenticated_entity,
     )
     !watcha """
     # watcha+
@@ -190,8 +210,9 @@ def create_requester(
         is_guest,
         shadow_banned,
         device_id,
-        is_partner,
         app_service,
+        authenticated_entity,
+        is_partner,
     )  
     # +watcha
 

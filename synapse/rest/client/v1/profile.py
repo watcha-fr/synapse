@@ -82,9 +82,6 @@ class ProfileDisplaynameRestServlet(RestServlet):
 
         return 200, {}
 
-    def on_OPTIONS(self, request, user_id):
-        return 200, {}
-
 
 class ProfileAvatarURLRestServlet(RestServlet):
     PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/avatar_url", v1=True)
@@ -134,9 +131,6 @@ class ProfileAvatarURLRestServlet(RestServlet):
             user, requester, new_avatar_url, is_admin
         )
 
-        return 200, {}
-
-    def on_OPTIONS(self, request, user_id):
         return 200, {}
 
 
