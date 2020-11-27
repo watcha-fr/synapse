@@ -191,8 +191,8 @@ class WatchaNextcloudClient(SimpleHttpClient):
         """
 
         response = await self.get_json(
-            uri="{nextcloud_server}/ocs/v2.php/apps/watcha_integrator/api/v1/shares".format(
-                nextcloud_server=self.nextcloud_server
+            uri="{}/ocs/v2.php/apps/watcha_integrator/api/v1/shares".format(
+                self.nextcloud_server
             ),
             args={"requester": requester, "path": path, "reshare": "true",},
             headers=self._headers,
