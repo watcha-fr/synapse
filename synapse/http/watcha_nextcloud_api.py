@@ -8,8 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class WatchaNextcloudClient(SimpleHttpClient):
-    """ Interface for talking with Nextcloud APIs : https://doc.owncloud.com/server/admin_manual/configuration/user/user_provisioning_api.html
-    """
+    """Interface for talking with Nextcloud APIs : https://doc.owncloud.com/server/admin_manual/configuration/user/user_provisioning_api.html"""
 
     def __init__(self, hs):
         super(WatchaNextcloudClient, self).__init__(hs)
@@ -18,20 +17,17 @@ class WatchaNextcloudClient(SimpleHttpClient):
         self.nextcloud_server = hs.config.nextcloud_server
         self.service_account_name = hs.config.service_account_name
         self.service_account_password = hs.config.service_account_password
+        self.headers = self._get_headers()
 
-    @property
-    def _headers(self):
+    def _get_headers(self):
         return {
             "OCS-APIRequest": ["true"],
             "Authorization": [
                 "Basic "
                 + b64encode(
-                    bytes(
-                        "{}:{}".format(
-                            self.service_account_name, self.service_account_password,
-                        ),
-                        "utf-8",
-                    )
+                    "{}:{}".format(
+                        self.service_account_name, self.service_account_password
+                    ).encode()
                 ).decode()
             ],
         }
@@ -47,7 +43,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
             )
 
     async def add_group(self, group_name):
-        """ Adds a new Nextcloud group.
+        """Adds a new Nextcloud group.
 
         Args:
             group_name: the name of the Nextcloud group
@@ -62,7 +58,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         response = await self.post_json_get_json(
             uri="{}/ocs/v1.php/cloud/groups".format(self.nextcloud_server),
             post_json={"groupid": group_name},
-            headers=self._headers,
+            headers=self.headers,
         )
 
         meta = response["ocs"]["meta"]
@@ -73,7 +69,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
             self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_CREATE_GROUP)
 
     async def delete_group(self, group_name):
-        """ Removes a existing Nextcloud group.
+        """Removes a existing Nextcloud group.
 
         Args:
             group_name: the name of the Nextcloud group
@@ -88,7 +84,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
             uri="{nextcloud_server}/ocs/v1.php/cloud/groups/{group_name}".format(
                 nextcloud_server=self.nextcloud_server, group_name=group_name
             ),
-            headers=self._headers,
+            headers=self.headers,
         )
 
         self._raise_for_status(
@@ -96,7 +92,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         )
 
     async def add_user_to_group(self, username, group_name):
-        """ Add user to the Nextcloud group.
+        """Add user to the Nextcloud group.
 
         Args:
             username: the username of the user to add to the group.
@@ -116,7 +112,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
                 nextcloud_server=self.nextcloud_server, user_id=username
             ),
             post_json={"groupid": group_name},
-            headers=self._headers,
+            headers=self.headers,
         )
 
         self._raise_for_status(
@@ -124,12 +120,12 @@ class WatchaNextcloudClient(SimpleHttpClient):
         )
 
     async def remove_from_group(self, username, group_name):
-        """ Removes the specified user from the specified group.
+        """Removes the specified user from the specified group.
 
         Args:
             username: the username of the user to remove from the group.
             group_name: the group name.
-        
+
         Status codes:
             100: successful
             101: no group specified
@@ -143,7 +139,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
             uri="{nextcloud_server}/ocs/v1.php/cloud/users/{user_id}/groups".format(
                 nextcloud_server=self.nextcloud_server, user_id=username
             ),
-            headers=self._headers,
+            headers=self.headers,
             json_body={"groupid": group_name},
         )
 
@@ -152,7 +148,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         )
 
     async def get_user(self, username):
-        """ Add user to the Nextcloud group.
+        """Add user to the Nextcloud group.
 
         Args:
             username: the username of the user to add to the group.
@@ -167,7 +163,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
             uri="{nextcloud_server}/ocs/v1.php/cloud/users/{user_id}".format(
                 nextcloud_server=self.nextcloud_server, user_id=username
             ),
-            headers=self._headers,
+            headers=self.headers,
         )
 
         self._raise_for_status(
@@ -177,8 +173,8 @@ class WatchaNextcloudClient(SimpleHttpClient):
         return response["ocs"]["data"]
 
     async def get_all_shares(self, requester, path):
-        """ Get informations about all shares and reshares on a folder
-        
+        """Get informations about all shares and reshares on a folder
+
         Args:
             requester: the user who want to remove the share
             path: folder's path.
@@ -194,8 +190,12 @@ class WatchaNextcloudClient(SimpleHttpClient):
             uri="{}/ocs/v2.php/apps/watcha_integrator/api/v1/shares".format(
                 self.nextcloud_server
             ),
-            args={"requester": requester, "path": path, "reshare": "true",},
-            headers=self._headers,
+            args={
+                "requester": requester,
+                "path": path,
+                "reshare": "true",
+            },
+            headers=self.headers,
         )
 
         self._raise_for_status(
@@ -205,7 +205,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         return response["ocs"]["data"]
 
     async def create_all_permission_share_with_group(self, requester, path, group_name):
-        """ Share an existing file or folder with all permissions for a group.
+        """Share an existing file or folder with all permissions for a group.
 
         Args:
             requester: the user who want to remove the share
@@ -238,7 +238,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
             uri="{}/ocs/v2.php/apps/watcha_integrator/api/v1/shares".format(
                 self.nextcloud_server
             ),
-            headers=self._headers,
+            headers=self.headers,
             post_json={
                 "path": path,
                 "shareType": 1,
@@ -253,7 +253,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         )
 
     async def delete_share(self, requester, share_id):
-        """ Remove a given Nextcloud share
+        """Remove a given Nextcloud share
 
         Args:
             requester: the user who want to remove the share
@@ -268,7 +268,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
             uri="{}/ocs/v2.php/apps/watcha_integrator/api/v1/shares/{}".format(
                 self.nextcloud_server, share_id
             ),
-            headers=self._headers,
+            headers=self.headers,
             json_body={"requester": requester},
         )
 
