@@ -77,7 +77,10 @@ logger = logging.getLogger(__name__)
 id_server_scheme = "https://"
 
 FIVE_MINUTES_IN_MS = 5 * 60 * 1000
-NEXTCLOUD_GROUP_NAME_PATTERN = "c4d96a06b758a7ed12f897690828e414_" # watcha+
+# watcha+
+# echo -n watcha | md5sum
+NEXTCLOUD_GROUP_NAME_PREFIX = "c4d96a06b758a7ed12f897690828e414_"
+# +watcha
 
 
 class RoomCreationHandler(BaseHandler):
@@ -1480,7 +1483,7 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
 
         # A pattern is added in front of room_id in order to recognized easily Watcha groups on NC.
         # This pattern correspond to the stdout of (echo -n watcha | md5sum) command
-        await self.nextcloud_client.add_group(NEXTCLOUD_GROUP_NAME_PATTERN + room_id)
+        await self.nextcloud_client.add_group(NEXTCLOUD_GROUP_NAME_PREFIX + room_id)
 
         await self.add_room_users_to_nextcloud_group(room_id)
 
