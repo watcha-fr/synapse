@@ -211,6 +211,22 @@ class WatchaNextcloudClient(SimpleHttpClient):
             requester: the user who want to remove the share
             args: request attributes to filter the search.
 
+        Payload:
+            shareType: the type of the share. This can be one of:
+                0 = user
+                1 = group
+                3 = public link
+                6 = federated cloud share
+
+            permissions: the permissions to set on the share.
+                1 = read (default for public link shares);
+                2 = update;
+                4 = create;
+                8 = delete;
+                15 = read/write;
+                16 = share;
+                31 = All permissions.
+
         Status codes:
             100: successful
             400: Unknown share type
