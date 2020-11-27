@@ -77,7 +77,10 @@ logger = logging.getLogger(__name__)
 id_server_scheme = "https://"
 
 FIVE_MINUTES_IN_MS = 5 * 60 * 1000
-NEXTCLOUD_GROUP_NAME_PATTERN = "c4d96a06b758a7ed12f897690828e414_" # watcha+
+# watcha+
+# echo -n watcha | md5sum
+NEXTCLOUD_GROUP_NAME_PREFIX = "c4d96a06b758a7ed12f897690828e414_"
+# +watcha
 
 
 class RoomCreationHandler(BaseHandler):
