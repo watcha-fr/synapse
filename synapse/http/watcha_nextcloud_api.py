@@ -249,8 +249,8 @@ class WatchaNextcloudClient(SimpleHttpClient):
         """
 
         response = await self.delete_get_json(
-            uri="{nextcloud_server}/ocs/v2.php/apps/watcha_integrator/api/v1/shares/{share_id}".format(
-                nextcloud_server=self.nextcloud_server, share_id=share_id
+            uri="{}/ocs/v2.php/apps/watcha_integrator/api/v1/shares/{}".format(
+                self.nextcloud_server, share_id
             ),
             headers=self._headers,
             json_body={"requester": requester},
