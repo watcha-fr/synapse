@@ -177,7 +177,7 @@ class WatchaRoomEventsStoreTestCase(unittest.HomeserverTestCase):
 
         # Set mapping between a room and a nextcloud directory :
         yield defer.ensureDeferred(
-            self.store.set_room_mapping_with_nextcloud_directory(
+            self.store.map_room_with_nextcloud_directory(
                 self.room_id, self.directory_path, self.share_id
             )
         )
@@ -221,7 +221,7 @@ class WatchaRoomEventsStoreTestCase(unittest.HomeserverTestCase):
         new_share_id = 2
 
         yield defer.ensureDeferred(
-            self.store.set_room_mapping_with_nextcloud_directory(
+            self.store.map_room_with_nextcloud_directory(
                 self.room_id, new_directory_path, new_share_id
             )
         )

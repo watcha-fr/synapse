@@ -1637,7 +1637,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             desc="get_nextcloud_share_id_from_roomID",
         )
 
-    async def set_room_mapping_with_nextcloud_directory(
+    async def map_room_with_nextcloud_directory(
         self, room_id, directory_path, share_id
     ):
         """ Set mapping between Watcha room and Nextcloud directory.
@@ -1651,7 +1651,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                 "directory_path": directory_path,
                 "share_id": share_id,
             },
-            desc="set_room_mapping_with_nextcloud_directory",
+            desc="map_room_with_nextcloud_directory",
         )
 
     async def deleted_room_mapping_with_nextcloud_directory(self, room_id):

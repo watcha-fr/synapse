@@ -105,7 +105,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
 
     def test_update_existing_room_nextcloud_mapping(self):
         self.get_success(
-            self.store.set_room_mapping_with_nextcloud_directory(
+            self.store.map_room_with_nextcloud_directory(
                 self.room_id, "/directory", 2
             )
         )
@@ -143,7 +143,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
 
     def test_delete_existing_room_nextcloud_mapping(self):
         self.get_success(
-            self.store.set_room_mapping_with_nextcloud_directory(
+            self.store.map_room_with_nextcloud_directory(
                 self.room_id, "/directory", 2
             )
         )

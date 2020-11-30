@@ -1490,7 +1490,7 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
             nextcloud_requester, nextcloud_directory_path, room_id
         )
 
-        await self.store.set_room_mapping_with_nextcloud_directory(
+        await self.store.map_room_with_nextcloud_directory(
             room_id, nextcloud_directory_path, new_share_id
         )
 
