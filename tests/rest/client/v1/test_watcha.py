@@ -401,7 +401,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
             room_id = self._create_room()
             mapping_value["room_id"] = room_id
 
-            await self.store.set_room_mapping_with_nextcloud_directory(
+            await self.store.map_room_with_nextcloud_directory(
                 room_id, mapping_value["path"], mapping_value["share_id"]
             )
 

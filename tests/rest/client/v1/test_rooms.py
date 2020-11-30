@@ -2237,7 +2237,7 @@ class WatchaMembershipNextcloudSharingTestCase(unittest.HomeserverTestCase):
 
         # map a room with a Nextcloud directory :
         self.get_success(
-            self.store.set_room_mapping_with_nextcloud_directory(
+            self.store.map_room_with_nextcloud_directory(
                 self.room_id, "/directory", 1
             )
         )
