@@ -149,15 +149,17 @@ class WatchaNextcloudClient(SimpleHttpClient):
         )
 
     async def get_user(self, username):
-        """Add user to the Nextcloud group.
+        """ Get informations of user with username given on parameter
 
         Args:
             username: the username of the user to add to the group.
-            group_name: the group name.
 
         Status codes:
             100: successful
             404: user does not exist
+
+        Returns:
+            informations on the user
         """
 
         response = await self.get_json(
@@ -201,6 +203,9 @@ class WatchaNextcloudClient(SimpleHttpClient):
             400: Unknown share type
             403: Public upload was disabled by the admin
             404: File or folder couldn’t be shared
+
+        Returns:
+            the id of Nextcloud share
         """
 
         response = await self.post_json_get_json(
