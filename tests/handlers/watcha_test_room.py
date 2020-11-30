@@ -87,17 +87,17 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
             self.store.get_nextcloud_share_id_from_roomID(self.room_id)
         )
 
-        # Verify that mocked functions has called once :
+        # Verify that mocked functions are called once
         self.keycloak_client.get_keycloak_user.assert_called_once()
         self.nextcloud_client.add_group.assert_called_once()
         self.keycloak_client.get_all_keycloak_users.assert_called_once()
         self.nextcloud_client.create_all_permission_share_with_group.assert_called_once()
 
-        # Verify that mocked functions has called twice :
+        # Verify that mocked functions are called twice
         self.assertEquals(self.nextcloud_client.get_user.call_count, 2)
         self.assertEquals(self.nextcloud_client.add_user_to_group.call_count, 2)
 
-        # Verify that mocked functions has not called :
+        # Verify that mocked functions are not called
         self.nextcloud_client.delete_share.assert_not_called()
 
         self.assertEqual(mapped_directory, "/directory")
