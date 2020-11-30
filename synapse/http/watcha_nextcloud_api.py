@@ -8,7 +8,8 @@ logger = logging.getLogger(__name__)
 
 
 class WatchaNextcloudClient(SimpleHttpClient):
-    """Interface for talking with Nextcloud APIs : https://doc.owncloud.com/server/admin_manual/configuration/user/user_provisioning_api.html"""
+    """Interface for talking with Nextcloud APIs
+    https://doc.owncloud.com/server/admin_manual/configuration/user/user_provisioning_api.html"""
 
     def __init__(self, hs):
         super(WatchaNextcloudClient, self).__init__(hs)
