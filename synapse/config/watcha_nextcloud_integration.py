@@ -1,57 +1,80 @@
-from ._base import Config
+import re
+from urllib.parse import urljoin
 
-DEFAULT_CONFIG = """
-# Nextcloud Integration configuration
-#
-# 'keycloak_server' corresponds to the Keycloak server URL
-# use to handle authentification process.
-#
-# 'keycloak_realm' is the name of your Keycloak realm 
-# (https://www.keycloak.org/docs/latest/getting_started/#creating-a-realm-and-a-user)
-#
-# 'nextcloud_server' corresponds to the Nextcloud server URL.
-#
-# 'nextcloud_shared_secret' is the secret used to allow Synapse 
-# to logged as a user and to call Nextcloud APIs.
-#
-# handle operations between keycloak, Synapse and Nextcloud.
-#
-# 'service_account_password' is the password or maybe more 
-# a shared secret for the service account.
-#
-#nextcloud_integration:
-#   keycloak_server: "https://example.com/auth/"
-#   keycloak_realm: "example.com"
-#   nextcloud_server: "https://example.com/nextcloud"
-#   nextcloud_shared_secret: "YOUR_SHARED_SECRET"
-#   service_account_password: "YOUR_SHARED_SECRET"
-"""
+from ._base import Config, ConfigError
 
 
 class NextcloudIntegrationConfig(Config):
 
     section = "nextcloudintegration"
 
-    def __init__(self, *args):
-        super(NextcloudIntegrationConfig, self).__init__(*args)
+    # echo -n watcha | md5sum
+    SERVICE_ACCOUNT_NAME = "c4d96a06b758a7ed12f897690828e414_watcha_service_account"
 
-        self.keycloak_server = None
-        self.keycloak_realm = None
-        self.nextcloud_server = None
-        self.nextcloud_shared_secret = None
-        self.service_account_password = None
+    def __init__(self, *args):
+        super().__init__(*args)
+
+        self.keycloak_url = None
+        self.realm_name = None
+        self.nextcloud_url = None
+        self.service_account_name = None
+        self.keycloak_service_account_password = None
+        self.nextcloud_service_account_password = None
 
     def read_config(self, config, **kwargs):
-        nextcloud_integration_config = config.get("nextcloud_integration", {})
-        self.keycloak_server = nextcloud_integration_config.get("keycloak_server")
-        self.keycloak_realm = nextcloud_integration_config.get("keycloak_realm")
-        self.nextcloud_server = nextcloud_integration_config.get("nextcloud_server")
-        self.nextcloud_shared_secret = nextcloud_integration_config.get(
-            "nextcloud_shared_secret"
-        )
-        self.service_account_password = nextcloud_integration_config.get(
-            "service_account_password"
-        )
+        self.nextcloud_enabled = False
+
+        nextcloud_config = config.get("nextcloud_integration")
+        if not nextcloud_config or not nextcloud_config.get("enabled", False):
+            return
+
+        oidc_config = config.get("oidc_config")
+        if not oidc_config or not oidc_config.get("enabled", False):
+            return
+
+        issuer = oidc_config.get("issuer", "")
+        match = re.match("(https?://.+?)/realms/([^/]+)", issuer)
+        if match is None:
+            raise ConfigError(
+                "nextcloud_integration requires oidc_config.issuer to be of the form https://example/realms/xxx"
+            )
+        self.keycloak_url = match.group(1)
+        self.realm_name = match.group(2)
+
+        nextcloud_url = nextcloud_config.get("nextcloud_url")
+        if nextcloud_url is None:
+            client_base_url = config.get("email", {}).get("client_base_url")
+            if client_base_url is None:
+                raise ConfigError(
+                    "nextcloud_integration requires nextcloud_url or email.client_base_url to be set"
+                )
+            nextcloud_url = urljoin(client_base_url, "nextcloud")
+        self.nextcloud_url = nextcloud_url
+
+        self.service_account_name = self.SERVICE_ACCOUNT_NAME
+
+        self.keycloak_service_account_password = nextcloud_config[
+            "keycloak_service_account_password"
+        ]
+        self.nextcloud_service_account_password = nextcloud_config[
+            "nextcloud_service_account_password"
+        ]
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
-        return DEFAULT_CONFIG
+        return """\
+        # Configuration for the Nextcloud integration
+        #
+        nextcloud_integration:
+          # Uncomment the below to enable the Nextcloud integration
+          #
+          #enabled: true
+
+          # Optional
+          # Default domaine infered from email.client_base_url, with "nextcloud" as path.
+          #
+          #nextcloud_url: "https://example.com/nextcloud"
+
+          #keycloak_service_account_password: "examplepassword"
+
+          #nextcloud_service_account_password: "examplepassword"
+        """

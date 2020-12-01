@@ -1,5 +1,4 @@
 from typing import List
-from urllib.parse import urljoin
 
 from synapse.http.client import SimpleHttpClient
 
@@ -8,13 +7,13 @@ class WatchaKeycloakClient(SimpleHttpClient):
     """ Interface for talking with Keycloak APIs
     """
 
-    SERVICE_ACCOUNT_NAME = "watcha_service_account"
-
     def __init__(self, hs):
         super().__init__(hs)
-        self.server_url = hs.config.keycloak_server
-        self.realm_name = hs.config.keycloak_realm
-        self.service_account_password = hs.config.service_account_password
+    
+        self.server_url = hs.config.keycloak_url
+        self.realm_name = hs.config.realm_name
+        self.service_account_name = hs.config.service_account_name
+        self.service_account_password = hs.config.keycloak_service_account_password
 
     async def get_user(self, localpart) -> dict:
         """ Get a specific Keycloak user.
@@ -62,11 +61,11 @@ class WatchaKeycloakClient(SimpleHttpClient):
             args={
                 "client_id": "admin-cli",
                 "grant_type": "password",
-                "username": self.SERVICE_ACCOUNT_NAME,
+                "username": self.service_account_name,
                 "password": self.service_account_password,
             },
         )
         return response["access_token"]
 
     def _get_endpoint(self, path):
-        return urljoin(self.server_url, path)
+        return "{}/{}".format(self.server_url, path)
