@@ -291,7 +291,8 @@ class WatchaRegisterRestServlet(RestServlet):
         params = parse_json_object_from_request(request)
         logger.info("Adding Watcha user...")
 
-        if params["user"].lower() != params["user"]:
+        localpart = params["user"]
+        if localpart.lower() != localpart:
             raise SynapseError(
                 500,
                 "User name must be lowercase",
@@ -338,13 +339,12 @@ class WatchaRegisterRestServlet(RestServlet):
 
         password_hash = await self.auth_handler.hash(password)
         admin = params["admin"] == "admin"
-        bind_emails = [params["email"]]
 
         user_id = await self.registration_handler.register_user(
-            localpart=params["user"],
+            localpart=localpart,
             password_hash=password_hash,
             admin=admin,
-            bind_emails=bind_emails,
+            bind_emails=[email],
         )
 
         user = UserID.from_string(user_id)
@@ -370,8 +370,10 @@ class WatchaRegisterRestServlet(RestServlet):
                 "Not sending email for user password for user %s, password is defined by sender",
                 user_id,
             )
-        
-        # TODO: create KC and NC account
+
+        role = "admin" if admin else None
+        await self.hs.get_nextcloud_handler().create_keycloak_and_nextcloud_user(localpart, email, password_hash, role)
+
         return 200, {"display_name": display_name, "user_id": user_id}
 
 
