@@ -68,7 +68,6 @@ from requests.auth import HTTPBasicAuth
 from synapse.http.watcha_keycloak_client import WatchaKeycloakClient
 from synapse.http.watcha_nextcloud_client import WatchaNextcloudClient
 from synapse.types import get_localpart_from_id
-from synapse.util.watcha import generate_password
 
 # +watcha
 
