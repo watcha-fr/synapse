@@ -370,6 +370,8 @@ class WatchaRegisterRestServlet(RestServlet):
                 "Not sending email for user password for user %s, password is defined by sender",
                 user_id,
             )
+        
+        # TODO: create KC and NC account
         return 200, {"display_name": display_name, "user_id": user_id}
 
 

@@ -956,6 +956,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 content["user_id"],
                 room_id,
             )
+            # TODO: create KC and NC account
         # +watcha
 
         target = requester.user
