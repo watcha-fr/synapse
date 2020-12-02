@@ -3,12 +3,13 @@ from base64 import b64encode
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SimpleHttpClient
+from synapse.util.watcha import generate_password
 
 logger = logging.getLogger(__name__)
 
 
 class WatchaNextcloudClient(SimpleHttpClient):
-    """ Interface for talking with Nextcloud APIs
+    """Interface for talking with Nextcloud APIs
     https://doc.owncloud.com/server/admin_manual/configuration/user/user_provisioning_api.html
     """
 
@@ -40,8 +41,38 @@ class WatchaNextcloudClient(SimpleHttpClient):
                 errcode,
             )
 
+    async def add_user(keycloak_user_id):
+        """Create a new user on the Nextcloud server.
+
+        Args:
+            user_id: the required username for the new user.
+
+        Status codes:
+            100 - successful
+            101 - invalid input data
+            102 - username already exists
+            103 - unknown error occurred whilst adding the user
+        """
+        password = generate_password()
+
+        headers = self._set_headers(
+            self.service_account_name, self.service_account_password
+        )
+        response = await self.post_json_get_json(
+            uri="{}ocs/v1.php/cloud/users".format(self.nextcloud_url),
+            post_json={"userid": keycloak_user_id, "password": password},
+            headers=headers,
+        )
+
+        meta = response["ocs"]["meta"]
+
+        if meta["statuscode"] == 102:
+            logger.info("User {} already exists.".format(userid))
+        else:
+            self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_CREATE_GROUP)
+
     async def add_group(self, group_name):
-        """ Adds a new Nextcloud group.
+        """Adds a new Nextcloud group.
 
         Args:
             group_name: the name of the Nextcloud group
@@ -70,7 +101,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
             self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_CREATE_GROUP)
 
     async def delete_group(self, group_name):
-        """ Removes a existing Nextcloud group.
+        """Removes a existing Nextcloud group.
 
         Args:
             group_name: the name of the Nextcloud group
@@ -96,7 +127,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         )
 
     async def add_user_to_group(self, username, group_name):
-        """ Add user to the Nextcloud group.
+        """Add user to the Nextcloud group.
 
         Args:
             username: the username of the user to add to the group.
@@ -127,7 +158,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         )
 
     async def remove_from_group(self, username, group_name):
-        """ Removes the specified user from the specified group.
+        """Removes the specified user from the specified group.
 
         Args:
             username: the username of the user to remove from the group.
@@ -158,7 +189,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         )
 
     async def get_user(self, username):
-        """ Add user to the Nextcloud group.
+        """Add user to the Nextcloud group.
 
         Args:
             username: the username of the user to add to the group.
@@ -186,7 +217,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         return response["ocs"]["data"]
 
     async def get_all_shares(self, requester, args={}):
-        """ Get informations about a known share
+        """Get informations about a known share
 
         Args:
             requester: the user who want to remove the share
@@ -214,7 +245,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         return response["ocs"]["data"]
 
     async def create_all_permission_share_with_group(self, requester, path, group_name):
-        """ Share an existing file or folder with all permissions for a group.
+        """Share an existing file or folder with all permissions for a group.
 
         Args:
             requester: the user who want to remove the share
@@ -246,7 +277,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         )
 
     async def delete_share(self, requester, share_id):
-        """ Remove a given Nextcloud share
+        """Remove a given Nextcloud share
 
         Args:
             requester: the user who want to remove the share
