@@ -47,7 +47,7 @@ class WatchaKeycloakClient(SimpleHttpClient):
             user["attributes"]["synapseRole"] = synapse_role
 
         try:
-            response = await self.post_json_get_json(
+            response = await self.post_json(
                 self._get_endpoint("admin/realms/{}/users".format(self.realm_name)),
                 headers=await self._get_header(),
                 post_json=user,
@@ -57,9 +57,6 @@ class WatchaKeycloakClient(SimpleHttpClient):
                 logger.info("User {} already exists on Keycloak server.".format(localpart))
             else:
                 raise
-        # A hack to avoid JSONDecodeError on empty body
-        except JSONDecodeError :
-            pass
 
     async def get_user(self, localpart) -> dict:
         """Get a specific Keycloak user.
