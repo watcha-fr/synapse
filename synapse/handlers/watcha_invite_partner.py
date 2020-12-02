@@ -94,6 +94,8 @@ class InvitePartnerHandler(BaseHandler):
                 else:
                     logger.info("registration error=%s", detail)
                     raise SynapseError(400, "Registration error: {0}".format(detail))
+            
+            await self.hs.get_nextcloud_handler().create_keycloak_and_nextcloud_user(localpart, invitee, password_hash, "partner")
 
         # log invitation in DB
         await self.store.insert_partner_invitation(
