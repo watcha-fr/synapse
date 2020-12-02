@@ -41,7 +41,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
                 errcode,
             )
 
-    async def add_user(keycloak_user_id):
+    async def add_user(self, keycloak_user_id):
         """Create a new user on the Nextcloud server.
 
         Args:
@@ -59,7 +59,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
             self.service_account_name, self.service_account_password
         )
         response = await self.post_json_get_json(
-            uri="{}ocs/v1.php/cloud/users".format(self.nextcloud_url),
+            uri="{}/ocs/v1.php/cloud/users".format(self.nextcloud_url),
             post_json={"userid": keycloak_user_id, "password": password},
             headers=headers,
         )
@@ -67,7 +67,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         meta = response["ocs"]["meta"]
 
         if meta["statuscode"] == 102:
-            logger.info("User {} already exists.".format(userid))
+            logger.info("User {} already exists on Nextcloud server.".format(keycloak_user_id))
         else:
             self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_CREATE_GROUP)
 
