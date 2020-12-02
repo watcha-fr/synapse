@@ -1,7 +1,11 @@
+import logging
+from json import JSONDecodeError
 from typing import List
 
+from synapse.api.errors import HttpResponseException
 from synapse.http.client import SimpleHttpClient
 
+logger = logging.getLogger(__name__)
 
 class WatchaKeycloakClient(SimpleHttpClient):
     """Interface for talking with Keycloak APIs"""
@@ -14,18 +18,20 @@ class WatchaKeycloakClient(SimpleHttpClient):
         self.service_account_name = hs.config.service_account_name
         self.service_account_password = hs.config.keycloak_service_account_password
 
-    async def add_user(locapart, password_hash, synapse_role=None):
+    async def add_user(self, localpart, email, password_hash, synapse_role=None):
         """Create a new user Username
 
         Args:
             username: username of the user. Correspond to synapse localpart.
+            email: email of the user
             password_hash: the synapse password hash
             synapse_role: the synapse role, it can be administrator, collaborator or partner.
         """
 
         user = {
             "enabled": True,
-            "username": locapart,
+            "username": localpart,
+            "email": email,
             "credentials": [
                 {
                     "type": "password",
@@ -40,12 +46,20 @@ class WatchaKeycloakClient(SimpleHttpClient):
         if synapse_role is not None:
             user["attributes"]["synapseRole"] = synapse_role
 
-        response = await self.post_urlencoded_get_json(
-            self._get_endpoint("admin/realms/{}/users".format(self.realm_name)),
-            headers=await self._get_header(),
-            args=user,
-        )
-        return response[0]
+        try:
+            response = await self.post_json_get_json(
+                self._get_endpoint("admin/realms/{}/users".format(self.realm_name)),
+                headers=await self._get_header(),
+                post_json=user,
+            )
+        except HttpResponseException as e:
+            if e.code != 409:
+                logger.info("User {} already exists on Keycloak server.".format(localpart))
+            else:
+                raise
+        # A hack to avoid JSONDecodeError on empty body
+        except JSONDecodeError :
+            pass
 
     async def get_user(self, localpart) -> dict:
         """Get a specific Keycloak user.
