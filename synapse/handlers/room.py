@@ -1448,6 +1448,24 @@ class NextcloudHandler(BaseHandler):
         self.keycloak_client = WatchaKeycloakClient(hs)
         self.nextcloud_client = WatchaNextcloudClient(hs)
 
+    async def create_keycloak_and_nextcloud_user(self, localpart, email, password_hash, synapse_role=None):
+        """ Create a user on Keycloak and Nextcloud server if it doesn't exist
+
+        Args :
+            localpart: the synapse localpart use as Keycloak username
+            email: email of the user
+            password_hash: the synapse password hash
+            synapse_role: the synapse role, it can be administrator, collaborator or partner. 
+        """
+
+        await self.keycloak_client.add_user(localpart, email, password_hash, synapse_role)
+
+        keycloak_user_representation = await self.keycloak_client.get_user(
+            localpart
+        )
+
+        await self.nextcloud_client.add_user(keycloak_user_representation["id"])
+
     async def delete_room_nextcloud_mapping(self, room_id):
         """ Delete a mapping between a room and an Nextcloud folder.
 
