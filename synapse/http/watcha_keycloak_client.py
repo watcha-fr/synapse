@@ -53,7 +53,7 @@ class WatchaKeycloakClient(SimpleHttpClient):
                 post_json=user,
             )
         except HttpResponseException as e:
-            if e.code != 409:
+            if e.code == 409:
                 logger.info("User {} already exists on Keycloak server.".format(localpart))
             else:
                 raise
