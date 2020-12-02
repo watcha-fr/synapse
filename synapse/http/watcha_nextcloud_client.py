@@ -53,6 +53,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
             102 - username already exists
             103 - unknown error occurred whilst adding the user
         """
+        # A password is needed to create NC user, but it will not be used by KC login process. 
         password = generate_password()
 
         headers = self._set_headers(
