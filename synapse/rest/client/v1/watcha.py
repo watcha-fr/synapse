@@ -340,6 +340,9 @@ class WatchaRegisterRestServlet(RestServlet):
         password_hash = await self.auth_handler.hash(password)
         admin = params["admin"] == "admin"
 
+        role = "admin" if admin else None
+        await self.hs.get_nextcloud_handler().create_keycloak_and_nextcloud_user(localpart, email, password_hash, role)
+
         user_id = await self.registration_handler.register_user(
             localpart=localpart,
             password_hash=password_hash,
@@ -370,9 +373,6 @@ class WatchaRegisterRestServlet(RestServlet):
                 "Not sending email for user password for user %s, password is defined by sender",
                 user_id,
             )
-
-        role = "admin" if admin else None
-        await self.hs.get_nextcloud_handler().create_keycloak_and_nextcloud_user(localpart, email, password_hash, role)
 
         return 200, {"display_name": display_name, "user_id": user_id}
 
