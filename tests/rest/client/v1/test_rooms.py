@@ -47,7 +47,9 @@ class RoomBase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         self.hs = self.setup_test_homeserver(
-            "red", http_client=None, federation_client=Mock(),
+            "red",
+            http_client=None,
+            federation_client=Mock(),
         )
 
         self.hs.get_federation_handler = Mock()
@@ -1555,7 +1557,9 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         results = channel.json_body["search_categories"]["room_events"]["results"]
 
         self.assertEqual(
-            len(results), 2, [result["result"]["content"] for result in results],
+            len(results),
+            2,
+            [result["result"]["content"] for result in results],
         )
         self.assertEqual(
             results[0]["result"]["content"]["body"],
@@ -1591,7 +1595,9 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         results = channel.json_body["search_categories"]["room_events"]["results"]
 
         self.assertEqual(
-            len(results), 4, [result["result"]["content"] for result in results],
+            len(results),
+            4,
+            [result["result"]["content"] for result in results],
         )
         self.assertEqual(
             results[0]["result"]["content"]["body"],
@@ -1639,7 +1645,9 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         results = channel.json_body["search_categories"]["room_events"]["results"]
 
         self.assertEqual(
-            len(results), 1, [result["result"]["content"] for result in results],
+            len(results),
+            1,
+            [result["result"]["content"] for result in results],
         )
         self.assertEqual(
             results[0]["result"]["content"]["body"],
@@ -2200,8 +2208,7 @@ class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
 
 
 class WatchaMembershipNextcloudSharingTestCase(unittest.HomeserverTestCase):
-    """Tests that Nextcloud sharing is updated with membership event when the room is mapped with a Nextcloud directory
-    """
+    """Tests that Nextcloud sharing is updated with membership event when the room is mapped with a Nextcloud directory"""
 
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
@@ -2221,12 +2228,10 @@ class WatchaMembershipNextcloudSharingTestCase(unittest.HomeserverTestCase):
 
         # map a room with a Nextcloud directory :
         self.get_success(
-            self.store.set_room_mapping_with_nextcloud_directory(
-                self.room_id, "/directory"
-            )
+            self.store.map_room_with_nextcloud_directory(self.room_id, "/directory", 1)
         )
 
-        # mock some functions of NextcloudHandler
+        # mock some functions of WatchaRoomNextcloudMappingHandler
         self.nextcloud_handler = hs.get_nextcloud_handler()
 
         self.keycloak_client = self.nextcloud_handler.keycloak_client
@@ -2297,5 +2302,6 @@ class WatchaMembershipNextcloudSharingTestCase(unittest.HomeserverTestCase):
         self.helper.invite(room_id, self.creator, self.inviter, tok=self.creator_tok)
 
         self.nextcloud_handler.update_existing_nextcloud_share_for_user.assert_not_called()
+
 
 # +watcha

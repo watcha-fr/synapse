@@ -76,6 +76,10 @@ logger = logging.getLogger(__name__)
 id_server_scheme = "https://"
 
 FIVE_MINUTES_IN_MS = 5 * 60 * 1000
+# watcha+
+# echo -n watcha | md5sum
+NEXTCLOUD_GROUP_NAME_PREFIX = "c4d96a06b758a7ed12f897690828e414_"
+# +watcha
 
 
 class RoomCreationHandler(BaseHandler):
@@ -1493,41 +1497,21 @@ class NextcloudHandler(BaseHandler):
         )
         nextcloud_requester = keycloak_user_representation["id"]
 
-        await self.nextcloud_client.add_group(room_id)
+        await self.nextcloud_client.add_group(NEXTCLOUD_GROUP_NAME_PREFIX + room_id)
 
         await self.add_room_users_to_nextcloud_group(room_id)
 
-        mapped_directory_path = await self.store.get_nextcloud_directory_path_from_roomID(
-            room_id
-        )
+        old_share_id = await self.store.get_nextcloud_share_id_from_roomID(room_id)
 
-        if mapped_directory_path:
-            all_shares = await self.nextcloud_client.get_all_shares(
-                nextcloud_requester, {"path": mapped_directory_path, "reshares": "true"}
-            )
+        if old_share_id:
+            await self.nextcloud_client.delete_share(nextcloud_requester, old_share_id)
 
-            share_id = ""
-            for share in all_shares:
-                if share["share_with"] == room_id:
-                    share_id = share["id"]
-                    break
-
-            if not share_id:
-                raise SynapseError(
-                    400,
-                    "Unable to retrieve share id between Nextcloud group {group_name} and Nextcloud directory {directory_path}".format(
-                        group_name=room_id, directory_path=mapped_directory_path
-                    ),
-                )
-
-            await self.nextcloud_client.delete_share(nextcloud_requester, share_id)
-
-        await self.nextcloud_client.create_all_permission_share_with_group(
+        new_share_id = await self.nextcloud_client.create_all_permission_share_with_group(
             nextcloud_requester, nextcloud_directory_path, room_id
         )
 
-        await self.store.set_room_mapping_with_nextcloud_directory(
-            room_id, nextcloud_directory_path
+        await self.store.map_room_with_nextcloud_directory(
+            room_id, nextcloud_directory_path, new_share_id
         )
 
     async def add_room_users_to_nextcloud_group(self, room_id):
@@ -1540,7 +1524,9 @@ class NextcloudHandler(BaseHandler):
         users_id = await self.store.get_users_in_room(room_id)
         users_localpart = [get_localpart_from_id(user_id) for user_id in users_id]
 
-        keycloak_users_representation = await self.keycloak_client.get_users()
+        keycloak_users_representation = (
+            await self.keycloak_client.get_users()
+        )
 
         for keycloak_user in keycloak_users_representation:
             localpart = keycloak_user["username"]

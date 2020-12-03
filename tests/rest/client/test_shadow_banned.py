@@ -141,7 +141,7 @@ class RoomTestCase(_ShadowBannedBase):
             self.other_user_id,
             self.banned_user_id,
             tok=self.other_access_token,
-        )  
+        )
         # +watcha
         self.helper.join(room_id, self.banned_user_id, tok=self.banned_access_token)
 
@@ -245,7 +245,9 @@ class RoomTestCase(_ShadowBannedBase):
     test_typing.skip = (
         "Disabled for Watcha because Watcha rooms are private by default."
     )
+    test_invite_3pid.skip = "Disabled for Watcha after OP553."
     # +watcha
+
 
 # To avoid the tests timing out don't add a delay to "annoy the requester".
 @patch("random.randint", new=lambda a, b: 0)
@@ -290,7 +292,10 @@ class ProfileTestCase(_ShadowBannedBase):
         message_handler = self.hs.get_message_handler()
         event = self.get_success(
             message_handler.get_room_data(
-                self.banned_user_id, room_id, "m.room.member", self.banned_user_id,
+                self.banned_user_id,
+                room_id,
+                "m.room.member",
+                self.banned_user_id,
             )
         )
         self.assertEqual(
@@ -323,7 +328,10 @@ class ProfileTestCase(_ShadowBannedBase):
         message_handler = self.hs.get_message_handler()
         event = self.get_success(
             message_handler.get_room_data(
-                self.banned_user_id, room_id, "m.room.member", self.banned_user_id,
+                self.banned_user_id,
+                room_id,
+                "m.room.member",
+                self.banned_user_id,
             )
         )
         self.assertEqual(

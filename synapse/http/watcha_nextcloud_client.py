@@ -19,15 +19,18 @@ class WatchaNextcloudClient(SimpleHttpClient):
         self.nextcloud_url = hs.config.nextcloud_url
         self.service_account_name = hs.config.service_account_name
         self.service_account_password = hs.config.nextcloud_service_account_password
-        # temporary attribute
-        self.nextcloud_shared_secret = self.service_account_password
+        self._headers = self._get_headers()
 
-    def _set_headers(self, username, password):
+    def _get_headers(self):
         return {
             "OCS-APIRequest": ["true"],
             "Authorization": [
                 "Basic "
-                + b64encode("{}:{}".format(username, password).encode()).decode()
+                + b64encode(
+                    "{}:{}".format(
+                        self.service_account_name, self.service_account_password
+                    ).encode()
+                ).decode()
             ],
         }
 
@@ -56,13 +59,10 @@ class WatchaNextcloudClient(SimpleHttpClient):
         # A password is needed to create NC user, but it will not be used by KC login process. 
         password = generate_password()
 
-        headers = self._set_headers(
-            self.service_account_name, self.service_account_password
-        )
         response = await self.post_json_get_json(
             uri="{}/ocs/v1.php/cloud/users".format(self.nextcloud_url),
             post_json={"userid": keycloak_user_id, "password": password},
-            headers=headers,
+            headers=self._headers,
         )
 
         meta = response["ocs"]["meta"]
@@ -85,13 +85,10 @@ class WatchaNextcloudClient(SimpleHttpClient):
             103: failed to add the group
         """
 
-        headers = self._set_headers(
-            self.service_account_name, self.service_account_password
-        )
         response = await self.post_json_get_json(
             uri="{}/ocs/v1.php/cloud/groups".format(self.nextcloud_url),
             post_json={"groupid": group_name},
-            headers=headers,
+            headers=self._headers,
         )
 
         meta = response["ocs"]["meta"]
@@ -113,14 +110,11 @@ class WatchaNextcloudClient(SimpleHttpClient):
             102: failed to delete group
         """
 
-        headers = self._set_headers(
-            self.service_account_name, self.service_account_password
-        )
         response = await self.delete_get_json(
-            uri="{nextcloud_url}/ocs/v1.php/cloud/groups/{group_name}".format(
-                nextcloud_url=self.nextcloud_url, group_name=group_name
+            uri="{}/ocs/v1.php/cloud/groups/{}".format(
+                self.nextcloud_url, group_name
             ),
-            headers=headers,
+            headers=self._headers,
         )
 
         self._raise_for_status(
@@ -143,15 +137,12 @@ class WatchaNextcloudClient(SimpleHttpClient):
             105: failed to add user to group
         """
 
-        headers = self._set_headers(
-            self.service_account_name, self.service_account_password
-        )
         response = await self.post_json_get_json(
-            uri="{nextcloud_url}/ocs/v1.php/cloud/users/{user_id}/groups".format(
-                nextcloud_url=self.nextcloud_url, user_id=username
+            uri="{}/ocs/v1.php/cloud/users/{}/groups".format(
+                self.nextcloud_url, username
             ),
             post_json={"groupid": group_name},
-            headers=headers,
+            headers=self._headers,
         )
 
         self._raise_for_status(
@@ -174,14 +165,11 @@ class WatchaNextcloudClient(SimpleHttpClient):
             105: failed to remove user from group
         """
 
-        headers = self._set_headers(
-            self.service_account_name, self.service_account_password
-        )
         response = await self.delete_get_json(
-            uri="{nextcloud_url}/ocs/v1.php/cloud/users/{user_id}/groups".format(
-                nextcloud_url=self.nextcloud_url, user_id=username
+            uri="{}/ocs/v1.php/cloud/users/{}/groups".format(
+                self.nextcloud_url, username
             ),
-            headers=headers,
+            headers=self._headers,
             json_body={"groupid": group_name},
         )
 
@@ -190,57 +178,28 @@ class WatchaNextcloudClient(SimpleHttpClient):
         )
 
     async def get_user(self, username):
-        """Add user to the Nextcloud group.
+        """ Get informations of user with username given on parameter
 
         Args:
             username: the username of the user to add to the group.
-            group_name: the group name.
 
         Status codes:
             100: successful
             404: user does not exist
+
+        Returns:
+            informations on the user
         """
 
-        headers = self._set_headers(
-            self.service_account_name, self.service_account_password
-        )
         response = await self.get_json(
-            uri="{nextcloud_url}/ocs/v1.php/cloud/users/{user_id}".format(
-                nextcloud_url=self.nextcloud_url, user_id=username
+            uri="{}/ocs/v1.php/cloud/users/{}".format(
+                self.nextcloud_url, username
             ),
-            headers=headers,
+            headers=self._headers,
         )
 
         self._raise_for_status(
             response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_GET_USER
-        )
-
-        return response["ocs"]["data"]
-
-    async def get_all_shares(self, requester, args={}):
-        """Get informations about a known share
-
-        Args:
-            requester: the user who want to remove the share
-            args: request attributes to filter the search.
-
-        Status codes:
-            100: successful
-            400: Not a directory
-            404: Couldn’t fetch shares or file doesn’t exist
-            997: Unauthorised
-        """
-
-        headers = self._set_headers(requester, self.nextcloud_shared_secret)
-        response = await self.get_json(
-            uri="{nextcloud_url}/ocs/v2.php/apps/files_sharing/api/v1/shares/".format(
-                nextcloud_url=self.nextcloud_url
-            ),
-            headers=headers,
-        )
-
-        self._raise_for_status(
-            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_GET_SHARES
         )
 
         return response["ocs"]["data"]
@@ -252,30 +211,51 @@ class WatchaNextcloudClient(SimpleHttpClient):
             requester: the user who want to remove the share
             args: request attributes to filter the search.
 
+        Payload:
+            shareType: the type of the share. This can be one of:
+                0 = user
+                1 = group
+                3 = public link
+                6 = federated cloud share
+
+            permissions: the permissions to set on the share.
+                1 = read (default for public link shares);
+                2 = update;
+                4 = create;
+                8 = delete;
+                15 = read/write;
+                16 = share;
+                31 = All permissions.
+
         Status codes:
             100: successful
             400: Unknown share type
             403: Public upload was disabled by the admin
             404: File or folder couldn’t be shared
+
+        Returns:
+            the id of Nextcloud share
         """
 
-        headers = self._set_headers(requester, self.nextcloud_shared_secret)
         response = await self.post_json_get_json(
-            uri="{}/ocs/v2.php/apps/files_sharing/api/v1/shares".format(
+            uri="{}/ocs/v2.php/apps/watcha_integrator/api/v1/shares".format(
                 self.nextcloud_url
             ),
-            headers=headers,
+            headers=self._headers,
             post_json={
                 "path": path,
                 "shareType": 1,
                 "shareWith": group_name,
                 "permissions": 31,
+                "requester": requester,
             },
         )
 
         self._raise_for_status(
             response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_CREATE_NEW_SHARE
         )
+
+        return response["ocs"]["data"]["id"]
 
     async def delete_share(self, requester, share_id):
         """Remove a given Nextcloud share
@@ -289,12 +269,12 @@ class WatchaNextcloudClient(SimpleHttpClient):
             404: Share couldn’t be deleted.
         """
 
-        headers = self._set_headers(requester, self.nextcloud_shared_secret)
         response = await self.delete_get_json(
-            uri="{nextcloud_url}/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}".format(
-                nextcloud_url=self.nextcloud_url, share_id=share_id
+            uri="{}/ocs/v2.php/apps/watcha_integrator/api/v1/shares/{}".format(
+                self.nextcloud_url, share_id
             ),
-            headers=headers,
+            headers=self._headers,
+            json_body={"requester": requester},
         )
 
         self._raise_for_status(

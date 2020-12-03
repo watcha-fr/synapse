@@ -1,4 +1,5 @@
 import json, logging
+from mock import Mock
 
 from synapse.rest import admin
 from synapse.rest.client.v1 import watcha, login, room
@@ -8,6 +9,16 @@ from tests.test_utils import get_awaitable_result
 from tests.utils import setup_test_homeserver
 
 logger = logging.getLogger(__name__)
+
+
+def simple_async_mock(return_value=None, raises=None):
+    # AsyncMock is not available in python3.5, this mimics part of its behaviour
+    async def cb(*args, **kwargs):
+        if raises:
+            raise raises
+        return return_value
+
+    return Mock(side_effect=cb)
 
 
 class BaseHomeserverWithEmailTestCase(unittest.HomeserverTestCase):
@@ -49,6 +60,14 @@ class BaseHomeserverWithEmailTestCase(unittest.HomeserverTestCase):
         )
 
         self.room_id = self._create_room()
+
+        self.nextcloud_handler = hs.get_nextcloud_handler()
+        self.keycloak_client = self.nextcloud_handler.keycloak_client
+        self.nextcloud_client = self.nextcloud_handler.nextcloud_client
+
+        self.keycloak_client.add_user = simple_async_mock()
+        self.keycloak_client.get_user = simple_async_mock(return_value={"id": "1234"})
+        self.nextcloud_client.add_user = simple_async_mock()
 
     def _do_register_user(self, request_content):
         # Admin send the request with access_token :
@@ -119,6 +138,10 @@ class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
             channel.result["body"],
             b'{"display_name":"test","user_id":"@user_test:test"}',
         )
+
+        self.assertTrue(self.keycloak_client.add_user.called)
+        self.assertTrue(self.keycloak_client.get_user.called)
+        self.assertTrue(self.nextcloud_client.add_user.called)
         self.assertEqual(channel.code, 200)
 
     def test_register_user_with_upper_user_id(self):
@@ -130,6 +153,10 @@ class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
             "password": "",
         }
         channel = self._do_register_user(request_content)
+
+        self.assertFalse(self.keycloak_client.add_user.called)
+        self.assertFalse(self.keycloak_client.get_user.called)
+        self.assertFalse(self.nextcloud_client.add_user.called)
         self.assertEqual(channel.code, 500)
 
     def test_register_user_with_empty_email(self):
@@ -141,6 +168,10 @@ class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
             "password": "",
         }
         channel = self._do_register_user(request_content)
+
+        self.assertFalse(self.keycloak_client.add_user.called)
+        self.assertFalse(self.keycloak_client.get_user.called)
+        self.assertFalse(self.nextcloud_client.add_user.called)
         self.assertEqual(channel.code, 500)
 
     def test_register_user_with_same_email_adress(self):
@@ -160,6 +191,10 @@ class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
             "password": "",
         }
         channel = self._do_register_user(request_content)
+
+        self.keycloak_client.add_user.assert_called_once()
+        self.keycloak_client.get_user.assert_called_once()
+        self.nextcloud_client.add_user.assert_called_once()
         self.assertEqual(channel.code, 500)
 
     def test_register_user_with_plus_in_email(self):
@@ -182,6 +217,9 @@ class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
                 channel.result["body"],
                 b'{"display_name":"test","user_id":"@user_test:test"}',
             )
+            self.assertTrue(self.keycloak_client.add_user.called)
+            self.assertTrue(self.keycloak_client.get_user.called)
+            self.assertTrue(self.nextcloud_client.add_user.called)
             self.assertEqual(channel.code, 200)
 
 
@@ -235,7 +273,9 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
         self.render(request)
 
         request, channel = self.make_request(
-            "GET", "watcha_user_list", access_token=self.user_access_token,
+            "GET",
+            "watcha_user_list",
+            access_token=self.user_access_token,
         )
         self.render(request)
 
@@ -275,7 +315,9 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
         )
 
         request, channel = self.make_request(
-            "GET", "/watcha_admin_stats", access_token=self.user_access_token,
+            "GET",
+            "/watcha_admin_stats",
+            access_token=self.user_access_token,
         )
         self.render(request)
         self.assertEquals(
@@ -298,7 +340,9 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
                     "number_of_last_month_logged_users": 0,
                     "number_of_last_week_logged_users": 0,
                 },
-                "other_statistics": {"number_of_users_with_pending_invitation": 2,},
+                "other_statistics": {
+                    "number_of_users_with_pending_invitation": 2,
+                },
             },
         )
 
@@ -391,18 +435,18 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
 
     async def _do_rooms_mapping_with_nextcloud_directories(self):
         rooms_mapping = {
-            "parent_directory": {"path": "/a",},
-            "main_directory": {"path": "/a/b",},
-            "sub_directory": {"path": "/a/b/c",},
-            "cross_directory": {"path": "/a/d",},
+            "parent_directory": {"path": "/a", "share_id": 1},
+            "main_directory": {"path": "/a/b", "share_id": 2},
+            "sub_directory": {"path": "/a/b/c", "share_id": 3},
+            "cross_directory": {"path": "/a/d", "share_id": 4},
         }
 
         for _, mapping_value in rooms_mapping.items():
             room_id = self._create_room()
             mapping_value["room_id"] = room_id
 
-            await self.store.set_room_mapping_with_nextcloud_directory(
-                room_id, mapping_value["path"]
+            await self.store.map_room_with_nextcloud_directory(
+                room_id, mapping_value["path"], mapping_value["share_id"]
             )
 
         return rooms_mapping
@@ -547,7 +591,11 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
             request_content = {
                 "file_name": self.nextcloud_file_name,
                 "file_url": self.nextcloud_file_url,
-                "notifications": [{"activity_type": "file_created",}],
+                "notifications": [
+                    {
+                        "activity_type": "file_created",
+                    }
+                ],
             }
 
             request_content["notifications"][0].pop("activity_type", None)

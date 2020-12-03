@@ -5,6 +5,7 @@
 
 import json
 from tests import unittest
+from mock import Mock
 
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, profile, room
@@ -13,6 +14,16 @@ from synapse.util.watcha import create_display_inviter_name
 from synapse.types import UserID
 
 from ..utils import setup_test_homeserver
+
+
+def simple_async_mock(return_value=None, raises=None):
+    # AsyncMock is not available in python3.5, this mimics part of its behaviour
+    async def cb(*args, **kwargs):
+        if raises:
+            raise raises
+        return return_value
+
+    return Mock(side_effect=cb)
 
 
 class InvitationTestCase(unittest.HomeserverTestCase):
@@ -51,6 +62,14 @@ class InvitationTestCase(unittest.HomeserverTestCase):
         self.other_access_token = self.login("otheruser", "pass")
         self.room_id = self.helper.create_room_as(self.owner, tok=self.owner_tok)
 
+        self.nextcloud_handler = hs.get_nextcloud_handler()
+        self.keycloak_client = self.nextcloud_handler.keycloak_client
+        self.nextcloud_client = self.nextcloud_handler.nextcloud_client
+
+        self.keycloak_client.add_user = simple_async_mock()
+        self.keycloak_client.get_user = simple_async_mock(return_value={"id": "1234"})
+        self.nextcloud_client.add_user = simple_async_mock()
+
     def _do_invite(self, room_id, request_content):
         request, channel = self.make_request(
             "POST",
@@ -66,6 +85,10 @@ class InvitationTestCase(unittest.HomeserverTestCase):
         self._do_invite(
             room_id, {"id_server": "localhost", "medium": "email", "address": email}
         )
+
+        self.assertTrue(self.keycloak_client.add_user.called)
+        self.assertTrue(self.keycloak_client.get_user.called)
+        self.assertTrue(self.nextcloud_client.add_user.called)
 
     def test_simple_invite(self):
         self._do_invite(self.room_id, {"user_id": self.other_user_id})
@@ -153,6 +176,14 @@ class NotAdminWatchaRegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.owner = self.register_user("owner", "pass", self.ADMIN)
         self.owner_tok = self.login("owner", "pass")
 
+        self.nextcloud_handler = hs.get_nextcloud_handler()
+        self.keycloak_client = self.nextcloud_handler.keycloak_client
+        self.nextcloud_client = self.nextcloud_handler.nextcloud_client
+
+        self.keycloak_client.add_user = simple_async_mock()
+        self.keycloak_client.get_user = simple_async_mock(return_value={"id": "1234"})
+        self.nextcloud_client.add_user = simple_async_mock()
+
     def _do_request(self):
         request, channel = self.make_request(
             "POST",
@@ -175,6 +206,11 @@ class NotAdminWatchaRegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     def test_watcha_register_servlet(self):
         channel = self._do_request()
+
+        self.assertFalse(self.keycloak_client.add_user.called)
+        self.assertFalse(self.keycloak_client.get_user.called)
+        self.assertFalse(self.nextcloud_client.add_user.called)
+
         self.assertEqual(channel.code, 403)
         self.assertEqual(
             channel.result["body"],
@@ -187,6 +223,11 @@ class WatchaRegisterRestServletTestCase(NotAdminWatchaRegisterRestServletTestCas
 
     def test_watcha_register_servlet(self):
         channel = self._do_request()
+
+        self.assertTrue(self.keycloak_client.add_user.called)
+        self.assertTrue(self.keycloak_client.get_user.called)
+        self.assertTrue(self.nextcloud_client.add_user.called)
+
         self.assertEqual(channel.code, 200)
         self.assertEqual(
             channel.result["body"],
@@ -220,6 +261,7 @@ class InvitationDisplayNameTestCase(unittest.HomeserverTestCase):
 
     test_invitation_display_name.skip = "Watcha test which not working"
 
+
 class RegistrationTestCase(unittest.HomeserverTestCase):
     servlets = [
         admin.register_servlets_for_client_rest_resource,
@@ -237,6 +279,14 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.owner = self.register_user("owner", "pass", True)
         self.owner_tok = self.login("owner", "pass")
 
+        self.nextcloud_handler = hs.get_nextcloud_handler()
+        self.keycloak_client = self.nextcloud_handler.keycloak_client
+        self.nextcloud_client = self.nextcloud_handler.nextcloud_client
+
+        self.keycloak_client.add_user = simple_async_mock()
+        self.keycloak_client.get_user = simple_async_mock(return_value={"id": "1234"})
+        self.nextcloud_client.add_user = simple_async_mock()
+
     def test_register_user(self):
         request, channel = self.make_request(
             "POST",
@@ -244,6 +294,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             content=json.dumps(
                 {
                     "user": "test",
+                    "public_baseurl": "TEST",
                     "email": "test@mail.com",
                     "full_name": "FirstName LastName",
                     "admin": "false",
@@ -254,9 +305,13 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             access_token=self.owner_tok,
         )
         self.render(request)
+
+        self.assertTrue(self.keycloak_client.add_user.called)
+        self.assertTrue(self.keycloak_client.get_user.called)
+        self.assertTrue(self.nextcloud_client.add_user.called)
+
         self.assertEqual(channel.code, 200)
         self.assertEqual(
             channel.result["body"],
             b'{"display_name":"FirstName LastName","user_id":"@test:test"}',
         )
-
