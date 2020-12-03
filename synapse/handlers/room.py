@@ -1477,7 +1477,7 @@ class NextcloudHandler(BaseHandler):
             room_id: the id of the room.
         """
 
-        await self.nextcloud_client.delete_group(room_id)
+        await self.nextcloud_client.delete_group(NEXTCLOUD_GROUP_NAME_PREFIX + room_id)
 
         await self.store.deleted_room_mapping_with_nextcloud_directory(room_id)
 
@@ -1491,13 +1491,13 @@ class NextcloudHandler(BaseHandler):
             requester_id: the user_id of the requester.
             nextcloud_directory_path: the directory path of the Nextcloud folder to link with the room.
         """
-
+        group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
         keycloak_user_representation = await self.keycloak_client.get_user(
             get_localpart_from_id(requester_id)
         )
         nextcloud_requester = keycloak_user_representation["id"]
 
-        await self.nextcloud_client.add_group(NEXTCLOUD_GROUP_NAME_PREFIX + room_id)
+        await self.nextcloud_client.add_group(group_name)
 
         await self.add_room_users_to_nextcloud_group(room_id)
 
@@ -1507,7 +1507,7 @@ class NextcloudHandler(BaseHandler):
             await self.nextcloud_client.delete_share(nextcloud_requester, old_share_id)
 
         new_share_id = await self.nextcloud_client.create_all_permission_share_with_group(
-            nextcloud_requester, nextcloud_directory_path, room_id
+            nextcloud_requester, nextcloud_directory_path, group_name
         )
 
         await self.store.map_room_with_nextcloud_directory(
@@ -1520,7 +1520,7 @@ class NextcloudHandler(BaseHandler):
         Args:
             room_id: the id of the room which is the name of the Nextcloud group.
         """
-
+        group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
         users_id = await self.store.get_users_in_room(room_id)
         users_localpart = [get_localpart_from_id(user_id) for user_id in users_id]
 
@@ -1545,19 +1545,20 @@ class NextcloudHandler(BaseHandler):
 
                 try:
                     await self.nextcloud_client.add_user_to_group(
-                        nextcloud_target, room_id
+                        nextcloud_target, group_name
                     )
                 except Exception:
                     logger.warn(
                         "Unable to add the user {username} to the Nextcloud group {group_name}.".format(
-                            username=localpart, group_name=room_id
+                            username=localpart, group_name=group_name
                         )
                     )
                 continue
 
     async def update_existing_nextcloud_share_for_user(
-        self, user_id, group_name, membership
+        self, user_id, room_id, membership
     ):
+        group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
         keycloak_user_representation = await self.keycloak_client.get_user(
             get_localpart_from_id(user_id)
         )
