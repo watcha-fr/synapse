@@ -391,18 +391,18 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
 
     async def _do_rooms_mapping_with_nextcloud_directories(self):
         rooms_mapping = {
-            "parent_directory": {"path": "/a",},
-            "main_directory": {"path": "/a/b",},
-            "sub_directory": {"path": "/a/b/c",},
-            "cross_directory": {"path": "/a/d",},
+            "parent_directory": {"path": "/a", "share_id": 1},
+            "main_directory": {"path": "/a/b", "share_id": 2},
+            "sub_directory": {"path": "/a/b/c", "share_id": 3},
+            "cross_directory": {"path": "/a/d", "share_id": 4},
         }
 
         for _, mapping_value in rooms_mapping.items():
             room_id = self._create_room()
             mapping_value["room_id"] = room_id
 
-            await self.store.set_room_mapping_with_nextcloud_directory(
-                room_id, mapping_value["path"]
+            await self.store.map_room_with_nextcloud_directory(
+                room_id, mapping_value["path"], mapping_value["share_id"]
             )
 
         return rooms_mapping
