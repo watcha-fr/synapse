@@ -1625,15 +1625,33 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             desc="get_roomID_from_nextcloud_directory_path",
         )
 
-    async def set_room_mapping_with_nextcloud_directory(self, room_id, directory_path):
+    async def get_nextcloud_share_id_from_roomID(self, room_id):
+        """ Get Nextcloud share id of the room id.
+        """
+
+        return await self.db_pool.simple_select_one_onecol(
+            table="room_nextcloud_mapping",
+            keyvalues={"room_id": room_id},
+            retcol="share_id",
+            allow_none=True,
+            desc="get_nextcloud_share_id_from_roomID",
+        )
+
+    async def map_room_with_nextcloud_directory(
+        self, room_id, directory_path, share_id
+    ):
         """ Set mapping between Watcha room and Nextcloud directory.
         """
 
         await self.db_pool.simple_upsert(
             table="room_nextcloud_mapping",
             keyvalues={"room_id": room_id},
-            values={"room_id": room_id, "directory_path": directory_path,},
-            desc="set_room_mapping_with_nextcloud_directory",
+            values={
+                "room_id": room_id,
+                "directory_path": directory_path,
+                "share_id": share_id,
+            },
+            desc="map_room_with_nextcloud_directory",
         )
 
     async def deleted_room_mapping_with_nextcloud_directory(self, room_id):
@@ -1645,4 +1663,5 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             keyvalues={"room_id": room_id},
             desc="deleted_room_mapping_with_nextcloud_directory",
         )
+
     # +watcha

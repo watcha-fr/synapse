@@ -65,7 +65,11 @@ if TYPE_CHECKING:
 from pathlib import Path
 from requests import get, post, delete, auth, HTTPError
 from requests.auth import HTTPBasicAuth
+from synapse.http.watcha_keycloak_api import WatchaKeycloakClient
+from synapse.http.watcha_nextcloud_api import WatchaNextcloudClient
 from synapse.types import get_localpart_from_id
+from synapse.util.watcha import generate_password
+
 # +watcha
 
 logger = logging.getLogger(__name__)
@@ -73,6 +77,10 @@ logger = logging.getLogger(__name__)
 id_server_scheme = "https://"
 
 FIVE_MINUTES_IN_MS = 5 * 60 * 1000
+# watcha+
+# echo -n watcha | md5sum
+NEXTCLOUD_GROUP_NAME_PREFIX = "c4d96a06b758a7ed12f897690828e414_"
+# +watcha
 
 
 class RoomCreationHandler(BaseHandler):
@@ -1439,38 +1447,25 @@ class RoomShutdownHandler:
 
 
 # watcha+
-class WatchaRoomHandler(BaseHandler):
+class WatchaRoomNextcloudMappingHandler(BaseHandler):
     def __init__(self, hs):
         self.store = hs.get_datastore()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.keycloak_client = WatchaKeycloakClient(hs)
+        self.nextcloud_client = WatchaNextcloudClient(hs)
 
-        # Nextcloud Integration config :
-        self.keycloak_server = hs.config.keycloak_serveur
-        self.keycloak_realm = hs.config.keycloak_realm
-        self.nextcloud_shared_secret = hs.config.nextcloud_shared_secret
-        self.nextcloud_server = hs.config.nextcloud_server
-        self.service_account_name = hs.config.service_account_name
-        self.service_account_password = hs.config.service_account_password
-
-        self.keycloak_access_token = ""
-
-    async def delete_room_mapping_with_nextcloud_directory(self, room_id):
+    async def delete_room_nextcloud_mapping(self, room_id):
         """ Delete a mapping between a room and an Nextcloud folder.
 
         Args :
             room_id: the id of the room.
         """
 
-        try:
-            await self.delete_nextcloud_group(room_id)
-        except HTTPError:
-            raise SynapseError(
-                400, "Unable to delete the Nextcloud group {}.".format(room_id),
-            )
+        await self.nextcloud_client.delete_group(room_id)
 
         await self.store.deleted_room_mapping_with_nextcloud_directory(room_id)
 
-    async def update_nextcloud_mapping(
+    async def update_room_nextcloud_mapping(
         self, room_id, requester_id, nextcloud_directory_path
     ):
         """ Update the mapping between a room and a Nextcloud folder.
@@ -1481,331 +1476,99 @@ class WatchaRoomHandler(BaseHandler):
             nextcloud_directory_path: the directory path of the Nextcloud folder to link with the room.
         """
 
-        try:
-            self.keycloak_access_token = await self.get_keycloak_access_token()
-        except HTTPError:
-            raise SynapseError(
-                400,
-                "Unable to retrieve the Keycloak access token of realm {}".format(
-                    self.keycloak_realm
-                ),
-            )
+        keycloak_user_representation = await self.keycloak_client.get_keycloak_user(
+            get_localpart_from_id(requester_id)
+        )
+        nextcloud_requester = keycloak_user_representation["id"]
 
-        try:
-            nextcloud_username = await self.get_nextcloud_username(
-                get_localpart_from_id(requester_id)
-            )
-        except HTTPError:
-            raise SynapseError(
-                400,
-                "Unable to retrieve the corresponding Nextcloud username of user {}.".format(
-                    requester_id
-                ),
-            )
+        await self.nextcloud_client.add_group(NEXTCLOUD_GROUP_NAME_PREFIX + room_id)
 
-        try:
-            group_exists = await self.nextcloud_room_group_exists(room_id)
-        except HTTPError:
-            raise SynapseError(
-                400, "Unable to know if the nextcloud group {} exists.".format(room_id),
-            )
+        await self.add_room_users_to_nextcloud_group(room_id)
 
-        if not group_exists:
-            try:
-                await self.create_nextcloud_group(room_id)
-            except HTTPError:
-                raise SynapseError(
-                    400, "Unable to create the Nextcloud group {}.".format(room_id)
-                )
+        old_share_id = await self.store.get_nextcloud_share_id_from_roomID(room_id)
 
-        mapped_directory_path = await self.store.get_nextcloud_directory_path_from_roomID(
-            room_id
+        if old_share_id:
+            await self.nextcloud_client.delete_share(nextcloud_requester, old_share_id)
+
+        new_share_id = await self.nextcloud_client.create_all_permission_share_with_group(
+            nextcloud_requester, nextcloud_directory_path, room_id
         )
 
-        if mapped_directory_path:
-            try:
-                await self.delete_existing_nextcloud_share(
-                    nextcloud_username, mapped_directory_path, room_id
-                )
-            except HTTPError as e:
-                logger.error(
-                    "Unable to delete the share on the nextcloud folder {} for the nextcloud group {} : ".format(
-                        room_id, directory_path, e
-                    )
-                )
-                if e.response.status_code == 404:
-                    raise SynapseError(
-                        404,
-                        "The user {} doesn't have the access right to the folder {}.".format(
-                            requester_id, directory_path
-                        ),
-                        Codes.NEXTCLOUD_FOLDER_ACCESS_FORBIDDEN,
-                    )
-
-                raise SynapseError(
-                    400,
-                    "Unable to get shares on the folder {}.".format(directory_path),
-                )
-
-        try:
-            await self.create_new_nextcloud_share(
-                nextcloud_username, nextcloud_directory_path, room_id
-            )
-        except HTTPError as e:
-            logger.error(
-                "Unable to create a share for the nextcloud group {} on the nextcloud folder {} : {}".format(
-                    room_id, nextcloud_directory_path, e
-                ),
-            )
-            if e.response.status_code == 404:
-                raise SynapseError(
-                    404,
-                    "The user {} doesn't have the access right to the folder {}.".format(
-                        requester_id, nextcloud_directory_path
-                    ),
-                    Codes.NEXTCLOUD_FOLDER_ACCESS_FORBIDDEN,
-                )
-
-            raise SynapseError(
-                400,
-                "Unable to get shares on the folder {}.".format(
-                    nextcloud_directory_path
-                ),
-            )
-
-        await self.store.set_room_mapping_with_nextcloud_directory(
-            room_id, nextcloud_directory_path
+        await self.store.map_room_with_nextcloud_directory(
+            room_id, nextcloud_directory_path, new_share_id
         )
 
-    async def get_nextcloud_username(self, user_localpart):
-        """ Get the corresponding Nextcloud username of the synapse user from Keycloak.
-
-        Args :
-            user_localpart: the synapse user localpart.
-
-        Returns:
-            The Nextcloud username.
-        """
-
-        request = get(
-            "{}/admin/realms/{}/users".format(
-                self.keycloak_server, self.keycloak_realm
-            ),
-            headers={"Authorization": "Bearer {}".format(self.keycloak_access_token)},
-            params={"username": user_localpart},
-        )
-        request.raise_for_status()
-
-        return request.json()[0]["id"]
-
-    async def get_keycloak_access_token(self):
-        """ Get the realm Keycloak access token in order to use Keycloak Admin API.
-
-        Returns:
-            The realm Keycloak access token.
-        """
-
-        request = post(
-            "{}/realms/{}/protocol/openid-connect/token".format(
-                self.keycloak_server, self.keycloak_realm
-            ),
-            data={
-                "client_id": "admin-cli",
-                "username": self.service_account_name,
-                "password": self.service_account_password,
-                "grant_type": "password",
-            },
-        )
-        request.raise_for_status()
-
-        return request.json()["access_token"]
-
-    async def get_sharing_of_nextcloud_directory(self, username, directory_path):
-        """ Get share for the requester and all reshares on the folder.
+    async def add_room_users_to_nextcloud_group(self, room_id):
+        """ Add all users of a room to a Nextcloud group which name like the room_id.
 
         Args:
-            username: the Nextcloud username of the requester.
-            directory: the directory path of the folder concerned by the share search.
-
-        Returns:
-            A list which contains all shares on the folder.
-            Each share is a dict that contains lot of information about the share (id, share_with, owner_uid...)
-        
-        Raises:
-            HTTPError 401 : Wrong Basic Auth.
-            HTTPError 404 : Couldn't fetch shares. Most likely due to the fact that the user doesn't have a share on the folder or the folder doesn't exists.
+            room_id: the id of the room which is the name of the Nextcloud group.
         """
 
-        request = get(
-            "{}/ocs/v2.php/apps/files_sharing/api/v1/shares".format(
-                self.nextcloud_server
-            ),
-            headers={"OCS-APIRequest": "true"},
-            auth=HTTPBasicAuth(username, self.nextcloud_shared_secret),
-            params={"path": directory_path, "reshares": "true", "format": "json"},
+        users_id = await self.store.get_users_in_room(room_id)
+        users_localpart = [get_localpart_from_id(user_id) for user_id in users_id]
+
+        keycloak_users_representation = (
+            await self.keycloak_client.get_all_keycloak_users()
         )
-        request.raise_for_status()
 
-        return request.json()["ocs"]["data"]
+        for keycloak_user in keycloak_users_representation:
+            localpart = keycloak_user["username"]
+            nextcloud_target = keycloak_user["id"]
 
-    async def nextcloud_room_group_exists(self, group_name):
-        """ Ask Nextcloud if the group name exist or not.
-
-        Args:
-            group_name: the name of Nextcloud group.
-
-        Returns:
-            True if the group exists, else False.
-        """
-
-        request = get(
-            "{}/ocs/v1.php/cloud/groups".format(self.nextcloud_server),
-            headers={"OCS-APIRequest": "true"},
-            auth=HTTPBasicAuth(
-                self.service_account_name, self.service_account_password
-            ),
-            params={"search": group_name, "format": "json"},
-        )
-        request.raise_for_status()
-        response = request.json()["ocs"]["data"]
-
-        groups = response.get("groups")
-        return groups is not None and len(groups) > 0
-
-    async def create_nextcloud_group(self, room_id):
-        """ Create an Nextcloud group named as room_id and add all users in the room into the new Nextcloud group.
-
-        Args:
-            room_id: the room_id of the room which Nextcloud directory is linked.
-        """
-
-        request = post(
-            "{}/ocs/v1.php/cloud/groups".format(self.nextcloud_server),
-            headers={"OCS-APIRequest": "true"},
-            auth=HTTPBasicAuth(
-                self.service_account_name, self.service_account_password
-            ),
-            data={"groupid": room_id, "format": "json"},
-        )
-        request.raise_for_status()
-
-        users = await self.store.get_users_in_room(room_id)
-
-        for user in users:
-            try:
-                nextcloud_username = await self.get_nextcloud_username(
-                    get_localpart_from_id(user)
-                )
-                await self.add_user_to_nextcloud_groups(nextcloud_username, room_id)
-            except HTTPError:
-                logger.warn(
-                    "An error occured during the addition of the user {} in the Nextcloud group {}.".format(
-                        user, room_id
+            if localpart in users_localpart:
+                try:
+                    await self.nextcloud_client.get_user(nextcloud_target)
+                except Exception:
+                    logger.warn(
+                        "The user {} does not have a Nextcloud account.".format(
+                            localpart
+                        )
                     )
-                )
+                    continue
+
+                try:
+                    await self.nextcloud_client.add_user_to_group(
+                        nextcloud_target, room_id
+                    )
+                except Exception:
+                    logger.warn(
+                        "Unable to add the user {username} to the Nextcloud group {group_name}.".format(
+                            username=localpart, group_name=room_id
+                        )
+                    )
                 continue
 
-    async def delete_nextcloud_group(self, room_id):
-        """ Delete an Nextcloud group named as room_id.
-
-        Args:
-            room_id: the room_id of the room which Nextcloud directory is linked.
-        """
-
-        request = delete(
-            "{}/ocs/v1.php/cloud/groups/{}".format(self.nextcloud_server, room_id),
-            headers={"OCS-APIRequest": "true"},
-            auth=HTTPBasicAuth(
-                self.service_account_name, self.service_account_password
-            ),
-        )
-        request.raise_for_status()
-
-    async def add_user_to_nextcloud_groups(self, username, group_name):
-        """ Add user to the Nextcloud group named as room_id.
-
-        Args:
-            username: the room_id of the room which Nextcloud directory is linked.
-            group_name: the Nextcloud group name, equivalent to room_id of the room linked.
-        """
-
-        request = post(
-            "{}/ocs/v1.php/cloud/users/{}/groups".format(
-                self.nextcloud_server, username
-            ),
-            headers={"OCS-APIRequest": "true"},
-            auth=HTTPBasicAuth(
-                self.service_account_name, self.service_account_password
-            ),
-            data={"groupid": group_name, "format": "json"},
-        )
-        request.raise_for_status()
-
-    async def create_new_nextcloud_share(self, requester, directory_path, group_name):
-        """ Create a share on Nextcloud folder for the specified Nextcloud group.
-        Post arguments: 
-            permission = 31 -> give all right on the folder (read, update, create, deleted and share)
-            shareType = 1 -> a group share
-
-        Args:
-            requester: the Nextcloud username of the requester who want to create the new share.
-            directory_path: the path of the folder to share.
-            group_name: the Nextcloud group id.
-        """
-
-        await self.get_sharing_of_nextcloud_directory(requester, directory_path)
-
-        request = post(
-            "{}/ocs/v2.php/apps/files_sharing/api/v1/shares".format(
-                self.nextcloud_server
-            ),
-            headers={"OCS-APIRequest": "true"},
-            auth=HTTPBasicAuth(requester, self.service_account_password),
-            data={
-                "path": directory_path,
-                "shareType": 1,
-                "shareWith": group_name,
-                "permissions": 31,
-                "format": "json",
-            },
-        )
-        request.raise_for_status()
-
-    async def delete_existing_nextcloud_share(
-        self, requester, mapped_directory_path, group_name
+    async def update_existing_nextcloud_share_for_user(
+        self, user_id, group_name, membership
     ):
-        """ Delete an existing share (corresponding to the share id) on the folder. 
-
-        Args:
-            requester: the Nextcloud username of the requester who want to delete an existing share.
-            share_id: the id of the share to delete.
-        """
-        all_shares = await self.get_sharing_of_nextcloud_directory(
-            requester, mapped_directory_path
+        keycloak_user_representation = await self.keycloak_client.get_keycloak_user(
+            get_localpart_from_id(user_id)
         )
+        nextcloud_username = keycloak_user_representation["id"]
 
-        share_id = ""
-        for share in all_shares:
-            if share["share_with"] == group_name:
-                share_id = share["id"]
-                break
-
-        if not share_id:
-            raise SynapseError(
-                400,
-                "Unable to retrieve share id between Nextcloud group {} and Nextcloud directory {}".format(
-                    group_name, mapped_directory_path
-                ),
-            )
-
-        request = delete(
-            "{}/ocs/v2.php/apps/files_sharing/api/v1/shares/{}".format(
-                self.nextcloud_server, share_id
-            ),
-            headers={"OCS-APIRequest": "true"},
-            auth=HTTPBasicAuth(requester, self.service_account_password),
-        )
-        request.raise_for_status()
+        if membership in ["invite", "join"]:
+            try:
+                await self.nextcloud_client.add_user_to_group(
+                    nextcloud_username, group_name
+                )
+            except Exception:
+                logger.warn(
+                    "Unable to add the user {username} to the Nextcloud group {group_name}.".format(
+                        username=user_id, group_name=group_name
+                    ),
+                )
+        else:
+            try:
+                await self.nextcloud_client.remove_from_group(
+                    nextcloud_username, group_name
+                )
+            except Exception:
+                logger.warn(
+                    "Unable to remove the user {username} from the Nextcloud group {group_name}.".format(
+                        username=user_id, group_name=group_name
+                    ),
+                )
 
     async def get_room_list_to_send_nextcloud_notification(
         self, directory, limit_of_notification_propagation
@@ -1884,4 +1647,6 @@ class WatchaRoomHandler(BaseHandler):
 
         notification_sent["notified_rooms"] = notified_rooms
         return notification_sent
+
+
 # +watcha
