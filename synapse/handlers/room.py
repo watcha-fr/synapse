@@ -67,7 +67,7 @@ from requests import get, post, delete, auth, HTTPError
 from requests.auth import HTTPBasicAuth
 from synapse.http.watcha_keycloak_client import WatchaKeycloakClient
 from synapse.http.watcha_nextcloud_client import WatchaNextcloudClient
-from synapse.types import get_localpart_from_id
+from synapse.types import get_localpart_from_id, decode_localpart, map_username_to_mxid_localpart
 
 # +watcha
 
@@ -1493,7 +1493,7 @@ class NextcloudHandler(BaseHandler):
         """
         group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
         keycloak_user_representation = await self.keycloak_client.get_user(
-            get_localpart_from_id(requester_id)
+            decode_localpart(requester_id)
         )
         nextcloud_requester = keycloak_user_representation["id"]
 
@@ -1529,7 +1529,7 @@ class NextcloudHandler(BaseHandler):
         )
 
         for keycloak_user in keycloak_users_representation:
-            localpart = keycloak_user["username"]
+            localpart = map_username_to_mxid_localpart(keycloak_user["username"])
             nextcloud_target = keycloak_user["id"]
 
             if localpart in users_localpart:
@@ -1560,7 +1560,7 @@ class NextcloudHandler(BaseHandler):
     ):
         group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
         keycloak_user_representation = await self.keycloak_client.get_user(
-            get_localpart_from_id(user_id)
+            decode_localpart(user_id)
         )
         nextcloud_username = keycloak_user_representation["id"]
 
