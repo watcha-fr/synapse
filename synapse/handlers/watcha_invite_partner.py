@@ -1,12 +1,10 @@
-from binascii import b2a_hex
 import logging
-import re
 
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
 from synapse.api.errors import SynapseError
-from synapse.types import UserID, create_requester
+from synapse.types import UserID, create_requester, map_username_to_mxid_localpart
 from synapse.util.watcha import (
     compute_registration_token,
     create_display_inviter_name,
@@ -61,7 +59,7 @@ class InvitePartnerHandler(BaseHandler):
 
         # the user does not exist. we create an account
         else:
-            localpart = self._gen_localpart_from_email(invitee)
+            localpart = map_username_to_mxid_localpart(invitee)
             logger.info(
                 "invited user %s is not in the DB. Creating user (id is %s), inviting to room and sending invitation email.",
                 invitee,
@@ -72,7 +70,7 @@ class InvitePartnerHandler(BaseHandler):
             password = generate_password()
             password_hash = await self.hs.get_auth_handler().hash(password)
 
-            await self.hs.get_nextcloud_handler().create_keycloak_and_nextcloud_user(localpart, invitee, password_hash, "partner")
+            await self.hs.get_nextcloud_handler().create_keycloak_and_nextcloud_user(invitee, invitee, password_hash, "partner")
 
             try:
                 await self.hs.get_registration_handler().register_user(
@@ -132,16 +130,3 @@ class InvitePartnerHandler(BaseHandler):
         )
 
         return user_id
-
-    def _gen_localpart_from_email(self, email):
-        # https://matrix.org/docs/spec/appendices#id14
-        lowered = email.lower()
-        escaped = lowered.replace("=", "==")
-        return re.sub(
-            r"[^\w.=/-]", self._encode_forbidden_char, escaped, flags=re.ASCII
-        )
-
-    def _encode_forbidden_char(self, match):
-        bin_char = match.group(0).encode()
-        hex_char = b2a_hex(bin_char).decode()
-        return re.sub(r"(..)", r"=\1", hex_char)
