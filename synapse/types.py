@@ -54,6 +54,8 @@ else:
         __slots__ = ()
 
 
+from binascii import a2b_hex  # watcha+
+
 # Define a state map type from type/state_key to T (usually an event ID or
 # event)
 T = TypeVar("T")
@@ -98,7 +100,7 @@ class Requester(
         ],
     )
 ):
-# +watcha
+    # +watcha
     """
     Represents the user making a request
 
@@ -213,7 +215,7 @@ def create_requester(
         app_service,
         authenticated_entity,
         is_partner,
-    )  
+    )
     # +watcha
 
 
@@ -429,6 +431,31 @@ def map_username_to_mxid_localpart(username, case_sensitive=False):
     # we should now only have ascii bytes left, so can decode back to a
     # unicode.
     return username.decode("ascii")
+
+
+# watcha+
+def decode_localpart(user_id):
+    """Reverse map_username_to_mxid_localpart
+
+    Args:
+        user_id (unicode): mxid to be decoded
+
+    Returns:
+        unicode: original username string
+    """
+
+    localpart = get_localpart_from_id(user_id)
+    return re.sub(r"=..", unescape, localpart)
+
+
+def unescape(match):
+    chunk = match.group(0)
+    hex_char = chunk.lstrip("=")
+    bin_char = a2b_hex(hex_char)
+    return bin_char.decode()
+
+
+# +watcha
 
 
 @attr.s(frozen=True, slots=True, cmp=False)
