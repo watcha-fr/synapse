@@ -445,14 +445,19 @@ def decode_localpart(user_id):
     """
 
     localpart = get_localpart_from_id(user_id)
-    return re.sub(r"=..", unescape, localpart)
+    username = re.sub(r"=..", unescape_non_mxid_character, localpart)
+    return re.sub(r"_.", unescape_upper_case_char, username)
 
-
-def unescape(match):
+def unescape_non_mxid_character(match):
     chunk = match.group(0)
     hex_char = chunk.lstrip("=")
     bin_char = a2b_hex(hex_char)
     return bin_char.decode()
+
+def unescape_upper_case_char(match):
+    chunk = match.group(0)
+    lower_case_char = chunk.lstrip("_")
+    return lower_case_char.upper()
 
 
 # +watcha
