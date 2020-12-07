@@ -2306,7 +2306,7 @@ class WatchaMembershipNextcloudSharingTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, channel.code)
 
     def test_update_nextcloud_share_with_an_unmapped_room(self):
-        self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user = (
+        self.watcha_room_nextcloud_mapping.update_share = (
             simple_async_mock()
         )
 
@@ -2314,7 +2314,7 @@ class WatchaMembershipNextcloudSharingTestCase(unittest.HomeserverTestCase):
 
         self.helper.invite(room_id, self.creator, self.inviter, tok=self.creator_tok)
 
-        self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user.assert_not_called()
+        self.watcha_room_nextcloud_mapping.update_share.assert_not_called()
 
 
 # +watcha

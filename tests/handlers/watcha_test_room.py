@@ -215,7 +215,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
 
     def test_update_existing_nextcloud_share_on_invite_membership(self):
         self.get_success(
-            self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user(
+            self.watcha_room_nextcloud_mapping.update_share(
                 "@second_inviter:test", self.room_id, "invite"
             )
         )
@@ -226,7 +226,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
 
     def test_update_existing_nextcloud_share_on_invite_membership(self):
         self.get_success(
-            self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user(
+            self.watcha_room_nextcloud_mapping.update_share(
                 "@second_inviter:test", self.room_id, "join"
             )
         )
@@ -237,7 +237,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
 
     def test_update_existing_nextcloud_share_on_leave_membership(self):
         self.get_success(
-            self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user(
+            self.watcha_room_nextcloud_mapping.update_share(
                 "@second_inviter:test", self.room_id, "leave"
             )
         )
@@ -248,7 +248,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
 
     def test_update_existing_nextcloud_share_on_kick_membership(self):
         self.get_success(
-            self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user(
+            self.watcha_room_nextcloud_mapping.update_share(
                 "@second_inviter:test", self.room_id, "kick"
             )
         )
@@ -263,7 +263,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
 
         with self.assertLogs("synapse.handlers.room", level="WARN") as cm:
             self.get_success(
-                self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user(
+                self.watcha_room_nextcloud_mapping.update_share(
                     second_inviter, self.room_id, "invite"
                 )
             )
@@ -281,7 +281,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
 
         with self.assertLogs("synapse.handlers.room", level="WARN") as cm:
             self.get_success(
-                self.watcha_room_nextcloud_mapping.update_existing_nextcloud_share_for_user(
+                self.watcha_room_nextcloud_mapping.update_share(
                     second_inviter, self.room_id, "leave"
                 )
             )

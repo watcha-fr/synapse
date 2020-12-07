@@ -1535,7 +1535,7 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
                     )
                 continue
 
-    async def update_existing_nextcloud_share_for_user(
+    async def update_share(
         self, user_id, group_name, membership
     ):
         keycloak_user_representation = await self.keycloak_client.get_keycloak_user(
@@ -1566,7 +1566,7 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
                     ),
                 )
 
-    async def get_room_list_to_send_nextcloud_notification(
+    async def get_rooms_to_send_notification(
         self, directory, limit_of_notification_propagation
     ):
         rooms = []
