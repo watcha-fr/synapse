@@ -145,7 +145,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         )
 
         self._raise_for_status(
-            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_REMOVE_USER_TO_GROUP
+            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_REMOVE_USER_FROM_GROUP
         )
 
     async def get_user(self, username):
@@ -223,7 +223,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         )
 
         self._raise_for_status(
-            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_CREATE_NEW_SHARE
+            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_SHARE_FOLDER
         )
 
         return response["ocs"]["data"]["id"]
