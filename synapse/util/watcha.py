@@ -68,7 +68,7 @@ async def create_display_inviter_name(hs, inviter):
     ]
     inviter_email = inviter_emails[0] if inviter_emails else ""
     inviter_name = (
-        (inviter_display_name + ((" (" + inviter_email + ")") if inviter_email else ""))
+        "{} ({})".format(inviter_display_name, inviter_email) if inviter_email else ""
         if inviter_display_name
         else inviter_email
     )
