@@ -129,7 +129,7 @@ if TYPE_CHECKING:
     from synapse.handlers.saml_handler import SamlHandler
 
 # watcha+
-from synapse.handlers.room import WatchaRoomNextcloudMappingHandler
+from synapse.handlers.watcha_nextcloud_integration import NextcloudHandler
 from synapse.handlers.watcha_admin_handler import WatchaAdminHandler
 from synapse.handlers.watcha_invite_external import WatchaInviteExternalHandler
 
@@ -713,7 +713,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return WatchaAdminHandler(self)
 
     @cache_in_self
-    def get_watcha_room_nextcloud_mapping_handler(self) -> WatchaRoomNextcloudMappingHandler:
-        return WatchaRoomNextcloudMappingHandler(self)
+    def get_nextcloud_handler(self) -> NextcloudHandler:
+        return NextcloudHandler(self)
 
     # +watcha

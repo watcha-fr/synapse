@@ -19,8 +19,7 @@ def simple_async_mock(return_value=None, raises=None):
     return Mock(side_effect=cb)
 
 
-class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
-    """ Tests the WatchaRoomNextcloudMappingHandler. """
+class NextcloudHandlerTestCase(unittest.HomeserverTestCase):
 
     servlets = [
         admin.register_servlets,
@@ -31,7 +30,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
         self.watcha_room_nextcloud_mapping = (
-            hs.get_watcha_room_nextcloud_mapping_handler()
+            hs.get_nextcloud_handler()
         )
 
         self.keycloak_client = self.watcha_room_nextcloud_mapping.keycloak_client

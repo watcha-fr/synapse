@@ -2127,7 +2127,7 @@ class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
         )
 
         self.watcha_room_nextcloud_mapping = (
-            hs.get_watcha_room_nextcloud_mapping_handler()
+            hs.get_nextcloud_handler()
         )
         self.watcha_room_nextcloud_mapping.bind = (
             simple_async_mock()
@@ -2242,9 +2242,9 @@ class WatchaMembershipNextcloudSharingTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        # mock some functions of WatchaRoomNextcloudMappingHandler
+        # mock some functions of NextcloudHandler
         self.watcha_room_nextcloud_mapping = (
-            hs.get_watcha_room_nextcloud_mapping_handler()
+            hs.get_nextcloud_handler()
         )
 
         self.keycloak_client = self.watcha_room_nextcloud_mapping.keycloak_client

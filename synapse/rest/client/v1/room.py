@@ -106,7 +106,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         # watcha+
         self.store = hs.get_datastore()
         self.watcha_room_nextcloud_mapping_handler = (
-            hs.get_watcha_room_nextcloud_mapping_handler()
+            hs.get_nextcloud_handler()
         )
         # +watcha
 
@@ -391,7 +391,7 @@ class JoinRoomAliasServlet(TransactionRestServlet):
         # watcha+
         self.store = hs.get_datastore()
         self.watcha_room_nextcloud_mapping_handler = (
-            hs.get_watcha_room_nextcloud_mapping_handler()
+            hs.get_nextcloud_handler()
         )
         # +watcha
 
@@ -879,7 +879,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         # watcha+
         self.watcha_invite_external_handler = hs.get_watcha_invite_external_handler()
         self.watcha_room_nextcloud_mapping_handler = (
-            hs.get_watcha_room_nextcloud_mapping_handler()
+            hs.get_nextcloud_handler()
         )
         self.store = hs.get_datastore()
         # +watcha

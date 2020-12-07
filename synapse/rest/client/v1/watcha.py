@@ -71,7 +71,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.watcha_room_nextcloud_mapping_handler = (
-            hs.get_watcha_room_nextcloud_mapping_handler()
+            hs.get_nextcloud_handler()
         )
 
     async def on_POST(self, request):
