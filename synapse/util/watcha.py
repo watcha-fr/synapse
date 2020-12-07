@@ -43,7 +43,7 @@ def compute_registration_token(user, email=None, password=None):
         json = '{{"user":"{user}", "email":"{email}", "pw":"{password}"}}'.format(
             user=user, email=email, password=password
         )
-    return b64encode(json.encode("utf-8")).decode("ascii")
+    return b64encode(json.encode()).decode()
 
 
 # additional email we send to, when not sending to a mail gun
