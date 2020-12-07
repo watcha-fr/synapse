@@ -1454,7 +1454,7 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
         self.keycloak_client = WatchaKeycloakClient(hs)
         self.nextcloud_client = WatchaNextcloudClient(hs)
 
-    async def delete_room_nextcloud_mapping(self, room_id):
+    async def unbind(self, room_id):
         """ Delete a mapping between a room and an Nextcloud folder.
 
         Args :
@@ -1465,7 +1465,7 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
 
         await self.store.deleted_room_mapping_with_nextcloud_directory(room_id)
 
-    async def update_room_nextcloud_mapping(
+    async def bind(
         self, room_id, requester_id, nextcloud_directory_path
     ):
         """ Update the mapping between a room and a Nextcloud folder.

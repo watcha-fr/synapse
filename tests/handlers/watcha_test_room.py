@@ -74,7 +74,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
 
     def test_set_new_room_nextcloud_mapping(self):
         self.get_success(
-            self.watcha_room_nextcloud_mapping.update_room_nextcloud_mapping(
+            self.watcha_room_nextcloud_mapping.bind(
                 self.room_id, self.creator, "/directory"
             )
         )
@@ -122,7 +122,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
         self.assertEqual(old_share_id, 2)
 
         self.get_success(
-            self.watcha_room_nextcloud_mapping.update_room_nextcloud_mapping(
+            self.watcha_room_nextcloud_mapping.bind(
                 self.room_id, self.creator, "/directory2"
             )
         )
@@ -148,7 +148,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
             )
         )
         self.get_success(
-            self.watcha_room_nextcloud_mapping.delete_room_nextcloud_mapping(
+            self.watcha_room_nextcloud_mapping.unbind(
                 self.room_id
             )
         )

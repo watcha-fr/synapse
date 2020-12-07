@@ -2129,10 +2129,10 @@ class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
         self.watcha_room_nextcloud_mapping = (
             hs.get_watcha_room_nextcloud_mapping_handler()
         )
-        self.watcha_room_nextcloud_mapping.update_room_nextcloud_mapping = (
+        self.watcha_room_nextcloud_mapping.bind = (
             simple_async_mock()
         )
-        self.watcha_room_nextcloud_mapping.delete_room_nextcloud_mapping = (
+        self.watcha_room_nextcloud_mapping.unbind = (
             simple_async_mock()
         )
         self.nextcloud_directory_url = (
@@ -2156,7 +2156,7 @@ class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertTrue(
-            self.watcha_room_nextcloud_mapping.update_room_nextcloud_mapping.called
+            self.watcha_room_nextcloud_mapping.bind.called
         )
         self.assertEquals(200, channel.code)
 
@@ -2167,7 +2167,7 @@ class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
         channel = self.send_room_nextcloud_mapping_event({"nextcloudShare": ""})
 
         self.assertTrue(
-            self.watcha_room_nextcloud_mapping.delete_room_nextcloud_mapping.called
+            self.watcha_room_nextcloud_mapping.unbind.called
         )
         self.assertEquals(200, channel.code)
 
@@ -2180,7 +2180,7 @@ class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertTrue(
-            self.watcha_room_nextcloud_mapping.update_room_nextcloud_mapping.called
+            self.watcha_room_nextcloud_mapping.bind.called
         )
         self.assertEquals(200, channel.code)
 
@@ -2190,7 +2190,7 @@ class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertFalse(
-            self.watcha_room_nextcloud_mapping.update_room_nextcloud_mapping.called
+            self.watcha_room_nextcloud_mapping.bind.called
         )
         self.assertRaises(SynapseError)
         self.assertEquals(400, channel.code)
@@ -2205,7 +2205,7 @@ class WatchaRoomNextcloudMappingEventTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertFalse(
-            self.watcha_room_nextcloud_mapping.update_room_nextcloud_mapping.called
+            self.watcha_room_nextcloud_mapping.bind.called
         )
         self.assertRaises(SynapseError)
         self.assertEquals(400, channel.code)
