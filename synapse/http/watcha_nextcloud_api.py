@@ -224,7 +224,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         )
 
         self._raise_for_status(
-            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_SHARE_FOLDER
+            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_SHARE
         )
 
         return response["ocs"]["data"]["id"]
@@ -250,5 +250,5 @@ class WatchaNextcloudClient(SimpleHttpClient):
         )
 
         self._raise_for_status(
-            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_DELETE_SHARE
+            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_UNSHARE
         )
