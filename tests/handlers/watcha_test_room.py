@@ -66,7 +66,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
         self.nextcloud_client.delete_group = simple_async_mock()
         self.nextcloud_client.get_user = simple_async_mock()
         self.nextcloud_client.add_user_to_group = simple_async_mock()
-        self.nextcloud_client.remove_from_group = simple_async_mock()
+        self.nextcloud_client.remove_user_from_group = simple_async_mock()
         self.nextcloud_client.delete_share = simple_async_mock()
         self.nextcloud_client.create_all_permission_share_with_group = simple_async_mock(
             return_value=1
@@ -222,7 +222,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
 
         self.keycloak_client.get_keycloak_user.assert_called_once()
         self.nextcloud_client.add_user_to_group.assert_called_once()
-        self.nextcloud_client.remove_from_group.assert_not_called()
+        self.nextcloud_client.remove_user_from_group.assert_not_called()
 
     def test_update_existing_nextcloud_share_on_invite_membership(self):
         self.get_success(
@@ -233,7 +233,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
 
         self.keycloak_client.get_keycloak_user.assert_called_once()
         self.nextcloud_client.add_user_to_group.assert_called_once()
-        self.nextcloud_client.remove_from_group.assert_not_called()
+        self.nextcloud_client.remove_user_from_group.assert_not_called()
 
     def test_update_existing_nextcloud_share_on_leave_membership(self):
         self.get_success(
@@ -243,7 +243,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
         )
 
         self.keycloak_client.get_keycloak_user.assert_called_once()
-        self.nextcloud_client.remove_from_group.assert_called_once()
+        self.nextcloud_client.remove_user_from_group.assert_called_once()
         self.nextcloud_client.add_user_to_group.assert_not_called()
 
     def test_update_existing_nextcloud_share_on_kick_membership(self):
@@ -254,7 +254,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
         )
 
         self.keycloak_client.get_keycloak_user.assert_called_once()
-        self.nextcloud_client.remove_from_group.assert_called_once()
+        self.nextcloud_client.remove_user_from_group.assert_called_once()
         self.nextcloud_client.add_user_to_group.assert_not_called()
 
     def test_update_existing_nextcloud_share_on_invite_membership_with_exception(self):
@@ -276,7 +276,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
         )
 
     def test_update_existing_nextcloud_share_on_leave_membership_with_exception(self):
-        self.nextcloud_client.remove_from_group = simple_async_mock(raises=SynapseError)
+        self.nextcloud_client.remove_user_from_group = simple_async_mock(raises=SynapseError)
         second_inviter = "@second_inviter:test"
 
         with self.assertLogs("synapse.handlers.room", level="WARN") as cm:

@@ -1560,7 +1560,7 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
                 )
         else:
             try:
-                await self.nextcloud_client.remove_from_group(
+                await self.nextcloud_client.remove_user_from_group(
                     nextcloud_username, group_name
                 )
             except Exception:

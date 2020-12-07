@@ -2254,7 +2254,7 @@ class WatchaMembershipNextcloudSharingTestCase(unittest.HomeserverTestCase):
             return_value={"id": "1234", "username": "creator"},
         )
         self.nextcloud_client.add_user_to_group = simple_async_mock()
-        self.nextcloud_client.remove_from_group = simple_async_mock()
+        self.nextcloud_client.remove_user_from_group = simple_async_mock()
 
     def test_update_nextcloud_share_on_invite_and_join_event(self):
         self.helper.invite(
@@ -2284,7 +2284,7 @@ class WatchaMembershipNextcloudSharingTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.nextcloud_client.add_user_to_group.assert_called_once()
-        self.nextcloud_client.remove_from_group.assert_called_once()
+        self.nextcloud_client.remove_user_from_group.assert_called_once()
         self.assertEqual(200, channel.code)
 
     def test_update_nextcloud_share_on_kick_event(self):
@@ -2302,7 +2302,7 @@ class WatchaMembershipNextcloudSharingTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEquals(self.nextcloud_client.add_user_to_group.call_count, 2)
-        self.nextcloud_client.remove_from_group.assert_called_once()
+        self.nextcloud_client.remove_user_from_group.assert_called_once()
         self.assertEqual(200, channel.code)
 
     def test_update_nextcloud_share_with_an_unmapped_room(self):

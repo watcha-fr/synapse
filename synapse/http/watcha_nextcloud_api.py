@@ -120,7 +120,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
             response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_ADD_USER_TO_GROUP
         )
 
-    async def remove_from_group(self, username, group_name):
+    async def remove_user_from_group(self, username, group_name):
         """Removes the specified user from the specified group.
 
         Args:
