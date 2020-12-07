@@ -229,7 +229,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
 
         return response["ocs"]["data"]["id"]
 
-    async def delete_share(self, requester, share_id):
+    async def unshare(self, requester, share_id):
         """Remove a given Nextcloud share
 
         Args:

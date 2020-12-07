@@ -67,7 +67,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
         self.nextcloud_client.get_user = simple_async_mock()
         self.nextcloud_client.add_user_to_group = simple_async_mock()
         self.nextcloud_client.remove_user_from_group = simple_async_mock()
-        self.nextcloud_client.delete_share = simple_async_mock()
+        self.nextcloud_client.unshare = simple_async_mock()
         self.nextcloud_client.share = simple_async_mock(
             return_value=1
         )
@@ -98,7 +98,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
         self.assertEquals(self.nextcloud_client.add_user_to_group.call_count, 2)
 
         # Verify that mocked functions are not called
-        self.nextcloud_client.delete_share.assert_not_called()
+        self.nextcloud_client.unshare.assert_not_called()
 
         self.assertEqual(mapped_directory, "/directory")
         self.assertEqual(share_id, 1)
@@ -136,7 +136,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
         )
 
         # Verify that mocked functions has called :
-        self.nextcloud_client.delete_share.assert_called()
+        self.nextcloud_client.unshare.assert_called()
 
         self.assertEqual(mapped_directory, "/directory2")
         self.assertEqual(new_share_id, 1)

@@ -1488,7 +1488,7 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
         old_share_id = await self.store.get_nextcloud_share_id_from_roomID(room_id)
 
         if old_share_id:
-            await self.nextcloud_client.delete_share(nextcloud_requester, old_share_id)
+            await self.nextcloud_client.unshare(nextcloud_requester, old_share_id)
 
         new_share_id = await self.nextcloud_client.share(
             nextcloud_requester, nextcloud_directory_path, room_id
