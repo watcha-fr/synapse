@@ -68,7 +68,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
         self.nextcloud_client.add_user_to_group = simple_async_mock()
         self.nextcloud_client.remove_user_from_group = simple_async_mock()
         self.nextcloud_client.delete_share = simple_async_mock()
-        self.nextcloud_client.create_all_permission_share_with_group = simple_async_mock(
+        self.nextcloud_client.share = simple_async_mock(
             return_value=1
         )
 
@@ -91,7 +91,7 @@ class WatchaRoomNextcloudMappingTestCase(unittest.HomeserverTestCase):
         self.keycloak_client.get_keycloak_user.assert_called_once()
         self.nextcloud_client.add_group.assert_called_once()
         self.keycloak_client.get_all_keycloak_users.assert_called_once()
-        self.nextcloud_client.create_all_permission_share_with_group.assert_called_once()
+        self.nextcloud_client.share.assert_called_once()
 
         # Verify that mocked functions are called twice
         self.assertEquals(self.nextcloud_client.get_user.call_count, 2)

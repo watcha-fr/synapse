@@ -175,12 +175,13 @@ class WatchaNextcloudClient(SimpleHttpClient):
 
         return response["ocs"]["data"]
 
-    async def create_all_permission_share_with_group(self, requester, path, group_name):
+    async def share(self, requester, path, group_name):
         """Share an existing file or folder with all permissions for a group.
 
         Args:
-            requester: the user who want to remove the share
-            args: request attributes to filter the search.
+            requester: the user who want to create the share
+            path: the path of folder to share
+            group_name: the name of group which will share the folder 
 
         Payload:
             shareType: the type of the share. This can be one of:
