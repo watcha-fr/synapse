@@ -1527,7 +1527,7 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
                     await self.nextcloud_client.add_user_to_group(
                         nextcloud_username, room_id
                     )
-                except Exception:
+                except SynapseError:
                     logger.warn(
                         "Unable to add the user {} to the Nextcloud group {}.".format(
                             localpart, room_id
@@ -1548,7 +1548,7 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
                 await self.nextcloud_client.add_user_to_group(
                     nextcloud_username, group_name
                 )
-            except Exception:
+            except SynapseError:
                 logger.warn(
                     "Unable to add the user {} to the Nextcloud group {}.".format(
                         user_id, group_name
@@ -1559,7 +1559,7 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
                 await self.nextcloud_client.remove_user_from_group(
                     nextcloud_username, group_name
                 )
-            except Exception:
+            except SynapseError:
                 logger.warn(
                     "Unable to remove the user {} from the Nextcloud group {}.".format(
                         user_id, group_name
