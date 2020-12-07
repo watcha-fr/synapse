@@ -9,7 +9,7 @@ from email.mime.text import MIMEText
 from jinja2 import Environment, FileSystemLoader
 from os.path import join, dirname, abspath
 from pathlib import Path
-from secrets import token_bytes
+from secrets import token_hex
 from smtplib import SMTP
 
 from synapse.api.errors import SynapseError
@@ -22,13 +22,13 @@ TEMPLATE_DIR = join(dirname(abspath(__file__)), "watcha_templates")
 
 
 def generate_password():
-    """ Generate a base 64 encoded password with 16 bytes of randomness
+    """ Generate a password with 16 bytes of randomness
 
     Returns:
         The encoded password.
     """
 
-    return b64encode(token_bytes(16)).decode()
+    return token_hex(16)
 
 
 def compute_registration_token(user, email=None, password=None):
