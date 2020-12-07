@@ -1506,19 +1506,15 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
         """
 
         users_id = await self.store.get_users_in_room(room_id)
-        users_localpart = [get_localpart_from_id(user_id) for user_id in users_id]
+        localparts = [get_localpart_from_id(user_id) for user_id in users_id]
 
-        keycloak_users_representation = (
-            await self.keycloak_client.get_all_keycloak_users()
-        )
+        for user in await self.keycloak_client.get_all_keycloak_users():
+            localpart = user["username"]
+            nextcloud_username = user["id"]
 
-        for keycloak_user in keycloak_users_representation:
-            localpart = keycloak_user["username"]
-            nextcloud_target = keycloak_user["id"]
-
-            if localpart in users_localpart:
+            if localpart in localparts:
                 try:
-                    await self.nextcloud_client.get_user(nextcloud_target)
+                    await self.nextcloud_client.get_user(nextcloud_username)
                 except Exception:
                     logger.warn(
                         "The user {} does not have a Nextcloud account.".format(
@@ -1529,12 +1525,12 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
 
                 try:
                     await self.nextcloud_client.add_user_to_group(
-                        nextcloud_target, room_id
+                        nextcloud_username, room_id
                     )
                 except Exception:
                     logger.warn(
-                        "Unable to add the user {username} to the Nextcloud group {group_name}.".format(
-                            username=localpart, group_name=room_id
+                        "Unable to add the user {} to the Nextcloud group {}.".format(
+                            localpart, room_id
                         )
                     )
                 continue
@@ -1547,15 +1543,15 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
         )
         nextcloud_username = keycloak_user_representation["id"]
 
-        if membership in ["invite", "join"]:
+        if membership in ("invite", "join"):
             try:
                 await self.nextcloud_client.add_user_to_group(
                     nextcloud_username, group_name
                 )
             except Exception:
                 logger.warn(
-                    "Unable to add the user {username} to the Nextcloud group {group_name}.".format(
-                        username=user_id, group_name=group_name
+                    "Unable to add the user {} to the Nextcloud group {}.".format(
+                        user_id, group_name
                     ),
                 )
         else:
@@ -1565,8 +1561,8 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
                 )
             except Exception:
                 logger.warn(
-                    "Unable to remove the user {username} from the Nextcloud group {group_name}.".format(
-                        username=user_id, group_name=group_name
+                    "Unable to remove the user {} from the Nextcloud group {}.".format(
+                        user_id, group_name
                     ),
                 )
 
