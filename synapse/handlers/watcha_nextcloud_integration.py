@@ -6,7 +6,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import  SynapseError
 from synapse.http.watcha_keycloak_api import WatchaKeycloakClient
 from synapse.http.watcha_nextcloud_api import WatchaNextcloudClient
-from synapse.types import create_requester,
+from synapse.types import create_requester
 from synapse.types import get_localpart_from_id
 
 logger = logging.getLogger(__name__)
