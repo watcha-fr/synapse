@@ -1,9 +1,35 @@
+from jsonschema import validate
+
 from synapse.http.client import SimpleHttpClient
+
+TOKEN_SCHEMA = {
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "description": "Keycloak token schema",
+    "type": "object",
+    "properties": {
+        "access_token": {
+            "type": "string",
+        },
+    },
+}
+
+USER_SCHEMA = {
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "description": "Keycloak user schema",
+    "type": "array",
+    "properties": {
+        "id": {
+            "type": "string",
+        },
+        "username": {
+            "type": "string",
+        },
+    },
+}
 
 
 class WatchaKeycloakClient(SimpleHttpClient):
-    """ Interface for talking with Keycloak APIs
-    """
+    """Interface for talking with Keycloak APIs"""
 
     def __init__(self, hs):
         super(WatchaKeycloakClient, self).__init__(hs)
@@ -14,7 +40,7 @@ class WatchaKeycloakClient(SimpleHttpClient):
         self.service_account_password = hs.config.service_account_password
 
     async def _get_keycloak_access_token(self):
-        """ Get the realm Keycloak access token in order to use Keycloak Admin API.
+        """Get the realm Keycloak access token in order to use Keycloak Admin API.
 
         Returns:
             The realm Keycloak access token.
@@ -31,10 +57,13 @@ class WatchaKeycloakClient(SimpleHttpClient):
                 "grant_type": "password",
             },
         )
+
+        validate(response, TOKEN_SCHEMA)
+
         return response["access_token"]
 
     async def get_all_keycloak_users(self):
-        """ Get a list of all Keycloak users.
+        """Get a list of all Keycloak users.
 
         Returns:
             A list of dict.
@@ -48,10 +77,13 @@ class WatchaKeycloakClient(SimpleHttpClient):
             ),
             headers={"Authorization": ["Bearer {}".format(access_token)]},
         )
+
+        validate(response, USER_SCHEMA)
+
         return response
 
     async def get_keycloak_user(self, localpart):
-        """ Get a list of all Keycloak users.
+        """Get a list of all Keycloak users.
 
         Returns:
             A list of dict.
@@ -66,4 +98,7 @@ class WatchaKeycloakClient(SimpleHttpClient):
             headers={"Authorization": ["Bearer {}".format(access_token)]},
             args={"username": localpart},
         )
+
+        validate(response, USER_SCHEMA)
+
         return response[0]

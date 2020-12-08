@@ -1,10 +1,27 @@
+
 import logging
 from base64 import b64encode
+from jsonschema import validate
 
 from synapse.http.client import SimpleHttpClient
 from synapse.api.errors import Codes, SynapseError
 
 logger = logging.getLogger(__name__)
+
+STANDARD_SCHEMA = {
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "description": "standard schema for Owncloud API",
+    "type": "object",
+    "properties": {
+        "ocs": {
+            "type": "object",
+            "properties": {
+                "meta": {"type": "object"},
+                "data": {"type": "array"},
+            },
+        },
+    },
+}
 
 
 class WatchaNextcloudClient(SimpleHttpClient):
@@ -61,7 +78,8 @@ class WatchaNextcloudClient(SimpleHttpClient):
             post_json={"groupid": group_name},
             headers=self._headers,
         )
-
+        
+        validate(response, STANDARD_SCHEMA)
         meta = response["ocs"]["meta"]
 
         if meta["statuscode"] == 102:
@@ -87,6 +105,8 @@ class WatchaNextcloudClient(SimpleHttpClient):
             ),
             headers=self._headers,
         )
+
+        validate(response, STANDARD_SCHEMA)
 
         self._raise_for_status(
             response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_DELETE_GROUP
@@ -116,6 +136,8 @@ class WatchaNextcloudClient(SimpleHttpClient):
             headers=self._headers,
         )
 
+        validate(response, STANDARD_SCHEMA)
+
         self._raise_for_status(
             response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_ADD_USER_TO_GROUP
         )
@@ -144,12 +166,14 @@ class WatchaNextcloudClient(SimpleHttpClient):
             json_body={"groupid": group_name},
         )
 
+        validate(response, STANDARD_SCHEMA)
+
         self._raise_for_status(
             response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_REMOVE_USER_FROM_GROUP
         )
 
     async def get_user(self, username):
-        """ Get informations of user with username given on parameter
+        """Get informations of user with username given on parameter
 
         Args:
             username: the username of the user to add to the group.
@@ -169,6 +193,8 @@ class WatchaNextcloudClient(SimpleHttpClient):
             headers=self._headers,
         )
 
+        validate(response, STANDARD_SCHEMA)
+
         self._raise_for_status(
             response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_GET_USER
         )
@@ -181,7 +207,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
         Args:
             requester: the user who want to create the share
             path: the path of folder to share
-            group_name: the name of group which will share the folder 
+            group_name: the name of group which will share the folder
 
         Payload:
             shareType: the type of the share. This can be one of:
@@ -223,9 +249,9 @@ class WatchaNextcloudClient(SimpleHttpClient):
             },
         )
 
-        self._raise_for_status(
-            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_SHARE
-        )
+        validate(response, STANDARD_SCHEMA)
+
+        self._raise_for_status(response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_SHARE)
 
         return response["ocs"]["data"]["id"]
 
@@ -249,6 +275,6 @@ class WatchaNextcloudClient(SimpleHttpClient):
             json_body={"requester": requester},
         )
 
-        self._raise_for_status(
-            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_UNSHARE
-        )
+        validate(response, STANDARD_SCHEMA)
+
+        self._raise_for_status(response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_UNSHARE)
