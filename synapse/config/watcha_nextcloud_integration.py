@@ -8,8 +8,8 @@ class NextcloudIntegrationConfig(Config):
 
     section = "nextcloudintegration"
 
-    # echo -n watcha | md5sum
-    SERVICE_ACCOUNT_NAME = "c4d96a06b758a7ed12f897690828e414_watcha_service_account"
+    # echo -n watcha | md5sum | head -c 10
+    SERVICE_ACCOUNT_NAME = "c4d96a06b7_watcha_service_account"
 
     def __init__(self, *args):
         super().__init__(*args)

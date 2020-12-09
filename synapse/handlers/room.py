@@ -77,8 +77,8 @@ id_server_scheme = "https://"
 
 FIVE_MINUTES_IN_MS = 5 * 60 * 1000
 # watcha+
-# echo -n watcha | md5sum
-NEXTCLOUD_GROUP_NAME_PREFIX = "c4d96a06b758a7ed12f897690828e414_"
+# echo -n watcha | md5sum | head -c 10
+NEXTCLOUD_GROUP_NAME_PREFIX = "c4d96a06b7_"
 # +watcha
 
 
