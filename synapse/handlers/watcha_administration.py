@@ -77,7 +77,3 @@ class AdministrationHandler(BaseHandler):
     async def watcha_user_ip(self, user_id):
         result = await self.store.watcha_user_ip(user_id)
         return result
-
-    async def watcha_reactivate_account(self, user_id):
-        result = await self.store.watcha_reactivate_account(user_id)
-        return result

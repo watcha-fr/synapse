@@ -377,64 +377,9 @@ class WatchaRegisterRestServlet(RestServlet):
         return 200, {"display_name": display_name, "user_id": user_id}
 
 
-class WatchaResetPasswordRestServlet(RestServlet):
-    PATTERNS = client_patterns("/watcha_reset_password", v1=True)
-
-    def __init__(self, hs):
-        super().__init__()
-        self.hs = hs
-        self.auth = hs.get_auth()
-        self.auth_handler = hs.get_auth_handler()
-        self.administration_handler = hs.get_administration_handler()
-        self.account_activity_handler = hs.get_account_validity_handler()
-
-    async def on_POST(self, request):
-        await _check_admin(
-            self.auth,
-            request,
-        )
-        params = parse_json_object_from_request(request)
-        user_id = params["user"]
-        # FIXME: when called from the 'watcha_users' script,
-        # the user_id usually doesn't have the server name. add it.
-        if not user_id.startswith("@"):
-            user_id = "@" + params["user"] + ":" + self.hs.get_config().server_name
-
-        password = generate_password()
-        password_hash = await self.auth_handler.hash(password)
-
-        logger.info("Setting password for user %s", user_id)
-        user = UserID.from_string(user_id)
-
-        email = await self.account_activity_handler.get_email_address_for_user(user_id)
-
-        requester = create_requester(user_id)
-        await self.hs.get_set_password_handler().set_password(
-            user_id, password_hash, requester
-        )
-        await self.administration_handler.watcha_reactivate_account(user_id)
-
-        try:
-            display_name = await self.hs.profile_handler.get_displayname(user)
-        except:
-            display_name = None
-
-        await send_registration_email(
-            self.hs.config,
-            email,
-            template_name="reset_password",
-            token=compute_registration_token(user_id, email, password),
-            inviter_name=None,
-            full_name=display_name,
-        )
-
-        return 200, {}
-
-
 def register_servlets(hs, http_server):
     WatchaAdminStatsRestServlet(hs).register(http_server)
     WatchaRegisterRestServlet(hs).register(http_server)
-    WatchaResetPasswordRestServlet(hs).register(http_server)
     WatchaRoomListRestServlet(hs).register(http_server)
     WatchaRoomMembershipRestServlet(hs).register(http_server)
     WatchaSendNextcloudActivityToWatchaRoomServlet(hs).register(http_server)

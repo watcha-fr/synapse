@@ -500,9 +500,6 @@ class WatchaAdminStore(SQLBaseStore):
     async def watcha_deactivate_account(self, user_id):
         return await self._update_user(user_id, is_active=0)
 
-    async def watcha_reactivate_account(self, user_id):
-        return await self._update_user(user_id, is_active=1)
-
     async def _get_users_with_pending_invitation(self):
         """Retrieve a list of users who have a pending invitation.
 

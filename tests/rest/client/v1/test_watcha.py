@@ -223,36 +223,6 @@ class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
             self.assertEqual(channel.code, 200)
 
 
-class WatchaResetPasswordRestServletTestCase(BaseHomeserverWithEmailTestCase):
-    def test_reset_password(self):
-        self._do_register_user(
-            {
-                "user": "user_test",
-                "full_name": "test",
-                "email": "test@test.com",
-                "admin": False,
-                "password": "password",
-            }
-        )
-        with self.assertLogs("synapse.util.watcha", level="INFO") as cm:
-            request, channel = self.make_request(
-                "POST",
-                "/_matrix/client/r0/watcha_reset_password",
-                content=json.dumps({"user": "user_test"}),
-                access_token=self.user_access_token,
-            )
-            self.render(request)
-
-            self.assertIn(
-                "INFO:synapse.util.watcha:NOT Sending registration email to 'test@test.com', we are in test mode",
-                "".join(cm.output),
-            )
-            self.assertIn(
-                "http://localhost:8080/setup-account.html?t=", "".join(cm.output)
-            )
-            self.assertEqual(channel.code, 200)
-
-
 class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
     def test_watcha_user_list(self):
         self._do_register_user(
