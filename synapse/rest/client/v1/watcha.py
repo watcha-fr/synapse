@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 from synapse.api.errors import AuthError, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.rest.client.v2_alpha._base import client_patterns
-from synapse.types import UserID, create_requester
+from synapse.types import UserID, create_requester, map_username_to_mxid_localpart
 from synapse.util.watcha import (
     compute_registration_token,
     create_display_inviter_name,
@@ -291,15 +291,8 @@ class WatchaRegisterRestServlet(RestServlet):
         params = parse_json_object_from_request(request)
         logger.info("Adding Watcha user...")
 
-        localpart = params["user"]
-        if localpart.lower() != localpart:
-            raise SynapseError(
-                500,
-                "User name must be lowercase",
-            )
-
-        email = params["email"]
-        if not email.strip():
+        email = params["email"].strip()
+        if not email:
             # the admin seems to have a bug and send empty email adresses sometimes.
             # (never bad to be resilient in any case)
             raise SynapseError(
@@ -331,21 +324,22 @@ class WatchaRegisterRestServlet(RestServlet):
             inviter_name = params["inviter"]
 
         send_email = False
-        password = params["password"]
 
-        if not password:
-            password = generate_password()
+        if hasattr(params, "password"):
+            password = params["password"]
+        else:
+            password = generate_password(length=6)
             send_email = True
 
         password_hash = await self.auth_handler.hash(password)
-        admin = params["admin"] == "admin"
+        admin = params["admin"]
 
         role = "admin" if admin else None
-        await self.hs.get_nextcloud_handler().create_keycloak_and_nextcloud_user(localpart, email, password_hash, role)
+        await self.hs.get_nextcloud_handler().create_keycloak_and_nextcloud_user(email, email, password_hash, role)
 
         user_id = await self.registration_handler.register_user(
-            localpart=localpart,
-            password_hash=password_hash,
+            localpart=map_username_to_mxid_localpart(email),
+            password_hash=None,
             admin=admin,
             bind_emails=[email],
         )
@@ -364,7 +358,7 @@ class WatchaRegisterRestServlet(RestServlet):
                 self.hs.config,
                 email,
                 template_name="invite_new_account",
-                token=token,
+                password=password,
                 inviter_name=inviter_name,
                 full_name=display_name,
             )

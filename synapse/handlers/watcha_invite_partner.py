@@ -67,7 +67,7 @@ class InvitePartnerHandler(BaseHandler):
             )
 
             user_id = UserID(localpart, self.hs.hostname).to_string()
-            password = generate_password()
+            password = generate_password(length=6)
             password_hash = await self.hs.get_auth_handler().hash(password)
 
             await self.hs.get_nextcloud_handler().create_keycloak_and_nextcloud_user(invitee, invitee, password_hash, "partner")
@@ -75,7 +75,7 @@ class InvitePartnerHandler(BaseHandler):
             try:
                 await self.hs.get_registration_handler().register_user(
                     localpart=localpart,
-                    password_hash=password_hash,
+                    password_hash=None,
                     guest_access_token=None,
                     make_guest=False,
                     admin=False,
@@ -124,7 +124,7 @@ class InvitePartnerHandler(BaseHandler):
             self.hs.config,
             invitee,
             template_name=template_name,
-            token=token,
+            password=password,
             inviter_name=inviter_name,
             full_name=None,
         )

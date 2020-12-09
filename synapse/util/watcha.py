@@ -9,7 +9,7 @@ from email.mime.text import MIMEText
 from jinja2 import Environment, FileSystemLoader
 from os.path import join, dirname, abspath
 from pathlib import Path
-from secrets import token_bytes
+from secrets import token_hex
 from smtplib import SMTP
 
 from synapse.api.errors import SynapseError
@@ -21,14 +21,14 @@ logger = logging.getLogger(__name__)
 TEMPLATE_DIR = join(dirname(abspath(__file__)), "watcha_templates")
 
 
-def generate_password():
-    """ Generate a base 64 encoded password with 16 bytes of randomness
+def generate_password(length=16):
+    """ Generate a password with 16 bytes of randomness
 
     Returns:
         The encoded password.
     """
 
-    return b64encode(token_bytes(16)).decode()
+    return token_hex(length)
 
 
 def compute_registration_token(user, email=None, password=None):
@@ -43,7 +43,7 @@ def compute_registration_token(user, email=None, password=None):
         json = '{{"user":"{user}", "email":"{email}", "pw":"{password}"}}'.format(
             user=user, email=email, password=password
         )
-    return b64encode(json.encode("utf-8")).decode("ascii")
+    return b64encode(json.encode()).decode()
 
 
 # additional email we send to, when not sending to a mail gun
