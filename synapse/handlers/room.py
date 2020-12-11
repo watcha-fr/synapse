@@ -65,8 +65,8 @@ if TYPE_CHECKING:
 from pathlib import Path
 from requests import get, post, delete, auth, HTTPError
 from requests.auth import HTTPBasicAuth
-from synapse.http.watcha_keycloak_client import WatchaKeycloakClient
-from synapse.http.watcha_nextcloud_client import WatchaNextcloudClient
+from synapse.http.watcha_keycloak_client import KeycloakClient
+from synapse.http.watcha_nextcloud_client import NextcloudClient
 from synapse.types import get_localpart_from_id, decode_localpart, map_username_to_mxid_localpart
 
 # +watcha
@@ -78,7 +78,7 @@ id_server_scheme = "https://"
 FIVE_MINUTES_IN_MS = 5 * 60 * 1000
 # watcha+
 # echo -n watcha | md5sum
-NEXTCLOUD_GROUP_NAME_PREFIX = "c4d96a06b758a7ed12f897690828e414_"
+NEXTCLOUD_GROUP_NAME_PREFIX = "c4d96a06b7_"
 # +watcha
 
 
@@ -1449,8 +1449,8 @@ class NextcloudHandler(BaseHandler):
     def __init__(self, hs):
         self.store = hs.get_datastore()
         self.event_creation_handler = hs.get_event_creation_handler()
-        self.keycloak_client = WatchaKeycloakClient(hs)
-        self.nextcloud_client = WatchaNextcloudClient(hs)
+        self.keycloak_client = KeycloakClient(hs)
+        self.nextcloud_client = NextcloudClient(hs)
 
     async def create_keycloak_and_nextcloud_user(self, localpart, email, password_hash, synapse_role=None):
         """ Create a user on Keycloak and Nextcloud server if it doesn't exist

@@ -1,13 +1,14 @@
 from mock import Mock
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.http.watcha_keycloak_client import WatchaKeycloakClient
-from synapse.http.watcha_nextcloud_client import WatchaNextcloudClient
+from synapse.http.watcha_keycloak_client import KeycloakClient
+from synapse.http.watcha_nextcloud_client import NextcloudClient
 from synapse.rest.client.v1 import login, room
 from synapse.rest import admin
 from synapse.types import get_localpart_from_id
 from tests.unittest import HomeserverTestCase
 
+NEXTCLOUD_GROUP_NAME_PREFIX = "c4d96a06b7_"
 
 def simple_async_mock(return_value=None, raises=None):
     # AsyncMock is not available in python3.5, this mimics part of its behaviour
@@ -79,26 +80,25 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
             self.store.get_nextcloud_directory_path_from_roomID(self.room_id)
         )
 
-        # Verify that mocked functions has called once :
+        # Verify that mocked functions are called once
         self.keycloak_client.get_user.assert_called_once()
         self.nextcloud_client.add_group.assert_called_once()
         self.keycloak_client.get_users.assert_called_once()
         self.nextcloud_client.create_all_permission_share_with_group.assert_called_once()
 
-        # Verify that mocked functions has called twice :
+        # Verify that mocked functions are called twice
         self.assertEquals(self.nextcloud_client.get_user.call_count, 2)
         self.assertEquals(self.nextcloud_client.add_user_to_group.call_count, 2)
 
-        # Verify that mocked functions has not called :
-        self.nextcloud_client.get_all_shares.assert_not_called()
+        # Verify that mocked functions are not called
         self.nextcloud_client.delete_share.assert_not_called()
 
         self.assertEqual(mapped_directory, "/directory")
 
     def test_update_existing_room_nextcloud_mapping(self):
         self.get_success(
-            self.store.set_room_mapping_with_nextcloud_directory(
-                self.room_id, "/directory"
+            self.store.map_room_with_nextcloud_directory(
+                self.room_id, "/directory", 2
             )
         )
 
@@ -180,6 +180,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         )
 
     def test_add_user_to_nextcloud_group_with_exception(self):
+        group_name = NEXTCLOUD_GROUP_NAME_PREFIX + self.room_id
         self.nextcloud_client.add_user_to_group = simple_async_mock(raises=SynapseError)
 
         with self.assertLogs("synapse.handlers.room", level="WARN") as cm:
@@ -188,15 +189,15 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
             )
 
         self.assertIn(
-            "Unable to add the user {username} to the Nextcloud group {group_name}.".format(
-                username=get_localpart_from_id(self.creator), group_name=self.room_id
+            "Unable to add the user {} to the Nextcloud group {}.".format(
+                get_localpart_from_id(self.creator), group_name
             ),
             cm.output[0],
         )
 
         self.assertIn(
-            "Unable to add the user {username} to the Nextcloud group {group_name}.".format(
-                username=get_localpart_from_id(self.inviter), group_name=self.room_id
+            "Unable to add the user {} to the Nextcloud group {}.".format(
+                get_localpart_from_id(self.inviter), group_name
             ),
             cm.output[1],
         )
@@ -246,6 +247,8 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.nextcloud_client.add_user_to_group.assert_not_called()
 
     def test_update_existing_nextcloud_share_on_invite_membership_with_exception(self):
+        group_name = NEXTCLOUD_GROUP_NAME_PREFIX + self.room_id
+
         self.nextcloud_client.add_user_to_group = simple_async_mock(raises=SynapseError)
         second_inviter = "@second_inviter:test"
 
@@ -257,13 +260,15 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
             )
 
         self.assertIn(
-            "Unable to add the user {username} to the Nextcloud group {group_name}.".format(
-                username=second_inviter, group_name=self.room_id
+            "Unable to add the user {} to the Nextcloud group {}.".format(
+                second_inviter, group_name
             ),
             cm.output[0],
         )
 
     def test_update_existing_nextcloud_share_on_leave_membership_with_exception(self):
+        group_name = NEXTCLOUD_GROUP_NAME_PREFIX + self.room_id
+
         self.nextcloud_client.remove_from_group = simple_async_mock(raises=SynapseError)
         second_inviter = "@second_inviter:test"
 
@@ -275,8 +280,8 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
             )
 
         self.assertIn(
-            "Unable to remove the user {username} from the Nextcloud group {group_name}.".format(
-                username=second_inviter, group_name=self.room_id
+            "Unable to remove the user {} from the Nextcloud group {}.".format(
+                second_inviter, group_name
             ),
             cm.output[0],
         )

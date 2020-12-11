@@ -7,7 +7,7 @@ from synapse.http.client import SimpleHttpClient
 
 logger = logging.getLogger(__name__)
 
-class WatchaKeycloakClient(SimpleHttpClient):
+class KeycloakClient(SimpleHttpClient):
     """Interface for talking with Keycloak APIs"""
 
     def __init__(self, hs):

@@ -8,7 +8,7 @@ from synapse.util.watcha import generate_password
 logger = logging.getLogger(__name__)
 
 
-class WatchaNextcloudClient(SimpleHttpClient):
+class NextcloudClient(SimpleHttpClient):
     """Interface for talking with Nextcloud APIs
     https://doc.owncloud.com/server/admin_manual/configuration/user/user_provisioning_api.html
     """

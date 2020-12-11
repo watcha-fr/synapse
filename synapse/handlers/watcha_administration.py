@@ -8,6 +8,10 @@ logger = logging.getLogger(__name__)
 
 
 class AdministrationHandler(BaseHandler):
+    def __init__(self, hs: "HomeServer"):
+        super().__init__(hs)
+        self.auth_handler = hs.get_auth_handler()
+
     async def watcha_user_list(self):
         users = await self.store.watcha_user_list()
 
@@ -52,8 +56,8 @@ class AdministrationHandler(BaseHandler):
         return role
 
     async def watcha_get_user_role(self, user_id):
-        is_partner = await self.hs.get_auth_handler().is_partner(user_id)
-        is_admin = await self.hs.get_auth_handler().is_admin(user_id)
+        is_partner = await self.auth_handler.is_partner(user_id)
+        is_admin = await self.auth_handler.is_admin(user_id)
 
         if is_partner and is_admin:
             raise SynapseError(400, "A user can't be admin and partner too.")
