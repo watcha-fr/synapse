@@ -1,5 +1,5 @@
 import logging
-from jsonschema.exceptions import ValidationError, SchemaError 
+from jsonschema.exceptions import ValidationError, SchemaError
 from pathlib import Path
 
 from ._base import BaseHandler
@@ -7,7 +7,12 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 from synapse.http.watcha_keycloak_client import KeycloakClient
 from synapse.http.watcha_nextcloud_client import NextcloudClient
-from synapse.types import create_requester, get_localpart_from_id
+from synapse.types import (
+    create_requester,
+    get_localpart_from_id,
+    map_username_to_mxid_localpart,
+    decode_localpart,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +27,26 @@ class NextcloudHandler(BaseHandler):
         self.keycloak_client = KeycloakClient(hs)
         self.nextcloud_client = NextcloudClient(hs)
 
+    async def create_keycloak_and_nextcloud_user(
+        self, localpart, email, password_hash, synapse_role=None
+    ):
+        """Create a user on Keycloak and Nextcloud server if it doesn't exist
+
+        Args :
+            localpart: the synapse localpart use as Keycloak username
+            email: email of the user
+            password_hash: the synapse password hash
+            synapse_role: the synapse role, it can be administrator, collaborator or partner.
+        """
+
+        await self.keycloak_client.add_user(
+            localpart, email, password_hash, synapse_role
+        )
+
+        keycloak_user_representation = await self.keycloak_client.get_user(localpart)
+
+        await self.nextcloud_client.add_user(keycloak_user_representation["id"])
+
     async def unbind(self, room_id):
         """Unbind a Nextcloud folder from a room.
 
@@ -29,7 +54,7 @@ class NextcloudHandler(BaseHandler):
             room_id: the id of the room to bind.
         """
 
-        await self.nextcloud_client.delete_group(room_id)
+        await self.nextcloud_client.delete_group(NEXTCLOUD_GROUP_NAME_PREFIX + room_id)
 
         await self.store.unbind(room_id)
 
@@ -41,12 +66,11 @@ class NextcloudHandler(BaseHandler):
            room_id: the id of the room to bind.
            path: the path of the Nextcloud folder to bind.
         """
-
-        user = await self.keycloak_client.get_user(get_localpart_from_id(user_id))
-
+        group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
+        user = await self.keycloak_client.get_user(decode_localpart(user_id))
         nextcloud_username = user["id"]
 
-        await self.nextcloud_client.add_group(NEXTCLOUD_GROUP_NAME_PREFIX + room_id)
+        await self.nextcloud_client.add_group(group_name)
 
         await self.add_room_users_to_nextcloud_group(room_id)
 
@@ -56,7 +80,7 @@ class NextcloudHandler(BaseHandler):
             await self.nextcloud_client.unshare(nextcloud_username, old_share_id)
 
         new_share_id = await self.nextcloud_client.share(
-            nextcloud_username, path, room_id
+            nextcloud_username, path, group_name
         )
 
         await self.store.bind(room_id, path, new_share_id)
@@ -67,13 +91,13 @@ class NextcloudHandler(BaseHandler):
         Args:
             room_id: the id of the room which the Nextcloud group name is infered from.
         """
-
+        group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
         user_ids = await self.store.get_users_in_room(room_id)
         localparts = [get_localpart_from_id(user_id) for user_id in user_ids]
         users = await self.keycloak_client.get_users()
 
         for user in users:
-            localpart = user["username"]
+            localpart = map_username_to_mxid_localpart(user["username"])
             nextcloud_username = user["id"]
 
             if localpart in localparts:
@@ -89,18 +113,19 @@ class NextcloudHandler(BaseHandler):
 
                 try:
                     await self.nextcloud_client.add_user_to_group(
-                        nextcloud_username, room_id
+                        nextcloud_username, group_name
                     )
                 except SynapseError:
                     logger.warn(
                         "Unable to add the user {} to the Nextcloud group {}.".format(
-                            localpart, room_id
+                            localpart, group_name
                         )
                     )
 
-    async def update_share(self, user_id, group_name, membership):
+    async def update_share(self, user_id, room_id, membership):
 
-        user = await self.keycloak_client.get_user(get_localpart_from_id(user_id))
+        group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
+        user = await self.keycloak_client.get_user(decode_localpart(user_id))
         nextcloud_username = user["id"]
 
         if membership in ("invite", "join"):
@@ -205,4 +230,5 @@ class NextcloudHandler(BaseHandler):
             )
 
         notification_sent["notified_rooms"] = notified_rooms
+
         return notification_sent

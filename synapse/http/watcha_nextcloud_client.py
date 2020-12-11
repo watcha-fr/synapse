@@ -2,8 +2,9 @@ import logging
 from base64 import b64encode
 from jsonschema import validate
 
-from synapse.http.client import SimpleHttpClient
 from synapse.api.errors import Codes, SynapseError
+from synapse.http.client import SimpleHttpClient
+from synapse.util.watcha import generate_password
 
 logger = logging.getLogger(__name__)
 
@@ -28,15 +29,15 @@ STANDARD_SCHEMA = {
 
 class NextcloudClient(SimpleHttpClient):
     """Interface for talking with Nextcloud APIs
-    https://doc.owncloud.com/server/admin_manual/configuration/user/user_provisioning_api.html"""
+    https://doc.owncloud.com/server/admin_manual/configuration/user/user_provisioning_api.html
+    """
 
     def __init__(self, hs):
         super().__init__(hs)
 
-        self.nextcloud_shared_secret = hs.config.nextcloud_shared_secret
-        self.nextcloud_server = hs.config.nextcloud_server
+        self.nextcloud_url = hs.config.nextcloud_url
         self.service_account_name = hs.config.service_account_name
-        self.service_account_password = hs.config.service_account_password
+        self.service_account_password = hs.config.nextcloud_service_account_password
         self._headers = self._get_headers()
 
     def _get_headers(self):
@@ -62,6 +63,34 @@ class NextcloudClient(SimpleHttpClient):
                 errcode,
             )
 
+    async def add_user(self, keycloak_user_id):
+        """Create a new user on the Nextcloud server.
+
+        Args:
+            user_id: the required username for the new user.
+
+        Status codes:
+            100 - successful
+            101 - invalid input data
+            102 - username already exists
+            103 - unknown error occurred whilst adding the user
+        """
+        # A password is needed to create NC user, but it will not be used by KC login process. 
+        password = generate_password()
+
+        response = await self.post_json_get_json(
+            uri="{}/ocs/v1.php/cloud/users".format(self.nextcloud_url),
+            post_json={"userid": keycloak_user_id, "password": password},
+            headers=self._headers,
+        )
+
+        meta = response["ocs"]["meta"]
+
+        if meta["statuscode"] == 102:
+            logger.info("User {} already exists on Nextcloud server.".format(keycloak_user_id))
+        else:
+            self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_CREATE_GROUP)
+
     async def add_group(self, group_name):
         """Adds a new Nextcloud group.
 
@@ -76,7 +105,7 @@ class NextcloudClient(SimpleHttpClient):
         """
 
         response = await self.post_json_get_json(
-            uri="{}/ocs/v1.php/cloud/groups".format(self.nextcloud_server),
+            uri="{}/ocs/v1.php/cloud/groups".format(self.nextcloud_url),
             post_json={"groupid": group_name},
             headers=self._headers,
         )
@@ -102,8 +131,8 @@ class NextcloudClient(SimpleHttpClient):
         """
 
         response = await self.delete_get_json(
-            uri="{nextcloud_server}/ocs/v1.php/cloud/groups/{group_name}".format(
-                nextcloud_server=self.nextcloud_server, group_name=group_name
+            uri="{}/ocs/v1.php/cloud/groups/{}".format(
+                self.nextcloud_url, group_name
             ),
             headers=self._headers,
         )
@@ -131,8 +160,8 @@ class NextcloudClient(SimpleHttpClient):
         """
 
         response = await self.post_json_get_json(
-            uri="{nextcloud_server}/ocs/v1.php/cloud/users/{user_id}/groups".format(
-                nextcloud_server=self.nextcloud_server, user_id=username
+            uri="{}/ocs/v1.php/cloud/users/{}/groups".format(
+                self.nextcloud_url, username
             ),
             post_json={"groupid": group_name},
             headers=self._headers,
@@ -161,8 +190,8 @@ class NextcloudClient(SimpleHttpClient):
         """
 
         response = await self.delete_get_json(
-            uri="{nextcloud_server}/ocs/v1.php/cloud/users/{user_id}/groups".format(
-                nextcloud_server=self.nextcloud_server, user_id=username
+            uri="{}/ocs/v1.php/cloud/users/{}/groups".format(
+                self.nextcloud_url, username
             ),
             headers=self._headers,
             json_body={"groupid": group_name},
@@ -189,8 +218,8 @@ class NextcloudClient(SimpleHttpClient):
         """
 
         response = await self.get_json(
-            uri="{nextcloud_server}/ocs/v1.php/cloud/users/{user_id}".format(
-                nextcloud_server=self.nextcloud_server, user_id=username
+            uri="{}/ocs/v1.php/cloud/users/{}".format(
+                self.nextcloud_url, username
             ),
             headers=self._headers,
         )
@@ -239,7 +268,7 @@ class NextcloudClient(SimpleHttpClient):
 
         response = await self.post_json_get_json(
             uri="{}/ocs/v2.php/apps/watcha_integrator/api/v1/shares".format(
-                self.nextcloud_server
+                self.nextcloud_url
             ),
             headers=self._headers,
             post_json={
@@ -271,7 +300,7 @@ class NextcloudClient(SimpleHttpClient):
 
         response = await self.delete_get_json(
             uri="{}/ocs/v2.php/apps/watcha_integrator/api/v1/shares/{}".format(
-                self.nextcloud_server, share_id
+                self.nextcloud_url, share_id
             ),
             headers=self._headers,
             json_body={"requester": requester},

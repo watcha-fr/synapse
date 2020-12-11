@@ -1,6 +1,11 @@
+import logging
 from jsonschema import validate
+from typing import List
 
+from synapse.api.errors import HttpResponseException
 from synapse.http.client import SimpleHttpClient
+
+logger = logging.getLogger(__name__)
 
 TOKEN_SCHEMA = {
     "$schema": "http://json-schema.org/draft-04/schema#",
@@ -34,27 +39,105 @@ class KeycloakClient(SimpleHttpClient):
     def __init__(self, hs):
         super().__init__(hs)
 
-        self.keycloak_server = hs.config.keycloak_serveur
-        self.keycloak_realm = hs.config.keycloak_realm
+        self.server_url = hs.config.keycloak_url
+        self.realm_name = hs.config.realm_name
         self.service_account_name = hs.config.service_account_name
-        self.service_account_password = hs.config.service_account_password
+        self.service_account_password = hs.config.keycloak_service_account_password
 
-    async def _get_access_token(self):
-        """Get the Keycloak realm access token in order to use Keycloak Admin API.
+    async def add_user(self, localpart, email, password_hash, synapse_role=None):
+        """Create a new user Username
+
+        Args:
+            username: username of the user. Correspond to synapse localpart.
+            email: email of the user
+            password_hash: the synapse password hash
+            synapse_role: the synapse role, it can be administrator, collaborator or partner.
+        """
+
+        user = {
+            "enabled": True,
+            "username": localpart,
+            "email": email,
+            "credentials": [
+                {
+                    "type": "password",
+                    "secretData": '{{"value":"{}","salt":""}}'.format(password_hash),
+                    "credentialData": '{"hashIterations":-1,"algorithm":"bcrypt"}',
+                }
+            ],
+            "attributes": {"locale": ["fr"]},
+            "requiredActions": ["UPDATE_PASSWORD", "UPDATE_PROFILE"],
+        }
+
+        if synapse_role is not None:
+            user["attributes"]["synapseRole"] = synapse_role
+
+        try:
+            response = await self.post_json(
+                self._get_endpoint("admin/realms/{}/users".format(self.realm_name)),
+                headers=await self._get_header(),
+                post_json=user,
+            )
+        except HttpResponseException as e:
+            if e.code == 409:
+                logger.info("User {} already exists on Keycloak server.".format(localpart))
+            else:
+                raise
+
+    async def get_user(self, localpart) -> dict:
+        """Get a specific Keycloak user.
 
         Returns:
-            The Keycloak realm access token.
+            dict
+            https://www.keycloak.org/docs-api/11.0/rest-api/#_userrepresentation
+        """
+
+        response = await self.get_json(
+            self._get_endpoint("admin/realms/{}/users".format(self.realm_name)),
+            headers=await self._get_header(),
+            args={"username": localpart},
+        )
+
+        validate(response, USER_SCHEMA)
+
+        return response[0]
+
+    async def get_users(self) -> List[dict]:
+        """Get a list of Keycloak users.
+
+        Returns:
+            Each user as a dictionary.
+        """
+
+        response = await self.get_json(
+            self._get_endpoint("admin/realms/{}/users".format(self.realm_name)),
+            headers=await self._get_header(),
+        )
+
+        validate(response, USER_SCHEMA)
+
+        return response
+
+    async def _get_header(self):
+        access_token = await self._get_access_token()
+        return {"Authorization": ["Bearer {}".format(access_token)]}
+
+    async def _get_access_token(self):
+        """Get the realm Keycloak access token in order to use Keycloak Admin API.
+
+        Returns:
+            The realm Keycloak access token.
         """
 
         response = await self.post_urlencoded_get_json(
-            uri="{keycloak_server}/realms/{keycloak_realm}/protocol/openid-connect/token".format(
-                keycloak_server=self.keycloak_server, keycloak_realm=self.keycloak_realm
+            uri=self._get_endpoint(
+                "realms/{}/protocol/openid-connect/token".format(self.realm_name)
             ),
             args={
                 "client_id": "admin-cli",
+                "grant_type": "password",
                 "username": self.service_account_name,
                 "password": self.service_account_password,
-                "grant_type": "password",
             },
         )
         
@@ -62,43 +145,5 @@ class KeycloakClient(SimpleHttpClient):
 
         return response["access_token"]
 
-    async def get_users(self):
-        """Get a list of all Keycloak users.
-
-        Returns:
-            A list of dict.
-        """
-
-        access_token = await self._get_access_token()
-
-        response = await self.get_json(
-            "{keycloak_server}/admin/realms/{keycloak_realm}/users".format(
-                keycloak_server=self.keycloak_server, keycloak_realm=self.keycloak_realm
-            ),
-            headers={"Authorization": ["Bearer {}".format(access_token)]},
-        )
-
-        validate(response, USER_SCHEMA)
-
-        return response
-
-    async def get_user(self, localpart):
-        """Get a list of all Keycloak users.
-
-        Returns:
-            A list of dict.
-        """
-
-        access_token = await self._get_access_token()
-
-        response = await self.get_json(
-            "{keycloak_server}/admin/realms/{keycloak_realm}/users".format(
-                keycloak_server=self.keycloak_server, keycloak_realm=self.keycloak_realm
-            ),
-            headers={"Authorization": ["Bearer {}".format(access_token)]},
-            args={"username": localpart},
-        )
-
-        validate(response, USER_SCHEMA)
-
-        return response[0]
+    def _get_endpoint(self, path):
+        return "{}/{}".format(self.server_url, path)

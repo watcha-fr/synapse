@@ -77,6 +77,7 @@ class RoomCreationHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.config = hs.config
+        self.invite_partner_handler = hs.get_invite_partner_handler()  # watcha+
 
         # Room state based off defined presets
         self._presets_dict = {
@@ -825,9 +826,7 @@ class RoomCreationHandler(BaseHandler):
                 requester.device_id,
             )
 
-            invite_3pid[
-                "user_id"
-            ] = await self.hs.get_watcha_invite_external_handler.invite(
+            invite_3pid["user_id"] = await self.invite_partner_handler.invite(
                 room_id=room_id,
                 inviter=requester.user,
                 inviter_device_id=str(requester.device_id),

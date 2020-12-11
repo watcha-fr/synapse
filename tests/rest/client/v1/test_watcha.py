@@ -1,4 +1,5 @@
 import json, logging
+from mock import Mock
 
 from synapse.rest import admin
 from synapse.rest.client.v1 import watcha, login, room
@@ -8,6 +9,16 @@ from tests.test_utils import get_awaitable_result
 from tests.utils import setup_test_homeserver
 
 logger = logging.getLogger(__name__)
+
+
+def simple_async_mock(return_value=None, raises=None):
+    # AsyncMock is not available in python3.5, this mimics part of its behaviour
+    async def cb(*args, **kwargs):
+        if raises:
+            raise raises
+        return return_value
+
+    return Mock(side_effect=cb)
 
 
 class BaseHomeserverWithEmailTestCase(unittest.HomeserverTestCase):
@@ -49,6 +60,14 @@ class BaseHomeserverWithEmailTestCase(unittest.HomeserverTestCase):
         )
 
         self.room_id = self._create_room()
+
+        self.nextcloud_handler = hs.get_nextcloud_handler()
+        self.keycloak_client = self.nextcloud_handler.keycloak_client
+        self.nextcloud_client = self.nextcloud_handler.nextcloud_client
+
+        self.keycloak_client.add_user = simple_async_mock()
+        self.keycloak_client.get_user = simple_async_mock(return_value={"id": "1234"})
+        self.nextcloud_client.add_user = simple_async_mock()
 
     def _do_register_user(self, request_content):
         # Admin send the request with access_token :
@@ -119,6 +138,10 @@ class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
             channel.result["body"],
             b'{"display_name":"test","user_id":"@user_test:test"}',
         )
+
+        self.assertTrue(self.keycloak_client.add_user.called)
+        self.assertTrue(self.keycloak_client.get_user.called)
+        self.assertTrue(self.nextcloud_client.add_user.called)
         self.assertEqual(channel.code, 200)
 
     def test_register_user_with_upper_user_id(self):
@@ -130,6 +153,10 @@ class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
             "password": "",
         }
         channel = self._do_register_user(request_content)
+
+        self.assertFalse(self.keycloak_client.add_user.called)
+        self.assertFalse(self.keycloak_client.get_user.called)
+        self.assertFalse(self.nextcloud_client.add_user.called)
         self.assertEqual(channel.code, 500)
 
     def test_register_user_with_empty_email(self):
@@ -141,6 +168,10 @@ class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
             "password": "",
         }
         channel = self._do_register_user(request_content)
+
+        self.assertFalse(self.keycloak_client.add_user.called)
+        self.assertFalse(self.keycloak_client.get_user.called)
+        self.assertFalse(self.nextcloud_client.add_user.called)
         self.assertEqual(channel.code, 500)
 
     def test_register_user_with_same_email_adress(self):
@@ -160,6 +191,10 @@ class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
             "password": "",
         }
         channel = self._do_register_user(request_content)
+
+        self.keycloak_client.add_user.assert_called_once()
+        self.keycloak_client.get_user.assert_called_once()
+        self.nextcloud_client.add_user.assert_called_once()
         self.assertEqual(channel.code, 500)
 
     def test_register_user_with_plus_in_email(self):
@@ -182,6 +217,9 @@ class WatchaRegisterRestServletTestCase(BaseHomeserverWithEmailTestCase):
                 channel.result["body"],
                 b'{"display_name":"test","user_id":"@user_test:test"}',
             )
+            self.assertTrue(self.keycloak_client.add_user.called)
+            self.assertTrue(self.keycloak_client.get_user.called)
+            self.assertTrue(self.nextcloud_client.add_user.called)
             self.assertEqual(channel.code, 200)
 
 

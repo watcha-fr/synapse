@@ -301,7 +301,11 @@ class EmailConfig(Config):
             )
             !watcha """
 
-        self.email_riot_base_url = email_config.get("riot_base_url", None) # watcha+
+        # watcha+
+        self.email_riot_base_url = email_config.get(
+            "client_base_url", email_config.get("riot_base_url", None)
+        )
+        # +watcha
 
         if self.account_validity.renew_by_email_enabled:
             expiry_template_html = email_config.get(
