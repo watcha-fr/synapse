@@ -129,7 +129,7 @@ if TYPE_CHECKING:
     from synapse.handlers.saml_handler import SamlHandler
 
 # watcha+
-from synapse.handlers.watcha_nextcloud_integration import NextcloudHandler
+from synapse.handlers.watcha_nextcloud import NextcloudHandler
 from synapse.handlers.watcha_admin_handler import WatchaAdminHandler
 from synapse.handlers.watcha_invite_external import WatchaInviteExternalHandler
 

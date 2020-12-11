@@ -235,7 +235,9 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
         self.render(request)
 
         request, channel = self.make_request(
-            "GET", "watcha_user_list", access_token=self.user_access_token,
+            "GET",
+            "watcha_user_list",
+            access_token=self.user_access_token,
         )
         self.render(request)
 
@@ -275,7 +277,9 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
         )
 
         request, channel = self.make_request(
-            "GET", "/watcha_admin_stats", access_token=self.user_access_token,
+            "GET",
+            "/watcha_admin_stats",
+            access_token=self.user_access_token,
         )
         self.render(request)
         self.assertEquals(
@@ -298,7 +302,9 @@ class WatchaAdminStatsTestCase(BaseHomeserverWithEmailTestCase):
                     "number_of_last_month_logged_users": 0,
                     "number_of_last_week_logged_users": 0,
                 },
-                "other_statistics": {"number_of_users_with_pending_invitation": 2,},
+                "other_statistics": {
+                    "number_of_users_with_pending_invitation": 2,
+                },
             },
         )
 
@@ -401,7 +407,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
             room_id = self._create_room()
             mapping_value["room_id"] = room_id
 
-            await self.store.map_room_with_nextcloud_directory(
+            await self.store.bind(
                 room_id, mapping_value["path"], mapping_value["share_id"]
             )
 
@@ -547,7 +553,11 @@ class WatchaSendNextcloudActivityToWatchaRoomServletTestCase(
             request_content = {
                 "file_name": self.nextcloud_file_name,
                 "file_url": self.nextcloud_file_url,
-                "notifications": [{"activity_type": "file_created",}],
+                "notifications": [
+                    {
+                        "activity_type": "file_created",
+                    }
+                ],
             }
 
             request_content["notifications"][0].pop("activity_type", None)

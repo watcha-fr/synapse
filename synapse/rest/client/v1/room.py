@@ -210,7 +210,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     content=content,
                 )
                 # watcha+
-                mapped_directory = await self.store.get_nextcloud_directory_path_from_roomID(
+                mapped_directory = await self.store.get_path_from_room_id(
                     room_id
                 )
                 if mapped_directory and membership in [
@@ -306,7 +306,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                         nextcloud_directory_path = url_query["dir"][0]
 
                         await self.watcha_room_nextcloud_mapping_handler.bind(
-                            room_id, requester_id, nextcloud_directory_path
+                            requester_id, room_id, nextcloud_directory_path
                         )
                 # +watcha
                 (
@@ -447,7 +447,7 @@ class JoinRoomAliasServlet(TransactionRestServlet):
         )
 
         # watcha+
-        mapped_directory = await self.store.get_nextcloud_directory_path_from_roomID(
+        mapped_directory = await self.store.get_path_from_room_id(
             room_id
         )
         if mapped_directory:
@@ -988,7 +988,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             pass
 
         # watcha+
-        mapped_directory = await self.store.get_nextcloud_directory_path_from_roomID(
+        mapped_directory = await self.store.get_path_from_room_id(
             room_id
         )
         if mapped_directory and membership_action in [

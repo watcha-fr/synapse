@@ -1,4 +1,3 @@
-
 import logging
 from base64 import b64encode
 from jsonschema import validate
@@ -16,7 +15,10 @@ STANDARD_SCHEMA = {
         "ocs": {
             "type": "object",
             "properties": {
-                "meta": {"type": "object"},
+                "meta": {
+                    "type": "object",
+                    "properties": {"statuscode": {"type": "number"}},
+                },
                 "data": {"type": "array"},
             },
         },
@@ -24,12 +26,12 @@ STANDARD_SCHEMA = {
 }
 
 
-class WatchaNextcloudClient(SimpleHttpClient):
+class NextcloudClient(SimpleHttpClient):
     """Interface for talking with Nextcloud APIs
     https://doc.owncloud.com/server/admin_manual/configuration/user/user_provisioning_api.html"""
 
     def __init__(self, hs):
-        super(WatchaNextcloudClient, self).__init__(hs)
+        super().__init__(hs)
 
         self.nextcloud_shared_secret = hs.config.nextcloud_shared_secret
         self.nextcloud_server = hs.config.nextcloud_server
@@ -78,7 +80,7 @@ class WatchaNextcloudClient(SimpleHttpClient):
             post_json={"groupid": group_name},
             headers=self._headers,
         )
-        
+
         validate(response, STANDARD_SCHEMA)
         meta = response["ocs"]["meta"]
 

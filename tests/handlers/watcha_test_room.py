@@ -2,8 +2,8 @@ from .. import unittest
 from mock import Mock
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.http.watcha_keycloak_api import WatchaKeycloakClient
-from synapse.http.watcha_nextcloud_api import WatchaNextcloudClient
+from synapse.http.watcha_keycloak_client import KeycloakClient
+from synapse.http.watcha_nextcloud_client import NextcloudClient
 from synapse.rest.client.v1 import login, room
 from synapse.rest import admin
 from synapse.types import get_localpart_from_id
@@ -29,9 +29,7 @@ class NextcloudHandlerTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
-        self.watcha_room_nextcloud_mapping = (
-            hs.get_nextcloud_handler()
-        )
+        self.watcha_room_nextcloud_mapping = hs.get_nextcloud_handler()
 
         self.keycloak_client = self.watcha_room_nextcloud_mapping.keycloak_client
         self.nextcloud_client = self.watcha_room_nextcloud_mapping.nextcloud_client
@@ -50,10 +48,10 @@ class NextcloudHandlerTestCase(unittest.HomeserverTestCase):
         self.helper.join(self.room_id, self.inviter, tok=inviter_tok)
 
         # Mock Keycloak client functions :
-        self.keycloak_client.get_keycloak_user = simple_async_mock(
+        self.keycloak_client.get_user = simple_async_mock(
             return_value={"id": "1234", "username": "creator"},
         )
-        self.keycloak_client.get_all_keycloak_users = simple_async_mock(
+        self.keycloak_client.get_users = simple_async_mock(
             return_value=[
                 {"id": "1234", "username": "creator"},
                 {"id": "56789", "username": "inviter"},
@@ -67,9 +65,7 @@ class NextcloudHandlerTestCase(unittest.HomeserverTestCase):
         self.nextcloud_client.add_user_to_group = simple_async_mock()
         self.nextcloud_client.remove_user_from_group = simple_async_mock()
         self.nextcloud_client.unshare = simple_async_mock()
-        self.nextcloud_client.share = simple_async_mock(
-            return_value=1
-        )
+        self.nextcloud_client.share = simple_async_mock(return_value=1)
 
     def test_set_a_new_bind(self):
         self.get_success(
@@ -79,17 +75,17 @@ class NextcloudHandlerTestCase(unittest.HomeserverTestCase):
         )
 
         mapped_directory = self.get_success(
-            self.store.get_nextcloud_directory_path_from_roomID(self.room_id)
+            self.store.get_path_from_room_id(self.room_id)
         )
 
         share_id = self.get_success(
-            self.store.get_nextcloud_share_id_from_roomID(self.room_id)
+            self.store.get_nextcloud_share_id_from_room_id(self.room_id)
         )
 
         # Verify that mocked functions are called once
-        self.keycloak_client.get_keycloak_user.assert_called_once()
+        self.keycloak_client.get_user.assert_called_once()
         self.nextcloud_client.add_group.assert_called_once()
-        self.keycloak_client.get_all_keycloak_users.assert_called_once()
+        self.keycloak_client.get_users.assert_called_once()
         self.nextcloud_client.share.assert_called_once()
 
         # Verify that mocked functions are called twice
@@ -103,18 +99,14 @@ class NextcloudHandlerTestCase(unittest.HomeserverTestCase):
         self.assertEqual(share_id, 1)
 
     def test_update_an_existing_bind(self):
-        self.get_success(
-            self.store.map_room_with_nextcloud_directory(
-                self.room_id, "/directory", 2
-            )
-        )
+        self.get_success(self.store.bind(self.room_id, "/directory", 2))
 
         old_mapped_directory = self.get_success(
-            self.store.get_nextcloud_directory_path_from_roomID(self.room_id)
+            self.store.get_path_from_room_id(self.room_id)
         )
 
         old_share_id = self.get_success(
-            self.store.get_nextcloud_share_id_from_roomID(self.room_id)
+            self.store.get_nextcloud_share_id_from_room_id(self.room_id)
         )
 
         self.assertEqual(old_mapped_directory, "/directory")
@@ -127,11 +119,11 @@ class NextcloudHandlerTestCase(unittest.HomeserverTestCase):
         )
 
         mapped_directory = self.get_success(
-            self.store.get_nextcloud_directory_path_from_roomID(self.room_id)
+            self.store.get_path_from_room_id(self.room_id)
         )
 
         new_share_id = self.get_success(
-            self.store.get_nextcloud_share_id_from_roomID(self.room_id)
+            self.store.get_nextcloud_share_id_from_room_id(self.room_id)
         )
 
         # Verify that mocked functions has called :
@@ -141,23 +133,15 @@ class NextcloudHandlerTestCase(unittest.HomeserverTestCase):
         self.assertEqual(new_share_id, 1)
 
     def test_delete_an_existing_bind(self):
-        self.get_success(
-            self.store.map_room_with_nextcloud_directory(
-                self.room_id, "/directory", 2
-            )
-        )
-        self.get_success(
-            self.watcha_room_nextcloud_mapping.unbind(
-                self.room_id
-            )
-        )
+        self.get_success(self.store.bind(self.room_id, "/directory", 2))
+        self.get_success(self.watcha_room_nextcloud_mapping.unbind(self.room_id))
 
         mapped_directory = self.get_success(
-            self.store.get_nextcloud_directory_path_from_roomID(self.room_id)
+            self.store.get_path_from_room_id(self.room_id)
         )
 
         share_id = self.get_success(
-            self.store.get_nextcloud_share_id_from_roomID(self.room_id)
+            self.store.get_nextcloud_share_id_from_room_id(self.room_id)
         )
 
         self.nextcloud_client.delete_group.assert_called()
@@ -219,7 +203,7 @@ class NextcloudHandlerTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.keycloak_client.get_keycloak_user.assert_called_once()
+        self.keycloak_client.get_user.assert_called_once()
         self.nextcloud_client.add_user_to_group.assert_called_once()
         self.nextcloud_client.remove_user_from_group.assert_not_called()
 
@@ -230,7 +214,7 @@ class NextcloudHandlerTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.keycloak_client.get_keycloak_user.assert_called_once()
+        self.keycloak_client.get_user.assert_called_once()
         self.nextcloud_client.add_user_to_group.assert_called_once()
         self.nextcloud_client.remove_user_from_group.assert_not_called()
 
@@ -241,7 +225,7 @@ class NextcloudHandlerTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.keycloak_client.get_keycloak_user.assert_called_once()
+        self.keycloak_client.get_user.assert_called_once()
         self.nextcloud_client.remove_user_from_group.assert_called_once()
         self.nextcloud_client.add_user_to_group.assert_not_called()
 
@@ -252,7 +236,7 @@ class NextcloudHandlerTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.keycloak_client.get_keycloak_user.assert_called_once()
+        self.keycloak_client.get_user.assert_called_once()
         self.nextcloud_client.remove_user_from_group.assert_called_once()
         self.nextcloud_client.add_user_to_group.assert_not_called()
 
@@ -275,7 +259,9 @@ class NextcloudHandlerTestCase(unittest.HomeserverTestCase):
         )
 
     def test_update_existing_nextcloud_share_on_leave_membership_with_exception(self):
-        self.nextcloud_client.remove_user_from_group = simple_async_mock(raises=SynapseError)
+        self.nextcloud_client.remove_user_from_group = simple_async_mock(
+            raises=SynapseError
+        )
         second_inviter = "@second_inviter:test"
 
         with self.assertLogs("synapse.handlers.room", level="WARN") as cm:

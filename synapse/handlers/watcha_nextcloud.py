@@ -1,82 +1,78 @@
 import logging
+from jsonschema.exceptions import ValidationError, SchemaError 
 from pathlib import Path
 
 from ._base import BaseHandler
 from synapse.api.constants import EventTypes
-from synapse.api.errors import  SynapseError
-from synapse.http.watcha_keycloak_api import WatchaKeycloakClient
-from synapse.http.watcha_nextcloud_api import WatchaNextcloudClient
-from synapse.types import create_requester
-from synapse.types import get_localpart_from_id
+from synapse.api.errors import SynapseError
+from synapse.http.watcha_keycloak_client import KeycloakClient
+from synapse.http.watcha_nextcloud_client import NextcloudClient
+from synapse.types import create_requester, get_localpart_from_id
 
 logger = logging.getLogger(__name__)
 
-# echo -n watcha | md5sum
-NEXTCLOUD_GROUP_NAME_PREFIX = "c4d96a06b758a7ed12f897690828e414_"
+# echo -n watcha | md5sum  | head -c 10
+NEXTCLOUD_GROUP_NAME_PREFIX = "c4d96a06b7_"
 
 
 class NextcloudHandler(BaseHandler):
     def __init__(self, hs):
         self.store = hs.get_datastore()
         self.event_creation_handler = hs.get_event_creation_handler()
-        self.keycloak_client = WatchaKeycloakClient(hs)
-        self.nextcloud_client = WatchaNextcloudClient(hs)
+        self.keycloak_client = KeycloakClient(hs)
+        self.nextcloud_client = NextcloudClient(hs)
 
     async def unbind(self, room_id):
-        """ Delete a mapping between a room and an Nextcloud folder.
+        """Unbind a Nextcloud folder from a room.
 
         Args :
-            room_id: the id of the room.
+            room_id: the id of the room to bind.
         """
 
         await self.nextcloud_client.delete_group(room_id)
 
-        await self.store.deleted_room_mapping_with_nextcloud_directory(room_id)
+        await self.store.unbind(room_id)
 
-    async def bind(
-        self, room_id, requester_id, nextcloud_directory_path
-    ):
-        """ Update the mapping between a room and a Nextcloud folder.
+    async def bind(self, user_id, room_id, path):
+        """Bind a Nextcloud folder with a room.
 
         Args :
-            room_id: the id of the room which must be linked with the Nextcloud folder.
-            requester_id: the user_id of the requester.
-            nextcloud_directory_path: the directory path of the Nextcloud folder to link with the room.
+           user_id: the matrix user id of the requester.
+           room_id: the id of the room to bind.
+           path: the path of the Nextcloud folder to bind.
         """
 
-        keycloak_user_representation = await self.keycloak_client.get_keycloak_user(
-            get_localpart_from_id(requester_id)
-        )
-        nextcloud_requester = keycloak_user_representation["id"]
+        user = await self.keycloak_client.get_user(get_localpart_from_id(user_id))
+
+        nextcloud_username = user["id"]
 
         await self.nextcloud_client.add_group(NEXTCLOUD_GROUP_NAME_PREFIX + room_id)
 
         await self.add_room_users_to_nextcloud_group(room_id)
 
-        old_share_id = await self.store.get_nextcloud_share_id_from_roomID(room_id)
+        old_share_id = await self.store.get_nextcloud_share_id_from_room_id(room_id)
 
         if old_share_id:
-            await self.nextcloud_client.unshare(nextcloud_requester, old_share_id)
+            await self.nextcloud_client.unshare(nextcloud_username, old_share_id)
 
         new_share_id = await self.nextcloud_client.share(
-            nextcloud_requester, nextcloud_directory_path, room_id
+            nextcloud_username, path, room_id
         )
 
-        await self.store.map_room_with_nextcloud_directory(
-            room_id, nextcloud_directory_path, new_share_id
-        )
+        await self.store.bind(room_id, path, new_share_id)
 
     async def add_room_users_to_nextcloud_group(self, room_id):
-        """ Add all users of a room to a Nextcloud group which name like the room_id.
+        """Add all users of a room to a Nextcloud.
 
         Args:
-            room_id: the id of the room which is the name of the Nextcloud group.
+            room_id: the id of the room which the Nextcloud group name is infered from.
         """
 
-        users_id = await self.store.get_users_in_room(room_id)
-        localparts = [get_localpart_from_id(user_id) for user_id in users_id]
+        user_ids = await self.store.get_users_in_room(room_id)
+        localparts = [get_localpart_from_id(user_id) for user_id in user_ids]
+        users = await self.keycloak_client.get_users()
 
-        for user in await self.keycloak_client.get_all_keycloak_users():
+        for user in users:
             localpart = user["username"]
             nextcloud_username = user["id"]
 
@@ -101,15 +97,11 @@ class NextcloudHandler(BaseHandler):
                             localpart, room_id
                         )
                     )
-                continue
 
-    async def update_share(
-        self, user_id, group_name, membership
-    ):
-        keycloak_user_representation = await self.keycloak_client.get_keycloak_user(
-            get_localpart_from_id(user_id)
-        )
-        nextcloud_username = keycloak_user_representation["id"]
+    async def update_share(self, user_id, group_name, membership):
+
+        user = await self.keycloak_client.get_user(get_localpart_from_id(user_id))
+        nextcloud_username = user["id"]
 
         if membership in ("invite", "join"):
             try:
@@ -151,7 +143,7 @@ class NextcloudHandler(BaseHandler):
         directories.append(directory)
 
         for directory in directories:
-            room = await self.store.get_roomID_from_nextcloud_directory_path(directory)
+            room = await self.store.get_room_id_from_path(directory)
 
             if room:
                 rooms.append(room)
@@ -206,7 +198,10 @@ class NextcloudHandler(BaseHandler):
             )
 
             notified_rooms.append(
-                {"room_id": room, "sender": sender,}
+                {
+                    "room_id": room,
+                    "sender": sender,
+                }
             )
 
         notification_sent["notified_rooms"] = notified_rooms

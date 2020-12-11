@@ -76,7 +76,7 @@ class RootConfig:
     roomdirectory: room_directory.RoomDirectoryConfig
     thirdpartyrules: third_party_event_rules.ThirdPartyRulesConfig
     tracer: tracer.TracerConfig
-    nextcloudintegration: watcha_nextcloud_integration.NextcloudIntegrationConfig # watcha+ op544
+    nextcloudintegration: watcha_nextcloud.NextcloudIntegrationConfig # watcha+ op544
 
     config_classes: List = ...
     def __init__(self) -> None: ...
