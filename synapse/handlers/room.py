@@ -65,10 +65,9 @@ if TYPE_CHECKING:
 from pathlib import Path
 from requests import get, post, delete, auth, HTTPError
 from requests.auth import HTTPBasicAuth
-from synapse.http.watcha_keycloak_api import WatchaKeycloakClient
-from synapse.http.watcha_nextcloud_api import WatchaNextcloudClient
-from synapse.types import get_localpart_from_id
-from synapse.util.watcha import generate_password
+from synapse.http.watcha_keycloak_client import KeycloakClient
+from synapse.http.watcha_nextcloud_client import NextcloudClient
+from synapse.types import get_localpart_from_id, decode_localpart, map_username_to_mxid_localpart
 
 # +watcha
 
@@ -79,7 +78,7 @@ id_server_scheme = "https://"
 FIVE_MINUTES_IN_MS = 5 * 60 * 1000
 # watcha+
 # echo -n watcha | md5sum
-NEXTCLOUD_GROUP_NAME_PREFIX = "c4d96a06b758a7ed12f897690828e414_"
+NEXTCLOUD_GROUP_NAME_PREFIX = "c4d96a06b7_"
 # +watcha
 
 
@@ -91,6 +90,7 @@ class RoomCreationHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.config = hs.config
+        self.invite_partner_handler = hs.get_invite_partner_handler()  # watcha+
 
         # Room state based off defined presets
         self._presets_dict = {
@@ -839,9 +839,7 @@ class RoomCreationHandler(BaseHandler):
                 requester.device_id,
             )
 
-            invite_3pid[
-                "user_id"
-            ] = await self.hs.get_watcha_invite_external_handler.invite(
+            invite_3pid["user_id"] = await self.invite_partner_handler.invite(
                 room_id=room_id,
                 inviter=requester.user,
                 inviter_device_id=str(requester.device_id),
@@ -1447,12 +1445,30 @@ class RoomShutdownHandler:
 
 
 # watcha+
-class WatchaRoomNextcloudMappingHandler(BaseHandler):
+class NextcloudHandler(BaseHandler):
     def __init__(self, hs):
         self.store = hs.get_datastore()
         self.event_creation_handler = hs.get_event_creation_handler()
-        self.keycloak_client = WatchaKeycloakClient(hs)
-        self.nextcloud_client = WatchaNextcloudClient(hs)
+        self.keycloak_client = KeycloakClient(hs)
+        self.nextcloud_client = NextcloudClient(hs)
+
+    async def create_keycloak_and_nextcloud_user(self, localpart, email, password_hash, synapse_role=None):
+        """ Create a user on Keycloak and Nextcloud server if it doesn't exist
+
+        Args :
+            localpart: the synapse localpart use as Keycloak username
+            email: email of the user
+            password_hash: the synapse password hash
+            synapse_role: the synapse role, it can be administrator, collaborator or partner. 
+        """
+
+        await self.keycloak_client.add_user(localpart, email, password_hash, synapse_role)
+
+        keycloak_user_representation = await self.keycloak_client.get_user(
+            localpart
+        )
+
+        await self.nextcloud_client.add_user(keycloak_user_representation["id"])
 
     async def delete_room_nextcloud_mapping(self, room_id):
         """ Delete a mapping between a room and an Nextcloud folder.
@@ -1461,7 +1477,7 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
             room_id: the id of the room.
         """
 
-        await self.nextcloud_client.delete_group(room_id)
+        await self.nextcloud_client.delete_group(NEXTCLOUD_GROUP_NAME_PREFIX + room_id)
 
         await self.store.deleted_room_mapping_with_nextcloud_directory(room_id)
 
@@ -1475,13 +1491,13 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
             requester_id: the user_id of the requester.
             nextcloud_directory_path: the directory path of the Nextcloud folder to link with the room.
         """
-
-        keycloak_user_representation = await self.keycloak_client.get_keycloak_user(
-            get_localpart_from_id(requester_id)
+        group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
+        keycloak_user_representation = await self.keycloak_client.get_user(
+            decode_localpart(requester_id)
         )
         nextcloud_requester = keycloak_user_representation["id"]
 
-        await self.nextcloud_client.add_group(NEXTCLOUD_GROUP_NAME_PREFIX + room_id)
+        await self.nextcloud_client.add_group(group_name)
 
         await self.add_room_users_to_nextcloud_group(room_id)
 
@@ -1491,7 +1507,7 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
             await self.nextcloud_client.delete_share(nextcloud_requester, old_share_id)
 
         new_share_id = await self.nextcloud_client.create_all_permission_share_with_group(
-            nextcloud_requester, nextcloud_directory_path, room_id
+            nextcloud_requester, nextcloud_directory_path, group_name
         )
 
         await self.store.map_room_with_nextcloud_directory(
@@ -1504,16 +1520,16 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
         Args:
             room_id: the id of the room which is the name of the Nextcloud group.
         """
-
+        group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
         users_id = await self.store.get_users_in_room(room_id)
         users_localpart = [get_localpart_from_id(user_id) for user_id in users_id]
 
         keycloak_users_representation = (
-            await self.keycloak_client.get_all_keycloak_users()
+            await self.keycloak_client.get_users()
         )
 
         for keycloak_user in keycloak_users_representation:
-            localpart = keycloak_user["username"]
+            localpart = map_username_to_mxid_localpart(keycloak_user["username"])
             nextcloud_target = keycloak_user["id"]
 
             if localpart in users_localpart:
@@ -1529,21 +1545,22 @@ class WatchaRoomNextcloudMappingHandler(BaseHandler):
 
                 try:
                     await self.nextcloud_client.add_user_to_group(
-                        nextcloud_target, room_id
+                        nextcloud_target, group_name
                     )
                 except Exception:
                     logger.warn(
                         "Unable to add the user {username} to the Nextcloud group {group_name}.".format(
-                            username=localpart, group_name=room_id
+                            username=localpart, group_name=group_name
                         )
                     )
                 continue
 
     async def update_existing_nextcloud_share_for_user(
-        self, user_id, group_name, membership
+        self, user_id, room_id, membership
     ):
-        keycloak_user_representation = await self.keycloak_client.get_keycloak_user(
-            get_localpart_from_id(user_id)
+        group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
+        keycloak_user_representation = await self.keycloak_client.get_user(
+            decode_localpart(user_id)
         )
         nextcloud_username = keycloak_user_representation["id"]
 
