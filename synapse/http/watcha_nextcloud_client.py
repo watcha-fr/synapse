@@ -2,9 +2,9 @@ import logging
 from base64 import b64encode
 from jsonschema import validate
 
+from secrets import token_hex
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SimpleHttpClient
-from synapse.util.watcha import generate_password
 
 logger = logging.getLogger(__name__)
 
@@ -110,8 +110,8 @@ class NextcloudClient(SimpleHttpClient):
             102 - username already exists
             103 - unknown error occurred whilst adding the user
         """
-        # A password is needed to create NC user, but it will not be used by KC login process.
-        password = generate_password()
+        # A password is needed to create NC user, but it will not be used by KC login process. 
+        password = token_hex()
 
         response = await self.post_json_get_json(
             uri="{}/ocs/v1.php/cloud/users".format(self.nextcloud_url),
