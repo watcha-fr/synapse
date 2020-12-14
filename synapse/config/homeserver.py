@@ -52,7 +52,7 @@ from .user_directory import UserDirectoryConfig
 from .voip import VoipConfig
 from .workers import WorkerConfig
 
-from .watcha_nextcloud_integration import NextcloudIntegrationConfig # watcha+ op544
+from .watcha_nextcloud import NextcloudIntegrationConfig # watcha+ op544
 
 
 class HomeServerConfig(RootConfig):
