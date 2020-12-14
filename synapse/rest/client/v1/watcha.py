@@ -1,16 +1,13 @@
 import logging
 from urllib.parse import urlparse
 
+from secrets import token_hex
 from synapse.api.errors import AuthError, SynapseError
+from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.push.mailer import Mailer
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import UserID, create_requester, map_username_to_mxid_localpart
-from synapse.util.watcha import (
-    compute_registration_token,
-    create_display_inviter_name,
-    generate_password,
-    send_registration_email,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -278,10 +275,20 @@ class WatchaRegisterRestServlet(RestServlet):
 
     def __init__(self, hs):
         super().__init__()
-        self.hs = hs
+        self.config = hs.config
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
+        self.nextcloud_handler = hs.get_nextcloud_handler()
+        self.profile_handler = hs.get_profile_handler()
         self.registration_handler = hs.get_registration_handler()
+
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            self.mailer = Mailer(
+                hs=hs,
+                app_name=self.config.email_app_name,
+                template_html=self.config.watcha_registration_template_html,
+                template_text=self.config.watcha_registration_template_text,
+            )
 
     async def on_POST(self, request):
         await _check_admin(
@@ -307,35 +314,21 @@ class WatchaRegisterRestServlet(RestServlet):
                 "A user with this email address already exists. Cannot create a new one.",
             )
 
-        try:
-            requester = await self.auth.get_user_by_req(request)
-        except Exception:
-            # no token - not logged in - inviter should be provided
-            requester = None
-
-        if requester:
-            inviter_name = await create_display_inviter_name(self.hs, requester.user)
-        else:
-            if not params["inviter"]:
-                raise AuthError(
-                    403,
-                    "'inviter' field is needed if not called from logged in admin user",
-                )
-            inviter_name = params["inviter"]
+        requester = await self.auth.get_user_by_req(request)
 
         send_email = False
 
         if hasattr(params, "password"):
             password = params["password"]
         else:
-            password = generate_password(length=6)
+            password = token_hex(6)
             send_email = True
 
         password_hash = await self.auth_handler.hash(password)
         admin = params["admin"]
 
         role = "admin" if admin else None
-        await self.hs.get_nextcloud_handler().create_keycloak_and_nextcloud_user(email, email, password_hash, role)
+        await self.nextcloud_handler.create_keycloak_and_nextcloud_user(email, password_hash, role)
 
         user_id = await self.registration_handler.register_user(
             localpart=map_username_to_mxid_localpart(email),
@@ -345,22 +338,17 @@ class WatchaRegisterRestServlet(RestServlet):
         )
 
         user = UserID.from_string(user_id)
-        await self.hs.profile_handler.set_displayname(
+        await self.profile_handler.set_displayname(
             user, create_requester(user_id), params["full_name"], by_admin=True
         )
 
-        display_name = await self.hs.profile_handler.get_displayname(user)
+        display_name = await self.profile_handler.get_displayname(user)
 
         if send_email:
-            token = compute_registration_token(user_id, email, password)
-
-            await send_registration_email(
-                self.hs.config,
-                email,
-                template_name="invite_new_account",
+            await self.mailer.send_watcha_registration_email(
+                email_address=email,
+                host_id=requester.user.to_string(),
                 password=password,
-                inviter_name=inviter_name,
-                full_name=display_name,
             )
         else:
             logger.info(
