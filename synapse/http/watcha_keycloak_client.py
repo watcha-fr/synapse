@@ -1,5 +1,5 @@
 import logging
-from json import JSONDecodeError
+from jsonschema import validate
 from typing import List
 
 from synapse.api.errors import HttpResponseException
@@ -7,7 +7,35 @@ from synapse.http.client import SimpleHttpClient
 
 logger = logging.getLogger(__name__)
 
-class WatchaKeycloakClient(SimpleHttpClient):
+TOKEN_SCHEMA = {
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "description": "Keycloak token schema",
+    "type": "object",
+    "properties": {
+        "access_token": {
+            "type": "string",
+        },
+    },
+    "required": ["access_token"]
+}
+
+USER_SCHEMA = {
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "description": "Keycloak user schema",
+    "type": "array",
+    "properties": {
+        "id": {
+            "type": "string",
+        },
+        "username": {
+            "type": "string",
+        },
+    },
+    "required": ["id", "username"]
+}
+
+
+class KeycloakClient(SimpleHttpClient):
     """Interface for talking with Keycloak APIs"""
 
     def __init__(self, hs):
@@ -71,6 +99,9 @@ class WatchaKeycloakClient(SimpleHttpClient):
             headers=await self._get_header(),
             args={"username": localpart},
         )
+
+        validate(response, USER_SCHEMA)
+
         return response[0]
 
     async def get_users(self) -> List[dict]:
@@ -84,6 +115,9 @@ class WatchaKeycloakClient(SimpleHttpClient):
             self._get_endpoint("admin/realms/{}/users".format(self.realm_name)),
             headers=await self._get_header(),
         )
+
+        validate(response, USER_SCHEMA)
+
         return response
 
     async def _get_header(self):
@@ -108,6 +142,9 @@ class WatchaKeycloakClient(SimpleHttpClient):
                 "password": self.service_account_password,
             },
         )
+        
+        validate(response, TOKEN_SCHEMA)
+
         return response["access_token"]
 
     def _get_endpoint(self, path):

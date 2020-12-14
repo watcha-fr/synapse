@@ -6,7 +6,7 @@ from ._base import Config, ConfigError
 
 class NextcloudIntegrationConfig(Config):
 
-    section = "nextcloudintegration"
+    section = "nextcloud"
 
     # echo -n watcha | md5sum | head -c 10
     SERVICE_ACCOUNT_NAME = "c4d96a06b7_watcha_service_account"
@@ -24,7 +24,7 @@ class NextcloudIntegrationConfig(Config):
     def read_config(self, config, **kwargs):
         self.nextcloud_enabled = False
 
-        nextcloud_config = config.get("nextcloud_integration")
+        nextcloud_config = config.get("nextcloud")
         if not nextcloud_config or not nextcloud_config.get("enabled", False):
             return
 
@@ -36,7 +36,7 @@ class NextcloudIntegrationConfig(Config):
         match = re.match("(https?://.+?)/realms/([^/]+)", issuer)
         if match is None:
             raise ConfigError(
-                "nextcloud_integration requires oidc_config.issuer to be of the form https://example/realms/xxx"
+                "nextcloud requires oidc_config.issuer to be of the form https://example/realms/xxx"
             )
         self.keycloak_url = match.group(1)
         self.realm_name = match.group(2)
@@ -46,7 +46,7 @@ class NextcloudIntegrationConfig(Config):
             client_base_url = config.get("email", {}).get("client_base_url")
             if client_base_url is None:
                 raise ConfigError(
-                    "nextcloud_integration requires nextcloud_url or email.client_base_url to be set"
+                    "nextcloud requires nextcloud_url or email.client_base_url to be set"
                 )
             nextcloud_url = urljoin(client_base_url, "nextcloud")
         self.nextcloud_url = nextcloud_url
@@ -64,7 +64,7 @@ class NextcloudIntegrationConfig(Config):
         return """\
         # Configuration for the Nextcloud integration
         #
-        nextcloud_integration:
+        nextcloud:
           # Uncomment the below to enable the Nextcloud integration
           #
           #enabled: true
