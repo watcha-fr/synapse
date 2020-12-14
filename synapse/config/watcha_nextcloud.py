@@ -4,7 +4,7 @@ from urllib.parse import urljoin
 from ._base import Config, ConfigError
 
 
-class NextcloudIntegrationConfig(Config):
+class NextcloudConfig(Config):
 
     section = "nextcloud"
 
