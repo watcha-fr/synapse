@@ -103,7 +103,7 @@ class NextcloudHandler(BaseHandler):
             if localpart in localparts:
                 try:
                     await self.nextcloud_client.get_user(nextcloud_username)
-                except Exception:
+                except (SynapseError, ValidationError, SchemaError):
                     logger.warn(
                         "The user {} does not have a Nextcloud account.".format(
                             localpart
@@ -115,7 +115,7 @@ class NextcloudHandler(BaseHandler):
                     await self.nextcloud_client.add_user_to_group(
                         nextcloud_username, group_name
                     )
-                except SynapseError:
+                except (SynapseError, ValidationError, SchemaError):
                     logger.warn(
                         "Unable to add the user {} to the Nextcloud group {}.".format(
                             localpart, group_name
@@ -133,7 +133,7 @@ class NextcloudHandler(BaseHandler):
                 await self.nextcloud_client.add_user_to_group(
                     nextcloud_username, group_name
                 )
-            except SynapseError:
+            except (SynapseError, ValidationError, SchemaError):
                 logger.warn(
                     "Unable to add the user {} to the Nextcloud group {}.".format(
                         user_id, group_name
@@ -144,7 +144,7 @@ class NextcloudHandler(BaseHandler):
                 await self.nextcloud_client.remove_user_from_group(
                     nextcloud_username, group_name
                 )
-            except SynapseError:
+            except (SynapseError, ValidationError, SchemaError):
                 logger.warn(
                     "Unable to remove the user {} from the Nextcloud group {}.".format(
                         user_id, group_name
