@@ -208,7 +208,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     content=content,
                 )
                 # watcha+
-                mapped_directory = await self.store.get_nextcloud_directory_path_from_roomID(
+                mapped_directory = await self.store.get_path_from_room_id(
                     room_id
                 )
                 if mapped_directory and membership in [
@@ -222,7 +222,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                         if membership in ["join", "leave"]
                         else state_key
                     )
-                    await self.nextcloud_handler.update_existing_nextcloud_share_for_user(
+                    await self.nextcloud_handler.update_share(
                         user, room_id, membership
                     )
                 # +watcha
@@ -287,7 +287,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     requester_id = requester.user.to_string()
 
                     if not nextcloud_url:
-                        await self.nextcloud_handler.delete_room_nextcloud_mapping(
+                        await self.nextcloud_handler.unbind(
                             room_id
                         )
                     else:
@@ -303,8 +303,8 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 
                         nextcloud_directory_path = url_query["dir"][0]
 
-                        await self.nextcloud_handler.update_room_nextcloud_mapping(
-                            room_id, requester_id, nextcloud_directory_path
+                        await self.nextcloud_handler.bind(
+                            requester_id, room_id, nextcloud_directory_path
                         )
                 # +watcha
                 (
@@ -443,11 +443,11 @@ class JoinRoomAliasServlet(TransactionRestServlet):
         )
 
         # watcha+
-        mapped_directory = await self.store.get_nextcloud_directory_path_from_roomID(
+        mapped_directory = await self.store.get_path_from_room_id(
             room_id
         )
         if mapped_directory:
-            await self.nextcloud_handler.update_existing_nextcloud_share_for_user(
+            await self.nextcloud_handler.update_share(
                 requester.user.to_string(), room_id, "join"
             )
         # +watcha
@@ -982,7 +982,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             pass
 
         # watcha+
-        mapped_directory = await self.store.get_nextcloud_directory_path_from_roomID(
+        mapped_directory = await self.store.get_path_from_room_id(
             room_id
         )
         if mapped_directory and membership_action in [
@@ -996,7 +996,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 if membership_action in ["join", "leave"]
                 else content["user_id"]
             )
-            await self.nextcloud_handler.update_existing_nextcloud_share_for_user(
+            await self.nextcloud_handler.update_share(
                 user, room_id, membership_action
             )
         # +watcha

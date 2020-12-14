@@ -23,9 +23,9 @@ def _caller_name():
         return "<unknown function>"
 
 
-class WatchaAdminStore(SQLBaseStore):
+class AdministrationStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-        super(WatchaAdminStore, self).__init__(database, db_conn, hs)
+        super().__init__(database, db_conn, hs)
 
         self.clock = hs.get_clock()
 

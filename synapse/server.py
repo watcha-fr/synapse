@@ -125,7 +125,7 @@ from synapse.util.stringutils import random_string
 # watcha+
 from synapse.handlers.watcha_administration import AdministrationHandler
 from synapse.handlers.watcha_invite_partner import InvitePartnerHandler
-from synapse.handlers.room import NextcloudHandler
+from synapse.handlers.watcha_nextcloud import NextcloudHandler
 
 # +watcha
 

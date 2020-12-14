@@ -1,11 +1,65 @@
 import logging
 from base64 import b64encode
+from jsonschema import validate
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SimpleHttpClient
 from synapse.util.watcha import generate_password
 
 logger = logging.getLogger(__name__)
+
+META_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "statuscode": {"type": "number"},
+        "status": {"type": "string"},
+    },
+    "required": ["statuscode", "status"],
+}
+
+STANDARD_SCHEMA = {
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "description": "Standard schema of Owncloud API",
+    "definitions": {
+        "meta": META_SCHEMA,
+    },
+    "type": "object",
+    "properties": {
+        "ocs": {
+            "type": "object",
+            "properties": {
+                "meta": {"$ref": "#/definitions/meta"},
+                "data": {
+                    "type": "array",
+                },
+            },
+            "required": ["meta", "data"],
+        },
+    },
+    "required": ["ocs"],
+}
+
+SHARE_SCHEMA = {
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "description": "Share schema of Owncloud Share API",
+    "definitions": {"meta": META_SCHEMA},
+    "type": "object",
+    "properties": {
+        "ocs": {
+            "type": "object",
+            "properties": {
+                "meta": {"$ref": "#/definitions/meta"},
+                "data": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}},
+                    "required": ["id"],
+                },
+            },
+            "required": ["meta", "data"],
+        },
+    },
+    "required": ["ocs"],
+}
 
 
 class NextcloudClient(SimpleHttpClient):
@@ -56,7 +110,7 @@ class NextcloudClient(SimpleHttpClient):
             102 - username already exists
             103 - unknown error occurred whilst adding the user
         """
-        # A password is needed to create NC user, but it will not be used by KC login process. 
+        # A password is needed to create NC user, but it will not be used by KC login process.
         password = generate_password()
 
         response = await self.post_json_get_json(
@@ -68,7 +122,9 @@ class NextcloudClient(SimpleHttpClient):
         meta = response["ocs"]["meta"]
 
         if meta["statuscode"] == 102:
-            logger.info("User {} already exists on Nextcloud server.".format(keycloak_user_id))
+            logger.info(
+                "User {} already exists on Nextcloud server.".format(keycloak_user_id)
+            )
         else:
             self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_CREATE_GROUP)
 
@@ -91,6 +147,7 @@ class NextcloudClient(SimpleHttpClient):
             headers=self._headers,
         )
 
+        validate(response, STANDARD_SCHEMA)
         meta = response["ocs"]["meta"]
 
         if meta["statuscode"] == 102:
@@ -111,11 +168,11 @@ class NextcloudClient(SimpleHttpClient):
         """
 
         response = await self.delete_get_json(
-            uri="{}/ocs/v1.php/cloud/groups/{}".format(
-                self.nextcloud_url, group_name
-            ),
+            uri="{}/ocs/v1.php/cloud/groups/{}".format(self.nextcloud_url, group_name),
             headers=self._headers,
         )
+
+        validate(response, STANDARD_SCHEMA)
 
         self._raise_for_status(
             response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_DELETE_GROUP
@@ -145,11 +202,13 @@ class NextcloudClient(SimpleHttpClient):
             headers=self._headers,
         )
 
+        validate(response, STANDARD_SCHEMA)
+
         self._raise_for_status(
             response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_ADD_USER_TO_GROUP
         )
 
-    async def remove_from_group(self, username, group_name):
+    async def remove_user_from_group(self, username, group_name):
         """Removes the specified user from the specified group.
 
         Args:
@@ -173,12 +232,14 @@ class NextcloudClient(SimpleHttpClient):
             json_body={"groupid": group_name},
         )
 
+        validate(response, STANDARD_SCHEMA)
+
         self._raise_for_status(
-            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_REMOVE_USER_TO_GROUP
+            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_REMOVE_USER_FROM_GROUP
         )
 
     async def get_user(self, username):
-        """ Get informations of user with username given on parameter
+        """Get informations of user with username given on parameter
 
         Args:
             username: the username of the user to add to the group.
@@ -192,11 +253,11 @@ class NextcloudClient(SimpleHttpClient):
         """
 
         response = await self.get_json(
-            uri="{}/ocs/v1.php/cloud/users/{}".format(
-                self.nextcloud_url, username
-            ),
+            uri="{}/ocs/v1.php/cloud/users/{}".format(self.nextcloud_url, username),
             headers=self._headers,
         )
+
+        validate(response, STANDARD_SCHEMA)
 
         self._raise_for_status(
             response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_GET_USER
@@ -204,12 +265,13 @@ class NextcloudClient(SimpleHttpClient):
 
         return response["ocs"]["data"]
 
-    async def create_all_permission_share_with_group(self, requester, path, group_name):
+    async def share(self, requester, path, group_name):
         """Share an existing file or folder with all permissions for a group.
 
         Args:
-            requester: the user who want to remove the share
-            args: request attributes to filter the search.
+            requester: the user who want to create the share
+            path: the path of folder to share
+            group_name: the name of group which will share the folder
 
         Payload:
             shareType: the type of the share. This can be one of:
@@ -251,13 +313,13 @@ class NextcloudClient(SimpleHttpClient):
             },
         )
 
-        self._raise_for_status(
-            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_CREATE_NEW_SHARE
-        )
+        validate(response, SHARE_SCHEMA)
+
+        self._raise_for_status(response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_SHARE)
 
         return response["ocs"]["data"]["id"]
 
-    async def delete_share(self, requester, share_id):
+    async def unshare(self, requester, share_id):
         """Remove a given Nextcloud share
 
         Args:
@@ -277,6 +339,6 @@ class NextcloudClient(SimpleHttpClient):
             json_body={"requester": requester},
         )
 
-        self._raise_for_status(
-            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_DELETE_SHARE
-        )
+        validate(response, STANDARD_SCHEMA)
+
+        self._raise_for_status(response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_UNSHARE)
