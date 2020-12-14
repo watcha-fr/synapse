@@ -2,9 +2,12 @@ import logging
 
 from ._base import BaseHandler
 from secrets import token_hex
+
+from synapse.api.errors import SynapseError
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.push.mailer import Mailer
 from synapse.types import map_username_to_mxid_localpart
+from synapse.util.threepids import canonicalise_email
 
 logger = logging.getLogger(__name__)
 
@@ -33,21 +36,19 @@ class InvitePartnerHandler(BaseHandler):
 
         if user_id:
             logger.info(
-                "Invitee with email {email} already exists (id is {user_id}), inviting her to room {room_id}".format(
+                "Partner with email {email} already exists. His id is {user_id}. Inviting him to room {room_id}".format(
                     email=invitee_email,
                     user_id=user_id,
                     room_id=room_id,
                 )
             )
         else:
-            localpart = map_username_to_mxid_localpart(invitee_email)
-            logger.info(
-                "invited user {} is not in the DB. Creating user (id is {}), inviting to room and sending invitation email.".format(
-                    invitee_email,
-                    localpart,
-                )
-            )
+            try:
+                invitee_email = canonicalise_email(invitee_email)
+            except ValueError as e:
+                raise SynapseError(400, str(e))
 
+            localpart = map_username_to_mxid_localpart(invitee_email)
             password = token_hex(6)
             password_hash = await self.auth_handler.hash(password)
 
@@ -68,7 +69,14 @@ class InvitePartnerHandler(BaseHandler):
             )
 
             email_sent = True
-        
+            logger.info(
+                "New partner with id {user_id} was created and an email has been sent to {email}. Inviting him to room {room_id}.".format(
+                    user_id=user_id,
+                    email=invitee_email,
+                    room_id=room_id,
+                )
+            )
+
         await self.store.insert_partner_invitation(
             partner_user_id=user_id,
             inviter_user_id=host_id,
