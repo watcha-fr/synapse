@@ -16,6 +16,7 @@ TOKEN_SCHEMA = {
             "type": "string",
         },
     },
+    "required": ["access_token"]
 }
 
 USER_SCHEMA = {
@@ -30,6 +31,7 @@ USER_SCHEMA = {
             "type": "string",
         },
     },
+    "required": ["id", "username"]
 }
 
 

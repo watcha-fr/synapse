@@ -8,22 +8,57 @@ from synapse.util.watcha import generate_password
 
 logger = logging.getLogger(__name__)
 
+META_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "statuscode": {"type": "number"},
+        "status": {"type": "string"},
+    },
+    "required": ["statuscode", "status"],
+}
+
 STANDARD_SCHEMA = {
     "$schema": "http://json-schema.org/draft-04/schema#",
-    "description": "standard schema for Owncloud API",
+    "description": "Standard schema of Owncloud API",
+    "definitions": {
+        "meta": META_SCHEMA,
+    },
     "type": "object",
     "properties": {
         "ocs": {
             "type": "object",
             "properties": {
-                "meta": {
-                    "type": "object",
-                    "properties": {"statuscode": {"type": "number"}},
+                "meta": {"$ref": "#/definitions/meta"},
+                "data": {
+                    "type": "array",
                 },
-                "data": {"type": "array"},
             },
+            "required": ["meta", "data"],
         },
     },
+    "required": ["ocs"],
+}
+
+SHARE_SCHEMA = {
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "description": "Share schema of Owncloud Share API",
+    "definitions": {"meta": META_SCHEMA},
+    "type": "object",
+    "properties": {
+        "ocs": {
+            "type": "object",
+            "properties": {
+                "meta": {"$ref": "#/definitions/meta"},
+                "data": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}},
+                    "required": ["id"],
+                },
+            },
+            "required": ["meta", "data"],
+        },
+    },
+    "required": ["ocs"],
 }
 
 
@@ -75,7 +110,7 @@ class NextcloudClient(SimpleHttpClient):
             102 - username already exists
             103 - unknown error occurred whilst adding the user
         """
-        # A password is needed to create NC user, but it will not be used by KC login process. 
+        # A password is needed to create NC user, but it will not be used by KC login process.
         password = generate_password()
 
         response = await self.post_json_get_json(
@@ -87,7 +122,9 @@ class NextcloudClient(SimpleHttpClient):
         meta = response["ocs"]["meta"]
 
         if meta["statuscode"] == 102:
-            logger.info("User {} already exists on Nextcloud server.".format(keycloak_user_id))
+            logger.info(
+                "User {} already exists on Nextcloud server.".format(keycloak_user_id)
+            )
         else:
             self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_CREATE_GROUP)
 
@@ -131,9 +168,7 @@ class NextcloudClient(SimpleHttpClient):
         """
 
         response = await self.delete_get_json(
-            uri="{}/ocs/v1.php/cloud/groups/{}".format(
-                self.nextcloud_url, group_name
-            ),
+            uri="{}/ocs/v1.php/cloud/groups/{}".format(self.nextcloud_url, group_name),
             headers=self._headers,
         )
 
@@ -218,9 +253,7 @@ class NextcloudClient(SimpleHttpClient):
         """
 
         response = await self.get_json(
-            uri="{}/ocs/v1.php/cloud/users/{}".format(
-                self.nextcloud_url, username
-            ),
+            uri="{}/ocs/v1.php/cloud/users/{}".format(self.nextcloud_url, username),
             headers=self._headers,
         )
 
@@ -280,7 +313,7 @@ class NextcloudClient(SimpleHttpClient):
             },
         )
 
-        validate(response, STANDARD_SCHEMA)
+        validate(response, SHARE_SCHEMA)
 
         self._raise_for_status(response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_SHARE)
 
