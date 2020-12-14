@@ -105,6 +105,10 @@ class Mailer:
         self.storage = hs.get_storage()
         self.app_name = app_name
         self.email_subjects = hs.config.email_subjects  # type: EmailSubjectConfig
+        # watcha+
+        self.account_handler = self.hs.get_account_validity_handler()
+        self.profile_handler = self.hs.get_profile_handler()
+        # +watcha
 
         logger.info("Created Mailer for app_name %s" % app_name)
 
@@ -163,6 +167,50 @@ class Mailer:
             % {"server_name": self.hs.config.server_name},
             template_vars,
         )
+
+    # watcha+
+    async def send_watcha_registration_email(
+        self,
+        email_address,
+        host_id,
+        password,
+    ):
+        """Send an email with temporary password and connexion link to Watcha.
+
+        Args:
+            email_address (str): Email address we're sending the invitation
+            host_id (str): the user id of the user who invite the partner
+            password (str): a temporay password
+        """
+        subject = self.email_subjects.watcha_registration % {
+            "app": self.app_name
+        }
+
+        if host_id == self.hs.config.service_account_name:
+            host_name = self.config.email_notif_from
+        else:
+            host_display_name = await self.profile_handler.get_displayname(
+                UserID.from_string(host_id)
+            )
+            host_email = await self.account_handler.get_email_address_for_user(host_id)
+            host_name = "{} ({})".format(host_display_name, host_email)
+
+        template_vars = {
+            "title": subject,
+            "host_name": host_name,
+            "login_url": self.hs.config.email_riot_base_url,
+            "email": email_address,
+            "password": password,
+            "server": self.hs.config.server_name,
+        }
+
+        await self.send_email(
+            email_address,
+            subject,
+            template_vars,
+        )
+
+    # +watcha
 
     async def send_add_threepid_mail(self, email_address, token, client_secret, sid):
         """Send an email with a validation link to a user for adding a 3pid to their account
