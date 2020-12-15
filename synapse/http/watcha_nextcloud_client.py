@@ -17,9 +17,9 @@ META_SCHEMA = {
     "required": ["statuscode", "status"],
 }
 
-STANDARD_SCHEMA = {
+WITHOUT_DATA_SCHEMA = {
     "$schema": "http://json-schema.org/draft-04/schema#",
-    "description": "Standard schema of Owncloud API",
+    "description": "Owncloud API schema which data is not expected",
     "definitions": {
         "meta": META_SCHEMA,
     },
@@ -33,15 +33,15 @@ STANDARD_SCHEMA = {
                     "type": "array",
                 },
             },
-            "required": ["meta", "data"],
+            "required": ["meta"],
         },
     },
     "required": ["ocs"],
 }
 
-SHARE_SCHEMA = {
+WITH_DATA_SCHEMA = {
     "$schema": "http://json-schema.org/draft-04/schema#",
-    "description": "Share schema of Owncloud Share API",
+    "description": "Owncloud API schema which data is expected",
     "definitions": {"meta": META_SCHEMA},
     "type": "object",
     "properties": {
@@ -147,7 +147,7 @@ class NextcloudClient(SimpleHttpClient):
             headers=self._headers,
         )
 
-        validate(response, STANDARD_SCHEMA)
+        validate(response, WITHOUT_DATA_SCHEMA)
         meta = response["ocs"]["meta"]
 
         if meta["statuscode"] == 102:
@@ -172,7 +172,7 @@ class NextcloudClient(SimpleHttpClient):
             headers=self._headers,
         )
 
-        validate(response, STANDARD_SCHEMA)
+        validate(response, WITHOUT_DATA_SCHEMA)
 
         self._raise_for_status(
             response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_DELETE_GROUP
@@ -202,7 +202,7 @@ class NextcloudClient(SimpleHttpClient):
             headers=self._headers,
         )
 
-        validate(response, STANDARD_SCHEMA)
+        validate(response, WITHOUT_DATA_SCHEMA)
 
         self._raise_for_status(
             response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_ADD_USER_TO_GROUP
@@ -232,7 +232,7 @@ class NextcloudClient(SimpleHttpClient):
             json_body={"groupid": group_name},
         )
 
-        validate(response, STANDARD_SCHEMA)
+        validate(response, WITHOUT_DATA_SCHEMA)
 
         self._raise_for_status(
             response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_REMOVE_USER_FROM_GROUP
@@ -257,7 +257,7 @@ class NextcloudClient(SimpleHttpClient):
             headers=self._headers,
         )
 
-        validate(response, STANDARD_SCHEMA)
+        validate(response, WITH_DATA_SCHEMA)
 
         self._raise_for_status(
             response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_GET_USER
@@ -313,7 +313,7 @@ class NextcloudClient(SimpleHttpClient):
             },
         )
 
-        validate(response, SHARE_SCHEMA)
+        validate(response, WITH_DATA_SCHEMA)
 
         self._raise_for_status(response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_SHARE)
 
@@ -339,6 +339,6 @@ class NextcloudClient(SimpleHttpClient):
             json_body={"requester": requester},
         )
 
-        validate(response, STANDARD_SCHEMA)
+        validate(response, WITHOUT_DATA_SCHEMA)
 
         self._raise_for_status(response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_UNSHARE)
