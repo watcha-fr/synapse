@@ -8,6 +8,7 @@ from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.push.mailer import Mailer
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import UserID, create_requester, map_username_to_mxid_localpart
+from synapse.util.threepids import canonicalise_email
 
 logger = logging.getLogger(__name__)
 
@@ -300,17 +301,20 @@ class WatchaRegisterRestServlet(RestServlet):
 
         email = params["email"].strip()
         if not email:
-            # the admin seems to have a bug and send empty email adresses sometimes.
-            # (never bad to be resilient in any case)
             raise SynapseError(
-                500,
+                400,
                 "Email address cannot be empty",
             )
 
-        full_user_id = await self.auth_handler.find_user_id_by_email(email)
-        if full_user_id:
+        try:
+            email = canonicalise_email(email)
+        except ValueError as e:
+            raise SynapseError(400, str(e))
+
+        user_id = await self.auth_handler.find_user_id_by_email(email)
+        if user_id:
             raise SynapseError(
-                500,
+                400,
                 "A user with this email address already exists. Cannot create a new one.",
             )
 
@@ -339,7 +343,7 @@ class WatchaRegisterRestServlet(RestServlet):
 
         user = UserID.from_string(user_id)
         await self.profile_handler.set_displayname(
-            user, create_requester(user_id), params["full_name"], by_admin=True
+            user, requester, params["displayname"], by_admin=True
         )
 
         display_name = await self.profile_handler.get_displayname(user)
