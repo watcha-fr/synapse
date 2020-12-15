@@ -2,7 +2,6 @@
 
 import time, json, calendar, logging
 from datetime import datetime
-import psutil
 from collections import defaultdict
 import inspect
 
@@ -236,7 +235,7 @@ class AdministrationStore(SQLBaseStore):
         """
 
         result = {
-            "disk": psutil.disk_usage("/")._asdict(),
+            "disk": "",
             "watcha_release": "",
             "upgrade_date": "",
             "install_date": "",
