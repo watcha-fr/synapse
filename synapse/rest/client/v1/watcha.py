@@ -3,7 +3,7 @@ from jsonschema.exceptions import ValidationError, SchemaError
 from urllib.parse import urlparse
 
 from secrets import token_hex
-from synapse.api.errors import AuthError, SynapseError
+from synapse.api.errors import AuthError, HttpResponseException, SynapseError
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.watcha_keycloak_client import KeycloakClient
@@ -325,21 +325,23 @@ class WatchaRegisterRestServlet(RestServlet):
 
         await self.keycloak_client.add_user(email, password_hash, role)
         keycloak_user = await self.keycloak_client.get_user(email)
+        keycloak_user_id = keycloak_user["id"]
 
         try:
-            await self.nextcloud_client.add_user(keycloak_user["id"])
-        except (SynapseError, ValidationError, SchemaError):
-            # TODO : remove Keycloak user
+            await self.nextcloud_client.add_user(keycloak_user_id)
+        except (SynapseError, HttpResponseException, ValidationError, SchemaError):
+            await self.keycloak_client.delete_user(keycloak_user_id)
             raise
 
         try:
             user_id = await self.registration_handler.register_user(
-                localpart=keycloak_user["id"],
+                localpart=keycloak_user_id,
                 admin=admin,
                 bind_emails=[email],
             )
         except SynapseError:
-            # TODO : remove Keycloak and Nextcloud user
+            await self.keycloak_client.delete_user(keycloak_user_id)
+            await self.nextcloud_client.delete_user(keycloak_user_id)
             raise
 
         requester = await self.auth.get_user_by_req(request)

@@ -29,9 +29,6 @@ WITHOUT_DATA_SCHEMA = {
             "type": "object",
             "properties": {
                 "meta": {"$ref": "#/definitions/meta"},
-                "data": {
-                    "type": "array",
-                },
             },
             "required": ["meta"],
         },
@@ -98,11 +95,11 @@ class NextcloudClient(SimpleHttpClient):
                 errcode,
             )
 
-    async def add_user(self, keycloak_user_id):
-        """Create a new user on the Nextcloud server.
+    async def add_user(self, user_id):
+        """Create a new user.
 
         Args:
-            keycloak_user_id: keycloak id of the user. Use as a Nextcloud username.
+            user_id: The id of the user to create.
 
         Status codes:
             100 - successful
@@ -112,10 +109,9 @@ class NextcloudClient(SimpleHttpClient):
         """
         # A password is needed to create NC user, but it will not be used by KC login process. 
         password = token_hex()
-
         response = await self.post_json_get_json(
             uri="{}/ocs/v1.php/cloud/users".format(self.nextcloud_url),
-            post_json={"userid": keycloak_user_id, "password": password},
+            post_json={"userid": user_id, "password": password},
             headers=self._headers,
         )
 
@@ -124,10 +120,32 @@ class NextcloudClient(SimpleHttpClient):
 
         if meta["statuscode"] == 102:
             logger.info(
-                "User {} already exists on Nextcloud server.".format(keycloak_user_id)
+                "User {} already exists on Nextcloud server.".format(user_id)
             )
         else:
             self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_CREATE_USER)
+
+    async def delete_user(self, user_id):
+        """Delete an existing user.
+
+        Args:
+            user_id: The id of the user to delete.
+
+        Status codes:
+            100 - successful
+            101 - failure
+        """
+
+        response = await self.delete_get_json(
+            uri="{}/ocs/v1.php/cloud/users/{}".format(self.nextcloud_url, user_id),
+            headers=self._headers,
+        )
+
+        validate(response, WITHOUT_DATA_SCHEMA)
+
+        self._raise_for_status(
+            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_DELETE_USER
+        )
 
     async def add_group(self, group_name):
         """Adds a new Nextcloud group.

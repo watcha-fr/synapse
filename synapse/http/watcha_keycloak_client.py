@@ -16,7 +16,7 @@ TOKEN_SCHEMA = {
             "type": "string",
         },
     },
-    "required": ["access_token"]
+    "required": ["access_token"],
 }
 
 USER_SCHEMA = {
@@ -31,7 +31,7 @@ USER_SCHEMA = {
             "type": "string",
         },
     },
-    "required": ["id", "username"]
+    "required": ["id", "username"],
 }
 
 
@@ -47,7 +47,7 @@ class KeycloakClient(SimpleHttpClient):
         self.service_account_password = hs.config.keycloak_service_account_password
 
     async def add_user(self, email, password_hash, synapse_role=None):
-        """Create a new user Username
+        """Create a new user
 
         Args:
             email: email of the user
@@ -81,9 +81,27 @@ class KeycloakClient(SimpleHttpClient):
             )
         except HttpResponseException as e:
             if e.code == 409:
-                logger.info("User with email {} already exists on Keycloak server.".format(email))
+                logger.info(
+                    "User with email {} already exists on Keycloak server.".format(
+                        email
+                    )
+                )
             else:
                 raise
+
+    async def delete_user(self, user_id):
+        """Delete an existing user
+
+        Args:
+            user_id: the Keycloak user id
+        """
+
+        response = await self.delete(
+            self._get_endpoint(
+                "admin/realms/{}/users/{}".format(self.realm_name, user_id)
+            ),
+            headers=await self._get_header(),
+        )
 
     async def get_user(self, localpart) -> dict:
         """Get a specific Keycloak user.
@@ -141,7 +159,7 @@ class KeycloakClient(SimpleHttpClient):
                 "password": self.service_account_password,
             },
         )
-        
+
         validate(response, TOKEN_SCHEMA)
 
         return response["access_token"]
