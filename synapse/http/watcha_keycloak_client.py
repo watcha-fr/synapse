@@ -46,11 +46,10 @@ class KeycloakClient(SimpleHttpClient):
         self.service_account_name = hs.config.service_account_name
         self.service_account_password = hs.config.keycloak_service_account_password
 
-    async def add_user(self, localpart, email, password_hash, synapse_role=None):
+    async def add_user(self, email, password_hash, synapse_role=None):
         """Create a new user Username
 
         Args:
-            username: username of the user. Correspond to synapse localpart.
             email: email of the user
             password_hash: the synapse password hash
             synapse_role: the synapse role, it can be administrator, collaborator or partner.
@@ -58,7 +57,7 @@ class KeycloakClient(SimpleHttpClient):
 
         user = {
             "enabled": True,
-            "username": localpart,
+            "username": email,
             "email": email,
             "credentials": [
                 {
@@ -82,7 +81,7 @@ class KeycloakClient(SimpleHttpClient):
             )
         except HttpResponseException as e:
             if e.code == 409:
-                logger.info("User {} already exists on Keycloak server.".format(localpart))
+                logger.info("User with email {} already exists on Keycloak server.".format(email))
             else:
                 raise
 
