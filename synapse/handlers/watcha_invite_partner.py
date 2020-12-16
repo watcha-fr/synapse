@@ -4,7 +4,7 @@ from ._base import BaseHandler
 from jsonschema.exceptions import ValidationError, SchemaError
 from secrets import token_hex
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import SynapseError, HttpResponseException
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.watcha_keycloak_client import KeycloakClient
 from synapse.http.watcha_nextcloud_client import NextcloudClient
@@ -56,21 +56,23 @@ class InvitePartnerHandler(BaseHandler):
 
             await self.keycloak_client.add_user(invitee_email, password_hash, "partner")
             keycloak_user = await self.keycloak_client.get_user(invitee_email)
+            keycloak_user_id = keycloak_user["id"]
 
             try:
-                await self.nextcloud_client.add_user(keycloak_user["id"])
-            except (SynapseError, ValidationError, SchemaError):
-                # TODO : remove Keycloak user
+                await self.nextcloud_client.add_user(keycloak_user_id)
+            except (SynapseError, HttpResponseException, ValidationError, SchemaError):
+                await self.keycloak_client.delete_user(keycloak_user_id)
                 raise
 
             try:
                 user_id = await self.registration_handler.register_user(
-                    localpart=keycloak_user["id"],
+                    localpart=keycloak_user_id,
                     bind_emails=[invitee_email],
                     make_partner=True,
                 )
             except SynapseError:
-                # TODO : remove Keycloak and Nextcloud user
+                await self.keycloak_client.delete_user(keycloak_user_id)
+                await self.nextcloud_client.delete_user(keycloak_user_id)
                 raise
 
             await self.mailer.send_watcha_registration_email(
