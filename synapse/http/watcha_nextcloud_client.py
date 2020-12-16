@@ -102,7 +102,7 @@ class NextcloudClient(SimpleHttpClient):
         """Create a new user on the Nextcloud server.
 
         Args:
-            user_id: the required username for the new user.
+            keycloak_user_id: keycloak id of the user. Use as a Nextcloud username.
 
         Status codes:
             100 - successful
@@ -119,6 +119,7 @@ class NextcloudClient(SimpleHttpClient):
             headers=self._headers,
         )
 
+        validate(response, WITH_DATA_SCHEMA)
         meta = response["ocs"]["meta"]
 
         if meta["statuscode"] == 102:
@@ -126,7 +127,7 @@ class NextcloudClient(SimpleHttpClient):
                 "User {} already exists on Nextcloud server.".format(keycloak_user_id)
             )
         else:
-            self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_CREATE_GROUP)
+            self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_CREATE_USER)
 
     async def add_group(self, group_name):
         """Adds a new Nextcloud group.
