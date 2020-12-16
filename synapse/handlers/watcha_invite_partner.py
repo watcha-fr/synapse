@@ -1,12 +1,14 @@
 import logging
 
 from ._base import BaseHandler
+from jsonschema.exceptions import ValidationError, SchemaError
 from secrets import token_hex
 
 from synapse.api.errors import SynapseError
 from synapse.config.emailconfig import ThreepidBehaviour
+from synapse.http.watcha_keycloak_client import KeycloakClient
+from synapse.http.watcha_nextcloud_client import NextcloudClient
 from synapse.push.mailer import Mailer
-from synapse.types import map_username_to_mxid_localpart
 from synapse.util.threepids import canonicalise_email
 
 logger = logging.getLogger(__name__)
@@ -16,14 +18,15 @@ class InvitePartnerHandler(BaseHandler):
     def __init__(self, hs):
         super().__init__(hs)
         self.config = hs.config
-        self.auth_handler = self.hs.get_auth_handler()
-        self.nextcloud_handler = self.hs.get_nextcloud_handler()
+        self.auth_handler = hs.get_auth_handler()
         self.registration_handler = self.hs.get_registration_handler()
-        self.room_handler = self.hs.get_room_member_handler()
+        self.store = hs.get_datastore()
+        self.keycloak_client = KeycloakClient(hs)
+        self.nextcloud_client = NextcloudClient(hs)
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self.mailer = Mailer(
-                hs=self.hs,
+                hs=hs,
                 app_name=self.config.email_app_name,
                 template_html=self.config.watcha_registration_template_html,
                 template_text=self.config.watcha_registration_template_text,
@@ -48,19 +51,27 @@ class InvitePartnerHandler(BaseHandler):
             except ValueError as e:
                 raise SynapseError(400, str(e))
 
-            localpart = map_username_to_mxid_localpart(invitee_email)
             password = token_hex(6)
             password_hash = await self.auth_handler.hash(password)
 
-            await self.nextcloud_handler.create_keycloak_and_nextcloud_user(
-                invitee_email, password_hash, "partner"
-            )
+            await self.keycloak_client.add_user(invitee_email, password_hash, "partner")
+            keycloak_user = await self.keycloak_client.get_user(invitee_email)
 
-            user_id = await self.registration_handler.register_user(
-                localpart=localpart,
-                bind_emails=[invitee_email],
-                make_partner=True,
-            )
+            try:
+                await self.nextcloud_client.add_user(keycloak_user["id"])
+            except (SynapseError, ValidationError, SchemaError):
+                # TODO : remove Keycloak user
+                raise
+
+            try:
+                user_id = await self.registration_handler.register_user(
+                    localpart=keycloak_user["id"],
+                    bind_emails=[invitee_email],
+                    make_partner=True,
+                )
+            except SynapseError:
+                # TODO : remove Keycloak and Nextcloud user
+                raise
 
             await self.mailer.send_watcha_registration_email(
                 email_address=invitee_email,

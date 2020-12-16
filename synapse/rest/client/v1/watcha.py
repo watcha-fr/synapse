@@ -1,13 +1,15 @@
 import logging
+from jsonschema.exceptions import ValidationError, SchemaError
 from urllib.parse import urlparse
 
 from secrets import token_hex
 from synapse.api.errors import AuthError, SynapseError
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.http.watcha_keycloak_client import KeycloakClient
+from synapse.http.watcha_nextcloud_client import NextcloudClient
 from synapse.push.mailer import Mailer
 from synapse.rest.client.v2_alpha._base import client_patterns
-from synapse.types import UserID, create_requester, map_username_to_mxid_localpart
 from synapse.util.threepids import canonicalise_email
 
 logger = logging.getLogger(__name__)
@@ -267,10 +269,6 @@ class WatchaUserIp(RestServlet):
 
 
 class WatchaRegisterRestServlet(RestServlet):
-    """
-    Registration of users.
-    Requester must either be logged in as an admin, or supply a valid HMAC (generated from the registration_shared_secret)
-    """
 
     PATTERNS = client_patterns("/watcha_register", v1=True)
 
@@ -279,9 +277,9 @@ class WatchaRegisterRestServlet(RestServlet):
         self.config = hs.config
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
-        self.nextcloud_handler = hs.get_nextcloud_handler()
-        self.profile_handler = hs.get_profile_handler()
         self.registration_handler = hs.get_registration_handler()
+        self.keycloak_client = KeycloakClient(hs)
+        self.nextcloud_client = NextcloudClient(hs)
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self.mailer = Mailer(
@@ -297,7 +295,6 @@ class WatchaRegisterRestServlet(RestServlet):
             request,
         )
         params = parse_json_object_from_request(request)
-        logger.info("Adding Watcha user...")
 
         email = params["email"].strip()
         if not email:
@@ -311,56 +308,49 @@ class WatchaRegisterRestServlet(RestServlet):
         except ValueError as e:
             raise SynapseError(400, str(e))
 
-        user_id = await self.auth_handler.find_user_id_by_email(email)
-        if user_id:
+        if await self.auth_handler.find_user_id_by_email(email):
             raise SynapseError(
                 400,
                 "A user with this email address already exists. Cannot create a new one.",
             )
 
-        requester = await self.auth.get_user_by_req(request)
-
-        send_email = False
-
         if hasattr(params, "password"):
             password = params["password"]
         else:
             password = token_hex(6)
-            send_email = True
 
         password_hash = await self.auth_handler.hash(password)
         admin = params["admin"]
+        role = "administrator" if admin else None
 
-        role = "admin" if admin else None
-        await self.nextcloud_handler.create_keycloak_and_nextcloud_user(email, password_hash, role)
+        await self.keycloak_client.add_user(email, password_hash, role)
+        keycloak_user = await self.keycloak_client.get_user(email)
 
-        user_id = await self.registration_handler.register_user(
-            localpart=map_username_to_mxid_localpart(email),
-            password_hash=None,
-            admin=admin,
-            bind_emails=[email],
+        try:
+            await self.nextcloud_client.add_user(keycloak_user["id"])
+        except (SynapseError, ValidationError, SchemaError):
+            # TODO : remove Keycloak user
+            raise
+
+        try:
+            user_id = await self.registration_handler.register_user(
+                localpart=keycloak_user["id"],
+                admin=admin,
+                bind_emails=[email],
+            )
+        except SynapseError:
+            # TODO : remove Keycloak and Nextcloud user
+            raise
+
+        requester = await self.auth.get_user_by_req(request)
+
+        await self.mailer.send_watcha_registration_email(
+            email_address=email,
+            host_id=requester.user.to_string(),
+            password=password,
         )
 
-        user = UserID.from_string(user_id)
-        await self.profile_handler.set_displayname(
-            user, requester, params["displayname"], by_admin=True
-        )
-
-        display_name = await self.profile_handler.get_displayname(user)
-
-        if send_email:
-            await self.mailer.send_watcha_registration_email(
-                email_address=email,
-                host_id=requester.user.to_string(),
-                password=password,
-            )
-        else:
-            logger.info(
-                "Not sending email for user password for user %s, password is defined by sender",
-                user_id,
-            )
-
-        return 200, {"display_name": display_name, "user_id": user_id}
+        return 200, {}
 
 
 def register_servlets(hs, http_server):

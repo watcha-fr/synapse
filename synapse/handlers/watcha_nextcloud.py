@@ -27,25 +27,6 @@ class NextcloudHandler(BaseHandler):
         self.keycloak_client = KeycloakClient(hs)
         self.nextcloud_client = NextcloudClient(hs)
 
-    async def create_keycloak_and_nextcloud_user(
-        self, email, password_hash, synapse_role=None
-    ):
-        """Create a user on Keycloak and Nextcloud server if it doesn't exist
-
-        Args :
-            email: email of the user
-            password_hash: the synapse password hash
-            synapse_role: the synapse role, it can be administrator, collaborator or partner.
-        """
-
-        await self.keycloak_client.add_user(
-            email, email, password_hash, synapse_role
-        )
-
-        keycloak_user_representation = await self.keycloak_client.get_user(email)
-
-        await self.nextcloud_client.add_user(keycloak_user_representation["id"])
-
     async def unbind(self, room_id):
         """Unbind a Nextcloud folder from a room.
 
