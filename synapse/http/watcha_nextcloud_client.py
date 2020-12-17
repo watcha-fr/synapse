@@ -107,7 +107,7 @@ class NextcloudClient(SimpleHttpClient):
             102 - username already exists
             103 - unknown error occurred whilst adding the user
         """
-        # A password is needed to create NC user, but it will not be used by KC login process. 
+        # A password is needed to create NC user, but it will not be used by KC login process.
         password = token_hex()
         response = await self.post_json_get_json(
             uri="{}/ocs/v1.php/cloud/users".format(self.nextcloud_url),
@@ -119,9 +119,7 @@ class NextcloudClient(SimpleHttpClient):
         meta = response["ocs"]["meta"]
 
         if meta["statuscode"] == 102:
-            logger.info(
-                "User {} already exists on Nextcloud server.".format(user_id)
-            )
+            logger.info("User {} already exists on Nextcloud server.".format(user_id))
         else:
             self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_CREATE_USER)
 
@@ -222,10 +220,14 @@ class NextcloudClient(SimpleHttpClient):
         )
 
         validate(response, WITHOUT_DATA_SCHEMA)
+        meta = response["ocs"]["meta"]
 
-        self._raise_for_status(
-            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_ADD_USER_TO_GROUP
-        )
+        if meta["statuscode"] == 103:
+            errcode = Codes.NEXTCLOUD_USER_DOES_NOT_EXIST
+        else:
+            errcode = Codes.NEXTCLOUD_CAN_NOT_ADD_USER_TO_GROUP
+
+        self._raise_for_status(meta, errcode)
 
     async def remove_user_from_group(self, username, group_name):
         """Removes the specified user from the specified group.
@@ -252,37 +254,14 @@ class NextcloudClient(SimpleHttpClient):
         )
 
         validate(response, WITHOUT_DATA_SCHEMA)
+        meta = response["ocs"]["meta"]
 
-        self._raise_for_status(
-            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_REMOVE_USER_FROM_GROUP
-        )
+        if meta["statuscode"] == 103:
+            errcode = Codes.NEXTCLOUD_USER_DOES_NOT_EXIST
+        else:
+            errcode = Codes.NEXTCLOUD_CAN_NOT_REMOVE_USER_FROM_GROUP
 
-    async def get_user(self, username):
-        """Get informations of user with username given on parameter
-
-        Args:
-            username: the username of the user to add to the group.
-
-        Status codes:
-            100: successful
-            404: user does not exist
-
-        Returns:
-            informations on the user
-        """
-
-        response = await self.get_json(
-            uri="{}/ocs/v1.php/cloud/users/{}".format(self.nextcloud_url, username),
-            headers=self._headers,
-        )
-
-        validate(response, WITH_DATA_SCHEMA)
-
-        self._raise_for_status(
-            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_GET_USER
-        )
-
-        return response["ocs"]["data"]
+        self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_REMOVE_USER_FROM_GROUP)
 
     async def share(self, requester, path, group_name):
         """Share an existing file or folder with all permissions for a group.
