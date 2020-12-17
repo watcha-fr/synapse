@@ -26,6 +26,18 @@ class NextcloudHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.keycloak_client = KeycloakClient(hs)
         self.nextcloud_client = NextcloudClient(hs)
+        self.unidentical_identifiers = hs.config.unidentical_identifiers
+
+    async def get_nextcloud_username(self, localpart):
+        """Get Nextcloud username"""
+        nextcloud_username = localpart
+
+        if self.unidentical_identifiers:
+            for identifier in self.unidentical_identifiers:
+                if identifier["localpart"] == localpart:
+                    nextcloud_username = identifier["nextcloud_username"]
+
+        return nextcloud_username
 
     async def unbind(self, room_id):
         """Unbind a Nextcloud folder from a room.
@@ -47,7 +59,9 @@ class NextcloudHandler(BaseHandler):
            path: the path of the Nextcloud folder to bind.
         """
         group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
-        localpart = get_localpart_from_id(user_id)
+        nextcloud_username = await self.get_nextcloud_username(
+            get_localpart_from_id(user_id)
+        )
 
         await self.nextcloud_client.add_group(group_name)
 
@@ -56,9 +70,11 @@ class NextcloudHandler(BaseHandler):
         old_share_id = await self.store.get_nextcloud_share_id_from_room_id(room_id)
 
         if old_share_id:
-            await self.nextcloud_client.unshare(localpart, old_share_id)
+            await self.nextcloud_client.unshare(nextcloud_username, old_share_id)
 
-        new_share_id = await self.nextcloud_client.share(localpart, path, group_name)
+        new_share_id = await self.nextcloud_client.share(
+            nextcloud_username, path, group_name
+        )
 
         await self.store.bind(room_id, path, new_share_id)
 
@@ -73,61 +89,48 @@ class NextcloudHandler(BaseHandler):
         localparts = [get_localpart_from_id(user_id) for user_id in user_ids]
 
         for localpart in localparts:
+            nextcloud_username = await self.get_nextcloud_username(localpart)
+
             try:
-                await self.nextcloud_client.add_user_to_group(localpart, group_name)
+                await self.nextcloud_client.add_user_to_group(
+                    nextcloud_username, group_name
+                )
             except (SynapseError, ValidationError, SchemaError) as error:
-                if (
-                    hasattr(error, errcode)
-                    and error.errcode == NEXTCLOUD_USER_DOES_NOT_EXIST
-                ):
-                    # TODO: get nextcloudID from Keycloak
-                    pass
-                else:
-                    logger.warn(
-                        "Unable to add the user {} to the Nextcloud group {}.".format(
-                            localpart, group_name
-                        )
+                logger.warn(
+                    "Unable to add the user {} to the Nextcloud group {}.".format(
+                        localpart, group_name
                     )
+                )
 
     async def update_share(self, user_id, room_id, membership):
 
         group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
-        localpart = get_localpart_from_id(user_id)
+        nextcloud_username = await self.get_nextcloud_username(
+            get_localpart_from_id(user_id)
+        )
 
         if membership in ("invite", "join"):
             try:
-                await self.nextcloud_client.add_user_to_group(localpart, group_name)
+                await self.nextcloud_client.add_user_to_group(
+                    nextcloud_username, group_name
+                )
             except (SynapseError, ValidationError, SchemaError):
-                if (
-                    hasattr(error, errcode)
-                    and error.errcode == NEXTCLOUD_USER_DOES_NOT_EXIST
-                ):
-                    # TODO: get nextcloudID from Keycloak
-                    pass
-                else:
-                    logger.warn(
-                        "Unable to add the user {} to the Nextcloud group {}.".format(
-                            user_id, group_name
-                        ),
-                    )
+                logger.warn(
+                    "Unable to add the user {} to the Nextcloud group {}.".format(
+                        user_id, group_name
+                    ),
+                )
         else:
             try:
                 await self.nextcloud_client.remove_user_from_group(
-                    localpart, group_name
+                    nextcloud_username, group_name
                 )
             except (SynapseError, ValidationError, SchemaError):
-                if (
-                    hasattr(error, errcode)
-                    and error.errcode == NEXTCLOUD_USER_DOES_NOT_EXIST
-                ):
-                    # TODO: get nextcloudID from Keycloak
-                    pass
-                else:
-                    logger.warn(
-                        "Unable to remove the user {} from the Nextcloud group {}.".format(
-                            user_id, group_name
-                        ),
-                    )
+                logger.warn(
+                    "Unable to remove the user {} from the Nextcloud group {}.".format(
+                        user_id, group_name
+                    ),
+                )
 
     async def get_rooms_to_send_notification(
         self, directory, limit_of_notification_propagation

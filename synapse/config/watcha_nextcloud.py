@@ -20,6 +20,7 @@ class NextcloudConfig(Config):
         self.service_account_name = None
         self.keycloak_service_account_password = None
         self.nextcloud_service_account_password = None
+        self.unidentical_identifiers = None
 
     def read_config(self, config, **kwargs):
         self.nextcloud_enabled = False
@@ -60,6 +61,8 @@ class NextcloudConfig(Config):
             "nextcloud_service_account_password"
         ]
 
+        self.unidentical_identifiers = nextcloud_config.get("unidentical_identifiers")
+
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
         # Configuration for the Nextcloud integration
@@ -77,4 +80,6 @@ class NextcloudConfig(Config):
           #keycloak_service_account_password: "examplepassword"
 
           #nextcloud_service_account_password: "examplepassword"
+
+          #unidentical_identifiers: [{"localpart": "", "nextcloud_username": ""}]
         """
