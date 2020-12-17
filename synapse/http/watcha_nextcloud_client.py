@@ -95,11 +95,11 @@ class NextcloudClient(SimpleHttpClient):
                 errcode,
             )
 
-    async def add_user(self, user_id):
+    async def add_user(self, username):
         """Create a new user.
 
         Args:
-            user_id: The id of the user to create.
+            username: the username of the user to create.
 
         Status codes:
             100 - successful
@@ -109,9 +109,10 @@ class NextcloudClient(SimpleHttpClient):
         """
         # A password is needed to create NC user, but it will not be used by KC login process.
         password = token_hex()
+
         response = await self.post_json_get_json(
             uri="{}/ocs/v1.php/cloud/users".format(self.nextcloud_url),
-            post_json={"userid": user_id, "password": password},
+            post_json={"userid": username, "password": password},
             headers=self._headers,
         )
 
@@ -123,11 +124,11 @@ class NextcloudClient(SimpleHttpClient):
         else:
             self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_CREATE_USER)
 
-    async def delete_user(self, user_id):
+    async def delete_user(self, username):
         """Delete an existing user.
 
         Args:
-            user_id: The id of the user to delete.
+            username: The username of the user to delete.
 
         Status codes:
             100 - successful
@@ -135,7 +136,7 @@ class NextcloudClient(SimpleHttpClient):
         """
 
         response = await self.delete_get_json(
-            uri="{}/ocs/v1.php/cloud/users/{}".format(self.nextcloud_url, user_id),
+            uri="{}/ocs/v1.php/cloud/users/{}".format(self.nextcloud_url, username),
             headers=self._headers,
         )
 
