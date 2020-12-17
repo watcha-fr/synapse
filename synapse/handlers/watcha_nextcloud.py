@@ -5,8 +5,6 @@ from pathlib import Path
 from ._base import BaseHandler
 from synapse.api.constants import EventTypes
 from synapse.api.errors import Codes, SynapseError
-from synapse.http.watcha_keycloak_client import KeycloakClient
-from synapse.http.watcha_nextcloud_client import NextcloudClient
 from synapse.types import (
     create_requester,
     get_localpart_from_id,
@@ -24,8 +22,8 @@ class NextcloudHandler(BaseHandler):
     def __init__(self, hs):
         self.store = hs.get_datastore()
         self.event_creation_handler = hs.get_event_creation_handler()
-        self.keycloak_client = KeycloakClient(hs)
-        self.nextcloud_client = NextcloudClient(hs)
+        self.keycloak_client = hs.get_keycloak_client()
+        self.nextcloud_client = hs.get_nextcloud_client()
         self.unidentical_identifiers = hs.config.unidentical_identifiers
 
     async def get_nextcloud_username(self, localpart):

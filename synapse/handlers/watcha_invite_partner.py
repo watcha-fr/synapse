@@ -6,8 +6,6 @@ from secrets import token_hex
 
 from synapse.api.errors import SynapseError, HttpResponseException
 from synapse.config.emailconfig import ThreepidBehaviour
-from synapse.http.watcha_keycloak_client import KeycloakClient
-from synapse.http.watcha_nextcloud_client import NextcloudClient
 from synapse.push.mailer import Mailer
 from synapse.util.threepids import canonicalise_email
 
@@ -21,8 +19,8 @@ class InvitePartnerHandler(BaseHandler):
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = self.hs.get_registration_handler()
         self.store = hs.get_datastore()
-        self.keycloak_client = KeycloakClient(hs)
-        self.nextcloud_client = NextcloudClient(hs)
+        self.keycloak_client = hs.get_keycloak_client()
+        self.nextcloud_client = hs.get_nextcloud_client()
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self.mailer = Mailer(

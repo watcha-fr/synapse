@@ -6,8 +6,6 @@ from secrets import token_hex
 from synapse.api.errors import AuthError, HttpResponseException, SynapseError
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
-from synapse.http.watcha_keycloak_client import KeycloakClient
-from synapse.http.watcha_nextcloud_client import NextcloudClient
 from synapse.push.mailer import Mailer
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.util.threepids import canonicalise_email
@@ -278,8 +276,8 @@ class WatchaRegisterRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
-        self.keycloak_client = KeycloakClient(hs)
-        self.nextcloud_client = NextcloudClient(hs)
+        self.keycloak_client = hs.get_keycloak_client()
+        self.nextcloud_client = hs.get_nextcloud_client()
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self.mailer = Mailer(
