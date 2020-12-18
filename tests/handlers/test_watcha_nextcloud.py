@@ -1,8 +1,6 @@
 from mock import Mock
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.http.watcha_keycloak_client import KeycloakClient
-from synapse.http.watcha_nextcloud_client import NextcloudClient
 from synapse.rest.client.v1 import login, room
 from synapse.rest import admin
 from synapse.types import get_localpart_from_id
@@ -48,21 +46,9 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         )
         self.helper.join(self.room_id, self.inviter, tok=inviter_tok)
 
-        # Mock Keycloak client functions :
-        self.keycloak_client.get_user = simple_async_mock(
-            return_value={"id": "1234", "username": "creator"},
-        )
-        self.keycloak_client.get_users = simple_async_mock(
-            return_value=[
-                {"id": "1234", "username": "creator"},
-                {"id": "56789", "username": "inviter"},
-            ]
-        )
-
         # Mock Nextcloud client functions :
         self.nextcloud_client.add_group = simple_async_mock()
         self.nextcloud_client.delete_group = simple_async_mock()
-        self.nextcloud_client.get_user = simple_async_mock()
         self.nextcloud_client.add_user_to_group = simple_async_mock()
         self.nextcloud_client.remove_user_from_group = simple_async_mock()
         self.nextcloud_client.unshare = simple_async_mock()
@@ -82,13 +68,10 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         )
 
         # Verify that mocked functions are called once
-        self.keycloak_client.get_user.assert_called_once()
         self.nextcloud_client.add_group.assert_called_once()
-        self.keycloak_client.get_users.assert_called_once()
         self.nextcloud_client.share.assert_called_once()
 
         # Verify that mocked functions are called twice
-        self.assertEquals(self.nextcloud_client.get_user.call_count, 2)
         self.assertEquals(self.nextcloud_client.add_user_to_group.call_count, 2)
 
         # Verify that mocked functions are not called
@@ -145,7 +128,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.assertIsNone(share_id)
 
     def test_add_user_to_nextcloud_group_without_nextcloud_account(self):
-        self.nextcloud_client.get_user = simple_async_mock(
+        self.nextcloud_client.add_user_to_group = simple_async_mock(
             raises=SynapseError(code=400, msg="")
         )
 
@@ -155,15 +138,17 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
             )
 
         self.assertIn(
-            "The user {} does not have a Nextcloud account.".format(
-                get_localpart_from_id(self.creator)
+            "Unable to add the user {} to the Nextcloud group {}".format(
+                get_localpart_from_id(self.creator),
+                NEXTCLOUD_GROUP_NAME_PREFIX + self.room_id,
             ),
             cm.output[0],
         )
 
         self.assertIn(
-            "The user {} does not have a Nextcloud account.".format(
-                get_localpart_from_id(self.inviter)
+            "Unable to add the user {} to the Nextcloud group {}".format(
+                get_localpart_from_id(self.inviter),
+                NEXTCLOUD_GROUP_NAME_PREFIX + self.room_id,
             ),
             cm.output[1],
         )
@@ -200,7 +185,6 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
             )
         )
 
-        self.keycloak_client.get_user.assert_called_once()
         self.nextcloud_client.add_user_to_group.assert_called_once()
         self.nextcloud_client.remove_user_from_group.assert_not_called()
 
@@ -211,7 +195,6 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
             )
         )
 
-        self.keycloak_client.get_user.assert_called_once()
         self.nextcloud_client.add_user_to_group.assert_called_once()
         self.nextcloud_client.remove_user_from_group.assert_not_called()
 
@@ -222,7 +205,6 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
             )
         )
 
-        self.keycloak_client.get_user.assert_called_once()
         self.nextcloud_client.remove_user_from_group.assert_called_once()
         self.nextcloud_client.add_user_to_group.assert_not_called()
 
@@ -233,7 +215,6 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
             )
         )
 
-        self.keycloak_client.get_user.assert_called_once()
         self.nextcloud_client.remove_user_from_group.assert_called_once()
         self.nextcloud_client.add_user_to_group.assert_not_called()
 

@@ -60,7 +60,6 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         self.time = self.hs.get_clock().time_msec()
 
         self.auth = hs.get_auth_handler()
-        self.nextcloud_handler = hs.get_nextcloud_handler()
 
         self.owner = self.register_user("owner", "pass", admin=True)
         self.owner_tok = self.login("owner", "pass")
@@ -69,10 +68,10 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         )
         self.room_id = self.helper.create_room_as(self.owner, tok=self.owner_tok)
 
-        self.keycloak_client = self.nextcloud_handler.keycloak_client
-        self.nextcloud_client = self.nextcloud_handler.nextcloud_client
+        self.keycloak_client = hs.get_keycloak_client()
+        self.nextcloud_client = hs.get_nextcloud_client()
         self.keycloak_client.add_user = simple_async_mock()
-        self.keycloak_client.get_user = simple_async_mock(return_value={"id": "1234"})
+        self.keycloak_client.get_user = simple_async_mock(return_value={"id": "user1"})
         self.nextcloud_client.add_user = simple_async_mock()
 
     def test_register_user(self):
@@ -80,7 +79,6 @@ class RegisterTestCase(unittest.HomeserverTestCase):
             "POST",
             self.url,
             {
-                "displayname": "user1",
                 "email": "user1@example.com",
                 "admin": False,
                 "password": "",
@@ -92,11 +90,6 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         self.assertTrue(self.keycloak_client.add_user.called)
         self.assertTrue(self.keycloak_client.get_user.called)
         self.assertTrue(self.nextcloud_client.add_user.called)
-
-        self.assertEqual(
-            channel.result["body"],
-            b'{"display_name":"user1","user_id":"@user1=40example.com:test"}',
-        )
         self.assertEqual(channel.code, 200)
 
     def test_register_user_with_password(self):
@@ -104,7 +97,6 @@ class RegisterTestCase(unittest.HomeserverTestCase):
             "POST",
             self.url,
             {
-                "displayname": "user1",
                 "email": "user1@example.com",
                 "admin": False,
                 "password": "pass",
@@ -116,12 +108,6 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         self.assertTrue(self.keycloak_client.add_user.called)
         self.assertTrue(self.keycloak_client.get_user.called)
         self.assertTrue(self.nextcloud_client.add_user.called)
-
-        self.assertEqual(
-            channel.result["body"],
-            b'{"display_name":"user1","user_id":"@user1=40example.com:test"}',
-        )
-
         self.assertEqual(channel.code, 200)
 
     def test_register_user_with_empty_email(self):
@@ -129,7 +115,6 @@ class RegisterTestCase(unittest.HomeserverTestCase):
             "POST",
             self.url,
             {
-                "displayname": "user1",
                 "email": "",
                 "admin": False,
                 "password": "",
@@ -153,7 +138,6 @@ class RegisterTestCase(unittest.HomeserverTestCase):
             "POST",
             self.url,
             {
-                "displayname": "user1",
                 "email": "owner@example.com",
                 "admin": False,
                 "password": "",
@@ -177,7 +161,6 @@ class RegisterTestCase(unittest.HomeserverTestCase):
             "POST",
             self.url,
             {
-                "displayname": "user1",
                 "email": "user1examplecom",
                 "admin": False,
                 "password": "",
@@ -195,27 +178,3 @@ class RegisterTestCase(unittest.HomeserverTestCase):
             channel.result["body"],
             b'{"errcode":"M_UNKNOWN","error":"Unable to parse email address"}',
         )
-
-    def test_register_user_with_empty_displayname(self):
-        request, channel = self.make_request(
-            "POST",
-            self.url,
-            {
-                "displayname": "",
-                "email": "user1@example.com",
-                "admin": False,
-                "password": "",
-            },
-            self.owner_tok,
-        )
-        self.render(request)
-
-        self.assertTrue(self.keycloak_client.add_user.called)
-        self.assertTrue(self.keycloak_client.get_user.called)
-        self.assertTrue(self.nextcloud_client.add_user.called)
-
-        self.assertEqual(
-            channel.result["body"],
-            b'{"display_name":null,"user_id":"@user1=40example.com:test"}',
-        )
-        self.assertEqual(channel.code, 200)
