@@ -24,18 +24,7 @@ class NextcloudHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
-        self.unidentical_identifiers = hs.config.unidentical_identifiers
-
-    async def get_nextcloud_username(self, localpart):
-        """Get Nextcloud username"""
-        nextcloud_username = localpart
-
-        if self.unidentical_identifiers:
-            for identifier in self.unidentical_identifiers:
-                if identifier["localpart"] == localpart:
-                    nextcloud_username = identifier["nextcloud_username"]
-
-        return nextcloud_username
+        self.unidentical_identifiers = hs.config.get(unidentical_identifiers, {})
 
     async def unbind(self, room_id):
         """Unbind a Nextcloud folder from a room.
@@ -57,9 +46,8 @@ class NextcloudHandler(BaseHandler):
            path: the path of the Nextcloud folder to bind.
         """
         group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
-        nextcloud_username = await self.get_nextcloud_username(
-            get_localpart_from_id(user_id)
-        )
+        localpart = get_localpart_from_id(user_id)
+        nextcloud_username = self.unidentical_identifiers.get(localpart, localpart)
 
         await self.nextcloud_client.add_group(group_name)
 
@@ -87,7 +75,7 @@ class NextcloudHandler(BaseHandler):
         localparts = [get_localpart_from_id(user_id) for user_id in user_ids]
 
         for localpart in localparts:
-            nextcloud_username = await self.get_nextcloud_username(localpart)
+            nextcloud_username = self.unidentical_identifiers.get(localpart, localpart)
 
             try:
                 await self.nextcloud_client.add_user_to_group(
@@ -103,9 +91,8 @@ class NextcloudHandler(BaseHandler):
     async def update_share(self, user_id, room_id, membership):
 
         group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
-        nextcloud_username = await self.get_nextcloud_username(
-            get_localpart_from_id(user_id)
-        )
+        localpart = get_localpart_from_id(user_id)
+        nextcloud_username = self.unidentical_identifiers.get(localpart, localpart)
 
         if membership in ("invite", "join"):
             try:
