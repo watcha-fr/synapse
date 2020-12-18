@@ -78,7 +78,7 @@ class InvitePartnerHandlerTestCase(unittest.HomeserverTestCase):
         self.keycloak_client = self.nextcloud_handler.keycloak_client
         self.nextcloud_client = self.nextcloud_handler.nextcloud_client
         self.keycloak_client.add_user = simple_async_mock()
-        self.keycloak_client.get_user = simple_async_mock(return_value={"id": "1234"})
+        self.keycloak_client.get_user = simple_async_mock(return_value={"id": "partner"})
         self.nextcloud_client.add_user = simple_async_mock()
 
         self.url = "/rooms/{}/invite".format(self.room_id)
