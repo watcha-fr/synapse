@@ -65,6 +65,7 @@ class InvitePartnerHandler(BaseHandler):
             try:
                 user_id = await self.registration_handler.register_user(
                     localpart=keycloak_user_id,
+                    default_display_name="",
                     bind_emails=[invitee_email],
                     make_partner=True,
                 )
