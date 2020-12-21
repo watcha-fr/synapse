@@ -37,6 +37,8 @@ from synapse.types import UserID
 from synapse.util.async_helpers import concurrently_execute
 from synapse.visibility import filter_events_for_client
 
+from synapse.types import get_localpart_from_id  # watcha+
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
@@ -182,12 +184,10 @@ class Mailer:
             host_id (str): the user id of the user who invite the partner
             password (str): a temporay password
         """
-        subject = self.email_subjects.watcha_registration % {
-            "app": self.app_name
-        }
+        subject = self.email_subjects.watcha_registration % {"app": self.app_name}
 
-        if host_id == self.hs.config.service_account_name:
-            host_name = self.config.email_notif_from
+        if get_localpart_from_id(host_id) == self.hs.config.service_account_name:
+            host_name = self.hs.config.email_notif_from
         else:
             host_display_name = await self.profile_handler.get_displayname(
                 UserID.from_string(host_id)

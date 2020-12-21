@@ -322,7 +322,7 @@ class WatchaRegisterRestServlet(RestServlet):
 
         send_email = False
 
-        if hasattr(params, "password"):
+        if "password" in params and params["password"]:
             password = params["password"]
         else:
             password = token_hex(6)
