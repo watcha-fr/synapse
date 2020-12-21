@@ -183,22 +183,6 @@ class WatchaRoomEventsStoreTestCase(unittest.HomeserverTestCase):
         )
 
     @defer.inlineCallbacks
-    def test_get_room_mapping_with_nextcloud_directory(self):
-        mapped_directory = yield defer.ensureDeferred(
-            self.store.get_path_from_room_id(self.room_id)
-        )
-        mapped_room = yield defer.ensureDeferred(
-            self.store.get_room_id_from_path(self.directory_path)
-        )
-        share_id = yield defer.ensureDeferred(
-            self.store.get_nextcloud_share_id_from_room_id(self.room_id)
-        )
-
-        self.assertEquals(mapped_directory, self.directory_path)
-        self.assertEquals(mapped_room, self.room_id)
-        self.assertEquals(share_id, self.share_id)
-
-    @defer.inlineCallbacks
     def test_delete_room_nextcloud_mapping(self):
         yield defer.ensureDeferred(
             self.store.unbind(self.room_id)

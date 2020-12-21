@@ -17,17 +17,6 @@ class NextcloudStore(SQLBaseStore):
             desc="get_path_from_room_id",
         )
 
-    async def get_room_id_from_path(self, path):
-        """Get the room_id bound with Nextcloud folder path."""
-
-        return await self.db_pool.simple_select_one_onecol(
-            table="room_nextcloud_mapping",
-            keyvalues={"directory_path": path},
-            retcol="room_id",
-            allow_none=True,
-            desc="get_room_id_from_path",
-        )
-
     async def get_nextcloud_share_id_from_room_id(self, room_id):
         """Get Nextcloud share id of the room id."""
 
