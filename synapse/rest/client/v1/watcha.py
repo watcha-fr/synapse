@@ -312,10 +312,6 @@ class WatchaRegisterRestServlet(RestServlet):
                 "A user with this email address already exists. Cannot create a new one.",
             )
 
-        requester = await self.auth.get_user_by_req(request)
-
-        send_email = False
-
         if "password" in params and params["password"]:
             password = params["password"]
         else:

@@ -24,7 +24,11 @@ class NextcloudHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
-        self.unidentical_identifiers = hs.config.get(unidentical_identifiers, {})
+        self.unidentical_identifiers = (
+            hs.config.unidentical_identifiers
+            if hs.config.unidentical_identifiers
+            else {}
+        )
 
     async def unbind(self, room_id):
         """Unbind a Nextcloud folder from a room.
