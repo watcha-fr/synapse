@@ -5,12 +5,7 @@ from pathlib import Path
 from ._base import BaseHandler
 from synapse.api.constants import EventTypes
 from synapse.api.errors import Codes, SynapseError
-from synapse.types import (
-    create_requester,
-    get_localpart_from_id,
-    map_username_to_mxid_localpart,
-    decode_localpart,
-)
+from synapse.types import get_localpart_from_id
 
 logger = logging.getLogger(__name__)
 
