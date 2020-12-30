@@ -50,7 +50,6 @@ class IdentityTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"POST", "/createRoom", b"{}", access_token=tok
         )
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
         room_id = channel.json_body["room_id"]
 
@@ -64,11 +63,6 @@ class IdentityTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"POST", request_url, request_data, access_token=tok
         )
-        self.render(request)
-        """ watcha! 
-        this tests the external invitation, in fact !
         self.assertEquals(channel.result["code"], b"403", channel.result)
-        !watcha """
-        self.assertEquals(channel.result["code"], b"200", channel.result)  # watcha+
 
-    test_3pid_lookup_disabled.skip = "Disabled for Watcha after OP553."
+    test_3pid_lookup_disabled.skip = "Disabled for Watcha after OP553." # watcha+

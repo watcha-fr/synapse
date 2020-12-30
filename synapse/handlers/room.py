@@ -61,7 +61,6 @@ from ._base import BaseHandler
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
-
 logger = logging.getLogger(__name__)
 
 id_server_scheme = "https://"
@@ -589,7 +588,7 @@ class RoomCreationHandler(BaseHandler):
         """
         user_id = requester.user.to_string()
 
-        await self.auth.check_auth_blocking(user_id)
+        await self.auth.check_auth_blocking(requester=requester)
 
         if (
             self._server_notices_mxid is not None
@@ -1323,7 +1322,9 @@ class RoomShutdownHandler:
                     400, "User must be our own: %s" % (new_room_user_id,)
                 )
 
-            room_creator_requester = create_requester(new_room_user_id)
+            room_creator_requester = create_requester(
+                new_room_user_id, authenticated_entity=requester_user_id
+            )
 
             info, stream_id = await self._room_creation_handler.create_room(
                 room_creator_requester,
@@ -1363,7 +1364,9 @@ class RoomShutdownHandler:
 
             try:
                 # Kick users from room
-                target_requester = create_requester(user_id)
+                target_requester = create_requester(
+                    user_id, authenticated_entity=requester_user_id
+                )
                 _, stream_id = await self.room_member_handler.update_membership(
                     requester=target_requester,
                     target=target_requester.user,

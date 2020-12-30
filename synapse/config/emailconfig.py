@@ -87,7 +87,7 @@ class EmailConfig(Config):
             """ watcha !
             self.email_app_name = "Matrix"
             !watcha """
-            self.email_app_name = "Watcha"
+            self.email_app_name = "Watcha" # watcha+
 
         # TODO: Rename notif_from to something more generic, or have a separate
         # from for password resets, message notifications, etc?

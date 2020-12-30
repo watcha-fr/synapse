@@ -543,7 +543,6 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", b"user_directory/search", b'{"search_term":"user2"}'
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
         self.assertTrue(len(channel.json_body["results"]) > 0)
 
@@ -552,7 +551,6 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", b"user_directory/search", b'{"search_term":"user2"}'
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
         self.assertTrue(len(channel.json_body["results"]) == 0)
 

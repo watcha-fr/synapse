@@ -181,7 +181,7 @@ class AccountValidityHandler:
         await self.store.set_renewal_mail_status(user_id=user_id, email_sent=True)
 
     # watcha+
-    async def get_threepids_for_user(self, user_id):
+    async def get_threepids_for_user(self, user_id: str) -> List[str]:
         """Retrieve the list of threepids attached to a user's account
 
         Args:
@@ -195,7 +195,7 @@ class AccountValidityHandler:
 
         return threepids
 
-    async def get_email_address_for_user(self, user_id):
+    async def get_email_address_for_user(self, user_id: str) -> str:
         """Retrieve only one email address attached to a user's account
 
         Args:

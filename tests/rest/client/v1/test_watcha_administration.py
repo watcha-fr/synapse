@@ -48,7 +48,6 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
             self.url + "watcha_user_list",
             access_token=self.admin_tok,
         )
-        self.render(request)
 
         self.assertEqual(
             json.loads(channel.result["body"]),
@@ -88,7 +87,6 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url + "watcha_admin_stats", access_token=self.admin_tok
         )
-        self.render(request)
 
         self.assertEquals(
             json.loads(channel.result["body"])["users"],
@@ -119,7 +117,7 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url + "watcha_admin_stats", access_token=self.admin_tok
         )
-        self.render(request)
+
         self.assertEquals(
             json.loads(channel.result["body"])["rooms"],
             {
@@ -137,7 +135,6 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url + "watcha_room_list", access_token=self.admin_tok
         )
-        self.render(request)
 
         for room_id in room_ids:
             self.assertIn(

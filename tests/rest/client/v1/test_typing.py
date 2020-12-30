@@ -91,10 +91,7 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.room_id = self.helper.create_room_as(self.user_id)
         # Need another user to make notifications actually work
-        # watcha+
-        # need to be invited
-        self.helper.invite(self.room_id, src=self.user_id, targ="@jim:red")
-        # +watcha
+        self.helper.invite(self.room_id, src=self.user_id, targ="@jim:red") # watcha+
         self.helper.join(self.room_id, user="@jim:red")
 
     def test_set_typing(self):
@@ -103,7 +100,6 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             b'{"typing": true, "timeout": 30000}',
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
 
         self.assertEquals(self.event_source.get_current_key(), 1)
@@ -127,7 +123,6 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             b'{"typing": false}',
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
 
     def test_typing_timeout(self):
@@ -136,7 +131,6 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             b'{"typing": true, "timeout": 30000}',
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
 
         self.assertEquals(self.event_source.get_current_key(), 1)
@@ -150,7 +144,6 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             b'{"typing": true, "timeout": 30000}',
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
 
         self.assertEquals(self.event_source.get_current_key(), 3)

@@ -491,10 +491,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
 
         # Create a room with two local users
         room_id = self.helper.create_room_as(self.user_id)
-        # watcha+
-        # need to be invited
-        self.helper.invite(room_id, src=self.user_id, targ="@test2:server")
-        # +watcha
+        self.helper.invite(room_id, src=self.user_id, targ="@test2:server") # watcha+
         self.helper.join(room_id, "@test2:server")
 
         # Mark test2 as online, test will be offline with a last_active of 0
@@ -529,10 +526,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             destinations=["server2"], states=[expected_state]
         )
         !watcha """
-        # watcha+
-        # not sending presence to other servers
-        self.federation_sender.send_presence_to_destinations.assert_not_called()
-        # +watcha
+        self.federation_sender.send_presence_to_destinations.assert_not_called() # watcha+
 
         #
         # Test that only the new server gets sent presence and not existing servers
@@ -585,10 +579,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         self.federation_sender.reset_mock()
 
         # Join local user to room
-        # watcha+
-        # need to be invited
-        self.helper.invite(room_id, src=self.user_id, targ="@test2:server")
-        # +watcha
+        self.helper.invite(room_id, src=self.user_id, targ="@test2:server") # watcha+
         self.helper.join(room_id, "@test2:server")
 
         self.reactor.pump([0])  # Wait for presence updates to be handled

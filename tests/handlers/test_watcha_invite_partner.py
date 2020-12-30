@@ -90,7 +90,6 @@ class InvitePartnerHandlerTestCase(unittest.HomeserverTestCase):
             {"id_server": "test", "medium": "email", "address": "partner@example.com"},
             self.owner_tok,
         )
-        self.render(request)
 
         self.assertTrue(self.keycloak_client.add_user.called)
         self.assertTrue(self.keycloak_client.get_user.called)
@@ -108,7 +107,6 @@ class InvitePartnerHandlerTestCase(unittest.HomeserverTestCase):
             {"id_server": "test", "medium": "email", "address": "otheruser@example.com"},
             self.owner_tok,
         )
-        self.render(request)
 
         self.keycloak_client.add_user.not_called()
         self.keycloak_client.get_user.not_called()
@@ -126,7 +124,6 @@ class InvitePartnerHandlerTestCase(unittest.HomeserverTestCase):
             {"id_server": "test", "medium": "email", "address": "partnerexamplecom"},
             self.owner_tok,
         )
-        self.render(request)
 
         self.keycloak_client.add_user.not_called()
         self.keycloak_client.get_user.not_called()

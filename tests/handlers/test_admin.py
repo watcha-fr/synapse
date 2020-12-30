@@ -50,10 +50,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
             self.user1, tok=self.token1, is_public=True
         )
         self.helper.send(room_id, body="Hello!", tok=self.token1)
-        # watcha+
-        # needed since rooms are private
-        self.helper.invite(room_id, self.user1, self.user2, tok=self.token1)
-        # +watcha
+        self.helper.invite(room_id, self.user1, self.user2, tok=self.token1) # watcha+
         self.helper.join(room_id, self.user2, tok=self.token2)
         self.helper.send(room_id, body="Hello again!", tok=self.token1)
 
@@ -82,10 +79,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         """ watcha!
         self.assertEqual(counter[(EventTypes.Member, self.user2)], 1)
         !watcha """
-        # watcha+
-        # from 1 to 2 because of additional invit event
-        self.assertEqual(counter[(EventTypes.Member, self.user2)], 2)
-        # +watcha
+        self.assertEqual(counter[(EventTypes.Member, self.user2)], 2) # watcha+
 
     def test_single_private_joined_room(self):
         """Tests that we correctly write state when we can't see all events in
@@ -99,10 +93,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
             tok=self.token1,
         )
         self.helper.send(room_id, body="Hello!", tok=self.token1)
-        # watcha+
-        # needed since rooms are private
-        self.helper.invite(room_id, self.user1, self.user2, tok=self.token1)
-        # +watcha
+        self.helper.invite(room_id, self.user1, self.user2, tok=self.token1) # watcha+
         self.helper.join(room_id, self.user2, tok=self.token2)
         self.helper.send(room_id, body="Hello again!", tok=self.token1)
 
@@ -130,10 +121,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         """ watcha!
         self.assertEqual(counter[(EventTypes.Member, self.user2)], 1)
         !watcha """
-        # watcha+
-        # from 1 to 2 because of additional invit event
-        self.assertEqual(counter[(EventTypes.Member, self.user2)], 2)
-        # +watcha
+        self.assertEqual(counter[(EventTypes.Member, self.user2)], 2) # watcha+
 
     def test_single_left_room(self):
         """Tests that we don't see events in the room after we leave.
@@ -173,10 +161,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         """ watcha!
         self.assertEqual(counter[(EventTypes.Member, self.user2)], 2)
         !watcha """
-        # watcha+
-        # from 2 to 3 because of additional invit event
-        self.assertEqual(counter[(EventTypes.Member, self.user2)], 3)
-        # +watcha
+        self.assertEqual(counter[(EventTypes.Member, self.user2)], 3) # watcha+
 
     def test_single_left_rejoined_private_room(self):
         """Tests that see the correct events in private rooms when we
@@ -190,18 +175,12 @@ class ExfiltrateData(unittest.HomeserverTestCase):
             tok=self.token1,
         )
         self.helper.send(room_id, body="Hello!", tok=self.token1)
-        # watcha+
-        # needed since rooms are private
-        self.helper.invite(room_id, self.user1, self.user2, tok=self.token1)
-        # +watcha
+        self.helper.invite(room_id, self.user1, self.user2, tok=self.token1) # watcha+
         self.helper.join(room_id, self.user2, tok=self.token2)
         self.helper.send(room_id, body="Hello again!", tok=self.token1)
         self.helper.leave(room_id, self.user2, tok=self.token2)
         self.helper.send(room_id, body="Helloooooo!", tok=self.token1)
-        # watcha+
-        # needed since rooms are private
-        self.helper.invite(room_id, self.user1, self.user2, tok=self.token1)
-        # +watcha
+        self.helper.invite(room_id, self.user1, self.user2, tok=self.token1) # watcha+
         self.helper.join(room_id, self.user2, tok=self.token2)
         self.helper.send(room_id, body="Helloooooo!!", tok=self.token1)
 
@@ -228,10 +207,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         """ watcha!
         self.assertEqual(counter[(EventTypes.Member, self.user2)], 3)
         !watcha """
-        # watcha+
-        # from 3 to 5 because of additional invit events
-        self.assertEqual(counter[(EventTypes.Member, self.user2)], 5)
-        # +watcha
+        self.assertEqual(counter[(EventTypes.Member, self.user2)], 5) # watcha+
 
     def test_invite(self):
         """Tests that pending invites get handled correctly.

@@ -202,7 +202,6 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             content=json.dumps({"displayname": "test"}),
             access_token=self.owner_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         res = self.get_displayname()
@@ -216,7 +215,6 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             content=json.dumps({"displayname": "test" * 100}),
             access_token=self.owner_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 400, channel.result)
 
         res = self.get_displayname()
@@ -230,7 +228,6 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "/profile/%s/displayname" % (self.owner,)
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
         return channel.json_body["displayname"]
 
@@ -246,7 +243,6 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             "GET", "/profile/%s" % (quote(self.owner, safe=""))
         )
 
-        self.render(request)
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body["email"], "example@email.com")
 
@@ -261,8 +257,6 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             request, channel = self.make_request(
                 "GET", "/profile/%s" % (quote(self.owner, safe=""))
             )
-
-            self.render(request)
 
         self.assertEqual(channel.code, 200)
         self.assertRaises(SynapseError)
@@ -287,8 +281,6 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             request, channel = self.make_request(
                 "GET", "/profile/%s" % (quote(self.owner, safe=""))
             )
-
-            self.render(request)
 
         self.assertEqual(channel.code, 200)
         self.assertRaises(SynapseError)
@@ -349,10 +341,7 @@ class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
     def test_in_shared_room(self):
         self.ensure_requester_left_room()
 
-        # watcha+
-        # need to be invited
-        self.helper.invite(self.room_id, src=self.owner, tok=self.owner_tok, targ=self.requester)
-        # +watcha
+        self.helper.invite(self.room_id, src=self.owner, tok=self.owner_tok, targ=self.requester) # watcha+
         self.helper.join(room=self.room_id, user=self.requester, tok=self.requester_tok)
 
         self.try_fetch_profile(200, self.requester_tok)
@@ -372,7 +361,6 @@ class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.profile_url + url_suffix, access_token=access_token
         )
-        self.render(request)
         self.assertEqual(channel.code, expected_code, channel.result)
 
     def ensure_requester_left_room(self):
@@ -415,7 +403,6 @@ class OwnProfileUnrestrictedTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", "/profile/" + self.requester, access_token=self.requester_tok
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         request, channel = self.make_request(
@@ -423,7 +410,6 @@ class OwnProfileUnrestrictedTestCase(unittest.HomeserverTestCase):
             "/profile/" + self.requester + "/displayname",
             access_token=self.requester_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         request, channel = self.make_request(
@@ -431,5 +417,4 @@ class OwnProfileUnrestrictedTestCase(unittest.HomeserverTestCase):
             "/profile/" + self.requester + "/avatar_url",
             access_token=self.requester_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)

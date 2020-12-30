@@ -64,7 +64,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
                 "password": "monkey",
             }
             request, channel = self.make_request(b"POST", LOGIN_URL, params)
-            self.render(request)
 
             if i == 5:
                 self.assertEquals(channel.result["code"], b"429", channel.result)
@@ -84,7 +83,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             "password": "monkey",
         }
         request, channel = self.make_request(b"POST", LOGIN_URL, params)
-        self.render(request)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
@@ -111,7 +109,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
                 "password": "monkey",
             }
             request, channel = self.make_request(b"POST", LOGIN_URL, params)
-            self.render(request)
 
             if i == 5:
                 self.assertEquals(channel.result["code"], b"429", channel.result)
@@ -131,7 +128,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             "password": "monkey",
         }
         request, channel = self.make_request(b"POST", LOGIN_URL, params)
-        self.render(request)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
@@ -158,7 +154,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
                 "password": "notamonkey",
             }
             request, channel = self.make_request(b"POST", LOGIN_URL, params)
-            self.render(request)
 
             if i == 5:
                 self.assertEquals(channel.result["code"], b"429", channel.result)
@@ -178,24 +173,8 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             "password": "notamonkey",
         }
         request, channel = self.make_request(b"POST", LOGIN_URL, params)
-        self.render(request)
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
-
-    # watcha+ op189
-    def test_LOGIN_with_trim(self):
-       self.register_user("kermit", "monkey")
-
-       params = {
-           "type": "m.login.password",
-           "identifier": {"type": "m.id.user", "user": "kermit "},
-           "password": "monkey",
-       }
-       request_data = json.dumps(params)
-       request, channel = self.make_request(b"POST", LOGIN_URL, params)
-       self.render(request)
-       self.assertEquals(channel.code, 200, channel.result)
-    # +watcha
 
     @override_config({"session_lifetime": "24h"})
     def test_soft_logout(self):
@@ -203,7 +182,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
         # we shouldn't be able to make requests without an access token
         request, channel = self.make_request(b"GET", TEST_URL)
-        self.render(request)
         self.assertEquals(channel.result["code"], b"401", channel.result)
         self.assertEquals(channel.json_body["errcode"], "M_MISSING_TOKEN")
 
@@ -214,7 +192,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             "password": "monkey",
         }
         request, channel = self.make_request(b"POST", LOGIN_URL, params)
-        self.render(request)
 
         self.assertEquals(channel.code, 200, channel.result)
         access_token = channel.json_body["access_token"]
@@ -224,7 +201,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"GET", TEST_URL, access_token=access_token
         )
-        self.render(request)
         self.assertEquals(channel.code, 200, channel.result)
 
         # time passes
@@ -234,7 +210,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"GET", TEST_URL, access_token=access_token
         )
-        self.render(request)
         self.assertEquals(channel.code, 401, channel.result)
         self.assertEquals(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
         self.assertEquals(channel.json_body["soft_logout"], True)
@@ -251,7 +226,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"GET", TEST_URL, access_token=access_token
         )
-        self.render(request)
         self.assertEquals(channel.code, 401, channel.result)
         self.assertEquals(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
         self.assertEquals(channel.json_body["soft_logout"], True)
@@ -262,7 +236,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"GET", TEST_URL, access_token=access_token
         )
-        self.render(request)
         self.assertEquals(channel.code, 401, channel.result)
         self.assertEquals(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
         self.assertEquals(channel.json_body["soft_logout"], False)
@@ -272,7 +245,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"DELETE", "devices/" + device_id, access_token=access_token
         )
-        self.render(request)
         self.assertEquals(channel.code, 401, channel.result)
         # check it's a UI-Auth fail
         self.assertEqual(
@@ -296,7 +268,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             access_token=access_token,
             content={"auth": auth},
         )
-        self.render(request)
         self.assertEquals(channel.code, 200, channel.result)
 
     @override_config({"session_lifetime": "24h"})
@@ -310,7 +281,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"GET", TEST_URL, access_token=access_token
         )
-        self.render(request)
         self.assertEquals(channel.code, 200, channel.result)
 
         # time passes
@@ -320,7 +290,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"GET", TEST_URL, access_token=access_token
         )
-        self.render(request)
         self.assertEquals(channel.code, 401, channel.result)
         self.assertEquals(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
         self.assertEquals(channel.json_body["soft_logout"], True)
@@ -329,7 +298,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"POST", "/logout", access_token=access_token
         )
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
     @override_config({"session_lifetime": "24h"})
@@ -343,7 +311,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"GET", TEST_URL, access_token=access_token
         )
-        self.render(request)
         self.assertEquals(channel.code, 200, channel.result)
 
         # time passes
@@ -353,7 +320,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"GET", TEST_URL, access_token=access_token
         )
-        self.render(request)
         self.assertEquals(channel.code, 401, channel.result)
         self.assertEquals(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
         self.assertEquals(channel.json_body["soft_logout"], True)
@@ -362,7 +328,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             b"POST", "/logout/all", access_token=access_token
         )
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
 
@@ -438,7 +403,6 @@ class CASTestCase(unittest.HomeserverTestCase):
 
         # Get Synapse to call the fake CAS and serve the template.
         request, channel = self.make_request("GET", cas_ticket_url)
-        self.render(request)
 
         # Test that the response is HTML.
         self.assertEqual(channel.code, 200)
@@ -483,7 +447,6 @@ class CASTestCase(unittest.HomeserverTestCase):
 
         # Get Synapse to call the fake CAS and serve the template.
         request, channel = self.make_request("GET", cas_ticket_url)
-        self.render(request)
 
         self.assertEqual(channel.code, 302)
         location_headers = channel.headers.getRawHeaders("Location")
@@ -510,7 +473,6 @@ class CASTestCase(unittest.HomeserverTestCase):
 
         # Get Synapse to call the fake CAS and serve the template.
         request, channel = self.make_request("GET", cas_ticket_url)
-        self.render(request)
 
         # Because the user is deactivated they are served an error template.
         self.assertEqual(channel.code, 403)
@@ -541,7 +503,6 @@ class JWTTestCase(unittest.HomeserverTestCase):
             {"type": "org.matrix.login.jwt", "token": self.jwt_encode(*args)}
         )
         request, channel = self.make_request(b"POST", LOGIN_URL, params)
-        self.render(request)
         return channel
 
     def test_login_jwt_valid_registered(self):
@@ -674,7 +635,6 @@ class JWTTestCase(unittest.HomeserverTestCase):
     def test_login_no_token(self):
         params = json.dumps({"type": "org.matrix.login.jwt"})
         request, channel = self.make_request(b"POST", LOGIN_URL, params)
-        self.render(request)
         self.assertEqual(channel.result["code"], b"403", channel.result)
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(channel.json_body["error"], "Token field for JWT is missing")
@@ -748,7 +708,6 @@ class JWTPubKeyTestCase(unittest.HomeserverTestCase):
             {"type": "org.matrix.login.jwt", "token": self.jwt_encode(*args)}
         )
         request, channel = self.make_request(b"POST", LOGIN_URL, params)
-        self.render(request)
         return channel
 
     def test_login_jwt_valid(self):
@@ -781,7 +740,6 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/r0/register?access_token=%s" % (self.service.token,),
             {"username": username},
         )
-        self.render(request)
 
     def make_homeserver(self, reactor, clock):
         self.hs = self.setup_test_homeserver()
@@ -830,7 +788,6 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
             b"POST", LOGIN_URL, params, access_token=self.service.token
         )
 
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
     def test_login_appservice_user_bot(self):
@@ -846,7 +803,6 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
             b"POST", LOGIN_URL, params, access_token=self.service.token
         )
 
-        self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
     def test_login_appservice_wrong_user(self):
@@ -862,7 +818,6 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
             b"POST", LOGIN_URL, params, access_token=self.service.token
         )
 
-        self.render(request)
         self.assertEquals(channel.result["code"], b"403", channel.result)
 
     def test_login_appservice_wrong_as(self):
@@ -878,7 +833,6 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
             b"POST", LOGIN_URL, params, access_token=self.another_service.token
         )
 
-        self.render(request)
         self.assertEquals(channel.result["code"], b"403", channel.result)
 
     def test_login_appservice_no_token(self):
@@ -893,5 +847,4 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
         }
         request, channel = self.make_request(b"POST", LOGIN_URL, params)
 
-        self.render(request)
         self.assertEquals(channel.result["code"], b"401", channel.result)

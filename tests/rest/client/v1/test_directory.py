@@ -101,7 +101,6 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", url, request_data, access_token=self.user_tok
         )
-        self.render(request)
         self.assertEqual(channel.code, 400, channel.result)
 
     def test_room_creation(self):
@@ -115,7 +114,6 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST", url, request_data, access_token=self.user_tok
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
     def set_alias_via_state_event(self, expected_code, alias_length=5):
@@ -130,7 +128,6 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "PUT", url, request_data, access_token=self.user_tok
         )
-        self.render(request)
         self.assertEqual(channel.code, expected_code, channel.result)
 
     def set_alias_via_directory(self, expected_code, alias_length=5):
@@ -141,7 +138,6 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "PUT", url, request_data, access_token=self.user_tok
         )
-        self.render(request)
         self.assertEqual(channel.code, expected_code, channel.result)
 
     def random_alias(self, length):

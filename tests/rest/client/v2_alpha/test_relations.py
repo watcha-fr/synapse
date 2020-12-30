@@ -46,10 +46,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.user2_id, self.user2_token = self._create_user("bob")
 
         self.room = self.helper.create_room_as(self.user_id, tok=self.user_token)
-        # watcha+
-        # need to be invited
-        self.helper.invite(self.room, src=self.user_id, tok=self.user_token, targ=self.user2_id)
-        # +watcha
+        self.helper.invite(self.room, src=self.user_id, tok=self.user_token, targ=self.user2_id) # watcha+
         self.helper.join(self.room, user=self.user2_id, tok=self.user2_token)
         res = self.helper.send(self.room, body="Hi!", tok=self.user_token)
         self.parent_id = res["event_id"]
@@ -69,7 +66,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             "/rooms/%s/event/%s" % (self.room, event_id),
             access_token=self.user_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         self.assert_dict(
@@ -118,7 +114,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             % (self.room, self.parent_id),
             access_token=self.user_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         # We expect to get back a single pagination result, which is the full
@@ -164,7 +159,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
                 % (self.room, self.parent_id, from_token),
                 access_token=self.user_token,
             )
-            self.render(request)
             self.assertEquals(200, channel.code, channel.json_body)
 
             found_event_ids.extend(e["event_id"] for e in channel.json_body["chunk"])
@@ -191,10 +185,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             user_id, token = self._create_user("test" + str(idx))
             idx += 1
 
-            # watcha+
-            # need to be invited
-            self.helper.invite(self.room, src=self.user_id, tok=self.user_token, targ=user_id)
-            # +watcha
+            self.helper.invite(self.room, src=self.user_id, tok=self.user_token, targ=user_id) # watcha+
             self.helper.join(self.room, user=user_id, tok=token)
             access_tokens.append(token)
 
@@ -227,7 +218,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
                 % (self.room, self.parent_id, from_token),
                 access_token=self.user_token,
             )
-            self.render(request)
             self.assertEquals(200, channel.code, channel.json_body)
 
             self.assertEqual(len(channel.json_body["chunk"]), 1, channel.json_body)
@@ -262,10 +252,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             user_id, token = self._create_user("test" + str(idx))
             idx += 1
 
-            # watcha+
-            # need to be invited
-            self.helper.invite(self.room, src=self.user_id, tok=self.user_token, targ=user_id)
-            # +watcha
+            self.helper.invite(self.room, src=self.user_id, tok=self.user_token, targ=user_id) # watcha+
             self.helper.join(self.room, user=user_id, tok=token)
             access_tokens.append(token)
 
@@ -308,7 +295,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
                 ),
                 access_token=self.user_token,
             )
-            self.render(request)
             self.assertEquals(200, channel.code, channel.json_body)
 
             self.assertEqual(len(channel.json_body["chunk"]), 1, channel.json_body)
@@ -348,7 +334,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             % (self.room, self.parent_id),
             access_token=self.user_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         self.assertEquals(
@@ -381,7 +366,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             access_token=self.user_token,
             content={},
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         request, channel = self.make_request(
@@ -390,7 +374,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             % (self.room, self.parent_id),
             access_token=self.user_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         self.assertEquals(
@@ -408,7 +391,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             % (self.room, self.parent_id, RelationTypes.REPLACE),
             access_token=self.user_token,
         )
-        self.render(request)
         self.assertEquals(400, channel.code, channel.json_body)
 
     def test_aggregation_get_event(self):
@@ -440,7 +422,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             "/rooms/%s/event/%s" % (self.room, self.parent_id),
             access_token=self.user_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         self.assertEquals(
@@ -477,7 +458,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             "/rooms/%s/event/%s" % (self.room, self.parent_id),
             access_token=self.user_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         self.assertEquals(channel.json_body["content"], new_body)
@@ -535,7 +515,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             "/rooms/%s/event/%s" % (self.room, self.parent_id),
             access_token=self.user_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         self.assertEquals(channel.json_body["content"], new_body)
@@ -579,7 +558,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             % (self.room, original_event_id),
             access_token=self.user_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         self.assertIn("chunk", channel.json_body)
@@ -593,7 +571,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             access_token=self.user_token,
             content="{}",
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         # Try to check for remaining m.replace relations
@@ -603,7 +580,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             % (self.room, original_event_id),
             access_token=self.user_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         # Check that no relations are returned
@@ -636,7 +612,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             access_token=self.user_token,
             content="{}",
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         # Check that aggregations returns zero
@@ -646,7 +621,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             % (self.room, original_event_id),
             access_token=self.user_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         self.assertIn("chunk", channel.json_body)
@@ -692,7 +666,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             json.dumps(content).encode("utf-8"),
             access_token=access_token,
         )
-        self.render(request)
         return channel
 
     def _create_user(self, localpart):

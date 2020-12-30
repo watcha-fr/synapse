@@ -77,7 +77,6 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         Try to get an event report without authentication.
         """
         request, channel = self.make_request("GET", self.url, b"{}")
-        self.render(request)
 
         self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
@@ -90,7 +89,6 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url, access_token=self.other_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
@@ -103,7 +101,6 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url, access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["total"], 20)
@@ -119,7 +116,6 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url + "?limit=5", access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["total"], 20)
@@ -135,7 +131,6 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url + "?from=5", access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["total"], 20)
@@ -151,7 +146,6 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url + "?from=5&limit=10", access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["total"], 20)
@@ -169,7 +163,6 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             self.url + "?room_id=%s" % self.room_id1,
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["total"], 10)
@@ -190,7 +183,6 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             self.url + "?user_id=%s" % self.other_user,
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["total"], 10)
@@ -211,7 +203,6 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             self.url + "?user_id=%s&room_id=%s" % (self.other_user, self.room_id1),
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["total"], 5)
@@ -232,7 +223,6 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url + "?dir=b", access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["total"], 20)
@@ -249,7 +239,6 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url + "?dir=f", access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["total"], 20)
@@ -270,7 +259,6 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url + "?dir=bar", access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
@@ -284,7 +272,6 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url + "?limit=-5", access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
@@ -297,7 +284,6 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url + "?from=-5", access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
@@ -312,7 +298,6 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url + "?limit=20", access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["total"], 20)
@@ -324,7 +309,6 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url + "?limit=21", access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["total"], 20)
@@ -336,7 +320,6 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url + "?limit=19", access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["total"], 20)
@@ -349,7 +332,6 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url + "?from=19", access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["total"], 20)
@@ -368,7 +350,6 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             json.dumps({"score": -100, "reason": "this makes me sad"}),
             access_token=user_tok,
         )
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
     def _check_fields(self, content):
@@ -422,7 +403,6 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         Try to get event report without authentication.
         """
         request, channel = self.make_request("GET", self.url, b"{}")
-        self.render(request)
 
         self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
@@ -435,7 +415,6 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url, access_token=self.other_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
@@ -448,7 +427,6 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET", self.url, access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self._check_fields(channel.json_body)
@@ -464,7 +442,6 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
             "/_synapse/admin/v1/event_reports/-123",
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
@@ -479,7 +456,6 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
             "/_synapse/admin/v1/event_reports/abcdef",
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
@@ -494,7 +470,6 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
             "/_synapse/admin/v1/event_reports/",
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
@@ -513,7 +488,6 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
             "/_synapse/admin/v1/event_reports/123",
             access_token=self.admin_user_tok,
         )
-        self.render(request)
 
         self.assertEqual(404, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
@@ -531,7 +505,6 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
             json.dumps({"score": -100, "reason": "this makes me sad"}),
             access_token=user_tok,
         )
-        self.render(request)
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
     def _check_fields(self, content):

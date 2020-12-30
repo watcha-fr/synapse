@@ -85,7 +85,6 @@ class RegisterTestCase(unittest.HomeserverTestCase):
             },
             self.owner_tok,
         )
-        self.render(request)
 
         self.assertTrue(self.keycloak_client.add_user.called)
         self.assertTrue(self.keycloak_client.get_user.called)
@@ -103,7 +102,6 @@ class RegisterTestCase(unittest.HomeserverTestCase):
             },
             self.owner_tok,
         )
-        self.render(request)
 
         self.assertTrue(self.keycloak_client.add_user.called)
         self.assertTrue(self.keycloak_client.get_user.called)
@@ -121,7 +119,6 @@ class RegisterTestCase(unittest.HomeserverTestCase):
             },
             self.owner_tok,
         )
-        self.render(request)
 
         self.keycloak_client.add_user.not_called()
         self.keycloak_client.get_user.not_called()
@@ -144,7 +141,6 @@ class RegisterTestCase(unittest.HomeserverTestCase):
             },
             self.owner_tok,
         )
-        self.render(request)
 
         self.keycloak_client.add_user.not_called()
         self.keycloak_client.get_user.not_called()
@@ -167,7 +163,6 @@ class RegisterTestCase(unittest.HomeserverTestCase):
             },
             self.owner_tok,
         )
-        self.render(request)
 
         self.keycloak_client.add_user.not_called()
         self.keycloak_client.get_user.not_called()
