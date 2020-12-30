@@ -934,9 +934,23 @@ class OidcHandler(BaseHandler):
         )
 
 
+""" watcha! op524
 UserAttributeDict = TypedDict(
     "UserAttributeDict", {"localpart": str, "display_name": Optional[str]}
 )
+!watcha """
+# watcha+ op524
+UserAttributeDict = TypedDict(
+    "UserAttributeDict",
+    {
+        "localpart": str,
+        "display_name": Optional[str],
+        "emails": Optional[list],
+        "synapse_role": Optional[str],
+        "locale": Optional[str],
+    },
+)
+# +watcha
 C = TypeVar("C")
 
 
@@ -1106,7 +1120,23 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             if display_name == "":
                 display_name = None
 
+        """ watcha! op524
         return UserAttributeDict(localpart=localpart, display_name=display_name)
+        !watcha """
+
+        # watcha+ op524 op525
+        email = userinfo.get("email")  # type: Optional[list]
+        synapse_role = userinfo.get("synapse_role")  # type: Optional[str]
+        locale = userinfo.get("locale")  # type: Optional[str]
+
+        return UserAttributeDict(
+            localpart=localpart,
+            display_name=display_name,
+            emails = [email] if email else [],
+            synapse_role=synapse_role,
+            locale=locale,
+        )
+        # +watcha
 
     async def get_extra_attributes(self, userinfo: UserInfo, token: Token) -> JsonDict:
         extras = {}  # type: Dict[str, str]

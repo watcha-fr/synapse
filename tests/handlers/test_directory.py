@@ -127,6 +127,7 @@ class TestCreateAlias(unittest.HomeserverTestCase):
         # Create a test user.
         self.test_user = self.register_user("user", "pass", admin=False)
         self.test_user_tok = self.login("user", "pass")
+        self.helper.invite(self.room_id, src=self.admin_user, tok=self.admin_user_tok, targ=self.test_user) # watcha+
         self.helper.join(room=self.room_id, user=self.test_user, tok=self.test_user_tok)
 
     def test_create_alias_joined_room(self):
@@ -191,6 +192,7 @@ class TestDeleteAlias(unittest.HomeserverTestCase):
         # Create a test user.
         self.test_user = self.register_user("user", "pass", admin=False)
         self.test_user_tok = self.login("user", "pass")
+        self.helper.invite(self.room_id, src=self.admin_user, tok=self.admin_user_tok, targ=self.test_user) # watcha+
         self.helper.join(room=self.room_id, user=self.test_user, tok=self.test_user_tok)
 
     def _create_alias(self, user):
@@ -466,3 +468,16 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
             "PUT", b"directory/list/room/%s" % (room_id.encode("ascii"),), b"{}"
         )
         self.assertEquals(403, channel.code, channel.result)
+
+    # watcha+
+    test_disabling_room_list.skip = "Directory is disabled for Watcha"
+
+    def test_room_list_is_disabled_for_watcha(self):
+        self.room_list_handler.enable_room_list_search = True
+        self.directory_handler.enable_room_list_search = True
+
+        # Room list is enabled so we should get some results
+        request, channel = self.make_request("GET", b"publicRooms")
+        self.assertEquals(403, channel.code, channel.result)
+        self.assertEquals("Directory is not available", channel.json_body["error"])
+    # +watcha

@@ -76,6 +76,7 @@ class RoomCreationHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.config = hs.config
+        self.invite_partner_handler = hs.get_invite_partner_handler()  # watcha+
 
         # Room state based off defined presets
         self._presets_dict = {
@@ -674,7 +675,10 @@ class RoomCreationHandler(BaseHandler):
                 % (user_id,),
             )
 
+        """ watcha!
         visibility = config.get("visibility", None)
+        !watcha """
+        visibility = "private"  # watcha+
         is_public = visibility == "public"
 
         room_id = await self._generate_room_id(
@@ -796,6 +800,7 @@ class RoomCreationHandler(BaseHandler):
                 )
 
         for invite_3pid in invite_3pid_list:
+            """ watcha!
             id_server = invite_3pid["id_server"]
             id_access_token = invite_3pid.get("id_access_token")  # optional
             address = invite_3pid["address"]
@@ -812,6 +817,42 @@ class RoomCreationHandler(BaseHandler):
                 txn_id=None,
                 id_access_token=id_access_token,
             )
+            !watcha """
+            # watcha+
+            logger.info(
+                "invitation on creation: inviter id=%s, device_id=%s",
+                requester.user,
+                requester.device_id,
+            )
+
+            invite_3pid["user_id"] = await self.invite_partner_handler.invite(
+                room_id=room_id,
+                host_id=requester.user.to_string(),
+                host_device_id=str(requester.device_id),
+                invitee_email=invite_3pid["address"],
+            )
+
+            logger.info(
+                "invitee email=%s has been invited as %s at the creation of the room with id=%s",
+                invite_3pid["address"],
+                invite_3pid["user_id"],
+                room_id,
+            )
+
+            content = {}
+            is_direct = config.get("is_direct", None)
+            if is_direct:
+                content["is_direct"] = is_direct
+
+            await self.room_member_handler.update_membership(
+                requester,
+                UserID.from_string(invite_3pid["user_id"]),
+                room_id,
+                "invite",
+                ratelimit=False,
+                content=content,
+            )
+            # +watcha
 
         result = {"room_id": room_id}
 
@@ -896,6 +937,7 @@ class RoomCreationHandler(BaseHandler):
                 etype=EventTypes.PowerLevels, content=pl_content
             )
         else:
+            """ watcha!
             power_level_content = {
                 "users": {creator_id: 100},
                 "users_default": 0,
@@ -916,6 +958,29 @@ class RoomCreationHandler(BaseHandler):
                 "redact": 50,
                 "invite": 50,
             }  # type: JsonDict
+            !watcha """
+            # watcha+
+            power_level_content = {
+                "users": {creator_id: 100},
+                "users_default": 0,
+                "events": {
+                    EventTypes.Name: 50,
+                    EventTypes.PowerLevels: 100,
+                    EventTypes.RoomHistoryVisibility: 50,
+                    EventTypes.CanonicalAlias: 50,
+                    EventTypes.RoomAvatar: 50,
+                    EventTypes.Tombstone: 100,
+                    EventTypes.ServerACL: 100,
+                    EventTypes.RoomEncryption: 100,
+                },
+                "events_default": 0,
+                "state_default": 50,
+                "ban": 50,
+                "kick": 50,
+                "redact": 50,
+                "invite": 50,
+            }
+            # +watcha
 
             if config["original_invitees_have_ops"]:
                 for invitee in invite_list:

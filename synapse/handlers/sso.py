@@ -40,6 +40,10 @@ class UserAttributes:
     localpart = attr.ib(type=str)
     display_name = attr.ib(type=Optional[str], default=None)
     emails = attr.ib(type=List[str], default=attr.Factory(list))
+    # # watcha+
+    synapse_role = attr.ib(type=Optional[str], default=None)
+    locale = attr.ib(type=Optional[str], default=None)
+    # # +watcha
 
 
 class SsoHandler(BaseHandler):
@@ -231,11 +235,29 @@ class SsoHandler(BaseHandler):
             raise MappingException("localpart is invalid: %s" % (attributes.localpart,))
 
         logger.debug("Mapped SSO user to local part %s", attributes.localpart)
+
+        # watcha+ op525
+        optional_params = {}
+
+        synapse_role = attributes.synapse_role
+        if synapse_role == "administrator":
+            optional_params["admin"] = True
+        elif synapse_role == "partner":
+            optional_params["make_partner"] = True
+        elif synapse_role is not None:
+            raise MappingException(
+                "synapse_role ({}) must be either administrator, partner or None".format(
+                    synapse_role
+                )
+            )
+        # +watcha
+
         registered_user_id = await self._registration_handler.register_user(
             localpart=attributes.localpart,
             default_display_name=attributes.display_name,
             bind_emails=attributes.emails,
             user_agent_ips=[(user_agent, ip_address)],
+            **optional_params, # watcha+
         )
 
         await self.store.record_user_external_id(

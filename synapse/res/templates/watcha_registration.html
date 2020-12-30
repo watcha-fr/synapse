@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="fr">
+    <head>
+        <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+        <title>{{ title }}</title>
+        <style>
+            {%- include 'watcha_registration.css' %}
+        </style>
+    </head>
+
+    <body class="centered">
+        <div class="centered">{%- include 'watcha.svg' %}</div>
+        <p>Bonjour,</p>
+        <p>
+            <span class="hint">{{ host_name }}</span> vous a invité(e) à
+            rejoindre l'espace de travail sécurisé Watcha.
+        </p>
+        <a class="btn-primary centered" href="{{ login_url }}"
+            >Se connecter à Watcha</a
+        >
+        <p>
+            Vous pourrez y créer et utiliser des salons de discussion avec les
+            autres utilisateurs.
+        </p>
+        <table class="credential-table">
+            <tbody>
+                <tr>
+                    <td class="credential-title">Email&nbsp;:</td>
+                </tr>
+                <tr>
+                    <td class="credential">{{ email }}</td>
+                </tr>
+                <tr>
+                    <td>
+                        <b>Mot de passe </b>(à renouveler lors de la première
+                        connexion)&nbsp;<b>:</b>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="credential hint">
+                        <em>&nbsp;{{ password }}&nbsp;</em>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="credential-title">Espace de travail&nbsp;:</td>
+                </tr>
+                <tr>
+                    <td class="credential">{{ server }}</td>
+                </tr>
+            </tbody>
+        </table>
+        <p class="fallback">
+            Si le lien ne fonctionne pas, copiez-collez cette URL dans la barre
+            d'adresse de votre navigateur internet&nbsp;:<br />
+            {{ login_url }}
+        </p>
+        <p>N'hésitez pas à nous contacter en répondant à cet email,</p>
+        <p>L'équipe Watcha</p>
+    </body>
+</html>

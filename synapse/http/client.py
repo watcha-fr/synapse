@@ -548,7 +548,10 @@ class SimpleHttpClient:
         if headers:
             actual_headers.update(headers)  # type: ignore
 
+        """ watcha!
         body = await self.get_raw(uri, args, headers=headers)
+        !watcha """
+        body = await self.get_raw(uri, args, headers=actual_headers)  # watcha+
         return json_decoder.decode(body.decode("utf-8"))
 
     async def put_json(
@@ -716,6 +719,130 @@ class SimpleHttpClient:
             response.request.absoluteURI.decode("ascii"),
             response.code,
         )
+
+    # watcha+
+    async def post_json(
+        self, uri: str, post_json: Any, headers: Optional[RawHeaders] = None
+    ) -> Any:
+        """
+
+        Args:
+            uri: URI to query.
+            post_json: request body, to be encoded as json
+            headers: a map from header name to a list of values for that header
+
+        Raises:
+            RequestTimedOutError: if there is a timeout before the response headers
+               are received. Note there is currently no timeout on reading the response
+               body.
+
+            HttpResponseException: On a non-2xx HTTP response.
+
+        """
+        json_str = encode_canonical_json(post_json)
+
+        logger.debug("HTTP POST %s -> %s", json_str, uri)
+
+        actual_headers = {
+            b"Content-Type": [b"application/json"],
+            b"User-Agent": [self.user_agent],
+            b"Accept": [b"application/json"],
+        }
+        if headers:
+            actual_headers.update(headers)
+
+        response = await self.request(
+            "POST", uri, headers=Headers(actual_headers), data=json_str
+        )
+
+        body = await make_deferred_yieldable(readBody(response))
+
+        if not (200 <= response.code < 300):
+            raise HttpResponseException(
+                response.code, response.phrase.decode("ascii", errors="replace"), body
+            )
+
+    async def delete_get_json(self, uri, headers=None, json_body={}):
+        """DELETE to a given URL and get json.
+
+        Args:
+            uri (str):
+            headers (dict[str|bytes, List[str|bytes]]|None): If not None, a map from
+               header name to a list of values for that header
+            json_body (dict): The JSON to put in the HTTP body,
+
+        Returns:
+            object: parsed json
+
+        Raises:
+            HttpResponseException: On a non-2xx HTTP response.
+
+            ValueError: if the response was not JSON
+        """
+
+        actual_headers = {
+            b"Content-Type": [b"application/json"],
+            b"User-Agent": [self.user_agent],
+            b"Accept": [b"application/json"],
+        }
+        if headers:
+            actual_headers.update(headers)
+
+        json_str = encode_canonical_json(json_body)
+
+        response = await self.request(
+            "DELETE", uri, headers=Headers(actual_headers), data=json_str
+        )
+
+        body = await make_deferred_yieldable(readBody(response))
+
+        if 200 <= response.code < 300:
+            return json_decoder.decode(body.decode("utf-8"))
+        else:
+            raise HttpResponseException(
+                response.code, response.phrase.decode("ascii", errors="replace"), body
+            )
+
+    async def delete(self, uri, headers=None, json_body={}):
+        """DELETE to a given URL and get json.
+
+        Args:
+            uri (str):
+            headers (dict[str|bytes, List[str|bytes]]|None): If not None, a map from
+               header name to a list of values for that header
+            json_body (dict): The JSON to put in the HTTP body,
+
+        Returns:
+            object: parsed json
+
+        Raises:
+            HttpResponseException: On a non-2xx HTTP response.
+
+            ValueError: if the response was not JSON
+        """
+
+        actual_headers = {
+            b"Content-Type": [b"application/json"],
+            b"User-Agent": [self.user_agent],
+            b"Accept": [b"application/json"],
+        }
+        if headers:
+            actual_headers.update(headers)
+
+        json_str = encode_canonical_json(json_body)
+
+        response = await self.request(
+            "DELETE", uri, headers=Headers(actual_headers), data=json_str
+        )
+
+        body = await make_deferred_yieldable(readBody(response))
+
+        if not (200 <= response.code < 300):
+            raise HttpResponseException(
+                response.code, response.phrase.decode("ascii", errors="replace"), body
+            )
+
+    # +watcha
 
 
 def _timeout_to_request_timed_out_error(f: Failure):

@@ -1760,6 +1760,7 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
         room_id = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
 
         # Trying to join as the other user should fail due to reaching MAU limit.
+        self.helper.invite(room_id, src=self.admin_user, tok=self.admin_user_tok, targ=self.other_user) # watcha+
         self.helper.join(
             room_id, user=self.other_user, tok=self.other_user_tok, expect_code=403
         )
