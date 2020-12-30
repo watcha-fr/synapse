@@ -1,8 +1,9 @@
 import logging
 from base64 import b64encode
+from secrets import token_hex
+
 from jsonschema import validate
 
-from secrets import token_hex
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SimpleHttpClient
 

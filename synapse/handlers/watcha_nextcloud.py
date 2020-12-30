@@ -1,11 +1,13 @@
 import logging
-from jsonschema.exceptions import ValidationError, SchemaError
 from pathlib import Path
 
-from ._base import BaseHandler
+from jsonschema.exceptions import SchemaError, ValidationError
+
 from synapse.api.constants import EventTypes
 from synapse.api.errors import Codes, SynapseError
 from synapse.types import get_localpart_from_id
+
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 

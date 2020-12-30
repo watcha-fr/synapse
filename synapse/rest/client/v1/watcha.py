@@ -1,8 +1,9 @@
 import logging
-from jsonschema.exceptions import ValidationError, SchemaError
+from secrets import token_hex
 from urllib.parse import urlparse
 
-from secrets import token_hex
+from jsonschema.exceptions import SchemaError, ValidationError
+
 from synapse.api.errors import AuthError, HttpResponseException, SynapseError
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.servlet import RestServlet, parse_json_object_from_request

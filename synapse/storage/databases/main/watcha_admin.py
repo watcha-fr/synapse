@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 
-import time, json, calendar, logging
-from datetime import datetime
-from collections import defaultdict
+import calendar
 import inspect
+import json
+import logging
+import time
+from collections import defaultdict
+from datetime import datetime
 
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
@@ -30,7 +33,7 @@ class AdministrationStore(SQLBaseStore):
 
     async def _get_new_rooms(self):
         """Retrieve a list of rooms that have recevied m.room.create event during the last week
-        
+
         Returns:
             A list of room_id
         """
@@ -51,7 +54,7 @@ class AdministrationStore(SQLBaseStore):
 
     async def _get_active_rooms(self):
         """Retrieve a list of rooms that have recevied some message during the last week
-        
+
         Returns:
             A list of room_id
         """
@@ -69,7 +72,9 @@ class AdministrationStore(SQLBaseStore):
 
             return [rooms[0] for rooms in txn.fetchall()]
 
-        return await self.db_pool.runInteraction("_get_active_rooms", _get_active_rooms_txn)
+        return await self.db_pool.runInteraction(
+            "_get_active_rooms", _get_active_rooms_txn
+        )
 
     async def _get_dm_rooms(self):
         """Retrieve a list of rooms that have m.direct flag on account_data and with exactly two joinned or invited members
@@ -113,7 +118,9 @@ class AdministrationStore(SQLBaseStore):
         active_rooms = set(active_rooms).union(new_rooms)
 
         all_rooms = await self.db_pool.simple_select_onecol(
-            table="rooms", keyvalues=None, retcol="room_id",
+            table="rooms",
+            keyvalues=None,
+            retcol="room_id",
         )
 
         regular_rooms = set(all_rooms) & set(members_by_room.keys()) - set(dm_rooms)
@@ -129,9 +136,9 @@ class AdministrationStore(SQLBaseStore):
 
     async def _get_users_stats(self):
         """Retrieve the count of users per role (administrators, members and partners) and some stats about activity of users and pending invitations
-        
+
         Used for Watcha admin console.
-        
+
         Returns:
             A dict of integers
         """
@@ -183,7 +190,9 @@ class AdministrationStore(SQLBaseStore):
 
             return collaborators_users, partner_users, last_seen_ts_per_users
 
-        users = await self.db_pool.runInteraction("_get_users_stats", _get_users_stats_txn)
+        users = await self.db_pool.runInteraction(
+            "_get_users_stats", _get_users_stats_txn
+        )
 
         number_of_collaborators = users[0][0]
         number_of_partners = users[1][0]
@@ -227,9 +236,9 @@ class AdministrationStore(SQLBaseStore):
 
     async def _get_server_state(self):
         """Retrieve informations about server (disk usage, install and upgrade date, version)
-        
+
         Used for Watcha admin console.
-        
+
         Returns:
             A dict of strings
         """
@@ -321,7 +330,9 @@ class AdministrationStore(SQLBaseStore):
 
             return [dict(zip(FIELDS, user)) for user in result]
 
-        users = await self.db_pool.runInteraction("watcha_user_list", watcha_user_list_txn)
+        users = await self.db_pool.runInteraction(
+            "watcha_user_list", watcha_user_list_txn
+        )
 
         for user in users:
             user["status"] = (
@@ -355,7 +366,9 @@ class AdministrationStore(SQLBaseStore):
 
             return txn.fetchall()
 
-        return await self.db_pool.runInteraction("watcha_email_list", watcha_email_list_txn)
+        return await self.db_pool.runInteraction(
+            "watcha_email_list", watcha_email_list_txn
+        )
 
     async def watcha_user_ip(self, user_id):
         def watcha_user_ip_txn(txn):
@@ -423,7 +436,7 @@ class AdministrationStore(SQLBaseStore):
     async def watcha_room_list(self):
         """Retrieve a list of rooms with some informations for each one (room_id, creator, name, members, type and status).
 
-        Used for Watcha admin console. 
+        Used for Watcha admin console.
 
         Returns:
             A list of dict for each rooms.
@@ -445,7 +458,9 @@ class AdministrationStore(SQLBaseStore):
 
             return txn.fetchall()
 
-        rooms = await self.db_pool.runInteraction("watcha_room_list", watcha_room_list_txn)
+        rooms = await self.db_pool.runInteraction(
+            "watcha_room_list", watcha_room_list_txn
+        )
         members_by_room = await self.members_by_room()
         new_rooms = await self._get_new_rooms()
         active_rooms = await self._get_active_rooms()
@@ -576,7 +591,9 @@ class AdministrationStore(SQLBaseStore):
 
             return txn.fetchall()
 
-        admins = await self.db_pool.runInteraction("_get_user_admin", _get_user_admin_txn)
+        admins = await self.db_pool.runInteraction(
+            "_get_user_admin", _get_user_admin_txn
+        )
         admins = [
             {"user_id": element[0], "email": element[1], "displayname": element[2]}
             for element in admins

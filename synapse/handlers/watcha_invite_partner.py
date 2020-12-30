@@ -1,13 +1,14 @@
 import logging
-
-from ._base import BaseHandler
-from jsonschema.exceptions import ValidationError, SchemaError
 from secrets import token_hex
 
-from synapse.api.errors import SynapseError, HttpResponseException
+from jsonschema.exceptions import SchemaError, ValidationError
+
+from synapse.api.errors import HttpResponseException, SynapseError
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.push.mailer import Mailer
 from synapse.util.threepids import canonicalise_email
+
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
