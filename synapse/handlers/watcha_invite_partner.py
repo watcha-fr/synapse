@@ -29,7 +29,7 @@ class InvitePartnerHandler(BaseHandler):
                 template_text=self.config.watcha_registration_template_text,
             )
 
-    async def invite(self, room_id, host_id, host_device_id, invitee_email):
+    async def invite(self, room_id, sender_id, sender_device_id, invitee_email):
 
         user_id = await self.auth_handler.find_user_id_by_email(invitee_email)
         email_sent = False
@@ -64,7 +64,7 @@ class InvitePartnerHandler(BaseHandler):
 
             await self.mailer.send_watcha_registration_email(
                 email_address=invitee_email,
-                host_id=host_id,
+                sender_id=sender_id,
                 password=password,
             )
 
@@ -79,8 +79,8 @@ class InvitePartnerHandler(BaseHandler):
 
         await self.store.insert_partner_invitation(
             partner_user_id=user_id,
-            inviter_user_id=host_id,
-            inviter_device_id=host_device_id,
+            inviter_user_id=sender_id,
+            inviter_device_id=sender_device_id,
             email_sent=email_sent,
         )
 

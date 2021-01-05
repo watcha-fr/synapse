@@ -351,7 +351,7 @@ class WatchaRegisterRestServlet(RestServlet):
         if send_email:
             await self.mailer.send_watcha_registration_email(
                 email_address=email,
-                host_id=requester.user.to_string(),
+                sender_id=requester.user.to_string(),
                 password=password,
             )
         else:
