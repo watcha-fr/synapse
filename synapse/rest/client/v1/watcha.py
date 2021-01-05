@@ -283,13 +283,12 @@ class WatchaRegisterRestServlet(RestServlet):
         self.profile_handler = hs.get_profile_handler()
         self.registration_handler = hs.get_registration_handler()
 
-        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            self.mailer = Mailer(
-                hs=hs,
-                app_name=self.config.email_app_name,
-                template_html=self.config.watcha_registration_template_html,
-                template_text=self.config.watcha_registration_template_text,
-            )
+        self.mailer = Mailer(
+            hs=hs,
+            app_name=self.config.email_app_name,
+            template_html=self.config.watcha_registration_template_html,
+            template_text=self.config.watcha_registration_template_text,
+        )
 
     async def on_POST(self, request):
         await _check_admin(
