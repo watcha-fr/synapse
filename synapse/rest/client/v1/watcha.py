@@ -1,7 +1,6 @@
 import logging
 from urllib.parse import urlparse
 
-from secrets import token_hex
 from synapse.api.errors import AuthError, SynapseError
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
@@ -282,6 +281,7 @@ class WatchaRegisterRestServlet(RestServlet):
         self.nextcloud_handler = hs.get_nextcloud_handler()
         self.profile_handler = hs.get_profile_handler()
         self.registration_handler = hs.get_registration_handler()
+        self.secret = hs.get_secrets()
 
         self.mailer = Mailer(
             hs=hs,
@@ -324,7 +324,7 @@ class WatchaRegisterRestServlet(RestServlet):
         if "password" in params and params["password"]:
             password = params["password"]
         else:
-            password = token_hex(6)
+            password = self.secret.token_hex(6)
             send_email = True
 
         password_hash = await self.auth_handler.hash(password)

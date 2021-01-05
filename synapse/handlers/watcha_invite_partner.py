@@ -1,7 +1,6 @@
 import logging
 
 from ._base import BaseHandler
-from secrets import token_hex
 
 from synapse.api.errors import SynapseError
 from synapse.config.emailconfig import ThreepidBehaviour
@@ -20,6 +19,7 @@ class InvitePartnerHandler(BaseHandler):
         self.nextcloud_handler = self.hs.get_nextcloud_handler()
         self.registration_handler = self.hs.get_registration_handler()
         self.room_handler = self.hs.get_room_member_handler()
+        self.secret = hs.get_secrets()
 
         self.mailer = Mailer(
             hs=self.hs,
@@ -48,7 +48,7 @@ class InvitePartnerHandler(BaseHandler):
                 raise SynapseError(400, str(e))
 
             localpart = map_username_to_mxid_localpart(invitee_email)
-            password = token_hex(6)
+            password = self.secret.token_hex(6)
             password_hash = await self.auth_handler.hash(password)
 
             await self.nextcloud_handler.create_keycloak_and_nextcloud_user(
