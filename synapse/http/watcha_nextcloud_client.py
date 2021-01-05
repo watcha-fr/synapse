@@ -19,7 +19,7 @@ META_SCHEMA = {
 
 WITHOUT_DATA_SCHEMA = {
     "$schema": "http://json-schema.org/draft-04/schema#",
-    "description": "Owncloud API schema which data is not expected",
+    "description": "Nextcloud API schema which data is not expected",
     "definitions": {
         "meta": META_SCHEMA,
     },
@@ -41,7 +41,7 @@ WITHOUT_DATA_SCHEMA = {
 
 WITH_DATA_SCHEMA = {
     "$schema": "http://json-schema.org/draft-04/schema#",
-    "description": "Owncloud API schema which data is expected",
+    "description": "Nextcloud API schema which data is expected",
     "definitions": {"meta": META_SCHEMA},
     "type": "object",
     "properties": {
@@ -64,7 +64,7 @@ WITH_DATA_SCHEMA = {
 
 class NextcloudClient(SimpleHttpClient):
     """Interface for talking with Nextcloud APIs
-    https://doc.owncloud.com/server/admin_manual/configuration/user/user_provisioning_api.html
+    https://docs.nextcloud.com/server/latest/developer_manual/client_apis/index.html
     """
 
     def __init__(self, hs):
