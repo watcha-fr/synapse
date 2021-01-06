@@ -31,6 +31,7 @@ class InvitePartnerHandler(BaseHandler):
     async def invite(self, room_id, sender_id, sender_device_id, invitee_email):
 
         user_id = await self.auth_handler.find_user_id_by_email(invitee_email)
+        invitee_email = invitee_email.strip()
         email_sent = False
 
         if user_id:
@@ -42,11 +43,6 @@ class InvitePartnerHandler(BaseHandler):
                 )
             )
         else:
-            try:
-                invitee_email = canonicalise_email(invitee_email)
-            except ValueError as e:
-                raise SynapseError(400, str(e))
-
             localpart = map_username_to_mxid_localpart(invitee_email)
             password = self.secret.token_hex(6)
             password_hash = await self.auth_handler.hash(password)

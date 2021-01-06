@@ -305,11 +305,6 @@ class WatchaRegisterRestServlet(RestServlet):
                 "Email address cannot be empty",
             )
 
-        try:
-            email = canonicalise_email(email)
-        except ValueError as e:
-            raise SynapseError(400, str(e))
-
         user_id = await self.auth_handler.find_user_id_by_email(email)
         if user_id:
             raise SynapseError(
