@@ -192,8 +192,14 @@ class Mailer:
             host_display_name = await self.profile_handler.get_displayname(
                 UserID.from_string(sender_id)
             )
-            host_email = await self.account_handler.get_email_address_for_user(sender_id)
-            host_name = "{} ({})".format(host_display_name, host_email)
+            host_email = await self.account_handler.get_email_address_for_user(
+                sender_id
+            )
+            host_name = (
+                "{} ({})".format(host_display_name, host_email)
+                if host_display_name
+                else host_email
+            )
 
         template_vars = {
             "title": subject,
