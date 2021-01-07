@@ -989,6 +989,7 @@ UserAttribute = TypedDict(
         "email": Optional[str],
         "synapse_role": Optional[str],
         "locale": Optional[str],
+        "nextcloud_username": Optional[str],
     },
 )
 # +watcha
@@ -1160,6 +1161,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         email = userinfo.get("email")  # type: Optional[str]
         synapse_role = userinfo.get("synapse_role")  # type: Optional[str]
         locale = userinfo.get("locale")  # type: Optional[str]
+        nextcloud_username = userinfo.get("nextcloud_username")  # type: Optional[str]
 
         return UserAttribute(
             localpart=localpart,
@@ -1167,6 +1169,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             email=email,
             synapse_role=synapse_role,
             locale=locale,
+            nextcloud_username=nextcloud_username
         )
         # +watcha
 
