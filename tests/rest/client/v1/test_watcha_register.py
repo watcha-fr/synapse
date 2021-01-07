@@ -155,26 +155,3 @@ class RegisterTestCase(unittest.HomeserverTestCase):
             channel.result["body"],
             b'{"errcode":"M_UNKNOWN","error":"A user with this email address already exists. Cannot create a new one."}',
         )
-
-    def test_register_user_with_unparsable_email(self):
-        request, channel = self.make_request(
-            "POST",
-            self.url,
-            {
-                "email": "user1examplecom",
-                "admin": False,
-                "password": "",
-            },
-            self.owner_tok,
-        )
-        self.render(request)
-
-        self.keycloak_client.add_user.not_called()
-        self.keycloak_client.get_user.not_called()
-        self.nextcloud_client.add_user.not_called()
-
-        self.assertEqual(channel.code, 400)
-        self.assertEqual(
-            channel.result["body"],
-            b'{"errcode":"M_UNKNOWN","error":"Unable to parse email address"}',
-        )

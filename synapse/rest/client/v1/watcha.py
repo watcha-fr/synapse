@@ -2,7 +2,6 @@ import logging
 from jsonschema.exceptions import ValidationError, SchemaError
 from urllib.parse import urlparse
 
-from secrets import token_hex
 from synapse.api.errors import AuthError, HttpResponseException, SynapseError
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
@@ -187,6 +186,7 @@ class WatchaRegisterRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
+        self.secret = hs.get_secrets()
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
 
@@ -212,11 +212,6 @@ class WatchaRegisterRestServlet(RestServlet):
                 "Email address cannot be empty",
             )
 
-        try:
-            email = canonicalise_email(email)
-        except ValueError as e:
-            raise SynapseError(400, str(e))
-
         if await self.auth_handler.find_user_id_by_email(email):
             raise SynapseError(
                 400,
@@ -226,7 +221,7 @@ class WatchaRegisterRestServlet(RestServlet):
         if "password" in params and params["password"]:
             password = params["password"]
         else:
-            password = token_hex(6)
+            password = self.secret.token_hex(6)
 
         password_hash = await self.auth_handler.hash(password)
         admin = params["admin"]
@@ -258,7 +253,7 @@ class WatchaRegisterRestServlet(RestServlet):
 
         await self.mailer.send_watcha_registration_email(
             email_address=email,
-            host_id=requester.user.to_string(),
+            sender_id=requester.user.to_string(),
             password=password,
         )
 

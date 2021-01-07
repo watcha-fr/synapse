@@ -94,6 +94,7 @@ class TestMappingProvider(OidcMappingProvider):
             "email": userinfo.get("email"),
             "synapse_role": userinfo.get("synapse_role"),
             "locale": userinfo.get("locale"),
+            "nextcloud_username": userinfo.get("nextcloud_username")
         }
         # +watcha
 

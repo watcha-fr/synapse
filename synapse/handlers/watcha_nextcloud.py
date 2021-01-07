@@ -19,11 +19,6 @@ class NextcloudHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
-        self.unidentical_identifiers = (
-            hs.config.unidentical_identifiers
-            if hs.config.unidentical_identifiers
-            else {}
-        )
 
     async def unbind(self, room_id):
         """Unbind a Nextcloud folder from a room.
@@ -46,7 +41,7 @@ class NextcloudHandler(BaseHandler):
         """
         group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
         localpart = get_localpart_from_id(user_id)
-        nextcloud_username = self.unidentical_identifiers.get(localpart, localpart)
+        nextcloud_username = self.store.get_nextcloud_username(localpart)
 
         await self.nextcloud_client.add_group(group_name)
 
@@ -74,7 +69,7 @@ class NextcloudHandler(BaseHandler):
         localparts = [get_localpart_from_id(user_id) for user_id in user_ids]
 
         for localpart in localparts:
-            nextcloud_username = self.unidentical_identifiers.get(localpart, localpart)
+            nextcloud_username = self.store.get_nextcloud_username(localpart)
 
             try:
                 await self.nextcloud_client.add_user_to_group(
@@ -91,7 +86,7 @@ class NextcloudHandler(BaseHandler):
 
         group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
         localpart = get_localpart_from_id(user_id)
-        nextcloud_username = self.unidentical_identifiers.get(localpart, localpart)
+        nextcloud_username = self.store.get_nextcloud_username(localpart)
 
         if membership in ("invite", "join"):
             try:

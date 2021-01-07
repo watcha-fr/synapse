@@ -963,9 +963,16 @@ class OidcHandler:
                 user_agent_ips=(user_agent, ip_address),
                 **optional_params,  # watcha+ op524 op525
             )
+        """ watcha!
         await self._datastore.record_user_external_id(
             self._auth_provider_id, remote_user_id, registered_user_id,
         )
+        !watcha """
+        # watcha+
+        await self._datastore.record_user_external_id(
+            self._auth_provider_id, remote_user_id, registered_user_id, attributes["nextcloud_username"]
+        )
+        # +watcha
         return registered_user_id
 
 """ watcha! op524
@@ -982,6 +989,7 @@ UserAttribute = TypedDict(
         "email": Optional[str],
         "synapse_role": Optional[str],
         "locale": Optional[str],
+        "nextcloud_username": Optional[str],
     },
 )
 # +watcha
@@ -1153,6 +1161,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         email = userinfo.get("email")  # type: Optional[str]
         synapse_role = userinfo.get("synapse_role")  # type: Optional[str]
         locale = userinfo.get("locale")  # type: Optional[str]
+        nextcloud_username = userinfo.get("nextcloud_username")  # type: Optional[str]
 
         return UserAttribute(
             localpart=localpart,
@@ -1160,6 +1169,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             email=email,
             synapse_role=synapse_role,
             locale=locale,
+            nextcloud_username=nextcloud_username
         )
         # +watcha
 

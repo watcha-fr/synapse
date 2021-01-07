@@ -2,7 +2,6 @@ import logging
 
 from ._base import BaseHandler
 from jsonschema.exceptions import ValidationError, SchemaError
-from secrets import token_hex
 
 from synapse.api.errors import SynapseError, HttpResponseException
 from synapse.config.emailconfig import ThreepidBehaviour
@@ -18,6 +17,7 @@ class InvitePartnerHandler(BaseHandler):
         self.config = hs.config
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = self.hs.get_registration_handler()
+        self.secret = hs.get_secrets()
         self.store = hs.get_datastore()
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
@@ -30,9 +30,10 @@ class InvitePartnerHandler(BaseHandler):
                 template_text=self.config.watcha_registration_template_text,
             )
 
-    async def invite(self, room_id, host_id, host_device_id, invitee_email):
+    async def invite(self, room_id, sender_id, sender_device_id, invitee_email):
 
         user_id = await self.auth_handler.find_user_id_by_email(invitee_email)
+        invitee_email = invitee_email.strip()
         email_sent = False
 
         if user_id:
@@ -44,12 +45,7 @@ class InvitePartnerHandler(BaseHandler):
                 )
             )
         else:
-            try:
-                invitee_email = canonicalise_email(invitee_email)
-            except ValueError as e:
-                raise SynapseError(400, str(e))
-
-            password = token_hex(6)
+            password = self.secret.token_hex(6)
             password_hash = await self.auth_handler.hash(password)
 
             await self.keycloak_client.add_user(invitee_email, password_hash, "partner")
@@ -76,7 +72,7 @@ class InvitePartnerHandler(BaseHandler):
 
             await self.mailer.send_watcha_registration_email(
                 email_address=invitee_email,
-                host_id=host_id,
+                sender_id=sender_id,
                 password=password,
             )
 
@@ -91,8 +87,8 @@ class InvitePartnerHandler(BaseHandler):
 
         await self.store.insert_partner_invitation(
             partner_user_id=user_id,
-            inviter_user_id=host_id,
-            inviter_device_id=host_device_id,
+            inviter_user_id=sender_id,
+            inviter_device_id=sender_device_id,
             email_sent=email_sent,
         )
 

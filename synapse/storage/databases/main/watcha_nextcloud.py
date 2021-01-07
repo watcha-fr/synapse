@@ -34,11 +34,7 @@ class NextcloudStore(SQLBaseStore):
         await self.db_pool.simple_upsert(
             table="room_nextcloud_mapping",
             keyvalues={"room_id": room_id},
-            values={
-                "room_id": room_id,
-                "directory_path": path,
-                "share_id": share_id,
-            },
+            values={"room_id": room_id, "directory_path": path, "share_id": share_id,},
             desc="bind",
         )
 
@@ -49,4 +45,21 @@ class NextcloudStore(SQLBaseStore):
             table="room_nextcloud_mapping",
             keyvalues={"room_id": room_id},
             desc="unbind",
+        )
+
+    async def get_nextcloud_username(self, user_id):
+        """Look up a Nextcloud username by their user_id
+
+        Args:
+            user_id: localpart of the user
+
+        Returns:
+            the Nextcloud username of the user, or None if they are not known
+        """
+        return await self.db_pool.simple_select_one_onecol(
+            table="user_external_ids",
+            keyvalues={"user_id": user_id},
+            retcol="nextcloud_username",
+            allow_none=True,
+            desc="get_nextcloud_username",
         )
