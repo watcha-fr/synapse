@@ -21,12 +21,13 @@ class InvitePartnerHandler(BaseHandler):
         self.room_handler = self.hs.get_room_member_handler()
         self.secret = hs.get_secrets()
 
-        self.mailer = Mailer(
-            hs=self.hs,
-            app_name=self.config.email_app_name,
-            template_html=self.config.watcha_registration_template_html,
-            template_text=self.config.watcha_registration_template_text,
-        )
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            self.mailer = Mailer(
+                hs=self.hs,
+                app_name=self.config.email_app_name,
+                template_html=self.config.watcha_registration_template_html,
+                template_text=self.config.watcha_registration_template_text,
+            )
 
     async def invite(self, room_id, sender_id, sender_device_id, invitee_email):
 
