@@ -118,20 +118,3 @@ class InvitePartnerHandlerTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.result["body"], b"{}")
-
-    def test_invite_new_partner_with_wrong_email(self):
-        request, channel = self.make_request(
-            "POST",
-            self.url,
-            {"id_server": "test", "medium": "email", "address": "partnerexamplecom"},
-            self.owner_tok,
-        )
-        self.render(request)
-
-        self.keycloak_client.add_user.not_called()
-        self.keycloak_client.get_user.not_called()
-        self.nextcloud_client.add_user.not_called()
-
-        self.assertEqual(len(self.email_attempts), 0)
-
-        self.assertEqual(channel.code, 400)
