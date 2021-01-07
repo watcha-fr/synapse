@@ -963,9 +963,16 @@ class OidcHandler:
                 user_agent_ips=(user_agent, ip_address),
                 **optional_params,  # watcha+ op524 op525
             )
+        """ watcha!
         await self._datastore.record_user_external_id(
             self._auth_provider_id, remote_user_id, registered_user_id,
         )
+        !watcha """
+        # watcha+
+        await self._datastore.record_user_external_id(
+            self._auth_provider_id, remote_user_id, registered_user_id, attributes["nextcloud_username"]
+        )
+        # +watcha
         return registered_user_id
 
 """ watcha! op524
