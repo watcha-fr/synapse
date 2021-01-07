@@ -2,7 +2,6 @@ import logging
 from base64 import b64encode
 from jsonschema import validate
 
-from secrets import token_hex
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SimpleHttpClient
 
@@ -19,7 +18,7 @@ META_SCHEMA = {
 
 WITHOUT_DATA_SCHEMA = {
     "$schema": "http://json-schema.org/draft-04/schema#",
-    "description": "Owncloud API schema which data is not expected",
+    "description": "Nextcloud API schema which data is not expected",
     "definitions": {
         "meta": META_SCHEMA,
     },
@@ -38,7 +37,7 @@ WITHOUT_DATA_SCHEMA = {
 
 WITH_DATA_SCHEMA = {
     "$schema": "http://json-schema.org/draft-04/schema#",
-    "description": "Owncloud API schema which data is expected",
+    "description": "Nextcloud API schema which data is expected",
     "definitions": {"meta": META_SCHEMA},
     "type": "object",
     "properties": {
@@ -61,13 +60,14 @@ WITH_DATA_SCHEMA = {
 
 class NextcloudClient(SimpleHttpClient):
     """Interface for talking with Nextcloud APIs
-    https://doc.owncloud.com/server/admin_manual/configuration/user/user_provisioning_api.html
+    https://docs.nextcloud.com/server/latest/developer_manual/client_apis/index.html
     """
 
     def __init__(self, hs):
         super().__init__(hs)
 
         self.nextcloud_url = hs.config.nextcloud_url
+        self.secret = hs.get_secrets()
         self.service_account_name = hs.config.service_account_name
         self.service_account_password = hs.config.nextcloud_service_account_password
         self._headers = self._get_headers()
@@ -107,8 +107,8 @@ class NextcloudClient(SimpleHttpClient):
             102 - username already exists
             103 - unknown error occurred whilst adding the user
         """
-        # A password is needed to create NC user, but it will not be used by KC login process.
-        password = token_hex()
+        # A password is needed to create NC user, but it will not be used by KC login process. 
+        password = self.secret.token_hex()
 
         response = await self.post_json_get_json(
             uri="{}/ocs/v1.php/cloud/users".format(self.nextcloud_url),

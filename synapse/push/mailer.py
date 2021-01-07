@@ -174,26 +174,32 @@ class Mailer:
     async def send_watcha_registration_email(
         self,
         email_address,
-        host_id,
+        sender_id,
         password,
     ):
         """Send an email with temporary password and connexion link to Watcha.
 
         Args:
             email_address (str): Email address we're sending the invitation
-            host_id (str): the user id of the user who invite the partner
+            sender_id (str): the user id of the user who invite the partner
             password (str): a temporay password
         """
         subject = self.email_subjects.watcha_registration % {"app": self.app_name}
 
-        if get_localpart_from_id(host_id) == self.hs.config.service_account_name:
+        if get_localpart_from_id(sender_id) == self.hs.config.service_account_name:
             host_name = self.hs.config.email_notif_from
         else:
             host_display_name = await self.profile_handler.get_displayname(
-                UserID.from_string(host_id)
+                UserID.from_string(sender_id)
             )
-            host_email = await self.account_handler.get_email_address_for_user(host_id)
-            host_name = "{} ({})".format(host_display_name, host_email)
+            host_email = await self.account_handler.get_email_address_for_user(
+                sender_id
+            )
+            host_name = (
+                "{} ({})".format(host_display_name, host_email)
+                if host_display_name
+                else host_email
+            )
 
         template_vars = {
             "title": subject,
