@@ -279,12 +279,13 @@ class WatchaRegisterRestServlet(RestServlet):
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
 
-        self.mailer = Mailer(
-            hs=hs,
-            app_name=self.config.email_app_name,
-            template_html=self.config.watcha_registration_template_html,
-            template_text=self.config.watcha_registration_template_text,
-        )
+        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            self.mailer = Mailer(
+                hs=hs,
+                app_name=self.config.email_app_name,
+                template_html=self.config.watcha_registration_template_html,
+                template_text=self.config.watcha_registration_template_text,
+            )
 
     async def on_POST(self, request):
         await _check_admin(
