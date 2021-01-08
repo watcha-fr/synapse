@@ -1179,14 +1179,10 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         locale = userinfo.get("locale")  # type: Optional[str]
 
         nextcloud_username = None
-        print("@@ NEXTCLOUD TEMPLATE?")
         if self._config.nextcloud_username_template is not None:
-            print("@@ NEXTCLOUD TEMPLATE OK")
             nextcloud_username = self._config.nextcloud_username_template.render(
                 user=userinfo
             ).strip()
-            print("@@ NEXTCLOUD TEMPLATE", self._config.nextcloud_username_template)
-            print("@@ NEXTCLOUD USERNAME", nextcloud_username)
 
         return UserAttribute(
             localpart=localpart,
