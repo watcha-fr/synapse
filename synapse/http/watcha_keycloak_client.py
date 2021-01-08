@@ -137,6 +137,23 @@ class KeycloakClient(SimpleHttpClient):
 
         return response
 
+    async def update_user(self, user_id, attributes):
+        """Update specific attribute of a Keycloak user
+
+        Args:
+            user_id: the Keycloak user id
+        """
+
+        response = await self.put(
+            self._get_endpoint(
+                "admin/realms/{}/users/{}".format(self.realm_name, user_id)
+            ),
+            headers=await self._get_header(),
+            json_body={
+                "attributes": attributes,
+            },
+        )
+
     async def _get_header(self):
         access_token = await self._get_access_token()
         return {"Authorization": ["Bearer {}".format(access_token)]}
