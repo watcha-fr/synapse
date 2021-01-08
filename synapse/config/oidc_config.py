@@ -217,7 +217,7 @@ class OIDCConfig(Config):
               #
               # If this and Nextcloud section are unset the Nextcloud username will not be stored.
               #
-              #nextcloud_username_template: "{% if user.nextcloud_username is defined %}{{user.nextcloud_username }}{% else %}{{ user.sub }}{% endif %}"
+              #nextcloud_username_template: "{{% if user.nextcloud_username is defined %}}{{{{user.nextcloud_username }}}}{{% else %}}{{{{ user.sub }}}}{{% endif %}}"
 
               # Jinja2 templates for extra attributes to send back to the client during
               # login.
