@@ -46,7 +46,7 @@ class NextcloudHandler(BaseHandler):
         """
         group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
         localpart = get_localpart_from_id(user_id)
-        nextcloud_username = self.store.get_nextcloud_username(localpart)
+        nextcloud_username = await self.store.get_nextcloud_username(localpart)
 
         await self.nextcloud_client.add_group(group_name)
 
@@ -74,7 +74,7 @@ class NextcloudHandler(BaseHandler):
         localparts = [get_localpart_from_id(user_id) for user_id in user_ids]
 
         for localpart in localparts:
-            nextcloud_username = self.store.get_nextcloud_username(localpart)
+            nextcloud_username = await self.store.get_nextcloud_username(localpart)
 
             try:
                 await self.nextcloud_client.add_user_to_group(
@@ -86,12 +86,13 @@ class NextcloudHandler(BaseHandler):
                         localpart, group_name
                     )
                 )
+                print(error)
 
     async def update_share(self, user_id, room_id, membership):
 
         group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
         localpart = get_localpart_from_id(user_id)
-        nextcloud_username = self.store.get_nextcloud_username(localpart)
+        nextcloud_username = await self.store.get_nextcloud_username(localpart)
 
         if membership in ("invite", "join"):
             try:
