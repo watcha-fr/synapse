@@ -727,6 +727,56 @@ class SimpleHttpClient:
                 response.code, response.phrase.decode("ascii", errors="replace"), body
             )
 
+    async def put(
+        self,
+        uri: str,
+        json_body: Any,
+        args: QueryParams = {},
+        headers: RawHeaders = None,
+    ) -> Any:
+        """Puts some json to the given URI.
+
+        Args:
+            uri: The URI to request, not including query parameters
+            json_body: The JSON to put in the HTTP body,
+            args: A dictionary used to create query strings
+            headers: a map from header name to a list of values for that header
+        Returns:
+            Succeeds when we get a 2xx HTTP response, with the HTTP body as JSON.
+        Raises:
+             RequestTimedOutError: if there is a timeout before the response headers
+               are received. Note there is currently no timeout on reading the response
+               body.
+
+            HttpResponseException On a non-2xx HTTP response.
+
+            ValueError: if the response was not JSON
+        """
+        if len(args):
+            query_bytes = urllib.parse.urlencode(args, True)
+            uri = "%s?%s" % (uri, query_bytes)
+
+        json_str = encode_canonical_json(json_body)
+
+        actual_headers = {
+            b"Content-Type": [b"application/json"],
+            b"User-Agent": [self.user_agent],
+            b"Accept": [b"application/json"],
+        }
+        if headers:
+            actual_headers.update(headers)
+
+        response = await self.request(
+            "PUT", uri, headers=Headers(actual_headers), data=json_str
+        )
+
+        body = await make_deferred_yieldable(readBody(response))
+
+        if not (200 <= response.code < 300):
+            raise HttpResponseException(
+                response.code, response.phrase.decode("ascii", errors="replace"), body
+            )
+
     async def delete_get_json(self, uri, headers=None, json_body={}):
         """DELETE to a given URL and get json.
 

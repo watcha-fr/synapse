@@ -53,6 +53,9 @@ class InvitePartnerHandler(BaseHandler):
             keycloak_user_id = keycloak_user["id"]
 
             try:
+                await self.keycloak_client.update_user(
+                    keycloak_user_id, {"nextcloudUsername": keycloak_user_id}
+                )
                 await self.nextcloud_client.add_user(keycloak_user_id)
             except (SynapseError, HttpResponseException, ValidationError, SchemaError):
                 await self.keycloak_client.delete_user(keycloak_user_id)

@@ -78,6 +78,7 @@ class InvitePartnerHandlerTestCase(unittest.HomeserverTestCase):
         self.keycloak_client = self.nextcloud_handler.keycloak_client
         self.nextcloud_client = self.nextcloud_handler.nextcloud_client
         self.keycloak_client.add_user = simple_async_mock()
+        self.keycloak_client.update_user = simple_async_mock()
         self.keycloak_client.get_user = simple_async_mock(return_value={"id": "partner"})
         self.nextcloud_client.add_user = simple_async_mock()
 
@@ -93,6 +94,7 @@ class InvitePartnerHandlerTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertTrue(self.keycloak_client.add_user.called)
+        self.assertTrue(self.keycloak_client.update_user.called)
         self.assertTrue(self.keycloak_client.get_user.called)
         self.assertTrue(self.nextcloud_client.add_user.called)
 
@@ -111,6 +113,7 @@ class InvitePartnerHandlerTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.keycloak_client.add_user.not_called()
+        self.keycloak_client.update_user.not_called()
         self.keycloak_client.get_user.not_called()
         self.nextcloud_client.add_user.not_called()
 
