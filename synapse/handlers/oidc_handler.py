@@ -1074,6 +1074,7 @@ class JinjaOidcMappingConfig:
     localpart_template = attr.ib()  # type: Template
     display_name_template = attr.ib()  # type: Optional[Template]
     extra_attributes = attr.ib()  # type: Dict[str, Template]
+    nextcloud_username_template = attr.ib()  # type: Dict[str, Template] # watcha+
 
 
 class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
@@ -1112,6 +1113,25 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
                     % (e,)
                 )
 
+        # watcha+
+        nextcloud_username_template = None  # type: Optional[Template]
+        nextcloud_config = config.get("nextcloud")
+        if (
+            nextcloud_config
+            and nextcloud_config.get("enabled", False)
+            and "nextcloud_username_template" in config
+        ):
+            try:
+                nextcloud_username_template = env.from_string(
+                    config["nextcloud_username_template"]
+                )
+            except Exception as e:
+                raise ConfigError(
+                    "invalid jinja template for oidc_config.user_mapping_provider.config.nextcloud_username_template: %r"
+                    % (e,)
+                )
+        # +watcha
+        
         extra_attributes = {}  # type Dict[str, Template]
         if "extra_attributes" in config:
             extra_attributes_config = config.get("extra_attributes") or {}
@@ -1134,6 +1154,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             localpart_template=localpart_template,
             display_name_template=display_name_template,
             extra_attributes=extra_attributes,
+            nextcloud_username_template=nextcloud_username_template, # watcha+
         )
 
     def get_remote_user_id(self, userinfo: UserInfo) -> str:
@@ -1161,7 +1182,12 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         email = userinfo.get("email")  # type: Optional[str]
         synapse_role = userinfo.get("synapse_role")  # type: Optional[str]
         locale = userinfo.get("locale")  # type: Optional[str]
-        nextcloud_username = userinfo.get("nextcloud_username")  # type: Optional[str]
+
+        nextcloud_username = None
+        if self._config.nextcloud_username_template is not None:
+            nextcloud_username = self._config.nextcloud_username_template.render(
+                user=userinfo
+            ).strip()
 
         return UserAttribute(
             localpart=localpart,
@@ -1169,7 +1195,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             email=email,
             synapse_role=synapse_role,
             locale=locale,
-            nextcloud_username=nextcloud_username
+            nextcloud_username=nextcloud_username,
         )
         # +watcha
 
