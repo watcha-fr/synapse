@@ -275,7 +275,7 @@ class WatchaRegisterRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
-        self.secret = hs.get_secrets()
+        self.secrets = hs.get_secrets()
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
 
@@ -307,11 +307,7 @@ class WatchaRegisterRestServlet(RestServlet):
                 "A user with this email address already exists. Cannot create a new one.",
             )
 
-        if "password" in params and params["password"]:
-            password = params["password"]
-        else:
-            password = self.secret.token_hex(6)
-
+        password = params.get("password") or self.secrets.passphrase()
         password_hash = await self.auth_handler.hash(password)
         is_admin = params["admin"]
         await self.keycloak_client.add_user(password_hash, email, is_admin)

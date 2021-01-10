@@ -67,7 +67,7 @@ class NextcloudClient(SimpleHttpClient):
         super().__init__(hs)
 
         self.nextcloud_url = hs.config.nextcloud_url
-        self.secret = hs.get_secrets()
+        self.secrets = hs.get_secrets()
         self.service_account_name = hs.config.service_account_name
         self.service_account_password = hs.config.nextcloud_service_account_password
         self._headers = self._get_headers()
@@ -108,7 +108,7 @@ class NextcloudClient(SimpleHttpClient):
             103 - unknown error occurred whilst adding the user
         """
         # A password is needed to create NC user, but it will not be used by KC login process. 
-        password = self.secret.token_hex()
+        password = self.secrets.token_hex()
 
         response = await self.post_json_get_json(
             uri="{}/ocs/v1.php/cloud/users".format(self.nextcloud_url),
