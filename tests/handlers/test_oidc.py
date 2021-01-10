@@ -87,14 +87,14 @@ class TestMappingProvider(OidcMappingProvider):
         """ watcha!
         return {"localpart": userinfo["username"], "display_name": None}
         !watcha """
-        # watcha+ op525
+        # watcha+
         return {
             "localpart": userinfo["username"],
             "display_name": None,
             "email": userinfo.get("email"),
-            "synapse_role": userinfo.get("synapse_role"),
+            "is_admin": userinfo.get("is_admin"),
             "locale": userinfo.get("locale"),
-            "nextcloud_username": userinfo.get("nextcloud_username")
+            "nextcloud_username": userinfo.get("nextcloud_username"),
         }
         # +watcha
 
@@ -713,12 +713,13 @@ class OidcHandlerTestCase(HomeserverTestCase):
         )
         self.assertEqual(str(e.value), "mxid '@test_user_3:test' is already taken")
 
-        # watcha+ op525
+        # watcha+
         userinfo = {
             "sub": "test_user_4",
             "username": "test_user_4",
             "email": "test_user@test.com",
             "locale": "fr",
+            "nextcloud_username": "test_nc_user",
         }
         mxid = self.get_success(
             self.handler._map_userinfo_to_user(
@@ -730,14 +731,8 @@ class OidcHandlerTestCase(HomeserverTestCase):
         userinfo = {
             "sub": "test_user_5",
             "username": "test_user_5",
-            "synapse_role": "administrator",
+            "is_admin": True,
         }
-        mxid = self.get_success(
-            self.handler._map_userinfo_to_user(
-                userinfo, token, "user-agent", "10.10.10.10"
-            )
-        )
-        self.assertEqual(mxid, "@test_user_5:test")
         mxid = self.get_success(
             self.handler._map_userinfo_to_user(
                 userinfo, token, "user-agent", "10.10.10.10"
@@ -748,7 +743,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         userinfo = {
             "sub": "test_user_6",
             "username": "test_user_6",
-            "synapse_role": "partner",
+            "is_admin": False,
         }
         mxid = self.get_success(
             self.handler._map_userinfo_to_user(
@@ -760,14 +755,15 @@ class OidcHandlerTestCase(HomeserverTestCase):
         userinfo = {
             "sub": "test_user_7",
             "username": "test_user_7",
-            "synapse_role": "erroneous",
+            "is_admin": "not_a_boolean",
         }
-        self.get_failure(
+        e = self.get_failure(
             self.handler._map_userinfo_to_user(
                 userinfo, token, "user-agent", "10.10.10.10"
             ),
             MappingException,
         )
+        self.assertEqual(str(e.value), "is_admin 'not_a_boolean' is not a boolean")
         # +watcha
 
     @override_config({"oidc_config": {"allow_existing_users": True}})

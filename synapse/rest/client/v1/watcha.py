@@ -313,13 +313,11 @@ class WatchaRegisterRestServlet(RestServlet):
             password = self.secret.token_hex(6)
 
         password_hash = await self.auth_handler.hash(password)
-        admin = params["admin"]
-        role = "administrator" if admin else None
+        is_admin = params["admin"]
+        await self.keycloak_client.add_user(password_hash, email, is_admin)
 
-        await self.keycloak_client.add_user(email, password_hash, role)
         keycloak_user = await self.keycloak_client.get_user(email)
         keycloak_user_id = keycloak_user["id"]
-
         try:
             await self.nextcloud_client.add_user(keycloak_user_id)
         except (SynapseError, HttpResponseException, ValidationError, SchemaError):
@@ -327,9 +325,9 @@ class WatchaRegisterRestServlet(RestServlet):
             raise
 
         try:
-            user_id = await self.registration_handler.register_user(
+            await self.registration_handler.register_user(
                 localpart=keycloak_user_id,
-                admin=admin,
+                admin=is_admin,
                 default_display_name="",
                 bind_emails=[email],
             )
