@@ -20,9 +20,6 @@ See https://docs.python.org/3/library/secrets.html#module-secrets for the API
 used in Python 3.6, and the API emulated in Python 2.7.
 """
 import sys
-import os  # watcha+
-
-import pkg_resources  # watcha+
 
 # secrets is available since python 3.6
 if sys.version_info[0:2] >= (3, 6):
@@ -35,18 +32,6 @@ if sys.version_info[0:2] >= (3, 6):
         def token_hex(self, nbytes=32):
             return secrets.token_hex(nbytes)
 
-        # watcha+
-        def passphrase(self, nwords=4):
-            # https://generatepasswords.org/passphrases-vs-passwords
-            # https://github.com/bitcoin/bips/blob/master/bip-0039/french.txt
-            # entropy == log₂(2048^4) == 44 bits
-            word_list_dir = pkg_resources.resource_filename("synapse", "res/word_lists")
-            word_list_path = os.path.join(word_list_dir, "french.txt")
-            with open(word_list_path) as f:
-                words = [word.strip() for word in f]
-            return " ".join(secrets.choice(words) for i in range(nwords))
-
-        # +watcha
 
 else:
     import binascii
@@ -58,13 +43,3 @@ else:
 
         def token_hex(self, nbytes=32):
             return binascii.hexlify(self.token_bytes(nbytes)).decode("ascii")
-
-        # watcha+
-        def passphrase(self, nwords=4, *args):
-            # entropy == log₂(16^12) == 48 bits
-            length = 3
-            nbytes = nwords * length / 2
-            token = self.token_hex(nbytes)
-            return " ".join(token[i : i + length] for i in range(0, len(token), length))
-
-        # +watcha
