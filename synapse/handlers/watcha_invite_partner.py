@@ -47,11 +47,10 @@ class InvitePartnerHandler(BaseHandler):
         else:
             password = self.secrets.passphrase()
             password_hash = await self.auth_handler.hash(password)
+            response = await self.keycloak_client.add_user(password_hash, invitee_email)
 
-            await self.keycloak_client.add_user(password_hash, invitee_email)
-            keycloak_user = await self.keycloak_client.get_user(invitee_email)
-            keycloak_user_id = keycloak_user["id"]
-
+            location = response.headers.getRawHeaders('location')[0]
+            keycloak_user_id = location.split("/")[-1]
             try:
                 await self.nextcloud_client.add_user(keycloak_user_id)
             except (SynapseError, HttpResponseException, ValidationError, SchemaError):

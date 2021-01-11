@@ -74,7 +74,7 @@ class KeycloakClient(SimpleHttpClient):
             user["attributes"]["isAdmin"] = True
 
         try:
-            response = await self.post_json(
+            return await self.post_json(
                 self._get_endpoint("admin/realms/{}/users".format(self.realm_name)),
                 headers=await self._get_header(),
                 post_json=user,
@@ -96,7 +96,7 @@ class KeycloakClient(SimpleHttpClient):
             user_id: the Keycloak user id
         """
 
-        response = await self.delete(
+        await self.delete(
             self._get_endpoint(
                 "admin/realms/{}/users/{}".format(self.realm_name, user_id)
             ),
@@ -144,14 +144,12 @@ class KeycloakClient(SimpleHttpClient):
             user_id: the Keycloak user id
         """
 
-        response = await self.put(
+        await self.put(
             self._get_endpoint(
                 "admin/realms/{}/users/{}".format(self.realm_name, user_id)
             ),
             headers=await self._get_header(),
-            json_body={
-                "attributes": attributes,
-            },
+            json_body={"attributes": attributes},
         )
 
     async def _get_header(self):

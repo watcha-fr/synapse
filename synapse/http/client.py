@@ -727,6 +727,8 @@ class SimpleHttpClient:
                 response.code, response.phrase.decode("ascii", errors="replace"), body
             )
 
+        return response
+
     async def put(
         self,
         uri: str,
