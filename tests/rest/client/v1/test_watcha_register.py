@@ -71,7 +71,6 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
         self.keycloak_client.add_user = simple_async_mock()
-        self.keycloak_client.get_user = simple_async_mock(return_value={"id": "user1"})
         self.nextcloud_client.add_user = simple_async_mock()
 
     def test_register_user(self):
@@ -88,7 +87,6 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertTrue(self.keycloak_client.add_user.called)
-        self.assertTrue(self.keycloak_client.get_user.called)
         self.assertTrue(self.nextcloud_client.add_user.called)
         self.assertEqual(channel.code, 200)
 
@@ -106,7 +104,6 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertTrue(self.keycloak_client.add_user.called)
-        self.assertTrue(self.keycloak_client.get_user.called)
         self.assertTrue(self.nextcloud_client.add_user.called)
         self.assertEqual(channel.code, 200)
 
@@ -124,7 +121,6 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.keycloak_client.add_user.not_called()
-        self.keycloak_client.get_user.not_called()
         self.nextcloud_client.add_user.not_called()
 
         self.assertEqual(channel.code, 400)
@@ -147,7 +143,6 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.keycloak_client.add_user.not_called()
-        self.keycloak_client.get_user.not_called()
         self.nextcloud_client.add_user.not_called()
 
         self.assertEqual(channel.code, 400)
