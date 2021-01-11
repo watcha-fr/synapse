@@ -20,7 +20,7 @@ class InvitePartnerHandler(BaseHandler):
         self.store = hs.get_datastore()
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
-        self.secrets = Secrets(hs.config.word_list_filename)
+        self.secrets = Secrets(hs.config.word_list_path)
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self.mailer = Mailer(
