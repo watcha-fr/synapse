@@ -6,8 +6,7 @@ from mock import Mock
 from synapse.rest import admin
 from synapse.rest.client.v1 import watcha, login, room
 from tests import unittest
-from tests.utils import mock_getRawHeaders
-from tests.utils import setup_test_homeserver
+from tests.utils import mock_getRawHeaders, setup_test_homeserver
 
 
 def simple_async_mock(return_value=None, raises=None):
