@@ -17,7 +17,7 @@ class InvitePartnerHandler(BaseHandler):
         self.config = hs.config
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = self.hs.get_registration_handler()
-        self.secrets = hs.get_secrets()
+        self.secret = hs.get_secrets()
         self.store = hs.get_datastore()
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
@@ -45,7 +45,7 @@ class InvitePartnerHandler(BaseHandler):
                 )
             )
         else:
-            password = self.secrets.passphrase()
+            password = self.secret.token_hex(6)
             password_hash = await self.auth_handler.hash(password)
 
             await self.keycloak_client.add_user(password_hash, invitee_email)
