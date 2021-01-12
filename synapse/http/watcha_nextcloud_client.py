@@ -120,7 +120,7 @@ class NextcloudClient(SimpleHttpClient):
         meta = response["ocs"]["meta"]
 
         if meta["statuscode"] == 102:
-            logger.info("User '{}' already exists on the Nextcloud server.".format(username))
+            logger.info("User {} already exists on Nextcloud server.".format(user_id))
         else:
             self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_CREATE_USER)
 
