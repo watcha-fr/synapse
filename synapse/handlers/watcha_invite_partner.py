@@ -6,7 +6,7 @@ from jsonschema.exceptions import ValidationError, SchemaError
 from synapse.api.errors import SynapseError, HttpResponseException
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.push.mailer import Mailer
-from synapse.util.watcha import Secrets
+from synapse.util.threepids import canonicalise_email
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +17,10 @@ class InvitePartnerHandler(BaseHandler):
         self.config = hs.config
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = self.hs.get_registration_handler()
+        self.secrets = hs.get_secrets()
         self.store = hs.get_datastore()
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
-        self.secrets = Secrets(hs.config.word_list_filename)
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self.mailer = Mailer(
