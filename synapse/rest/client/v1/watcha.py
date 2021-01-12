@@ -61,8 +61,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
 
     async def on_POST(self, request):
         await _check_admin(
-            self.auth,
-            request,
+            self.auth, request,
         )
         params = parse_json_object_from_request(request)
 
@@ -72,8 +71,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
 
         if not file_name or not file_url or not notifications:
             raise SynapseError(
-                400,
-                "Some data in payload have empty value.",
+                400, "Some data in payload have empty value.",
             )
 
         server_name = self.hs.get_config().server_name
@@ -88,8 +86,7 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
             or file_url_parsed.netloc != server_name
         ):
             raise SynapseError(
-                400,
-                "The Nextcloud url is not recognized.",
+                400, "The Nextcloud url is not recognized.",
             )
 
         notifications_sent = []
@@ -124,10 +121,8 @@ class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
                 continue
 
             try:
-                notification_sent = (
-                    await self.nextcloud_handler.send_nextcloud_notification_to_rooms(
-                        rooms, file_name, file_url, file_operation
-                    )
+                notification_sent = await self.nextcloud_handler.send_nextcloud_notification_to_rooms(
+                    rooms, file_name, file_url, file_operation
                 )
             except SynapseError as e:
                 logger.error("Error during sending notification to room : %s", e)
@@ -289,16 +284,14 @@ class WatchaRegisterRestServlet(RestServlet):
 
     async def on_POST(self, request):
         await _check_admin(
-            self.auth,
-            request,
+            self.auth, request,
         )
         params = parse_json_object_from_request(request)
 
         email = params["email"].strip()
         if not email:
             raise SynapseError(
-                400,
-                "Email address cannot be empty",
+                400, "Email address cannot be empty",
             )
 
         if await self.auth_handler.find_user_id_by_email(email):
@@ -312,7 +305,7 @@ class WatchaRegisterRestServlet(RestServlet):
         is_admin = params["admin"]
         response = await self.keycloak_client.add_user(password_hash, email, is_admin)
 
-        location = response.headers.getRawHeaders('location')[0]
+        location = response.headers.getRawHeaders("location")[0]
         keycloak_user_id = location.split("/")[-1]
         try:
             await self.nextcloud_client.add_user(keycloak_user_id)

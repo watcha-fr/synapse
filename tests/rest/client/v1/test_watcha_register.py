@@ -1,10 +1,12 @@
 import os
 import pkg_resources
+
 from mock import Mock
 
 from synapse.rest import admin
 from synapse.rest.client.v1 import watcha, login, room
 from tests import unittest
+from tests.utils import mock_getRawHeaders
 from tests.utils import setup_test_homeserver
 
 
@@ -70,18 +72,20 @@ class RegisterTestCase(unittest.HomeserverTestCase):
 
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
-        self.keycloak_client.add_user = simple_async_mock()
+        response = simple_async_mock()
+        response.headers.getRawHeaders = mock_getRawHeaders(
+            {
+                "location": "https://auth.watcha.fr/auth/admin/realms/dev/users/c76bff5e-dd38-4100-bad2-ed2aa4dc9c6f"
+            }
+        )
+        self.keycloak_client.add_user = simple_async_mock(return_value=response)
         self.nextcloud_client.add_user = simple_async_mock()
 
     def test_register_user(self):
         request, channel = self.make_request(
             "POST",
             self.url,
-            {
-                "email": "user1@example.com",
-                "admin": False,
-                "password": "",
-            },
+            {"email": "user1@example.com", "admin": False, "password": "",},
             self.owner_tok,
         )
         self.render(request)
@@ -94,11 +98,7 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST",
             self.url,
-            {
-                "email": "user1@example.com",
-                "admin": False,
-                "password": "pass",
-            },
+            {"email": "user1@example.com", "admin": False, "password": "pass",},
             self.owner_tok,
         )
         self.render(request)
@@ -111,11 +111,7 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST",
             self.url,
-            {
-                "email": "",
-                "admin": False,
-                "password": "",
-            },
+            {"email": "", "admin": False, "password": "",},
             self.owner_tok,
         )
         self.render(request)
@@ -133,11 +129,7 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST",
             self.url,
-            {
-                "email": "owner@example.com",
-                "admin": False,
-                "password": "",
-            },
+            {"email": "owner@example.com", "admin": False, "password": "",},
             self.owner_tok,
         )
         self.render(request)

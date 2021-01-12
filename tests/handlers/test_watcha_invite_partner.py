@@ -1,11 +1,12 @@
 import os
 import pkg_resources
+
 from mock import Mock
 
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
-
 from tests import unittest
+from tests.utils import mock_getRawHeaders
 
 
 def simple_async_mock(return_value=None, raises=None):
@@ -62,9 +63,7 @@ class InvitePartnerHandlerTestCase(unittest.HomeserverTestCase):
         self.owner = self.register_user("owner", "pass")
         self.owner_tok = self.login("owner", "pass")
         self.get_success(
-            self.auth.add_threepid(
-                self.owner, "email", "owner@example.com", self.time
-            )
+            self.auth.add_threepid(self.owner, "email", "owner@example.com", self.time)
         )
         self.other_user = self.register_user("otheruser", "pass")
         self.other_user_access_token = self.login("otheruser", "pass")
@@ -77,7 +76,13 @@ class InvitePartnerHandlerTestCase(unittest.HomeserverTestCase):
 
         self.keycloak_client = self.nextcloud_handler.keycloak_client
         self.nextcloud_client = self.nextcloud_handler.nextcloud_client
-        self.keycloak_client.add_user = simple_async_mock()
+        response = simple_async_mock()
+        response.headers.getRawHeaders = mock_getRawHeaders(
+            {
+                "location": "https://auth.watcha.fr/auth/admin/realms/dev/users/c76bff5e-dd38-4100-bad2-ed2aa4dc9c6f"
+            }
+        )
+        self.keycloak_client.add_user = simple_async_mock(return_value=response)
         self.nextcloud_client.add_user = simple_async_mock()
 
         self.url = "/rooms/{}/invite".format(self.room_id)
@@ -103,7 +108,11 @@ class InvitePartnerHandlerTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST",
             self.url,
-            {"id_server": "test", "medium": "email", "address": "otheruser@example.com"},
+            {
+                "id_server": "test",
+                "medium": "email",
+                "address": "otheruser@example.com",
+            },
             self.owner_tok,
         )
         self.render(request)
