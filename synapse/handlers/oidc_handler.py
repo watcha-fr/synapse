@@ -935,20 +935,24 @@ class OidcHandler:
                 # This mxid is taken
                 raise MappingException("mxid '{}' is already taken".format(user_id))
         else:
-            # watcha+
+            # watcha+ op525
             optional_params = {}
 
             email = attributes["email"]
             if email:
                 optional_params["bind_emails"] = [email]
 
-            is_admin = attributes["is_admin"]
-            if not isinstance(is_admin, bool) and is_admin is not None:
-                raise MappingException(
-                    "is_admin '{}' is not a boolean".format(is_admin)
-                )
-            elif is_admin:
+            synapse_role = attributes["synapse_role"]
+            if synapse_role == "administrator":
                 optional_params["admin"] = True
+            elif synapse_role == "partner":
+                optional_params["make_partner"] = True
+            elif synapse_role is not None:
+                raise MappingException(
+                    "synapse_role ({}) must be either administrator, partner or None".format(
+                        synapse_role
+                    )
+                )
             # +watcha
 
             # It's the first time this user is logging in and the mapped mxid was
@@ -957,7 +961,7 @@ class OidcHandler:
                 localpart=localpart,
                 default_display_name=attributes["display_name"],
                 user_agent_ips=(user_agent, ip_address),
-                **optional_params,  # watcha+
+                **optional_params,  # watcha+ op524 op525
             )
         """ watcha!
         await self._datastore.record_user_external_id(
@@ -966,14 +970,10 @@ class OidcHandler:
         !watcha """
         # watcha+
         await self._datastore.record_user_external_id(
-            self._auth_provider_id,
-            remote_user_id,
-            registered_user_id,
-            attributes["nextcloud_username"],
+            self._auth_provider_id, remote_user_id, registered_user_id, attributes["nextcloud_username"]
         )
         # +watcha
         return registered_user_id
-
 
 """ watcha! op524
 UserAttribute = TypedDict(
@@ -987,7 +987,7 @@ UserAttribute = TypedDict(
         "localpart": str,
         "display_name": Optional[str],
         "email": Optional[str],
-        "is_admin": Optional[bool],
+        "synapse_role": Optional[str],
         "locale": Optional[str],
         "nextcloud_username": Optional[str],
     },
@@ -1074,7 +1074,7 @@ class JinjaOidcMappingConfig:
     localpart_template = attr.ib()  # type: Template
     display_name_template = attr.ib()  # type: Optional[Template]
     extra_attributes = attr.ib()  # type: Dict[str, Template]
-    nextcloud_username_template = attr.ib()  # type: Optional[Template] # watcha+
+    nextcloud_username_template = attr.ib()  # type: Dict[str, Template] # watcha+
 
 
 class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
@@ -1126,7 +1126,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
                     % (e,)
                 )
         # +watcha
-
+        
         extra_attributes = {}  # type Dict[str, Template]
         if "extra_attributes" in config:
             extra_attributes_config = config.get("extra_attributes") or {}
@@ -1149,7 +1149,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             localpart_template=localpart_template,
             display_name_template=display_name_template,
             extra_attributes=extra_attributes,
-            nextcloud_username_template=nextcloud_username_template,  # watcha+
+            nextcloud_username_template=nextcloud_username_template, # watcha+
         )
 
     def get_remote_user_id(self, userinfo: UserInfo) -> str:
@@ -1169,15 +1169,16 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             if display_name == "":
                 display_name = None
 
-        """ watcha!
+        """ watcha! op524
         return UserAttribute(localpart=localpart, display_name=display_name)
         !watcha """
-        # watcha+
+
+        # watcha+ op524 op525
         email = userinfo.get("email")  # type: Optional[str]
-        is_admin = userinfo.get("is_admin")  # type: Optional[bool]
+        synapse_role = userinfo.get("synapse_role")  # type: Optional[str]
         locale = userinfo.get("locale")  # type: Optional[str]
 
-        nextcloud_username = None  # type: Optional[str]
+        nextcloud_username = None
         if self._config.nextcloud_username_template is not None:
             nextcloud_username = self._config.nextcloud_username_template.render(
                 user=userinfo
@@ -1187,7 +1188,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             localpart=localpart,
             display_name=display_name,
             email=email,
-            is_admin=is_admin,
+            synapse_role=synapse_role,
             locale=locale,
             nextcloud_username=nextcloud_username,
         )
