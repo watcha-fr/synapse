@@ -3,7 +3,6 @@ from mock import Mock
 from synapse.api.errors import Codes, SynapseError
 from synapse.rest.client.v1 import login, room
 from synapse.rest import admin
-from synapse.types import get_localpart_from_id
 from tests.unittest import HomeserverTestCase
 
 NEXTCLOUD_GROUP_NAME_PREFIX = "c4d96a06b7_"
@@ -139,7 +138,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
 
         self.assertIn(
             "Unable to add the user {} to the Nextcloud group {}".format(
-                get_localpart_from_id(self.creator),
+                self.creator,
                 NEXTCLOUD_GROUP_NAME_PREFIX + self.room_id,
             ),
             cm.output[0],
@@ -147,7 +146,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
 
         self.assertIn(
             "Unable to add the user {} to the Nextcloud group {}".format(
-                get_localpart_from_id(self.inviter),
+                self.inviter,
                 NEXTCLOUD_GROUP_NAME_PREFIX + self.room_id,
             ),
             cm.output[1],
@@ -166,14 +165,14 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
 
         self.assertIn(
             "Unable to add the user {} to the Nextcloud group {}.".format(
-                get_localpart_from_id(self.creator), group_name
+                self.creator, group_name
             ),
             cm.output[0],
         )
 
         self.assertIn(
             "Unable to add the user {} to the Nextcloud group {}.".format(
-                get_localpart_from_id(self.inviter), group_name
+                self.inviter, group_name
             ),
             cm.output[1],
         )
