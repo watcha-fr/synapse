@@ -62,7 +62,7 @@ class NextcloudStore(SQLBaseStore):
         """Look up a Nextcloud username by their user_id
 
         Args:
-            user_id: localpart of the user
+            user_id: The matrix ID of the user
 
         Returns:
             the Nextcloud username of the user, or None if they are not known
