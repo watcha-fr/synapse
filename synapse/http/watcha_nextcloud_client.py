@@ -107,7 +107,7 @@ class NextcloudClient(SimpleHttpClient):
             102 - username already exists
             103 - unknown error occurred whilst adding the user
         """
-        # A password is needed to create NC user, but it will not be used by KC login process. 
+        # A password is needed to create NC user, but it will not be used by KC login process.
         password = self.secret.token_hex()
 
         response = await self.post_json_get_json(
@@ -257,12 +257,13 @@ class NextcloudClient(SimpleHttpClient):
         validate(response, WITHOUT_DATA_SCHEMA)
         meta = response["ocs"]["meta"]
 
-        if meta["statuscode"] == 103:
-            errcode = Codes.NEXTCLOUD_USER_DOES_NOT_EXIST
-        else:
-            errcode = Codes.NEXTCLOUD_CAN_NOT_REMOVE_USER_FROM_GROUP
+        errcode = (
+            Codes.NEXTCLOUD_USER_DOES_NOT_EXIST
+            if meta["statuscode"] == 103
+            else Codes.NEXTCLOUD_CAN_NOT_REMOVE_USER_FROM_GROUP
+        )
 
-        self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_REMOVE_USER_FROM_GROUP)
+        self._raise_for_status(meta, errcode)
 
     async def share(self, requester, path, group_name):
         """Share an existing file or folder with all permissions for a group.
