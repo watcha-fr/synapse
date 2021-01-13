@@ -74,8 +74,8 @@ class KeycloakClient(SimpleHttpClient):
             user["attributes"]["synapseRole"] = synapse_role
 
         try:
-            response = await self.post_json(
-                self._get_endpoint("admin/realms/{}/users".format(self.realm_name)),
+            response = await self.post_json_get_json(
+                uri=self._get_endpoint("admin/realms/{}/users", self.realm_name),
                 headers=await self._get_header(),
                 post_json=user,
             )
@@ -96,9 +96,9 @@ class KeycloakClient(SimpleHttpClient):
             user_id: the Keycloak user id
         """
 
-        response = await self.delete(
-            self._get_endpoint(
-                "admin/realms/{}/users/{}".format(self.realm_name, user_id)
+        response = await self.delete_get_json(
+            uri=self._get_endpoint(
+                "admin/realms/{}/users/{}", self.realm_name, user_id
             ),
             headers=await self._get_header(),
         )
@@ -112,7 +112,7 @@ class KeycloakClient(SimpleHttpClient):
         """
 
         response = await self.get_json(
-            self._get_endpoint("admin/realms/{}/users".format(self.realm_name)),
+            uri=self._get_endpoint("admin/realms/{}/users", self.realm_name),
             headers=await self._get_header(),
             args={"username": localpart},
         )
@@ -129,7 +129,7 @@ class KeycloakClient(SimpleHttpClient):
         """
 
         response = await self.get_json(
-            self._get_endpoint("admin/realms/{}/users".format(self.realm_name)),
+            uri=self._get_endpoint("admin/realms/{}/users", self.realm_name),
             headers=await self._get_header(),
         )
 
@@ -144,9 +144,9 @@ class KeycloakClient(SimpleHttpClient):
             user_id: the Keycloak user id
         """
 
-        response = await self.put(
-            self._get_endpoint(
-                "admin/realms/{}/users/{}".format(self.realm_name, user_id)
+        response = await self.put_json(
+            uri=self._get_endpoint(
+                "admin/realms/{}/users/{}", self.realm_name, user_id
             ),
             headers=await self._get_header(),
             json_body={
@@ -167,7 +167,7 @@ class KeycloakClient(SimpleHttpClient):
 
         response = await self.post_urlencoded_get_json(
             uri=self._get_endpoint(
-                "realms/{}/protocol/openid-connect/token".format(self.realm_name)
+                "realms/{}/protocol/openid-connect/token", self.realm_name
             ),
             args={
                 "client_id": "admin-cli",
@@ -181,5 +181,7 @@ class KeycloakClient(SimpleHttpClient):
 
         return response["access_token"]
 
-    def _get_endpoint(self, path):
+    def _get_endpoint(self, path, *args):
+        if args:
+            path = path.format(*args)
         return "{}/{}".format(self.server_url, path)

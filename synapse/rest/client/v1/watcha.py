@@ -249,11 +249,12 @@ class WatchaRegisterRestServlet(RestServlet):
             await self.nextcloud_client.delete_user(keycloak_user_id)
             raise
 
-        requester = await self.auth.get_user_by_req(request)
+        sender = await self.auth.get_user_by_req(request)
+        sender_id = sender.user.to_string()
 
         await self.mailer.send_watcha_registration_email(
             email_address=email,
-            sender_id=requester.user.to_string(),
+            sender_id=sender_id,
             password=password,
         )
 

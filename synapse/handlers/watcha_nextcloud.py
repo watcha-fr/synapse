@@ -77,7 +77,6 @@ class NextcloudHandler(BaseHandler):
                         user_id, group_name
                     )
                 )
-                print(error)
 
     async def update_share(self, user_id, room_id, membership):
 

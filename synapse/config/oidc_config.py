@@ -213,11 +213,11 @@ class OIDCConfig(Config):
               #
               #display_name_template: "{{{{ user.given_name }}}} {{{{ user.last_name }}}}"
 
-              # Jinja2 template for the nextcloud username to map with Synapse localpart.
+              # Jinja2 template for the Nextcloud username used for share.
               #
-              # If this and Nextcloud section are unset the Nextcloud username will not be stored.
+              # If unset, the Nextcloud username will not be stored.
               #
-              #nextcloud_username_template: "{{% if user.nextcloud_username is defined %}}{{{{user.nextcloud_username }}}}{{% else %}}{{{{ user.sub }}}}{{% endif %}}"
+              #nextcloud_username_template: "{{{{ user.nextcloud_username | default(user.sub, true) }}}}"
 
               # Jinja2 templates for extra attributes to send back to the client during
               # login.
