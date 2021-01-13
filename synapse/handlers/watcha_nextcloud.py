@@ -5,7 +5,6 @@ from pathlib import Path
 from ._base import BaseHandler
 from synapse.api.constants import EventTypes
 from synapse.api.errors import Codes, SynapseError
-from synapse.types import get_localpart_from_id
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +39,7 @@ class NextcloudHandler(BaseHandler):
            path: the path of the Nextcloud folder to bind.
         """
         group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
-        localpart = get_localpart_from_id(user_id)
-        nextcloud_username = await self.store.get_nextcloud_username(localpart)
+        nextcloud_username = await self.store.get_nextcloud_username(user_id)
 
         await self.nextcloud_client.add_group(group_name)
 
@@ -66,11 +64,9 @@ class NextcloudHandler(BaseHandler):
         """
         group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
         user_ids = await self.store.get_users_in_room(room_id)
-        localparts = [get_localpart_from_id(user_id) for user_id in user_ids]
 
-        for localpart in localparts:
-            nextcloud_username = await self.store.get_nextcloud_username(localpart)
-
+        for user_id in user_ids:
+            nextcloud_username = await self.store.get_nextcloud_username(user_id)
             try:
                 await self.nextcloud_client.add_user_to_group(
                     nextcloud_username, group_name
@@ -78,7 +74,7 @@ class NextcloudHandler(BaseHandler):
             except (SynapseError, ValidationError, SchemaError) as error:
                 logger.warn(
                     "Unable to add the user {} to the Nextcloud group {}.".format(
-                        localpart, group_name
+                        user_id, group_name
                     )
                 )
                 print(error)
@@ -86,8 +82,7 @@ class NextcloudHandler(BaseHandler):
     async def update_share(self, user_id, room_id, membership):
 
         group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
-        localpart = get_localpart_from_id(user_id)
-        nextcloud_username = await self.store.get_nextcloud_username(localpart)
+        nextcloud_username = await self.store.get_nextcloud_username(user_id)
 
         if membership in ("invite", "join"):
             try:
