@@ -74,7 +74,7 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         response = simple_async_mock()
         response.headers.getRawHeaders = mock_getRawHeaders(
             {
-                "location": "https://auth.watcha.fr/auth/admin/realms/dev/users/c76bff5e-dd38-4100-bad2-ed2aa4dc9c6f"
+                "location": "https://keycloak_url/auth/admin/realms/realm_name/users/c76bff5e-dd38-4100-bad2-ed2aa4dc9c6f"
             }
         )
         self.keycloak_client.add_user = simple_async_mock(return_value=response)
