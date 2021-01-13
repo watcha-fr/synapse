@@ -1178,7 +1178,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         synapse_role = userinfo.get("synapse_role")  # type: Optional[str]
         locale = userinfo.get("locale")  # type: Optional[str]
 
-        nextcloud_username = None   # type: Optional[str]
+        nextcloud_username = None  # type: Optional[str]
         if self._config.nextcloud_username_template is not None:
             nextcloud_username = self._config.nextcloud_username_template.render(
                 user=userinfo
