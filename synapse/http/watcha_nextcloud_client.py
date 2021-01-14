@@ -67,7 +67,7 @@ class NextcloudClient(SimpleHttpClient):
         super().__init__(hs)
 
         self.nextcloud_url = hs.config.nextcloud_url
-        self.secret = hs.get_secrets()
+        self.secrets = hs.get_secrets()
         self.service_account_name = hs.config.service_account_name
         self.service_account_password = hs.config.nextcloud_service_account_password
         self._headers = self._get_headers()
@@ -107,8 +107,8 @@ class NextcloudClient(SimpleHttpClient):
             102 - username already exists
             103 - unknown error occurred whilst adding the user
         """
-        # A password is needed to create NC user, but it will not be used by KC login process.
-        password = self.secret.token_hex()
+        # A password is needed to create NC user, but it will not be used by KC login process. 
+        password = self.secrets.token_hex()
 
         response = await self.post_json_get_json(
             uri="{}/ocs/v1.php/cloud/users".format(self.nextcloud_url),
@@ -120,7 +120,7 @@ class NextcloudClient(SimpleHttpClient):
         meta = response["ocs"]["meta"]
 
         if meta["statuscode"] == 102:
-            logger.info("User {} already exists on Nextcloud server.".format(user_id))
+            logger.info("User '{}' already exists on the Nextcloud server.".format(username))
         else:
             self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_CREATE_USER)
 

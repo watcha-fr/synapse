@@ -46,13 +46,13 @@ class KeycloakClient(SimpleHttpClient):
         self.service_account_name = hs.config.service_account_name
         self.service_account_password = hs.config.keycloak_service_account_password
 
-    async def add_user(self, email, password_hash, synapse_role=None):
+    async def add_user(self, password_hash, email, is_admin=False):
         """Create a new user
 
         Args:
-            email: email of the user
             password_hash: the synapse password hash
-            synapse_role: the synapse role, it can be administrator, collaborator or partner.
+            email: email of the user
+            is_admin: whether the user is a synapse administrator or not
         """
 
         user = {
@@ -70,11 +70,11 @@ class KeycloakClient(SimpleHttpClient):
             "requiredActions": ["UPDATE_PASSWORD", "UPDATE_PROFILE"],
         }
 
-        if synapse_role is not None:
-            user["attributes"]["synapseRole"] = synapse_role
+        if is_admin:
+            user["attributes"]["isAdmin"] = True
 
         try:
-            response = await self.post_json_get_json(
+            return await self.post_json_get_json(
                 uri=self._get_endpoint("admin/realms/{}/users", self.realm_name),
                 headers=await self._get_header(),
                 post_json=user,
@@ -96,7 +96,7 @@ class KeycloakClient(SimpleHttpClient):
             user_id: the Keycloak user id
         """
 
-        response = await self.delete_get_json(
+        await self.delete_get_json(
             uri=self._get_endpoint(
                 "admin/realms/{}/users/{}", self.realm_name, user_id
             ),
@@ -144,14 +144,12 @@ class KeycloakClient(SimpleHttpClient):
             user_id: the Keycloak user id
         """
 
-        response = await self.put_json(
+        await self.put_json(
             uri=self._get_endpoint(
                 "admin/realms/{}/users/{}", self.realm_name, user_id
             ),
             headers=await self._get_header(),
-            json_body={
-                "attributes": attributes,
-            },
+            json_body={"attributes": attributes},
         )
 
     async def _get_header(self):

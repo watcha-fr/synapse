@@ -7,7 +7,7 @@ from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.push.mailer import Mailer
 from synapse.rest.client.v2_alpha._base import client_patterns
-from synapse.util.threepids import canonicalise_email
+from synapse.util.watcha import Secrets
 
 logger = logging.getLogger(__name__)
 
@@ -186,9 +186,9 @@ class WatchaRegisterRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
-        self.secret = hs.get_secrets()
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
+        self.secrets = Secrets(hs.config.word_list_path)
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self.mailer = Mailer(
@@ -200,16 +200,14 @@ class WatchaRegisterRestServlet(RestServlet):
 
     async def on_POST(self, request):
         await _check_admin(
-            self.auth,
-            request,
+            self.auth, request,
         )
         params = parse_json_object_from_request(request)
 
         email = params["email"].strip()
         if not email:
             raise SynapseError(
-                400,
-                "Email address cannot be empty",
+                400, "Email address cannot be empty",
             )
 
         if await self.auth_handler.find_user_id_by_email(email):
@@ -218,19 +216,13 @@ class WatchaRegisterRestServlet(RestServlet):
                 "A user with this email address already exists. Cannot create a new one.",
             )
 
-        if "password" in params and params["password"]:
-            password = params["password"]
-        else:
-            password = self.secret.token_hex(6)
-
+        password = params.get("password") or self.secrets.passphrase()
         password_hash = await self.auth_handler.hash(password)
-        admin = params["admin"]
-        role = "administrator" if admin else None
+        is_admin = params["admin"]
+        response = await self.keycloak_client.add_user(password_hash, email, is_admin)
 
-        await self.keycloak_client.add_user(email, password_hash, role)
-        keycloak_user = await self.keycloak_client.get_user(email)
-        keycloak_user_id = keycloak_user["id"]
-
+        location = response.headers.getRawHeaders("location")[0]
+        keycloak_user_id = location.split("/")[-1]
         try:
             await self.nextcloud_client.add_user(keycloak_user_id)
         except (SynapseError, HttpResponseException, ValidationError, SchemaError):
@@ -238,9 +230,9 @@ class WatchaRegisterRestServlet(RestServlet):
             raise
 
         try:
-            user_id = await self.registration_handler.register_user(
+            await self.registration_handler.register_user(
                 localpart=keycloak_user_id,
-                admin=admin,
+                admin=is_admin,
                 default_display_name="",
                 bind_emails=[email],
             )
