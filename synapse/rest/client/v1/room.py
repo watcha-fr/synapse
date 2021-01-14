@@ -946,9 +946,9 @@ class RoomMembershipRestServlet(TransactionRestServlet):
 
             content["user_id"] = await self.invite_partner_handler.invite(
                 room_id=room_id,
-                inviter=requester.user,
-                inviter_device_id=str(requester.device_id),
-                invitee=content["address"],
+                sender_id=requester.user.to_string(),
+                sender_device_id=requester.device_id,
+                invitee_email=content["address"],
             )
             logger.info(
                 "invitee email=%s has been invited as %s in room_id=%s",

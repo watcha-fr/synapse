@@ -74,7 +74,7 @@ from .user_erasure_store import UserErasureStore
 
 # watcha+
 from .watcha_admin import AdministrationStore
-from .watcha_invite_external import ExternalInvitationStore
+from .watcha_invite_partner import ExternalInvitationStore
 from .watcha_nextcloud import NextcloudStore
 # +watcha
 

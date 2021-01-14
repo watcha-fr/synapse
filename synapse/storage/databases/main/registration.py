@@ -1330,15 +1330,27 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
 
         self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
 
+    """ watcha!
     async def record_user_external_id(
         self, auth_provider: str, external_id: str, user_id: str
     ) -> None:
+    !watcha """
+    # watcha+
+    async def record_user_external_id(
+        self,
+        auth_provider: str,
+        external_id: str,
+        user_id: str,
+        nextcloud_username: str = None,
+    ) -> None:
+    # +watcha
         """Record a mapping from an external user id to a mxid
 
         Args:
             auth_provider: identifier for the remote auth provider
             external_id: id on that system
             user_id: complete mxid that it is mapped to
+            nextcloud_username: the Nextcloud username # watcha+
         """
         await self.db_pool.simple_insert(
             table="user_external_ids",
@@ -1346,6 +1358,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                 "auth_provider": auth_provider,
                 "external_id": external_id,
                 "user_id": user_id,
+                "nextcloud_username": nextcloud_username, # watcha+
             },
             desc="record_user_external_id",
         )

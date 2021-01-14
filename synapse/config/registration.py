@@ -192,6 +192,8 @@ class RegistrationConfig(Config):
             ["auth_success.html"], autoescape=True
         )[0]
 
+        self.word_list_path = config.get("word_list_path", "french.txt")  # watcha+
+
     def generate_config_section(self, generate_secrets=False, **kwargs):
         if generate_secrets:
             registration_shared_secret = 'registration_shared_secret: "%s"' % (
@@ -463,6 +465,15 @@ class RegistrationConfig(Config):
         # Defaults to true.
         #
         #auto_join_rooms_for_guests: false
+
+        # watcha+
+        # File within "res/watcha_word_lists" giving the set of words used to generate
+        # user registration passphrases.
+        #
+        # Defaults to "french.txt".
+        #
+        #word_list_path: english.txt
+        # +watcha
         """
             % locals()
         )
