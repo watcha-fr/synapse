@@ -129,7 +129,7 @@ class Mailer:
         self.account_handler = self.hs.get_account_validity_handler()
         self.profile_handler = self.hs.get_profile_handler()
         self.base64_watcha_logo = self._get_base64_image("watcha_logo.png")
-        self.base64_google_play_store_badge = self._get_base64_image(
+        self.base64_google_play_badge = self._get_base64_image(
             "watcha_google_play_badge_fr.png"
         )
         self.base64_app_store_badge = self._get_base64_image(
@@ -245,7 +245,7 @@ class Mailer:
             "password": password,
             "server": self.hs.config.server_name,
             "base64_watcha_logo": self.base64_watcha_logo,
-            "base64_google_play_store_badge": self.base64_google_play_store_badge,
+            "base64_google_play_badge": self.base64_google_play_badge,
             "base64_app_store_badge": self.base64_app_store_badge,
         }
 
