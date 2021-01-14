@@ -37,6 +37,8 @@ from synapse.types import UserID
 from synapse.util.async_helpers import concurrently_execute
 from synapse.visibility import filter_events_for_client
 
+from synapse.types import get_localpart_from_id  # watcha+
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
@@ -105,6 +107,10 @@ class Mailer:
         self.storage = hs.get_storage()
         self.app_name = app_name
         self.email_subjects = hs.config.email_subjects  # type: EmailSubjectConfig
+        # watcha+
+        self.account_handler = self.hs.get_account_validity_handler()
+        self.profile_handler = self.hs.get_profile_handler()
+        # +watcha
 
         logger.info("Created Mailer for app_name %s" % app_name)
 
@@ -163,6 +169,54 @@ class Mailer:
             % {"server_name": self.hs.config.server_name},
             template_vars,
         )
+
+    # watcha+
+    async def send_watcha_registration_email(
+        self,
+        email_address,
+        sender_id,
+        password,
+    ):
+        """Send an email with temporary password and connexion link to Watcha.
+
+        Args:
+            email_address (str): Email address we're sending the invitation
+            sender_id (str): the user id of the user who invite the partner
+            password (str): a temporay password
+        """
+        subject = self.email_subjects.watcha_registration % {"app": self.app_name}
+
+        if get_localpart_from_id(sender_id) == self.hs.config.service_account_name:
+            sender_name = self.hs.config.email_notif_from
+        else:
+            sender_display_name = await self.profile_handler.get_displayname(
+                UserID.from_string(sender_id)
+            )
+            sender_email = await self.account_handler.get_email_address_for_user(
+                sender_id
+            )
+            sender_name = (
+                "{} ({})".format(sender_display_name, sender_email)
+                if sender_display_name
+                else sender_email
+            )
+
+        template_vars = {
+            "title": subject,
+            "sender_name": sender_name,
+            "login_url": self.hs.config.email_riot_base_url,
+            "email": email_address,
+            "password": password,
+            "server": self.hs.config.server_name,
+        }
+
+        await self.send_email(
+            email_address,
+            subject,
+            template_vars,
+        )
+
+    # +watcha
 
     async def send_add_threepid_mail(self, email_address, token, client_secret, sid):
         """Send an email with a validation link to a user for adding a 3pid to their account

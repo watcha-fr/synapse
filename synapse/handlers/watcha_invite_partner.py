@@ -1,132 +1,82 @@
 import logging
 
-from twisted.internet import defer
-
-from synapse.api.constants import Membership
-from synapse.api.errors import SynapseError
-from synapse.types import UserID, create_requester, map_username_to_mxid_localpart
-from synapse.util.watcha import (
-    compute_registration_token,
-    create_display_inviter_name,
-    generate_password,
-    send_registration_email,
-)
-
 from ._base import BaseHandler
+from jsonschema.exceptions import ValidationError, SchemaError
+
+from synapse.api.errors import SynapseError, HttpResponseException
+from synapse.config.emailconfig import ThreepidBehaviour
+from synapse.push.mailer import Mailer
+from synapse.util.watcha import Secrets
 
 logger = logging.getLogger(__name__)
 
 
 class InvitePartnerHandler(BaseHandler):
-    async def invite(self, room_id, inviter, inviter_device_id, invitee):
+    def __init__(self, hs):
+        super().__init__(hs)
+        self.auth_handler = hs.get_auth_handler()
+        self.registration_handler = hs.get_registration_handler()
+        self.store = hs.get_datastore()
+        self.keycloak_client = hs.get_keycloak_client()
+        self.nextcloud_client = hs.get_nextcloud_client()
+        self.secrets = Secrets(hs.config.word_list_path)
 
-        user_id = await self.hs.get_auth_handler().find_user_id_by_email(invitee)
+        if hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            self.mailer = Mailer(
+                hs=hs,
+                app_name=hs.config.email_app_name,
+                template_html=hs.config.watcha_registration_template_html,
+                template_text=hs.config.watcha_registration_template_text,
+            )
 
-        # the user already exists. it is an internal user or an external user.
-        if user_id:
+    async def invite(self, room_id, sender_id, sender_device_id, invitee_email):
+
+        invitee_id = await self.auth_handler.find_user_id_by_email(invitee_email)
+        invitee_email = invitee_email.strip()
+        email_sent = False
+
+        if invitee_id:
             logger.info(
-                "Invitee with email %s already exists (id is %s), inviting her to room %s",
-                invitee,
-                user_id,
-                room_id,
-            )
-
-            user = UserID.from_string(user_id)
-            await self.hs.get_room_member_handler().update_membership(
-                requester=create_requester(inviter.to_string()),
-                target=user,
-                room_id=room_id,
-                action=Membership.INVITE,
-                txn_id=None,
-                third_party_signed=None,
-                content=None,
-            )
-
-            localpart = user.localpart
-            new_user = False
-
-            # TODO: This is probably very wrong !
-            # there is no reason to have a different behaviour for partner ??
-
-            # only send email if that user is external.
-            # this restriction can be removed once internal users will also receive notifications from invitations by user ID.
-            is_partner = await self.hs.get_auth_handler().is_partner(user_id)
-            if not is_partner:
-                logger.info(
-                    "Invitee is an internal user. Do not send a notification email."
+                "Partner with email {email} already exists. His id is {invitee_id}. Inviting him to room {room_id}".format(
+                    email=invitee_email, invitee_id=invitee_id, room_id=room_id,
                 )
-                defer.returnValue(user_id)
-
-        # the user does not exist. we create an account
-        else:
-            localpart = map_username_to_mxid_localpart(invitee)
-            logger.info(
-                "invited user %s is not in the DB. Creating user (id is %s), inviting to room and sending invitation email.",
-                invitee,
-                localpart,
             )
+        else:
+            password = self.secrets.passphrase()
+            password_hash = await self.auth_handler.hash(password)
+            response = await self.keycloak_client.add_user(password_hash, invitee_email)
 
-            user_id = UserID(localpart, self.hs.hostname).to_string()
-            password = generate_password()
-            password_hash = await self.hs.get_auth_handler().hash(password)
-
-            await self.hs.get_nextcloud_handler().create_keycloak_and_nextcloud_user(invitee, invitee, password_hash, "partner")
+            location = response.headers.getRawHeaders("location")[0]
+            keycloak_user_id = location.split("/")[-1]
 
             try:
-                await self.hs.get_registration_handler().register_user(
-                    localpart=localpart,
-                    password_hash=password_hash,
-                    guest_access_token=None,
-                    make_guest=False,
-                    admin=False,
-                    make_partner=True,
-                    bind_emails=[invitee],
+                await self.nextcloud_client.add_user(keycloak_user_id)
+            except (SynapseError, HttpResponseException, ValidationError, SchemaError):
+                await self.keycloak_client.delete_user(keycloak_user_id)
+                raise
+
+            invitee_id = await self.registration_handler.register_user(
+                localpart=keycloak_user_id,
+                bind_emails=[invitee_email],
+                make_partner=True,
+            )
+
+            await self.mailer.send_watcha_registration_email(
+                email_address=invitee_email, sender_id=sender_id, password=password,
+            )
+
+            email_sent = True
+            logger.info(
+                "New partner with id {invitee_id} was created and an email has been sent to {email}. Inviting him to room {room_id}.".format(
+                    invitee_id=invitee_id, email=invitee_email, room_id=room_id,
                 )
-                new_user = True
-            except SynapseError as detail:
-                # user already exists as external user
-                # (maybe this code is useless since adding a check for email; but leaving it for now)
-                if str(detail) == "400: User ID already taken.":
-                    logger.info(
-                        "invited user is already in the DB. Not modified. Will send a notification by email."
-                    )
-                    new_user = False
-                else:
-                    logger.info("registration error=%s", detail)
-                    raise SynapseError(400, "Registration error: {0}".format(detail))
+            )
 
-        # log invitation in DB
         await self.store.insert_partner_invitation(
-            partner_user_id=user_id,
-            inviter_user_id=inviter,
-            inviter_device_id=inviter_device_id,
-            email_sent=True,
+            partner_user_id=invitee_id,
+            inviter_user_id=sender_id,
+            inviter_device_id=sender_device_id,
+            email_sent=email_sent,
         )
 
-        inviter_name = await create_display_inviter_name(self.hs, inviter)
-
-        logger.info(
-            "Generating message: invitation_name=%s invitee=%s localpart=%s new_user=%s",
-            inviter_name,
-            invitee,
-            localpart,
-            new_user,
-        )
-
-        if new_user:
-            token = compute_registration_token(localpart, invitee, password)
-            template_name = "invite_new_account"
-        else:
-            token = compute_registration_token(localpart, invitee)
-            template_name = "invite_existing_account"
-
-        await send_registration_email(
-            self.hs.config,
-            invitee,
-            template_name=template_name,
-            token=token,
-            inviter_name=inviter_name,
-            full_name=None,
-        )
-
-        return user_id
+        return invitee_id

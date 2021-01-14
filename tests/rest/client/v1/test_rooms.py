@@ -2106,14 +2106,3 @@ class RoomCanonicalAliasTestCase(unittest.HomeserverTestCase):
         """An alias which does not point to the room raises a SynapseError."""
         self._set_canonical_alias({"alias": "@unknown:test"}, expected_code=400)
         self._set_canonical_alias({"alt_aliases": ["@unknown:test"]}, expected_code=400)
-
-
-# watcha+
-def simple_async_mock(return_value=None, raises=None):
-    # AsyncMock is not available in python3.5, this mimics part of its behaviour
-    async def cb(*args, **kwargs):
-        if raises:
-            raise raises
-        return return_value
-
-    return Mock(side_effect=cb)

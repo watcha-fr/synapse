@@ -1,11 +1,13 @@
 import json
 from mock import Mock
 
-import synapse.rest.admin
 from synapse.api.errors import SynapseError
-from synapse.rest.client.v1 import login, room
+from synapse.rest import admin
+from synapse.rest.client.v1 import login, room, watcha
+from synapse.types import UserID, create_requester
 
 from tests import unittest
+
 
 def simple_async_mock(return_value=None, raises=None):
     # AsyncMock is not available in python3.5, this mimics part of its behaviour
@@ -17,11 +19,11 @@ def simple_async_mock(return_value=None, raises=None):
     return Mock(side_effect=cb)
 
 
-class NextcloudRestTestCase(unittest.HomeserverTestCase):
+class NextcloudShareTestCase(unittest.HomeserverTestCase):
     """Tests that Nextcloud sharing is updated with membership event when the room is mapped with a Nextcloud directory"""
 
     servlets = [
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
         login.register_servlets,
     ]
@@ -37,9 +39,7 @@ class NextcloudRestTestCase(unittest.HomeserverTestCase):
         self.room_id = self.helper.create_room_as(self.creator, tok=self.creator_tok)
 
         # map a room with a Nextcloud directory :
-        self.get_success(
-            self.store.bind(self.room_id, "/directory", 1)
-        )
+        self.get_success(self.store.bind(self.room_id, "/directory", 1))
 
         # mock some functions of WatchaRoomNextcloudMappingHandler
         self.nextcloud_handler = hs.get_nextcloud_handler()
@@ -85,7 +85,7 @@ class NextcloudRestTestCase(unittest.HomeserverTestCase):
 
         channel = self.send_room_nextcloud_mapping_event({"nextcloudShare": ""})
         self.assertTrue(self.nextcloud_handler.unbind.called)
-        
+
         self.assertEquals(200, channel.code)
 
     def test_update_existing_room_nextcloud_mapping(self):
@@ -184,6 +184,3 @@ class NextcloudRestTestCase(unittest.HomeserverTestCase):
         self.helper.invite(room_id, self.creator, self.inviter, tok=self.creator_tok)
 
         self.nextcloud_handler.update_existing_nextcloud_share_for_user.assert_not_called()
-
-
-# +watcha

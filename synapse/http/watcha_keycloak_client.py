@@ -16,7 +16,7 @@ TOKEN_SCHEMA = {
             "type": "string",
         },
     },
-    "required": ["access_token"]
+    "required": ["access_token"],
 }
 
 USER_SCHEMA = {
@@ -31,7 +31,7 @@ USER_SCHEMA = {
             "type": "string",
         },
     },
-    "required": ["id", "username"]
+    "required": ["id", "username"],
 }
 
 
@@ -46,19 +46,18 @@ class KeycloakClient(SimpleHttpClient):
         self.service_account_name = hs.config.service_account_name
         self.service_account_password = hs.config.keycloak_service_account_password
 
-    async def add_user(self, localpart, email, password_hash, synapse_role=None):
-        """Create a new user Username
+    async def add_user(self, password_hash, email, is_admin=False):
+        """Create a new user
 
         Args:
-            username: username of the user. Correspond to synapse localpart.
-            email: email of the user
             password_hash: the synapse password hash
-            synapse_role: the synapse role, it can be administrator, collaborator or partner.
+            email: email of the user
+            is_admin: whether the user is a synapse administrator or not
         """
 
         user = {
             "enabled": True,
-            "username": localpart,
+            "username": email,
             "email": email,
             "credentials": [
                 {
@@ -71,20 +70,38 @@ class KeycloakClient(SimpleHttpClient):
             "requiredActions": ["UPDATE_PASSWORD", "UPDATE_PROFILE"],
         }
 
-        if synapse_role is not None:
-            user["attributes"]["synapseRole"] = synapse_role
+        if is_admin:
+            user["attributes"]["isAdmin"] = True
 
         try:
-            response = await self.post_json(
-                self._get_endpoint("admin/realms/{}/users".format(self.realm_name)),
+            return await self.post_json_get_json(
+                uri=self._get_endpoint("admin/realms/{}/users", self.realm_name),
                 headers=await self._get_header(),
                 post_json=user,
             )
         except HttpResponseException as e:
             if e.code == 409:
-                logger.info("User {} already exists on Keycloak server.".format(localpart))
+                logger.info(
+                    "User with email {} already exists on Keycloak server.".format(
+                        email
+                    )
+                )
             else:
                 raise
+
+    async def delete_user(self, user_id):
+        """Delete an existing user
+
+        Args:
+            user_id: the Keycloak user id
+        """
+
+        await self.delete_get_json(
+            uri=self._get_endpoint(
+                "admin/realms/{}/users/{}", self.realm_name, user_id
+            ),
+            headers=await self._get_header(),
+        )
 
     async def get_user(self, localpart) -> dict:
         """Get a specific Keycloak user.
@@ -95,7 +112,7 @@ class KeycloakClient(SimpleHttpClient):
         """
 
         response = await self.get_json(
-            self._get_endpoint("admin/realms/{}/users".format(self.realm_name)),
+            uri=self._get_endpoint("admin/realms/{}/users", self.realm_name),
             headers=await self._get_header(),
             args={"username": localpart},
         )
@@ -112,13 +129,28 @@ class KeycloakClient(SimpleHttpClient):
         """
 
         response = await self.get_json(
-            self._get_endpoint("admin/realms/{}/users".format(self.realm_name)),
+            uri=self._get_endpoint("admin/realms/{}/users", self.realm_name),
             headers=await self._get_header(),
         )
 
         validate(response, USER_SCHEMA)
 
         return response
+
+    async def update_user(self, user_id, attributes):
+        """Update specific attribute of a Keycloak user
+
+        Args:
+            user_id: the Keycloak user id
+        """
+
+        await self.put_json(
+            uri=self._get_endpoint(
+                "admin/realms/{}/users/{}", self.realm_name, user_id
+            ),
+            headers=await self._get_header(),
+            json_body={"attributes": attributes},
+        )
 
     async def _get_header(self):
         access_token = await self._get_access_token()
@@ -133,7 +165,7 @@ class KeycloakClient(SimpleHttpClient):
 
         response = await self.post_urlencoded_get_json(
             uri=self._get_endpoint(
-                "realms/{}/protocol/openid-connect/token".format(self.realm_name)
+                "realms/{}/protocol/openid-connect/token", self.realm_name
             ),
             args={
                 "client_id": "admin-cli",
@@ -142,10 +174,12 @@ class KeycloakClient(SimpleHttpClient):
                 "password": self.service_account_password,
             },
         )
-        
+
         validate(response, TOKEN_SCHEMA)
 
         return response["access_token"]
 
-    def _get_endpoint(self, path):
+    def _get_endpoint(self, path, *args):
+        if args:
+            path = path.format(*args)
         return "{}/{}".format(self.server_url, path)

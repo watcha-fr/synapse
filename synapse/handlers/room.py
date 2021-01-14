@@ -828,9 +828,9 @@ class RoomCreationHandler(BaseHandler):
 
             invite_3pid["user_id"] = await self.invite_partner_handler.invite(
                 room_id=room_id,
-                inviter=requester.user,
-                inviter_device_id=str(requester.device_id),
-                invitee=invite_3pid["address"],
+                sender_id=requester.user.to_string(),
+                sender_device_id=requester.device_id,
+                invitee_email=invite_3pid["address"],
             )
 
             logger.info(
