@@ -580,7 +580,8 @@ class AdministrationStore(SQLBaseStore):
                         WHERE user_threepids.medium = "email") AS user_emails
                         ON user_emails.user_id = users.name
                 LEFT JOIN user_directory ON users.name = user_directory.user_id
-                WHERE users.admin = 1 and users.deactivated = 0;
+                WHERE users.admin = 1 
+                    AND users.deactivated = 0;
             """
             )
 
