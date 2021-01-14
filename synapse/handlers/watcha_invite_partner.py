@@ -13,19 +13,18 @@ logger = logging.getLogger(__name__)
 class InvitePartnerHandler(BaseHandler):
     def __init__(self, hs):
         super().__init__(hs)
-        self.config = hs.config
-        self.auth_handler = self.hs.get_auth_handler()
-        self.nextcloud_handler = self.hs.get_nextcloud_handler()
-        self.registration_handler = self.hs.get_registration_handler()
-        self.room_handler = self.hs.get_room_member_handler()
+        self.auth_handler = hs.get_auth_handler()
+        self.nextcloud_handler = hs.get_nextcloud_handler()
+        self.registration_handler = hs.get_registration_handler()
+        self.room_handler = hs.get_room_member_handler()
         self.secret = hs.get_secrets()
 
-        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+        if hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self.mailer = Mailer(
-                hs=self.hs,
-                app_name=self.config.email_app_name,
-                template_html=self.config.watcha_registration_template_html,
-                template_text=self.config.watcha_registration_template_text,
+                hs=hs,
+                app_name=hs.config.email_app_name,
+                template_html=hs.config.watcha_registration_template_html,
+                template_text=hs.config.watcha_registration_template_text,
             )
 
     async def invite(self, room_id, sender_id, sender_device_id, invitee_email):
