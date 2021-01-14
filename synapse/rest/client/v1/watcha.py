@@ -223,6 +223,7 @@ class WatchaRegisterRestServlet(RestServlet):
 
         location = response.headers.getRawHeaders("location")[0]
         keycloak_user_id = location.split("/")[-1]
+
         try:
             await self.nextcloud_client.add_user(keycloak_user_id)
         except (SynapseError, HttpResponseException, ValidationError, SchemaError):
@@ -245,9 +246,7 @@ class WatchaRegisterRestServlet(RestServlet):
         sender_id = sender.user.to_string()
 
         await self.mailer.send_watcha_registration_email(
-            email_address=email,
-            sender_id=sender_id,
-            password=password,
+            email_address=email, sender_id=sender_id, password=password,
         )
 
         return 200, {}
