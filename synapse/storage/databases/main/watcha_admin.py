@@ -31,7 +31,7 @@ class AdministrationStore(SQLBaseStore):
 
     async def _get_new_rooms(self):
         """Retrieve a list of rooms that have recevied m.room.create event during the last week
-        
+
         Returns:
             A list of room_id
         """
@@ -52,7 +52,7 @@ class AdministrationStore(SQLBaseStore):
 
     async def _get_active_rooms(self):
         """Retrieve a list of rooms that have recevied some message during the last week
-        
+
         Returns:
             A list of room_id
         """
@@ -70,7 +70,9 @@ class AdministrationStore(SQLBaseStore):
 
             return [rooms[0] for rooms in txn.fetchall()]
 
-        return await self.db_pool.runInteraction("_get_active_rooms", _get_active_rooms_txn)
+        return await self.db_pool.runInteraction(
+            "_get_active_rooms", _get_active_rooms_txn
+        )
 
     async def _get_dm_rooms(self):
         """Retrieve a list of rooms that have m.direct flag on account_data and with exactly two joinned or invited members
@@ -87,15 +89,13 @@ class AdministrationStore(SQLBaseStore):
         )
 
         dm_rooms = list(
-            set(
-                [
-                    room
-                    for row in dm_rooms_by_member
-                    for member_rooms in json.loads(row).values()
-                    for room in member_rooms
-                    if room in members_by_room and len(members_by_room[room]) == 2
-                ]
-            )
+            {
+                room
+                for row in dm_rooms_by_member
+                for member_rooms in json.loads(row).values()
+                for room in member_rooms
+                if room in members_by_room and len(members_by_room[room]) == 2
+            }
         )
 
         return dm_rooms
@@ -130,9 +130,9 @@ class AdministrationStore(SQLBaseStore):
 
     async def _get_users_stats(self):
         """Retrieve the count of users per role (administrators, members and partners) and some stats about activity of users and pending invitations
-        
+
         Used for Watcha admin console.
-        
+
         Returns:
             A dict of integers
         """
@@ -186,7 +186,9 @@ class AdministrationStore(SQLBaseStore):
 
             return collaborators_users, partner_users, last_seen_ts_per_users
 
-        users = await self.db_pool.runInteraction("_get_users_stats", _get_users_stats_txn)
+        users = await self.db_pool.runInteraction(
+            "_get_users_stats", _get_users_stats_txn
+        )
 
         number_of_collaborators = users[0][0]
         number_of_partners = users[1][0]
@@ -230,9 +232,9 @@ class AdministrationStore(SQLBaseStore):
 
     async def _get_server_state(self):
         """Retrieve informations about server (disk usage, install and upgrade date, version)
-        
+
         Used for Watcha admin console.
-        
+
         Returns:
             A dict of strings
         """
@@ -351,7 +353,9 @@ class AdministrationStore(SQLBaseStore):
 
             return [dict(zip(FIELDS, user)) for user in result]
 
-        users = await self.db_pool.runInteraction("watcha_user_list", watcha_user_list_txn)
+        users = await self.db_pool.runInteraction(
+            "watcha_user_list", watcha_user_list_txn
+        )
 
         for user in users:
             user["status"] = (
@@ -385,7 +389,9 @@ class AdministrationStore(SQLBaseStore):
 
             return txn.fetchall()
 
-        return await self.db_pool.runInteraction("watcha_email_list", watcha_email_list_txn)
+        return await self.db_pool.runInteraction(
+            "watcha_email_list", watcha_email_list_txn
+        )
 
     async def watcha_user_ip(self, user_id):
         def watcha_user_ip_txn(txn):
@@ -393,7 +399,7 @@ class AdministrationStore(SQLBaseStore):
                 """
                 SELECT ip
                     , user_agent
-                    , last_seen 
+                    , last_seen
                 FROM user_ips
                 WHERE user_id = ?
                 ORDER BY last_seen DESC
@@ -438,14 +444,12 @@ class AdministrationStore(SQLBaseStore):
 
         return {
             room_id: list(
-                set(
+                {
                     user_id
                     for user_id, membership in members
                     if membership in ["join", "invite"]
-                )
-                - set(
-                    user_id for user_id, membership in members if membership == "leave"
-                )
+                }
+                - {user_id for user_id, membership in members if membership == "leave"}
             )
             for room_id, members in membership_by_room.items()
         }
@@ -453,7 +457,7 @@ class AdministrationStore(SQLBaseStore):
     async def watcha_room_list(self):
         """Retrieve a list of rooms with some informations for each one (room_id, creator, name, members, type and status).
 
-        Used for Watcha admin console. 
+        Used for Watcha admin console.
 
         Returns:
             A list of dict for each rooms.
@@ -475,7 +479,9 @@ class AdministrationStore(SQLBaseStore):
 
             return txn.fetchall()
 
-        rooms = await self.db_pool.runInteraction("watcha_room_list", watcha_room_list_txn)
+        rooms = await self.db_pool.runInteraction(
+            "watcha_room_list", watcha_room_list_txn
+        )
         members_by_room = await self.members_by_room()
         new_rooms = await self._get_new_rooms()
         active_rooms = await self._get_active_rooms()
@@ -600,14 +606,16 @@ class AdministrationStore(SQLBaseStore):
                         WHERE user_threepids.medium = "email") AS user_emails
                         ON user_emails.user_id = users.name
                 LEFT JOIN user_directory ON users.name = user_directory.user_id
-                WHERE users.admin = 1 
+                WHERE users.admin = 1
                     AND users.deactivated = 0;
             """
             )
 
             return txn.fetchall()
 
-        admins = await self.db_pool.runInteraction("_get_user_admin", _get_user_admin_txn)
+        admins = await self.db_pool.runInteraction(
+            "_get_user_admin", _get_user_admin_txn
+        )
         admins = [
             {"user_id": element[0], "email": element[1], "displayname": element[2]}
             for element in admins
