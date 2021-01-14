@@ -187,23 +187,23 @@ class Mailer:
         subject = self.email_subjects.watcha_registration % {"app": self.app_name}
 
         if get_localpart_from_id(sender_id) == self.hs.config.service_account_name:
-            host_name = self.hs.config.email_notif_from
+            sender_name = self.hs.config.email_notif_from
         else:
-            host_display_name = await self.profile_handler.get_displayname(
+            sender_display_name = await self.profile_handler.get_displayname(
                 UserID.from_string(sender_id)
             )
-            host_email = await self.account_handler.get_email_address_for_user(
+            sender_email = await self.account_handler.get_email_address_for_user(
                 sender_id
             )
-            host_name = (
-                "{} ({})".format(host_display_name, host_email)
-                if host_display_name
-                else host_email
+            sender_name = (
+                "{} ({})".format(sender_display_name, sender_email)
+                if sender_display_name
+                else sender_email
             )
 
         template_vars = {
             "title": subject,
-            "host_name": host_name,
+            "sender_name": sender_name,
             "login_url": self.hs.config.email_riot_base_url,
             "email": email_address,
             "password": password,

@@ -29,11 +29,11 @@ class InvitePartnerHandler(BaseHandler):
 
     async def invite(self, room_id, sender_id, sender_device_id, invitee_email):
 
-        user_id = await self.auth_handler.find_user_id_by_email(invitee_email)
+        invitee_id = await self.auth_handler.find_user_id_by_email(invitee_email)
         invitee_email = invitee_email.strip()
         email_sent = False
 
-        if user_id:
+        if invitee_id:
             logger.info(
                 "Partner with email {email} already exists. His id is {user_id}. Inviting him to room {room_id}".format(
                     email=invitee_email,
@@ -50,7 +50,7 @@ class InvitePartnerHandler(BaseHandler):
                 invitee_email, password_hash, "partner"
             )
 
-            user_id = await self.registration_handler.register_user(
+            invitee_id = await self.registration_handler.register_user(
                 localpart=localpart,
                 bind_emails=[invitee_email],
                 make_partner=True,
@@ -65,17 +65,17 @@ class InvitePartnerHandler(BaseHandler):
             email_sent = True
             logger.info(
                 "New partner with id {user_id} was created and an email has been sent to {email}. Inviting him to room {room_id}.".format(
-                    user_id=user_id,
+                    user_id=invitee_id,
                     email=invitee_email,
                     room_id=room_id,
                 )
             )
 
         await self.store.insert_partner_invitation(
-            partner_user_id=user_id,
+            partner_user_id=invitee_id,
             inviter_user_id=sender_id,
             inviter_device_id=sender_device_id,
             email_sent=email_sent,
         )
 
-        return user_id
+        return invitee_id
