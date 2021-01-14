@@ -41,7 +41,15 @@ from synapse.visibility import filter_events_for_client
 if TYPE_CHECKING:
     from synapse.app.homeserver import HomeServer
 
-from synapse.types import get_localpart_from_id  # watcha+
+# watcha+
+from base64 import b64encode
+from pathlib import Path
+
+import pkg_resources
+
+from synapse.types import get_localpart_from_id
+
+# +watcha
 
 logger = logging.getLogger(__name__)
 
@@ -120,9 +128,23 @@ class Mailer:
         # watcha+
         self.account_handler = self.hs.get_account_validity_handler()
         self.profile_handler = self.hs.get_profile_handler()
+        self.base64_watcha_logo = self._get_base64_image("watcha_logo.png")
+        self.base64_google_play_store_badge = self._get_base64_image(
+            "watcha_google_play_badge_fr.png"
+        )
+        self.base64_app_store_badge = self._get_base64_image(
+            "watcha_app_store_badge_fr.png"
+        )
         # +watcha
 
         logger.info("Created Mailer for app_name %s" % app_name)
+
+    def _get_base64_image(self, image_name):
+        path = Path(
+            pkg_resources.resource_filename("synapse", "res/templates"), image_name
+        )
+        data = path.read_bytes()
+        return b64encode(data)
 
     async def send_password_reset_mail(
         self, email_address: str, token: str, client_secret: str, sid: str
@@ -222,12 +244,13 @@ class Mailer:
             "email": email_address,
             "password": password,
             "server": self.hs.config.server_name,
+            "base64_watcha_logo": self.base64_watcha_logo,
+            "base64_google_play_store_badge": self.base64_google_play_store_badge,
+            "base64_app_store_badge": self.base64_app_store_badge,
         }
 
         await self.send_email(
-            email_address,
-            subject,
-            template_vars,
+            email_address, subject, template_vars,
         )
 
     # +watcha
