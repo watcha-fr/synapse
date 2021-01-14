@@ -316,7 +316,7 @@ class AdministrationStore(SQLBaseStore):
                         FROM user_ips
                         GROUP BY user_ips.user_id) as users_last_seen ON users_last_seen.user_id = users.name
                     LEFT JOIN profiles ON users.name LIKE "@"||profiles.user_id||":%"
-                    WHERE users.deactivated = 0
+                WHERE users.deactivated = 0
                 GROUP BY users.name
             """
 
