@@ -529,7 +529,7 @@ class EmailConfig(Config):
             # ownership.
             #email_validation: "%(email_validation)s"
             #
-            # Subject to use to notify about an invite to join a Watcha instance
+            # Subject to use to notify about an invite to join a Watcha instance.
             #watcha_registration: "%(watcha_registration)s"
         """
             % DEFAULT_SUBJECTS
