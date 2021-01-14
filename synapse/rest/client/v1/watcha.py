@@ -49,95 +49,6 @@ class WatchaRoomMembershipRestServlet(RestServlet):
         return 200, ret
 
 
-class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
-
-    PATTERNS = client_patterns("/watcha_room_nextcloud_activity", v1=True)
-
-    def __init__(self, hs):
-        super().__init__()
-        self.hs = hs
-        self.auth = hs.get_auth()
-        self.nextcloud_handler = hs.get_nextcloud_handler()
-
-    async def on_POST(self, request):
-        await _check_admin(
-            self.auth,
-            request,
-        )
-        params = parse_json_object_from_request(request)
-
-        file_name = params["file_name"]
-        file_url = params["file_url"]
-        notifications = params["notifications"]
-
-        if not file_name or not file_url or not notifications:
-            raise SynapseError(
-                400,
-                "Some data in payload have empty value.",
-            )
-
-        server_name = self.hs.get_config().server_name
-
-        if not server_name:
-            raise SynapseError(400, "No server name in homeserver config.")
-
-        file_url_parsed = urlparse(file_url)
-
-        if (
-            file_url_parsed.scheme not in ["http", "https"]
-            or file_url_parsed.netloc != server_name
-        ):
-            raise SynapseError(
-                400,
-                "The Nextcloud url is not recognized.",
-            )
-
-        notifications_sent = []
-
-        for notification in notifications:
-
-            if list(notification.keys()) != [
-                "activity_type",
-                "directory",
-                "limit_of_notification_propagation",
-            ]:
-                logger.warn("It missing some parameters to notify file operation")
-                continue
-
-            file_operation = notification["activity_type"]
-            if file_operation not in [
-                "file_created",
-                "file_deleted",
-                "file_moved",
-                "file_restored",
-            ]:
-                logger.warn("This nextcloud file operation is not handled")
-                continue
-
-            try:
-                rooms = await self.nextcloud_handler.get_rooms_to_send_notification(
-                    notification["directory"],
-                    notification["limit_of_notification_propagation"],
-                )
-            except SynapseError as e:
-                logger.error("Error during getting rooms to send notifications : %s", e)
-                continue
-
-            try:
-                notification_sent = (
-                    await self.nextcloud_handler.send_nextcloud_notification_to_rooms(
-                        rooms, file_name, file_url, file_operation
-                    )
-                )
-            except SynapseError as e:
-                logger.error("Error during sending notification to room : %s", e)
-                continue
-
-            notifications_sent.append(notification_sent)
-
-        return (200, notifications_sent)
-
-
 class WatchaRoomListRestServlet(RestServlet):
     PATTERNS = client_patterns("/watcha_room_list", v1=True)
 
@@ -355,7 +266,6 @@ def register_servlets(hs, http_server):
     WatchaRegisterRestServlet(hs).register(http_server)
     WatchaRoomListRestServlet(hs).register(http_server)
     WatchaRoomMembershipRestServlet(hs).register(http_server)
-    WatchaSendNextcloudActivityToWatchaRoomServlet(hs).register(http_server)
     WatchaUpdateMailRestServlet(hs).register(http_server)
     WatchaUpdateUserRoleRestServlet(hs).register(http_server)
     WatchaUserIp(hs).register(http_server)
