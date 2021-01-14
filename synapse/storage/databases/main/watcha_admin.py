@@ -156,6 +156,7 @@ class AdministrationStore(SQLBaseStore):
                 FROM users
                 WHERE is_partner = 0
                     AND admin = 0
+                    AND deactivated = 0
             """
             )
             collaborators_users = txn.fetchone()
@@ -166,6 +167,7 @@ class AdministrationStore(SQLBaseStore):
                 FROM users
                 WHERE is_partner = 1
                     AND admin = 0
+                    AND deactivated = 0
             """
             )
             partner_users = txn.fetchone()
@@ -295,7 +297,7 @@ class AdministrationStore(SQLBaseStore):
                     , profiles.displayname
                     , users.is_partner
                     , users.admin
-                    , users.is_active
+                    , users.deactivated
                     , users_last_seen.last_seen
                     , users.creation_ts * 1000
                 FROM users
@@ -313,6 +315,7 @@ class AdministrationStore(SQLBaseStore):
                         FROM user_ips
                         GROUP BY user_ips.user_id) as users_last_seen ON users_last_seen.user_id = users.name
                     LEFT JOIN profiles ON users.name LIKE "@"||profiles.user_id||":%"
+                WHERE users.deactivated = 0
                 GROUP BY users.name
             """
 
@@ -570,7 +573,8 @@ class AdministrationStore(SQLBaseStore):
                         WHERE user_threepids.medium = "email") AS user_emails
                         ON user_emails.user_id = users.name
                 LEFT JOIN user_directory ON users.name = user_directory.user_id
-                WHERE users.admin = 1;
+                WHERE users.admin = 1 
+                    AND users.deactivated = 0;
             """
             )
 
