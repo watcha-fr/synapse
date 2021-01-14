@@ -128,23 +128,77 @@ class Mailer:
         # watcha+
         self.account_handler = self.hs.get_account_validity_handler()
         self.profile_handler = self.hs.get_profile_handler()
-        self.base64_watcha_logo = self._get_base64_image("watcha_logo.png")
-        self.base64_google_play_badge = self._get_base64_image(
-            "watcha_google_play_badge_fr.png"
-        )
-        self.base64_app_store_badge = self._get_base64_image(
-            "watcha_app_store_badge_fr.png"
-        )
         # +watcha
 
         logger.info("Created Mailer for app_name %s" % app_name)
 
-    def _get_base64_image(self, image_name):
+    # watcha+
+    def _get_b64_image(self, image_name):
+        b64_image_cache = self.__dict__.setdefault("_watcha_image_cache", {})
+        b64_image = b64_image_cache.get(image_name)
+        if b64_image is not None:
+            logger.debug(
+                "[watcha] load base64 image from cache %s" % {image_name: image_name}
+            )
+            return b64_image
         path = Path(
             pkg_resources.resource_filename("synapse", "res/templates"), image_name
         )
         data = path.read_bytes()
-        return b64encode(data)
+        b64_image = b64encode(data).decode()
+        b64_image_cache[image_name] = b64_image
+        logger.debug("[watcha] load image from disk %s" % {image_name: image_name})
+        return b64_image
+
+    async def send_watcha_registration_email(
+        self,
+        email_address: str,
+        sender_id: str,
+        password: str,
+    )-> None:
+        """Send an email with temporary password and connexion link to Watcha.
+
+        Args:
+            email_address (str): Email address we're sending the invitation
+            sender_id (str): the user id of the user who invite the partner
+            password (str): a temporay password
+        """
+        subject = self.email_subjects.watcha_registration % {"app": self.app_name}
+
+        if get_localpart_from_id(sender_id) == self.hs.config.service_account_name:
+            sender_name = self.hs.config.email_notif_from
+        else:
+            sender_display_name = await self.profile_handler.get_displayname(
+                UserID.from_string(sender_id)
+            )
+            sender_email = await self.account_handler.get_email_address_for_user(
+                sender_id
+            )
+            sender_name = (
+                "{} ({})".format(sender_display_name, sender_email)
+                if sender_display_name
+                else sender_email
+            )
+
+        template_vars = {
+            "title": subject,
+            "sender_name": sender_name,
+            "login_url": self.hs.config.email_riot_base_url,
+            "email": email_address,
+            "password": password,
+            "server": self.hs.config.server_name,
+            "b64_watcha_logo": self._get_b64_image("watcha_logo.png"),
+            "b64_google_play_badge": self._get_b64_image(
+                "watcha_google_play_badge_fr.png"
+            ),
+            "b64_app_store_badge": self._get_b64_image("watcha_app_store_badge_fr.png"),
+        }
+
+        await self.send_email(
+            email_address, subject, template_vars,
+        )
+
+    # +watcha
 
     async def send_password_reset_mail(
         self, email_address: str, token: str, client_secret: str, sid: str
@@ -205,55 +259,6 @@ class Mailer:
             % {"server_name": self.hs.config.server_name},
             template_vars,
         )
-
-    # watcha+
-    async def send_watcha_registration_email(
-        self,
-        email_address: str,
-        sender_id: str,
-        password: str,
-    )-> None:
-        """Send an email with temporary password and connexion link to Watcha.
-
-        Args:
-            email_address (str): Email address we're sending the invitation
-            sender_id (str): the user id of the user who invite the partner
-            password (str): a temporay password
-        """
-        subject = self.email_subjects.watcha_registration % {"app": self.app_name}
-
-        if get_localpart_from_id(sender_id) == self.hs.config.service_account_name:
-            sender_name = self.hs.config.email_notif_from
-        else:
-            sender_display_name = await self.profile_handler.get_displayname(
-                UserID.from_string(sender_id)
-            )
-            sender_email = await self.account_handler.get_email_address_for_user(
-                sender_id
-            )
-            sender_name = (
-                "{} ({})".format(sender_display_name, sender_email)
-                if sender_display_name
-                else sender_email
-            )
-
-        template_vars = {
-            "title": subject,
-            "sender_name": sender_name,
-            "login_url": self.hs.config.email_riot_base_url,
-            "email": email_address,
-            "password": password,
-            "server": self.hs.config.server_name,
-            "base64_watcha_logo": self.base64_watcha_logo,
-            "base64_google_play_badge": self.base64_google_play_badge,
-            "base64_app_store_badge": self.base64_app_store_badge,
-        }
-
-        await self.send_email(
-            email_address, subject, template_vars,
-        )
-
-    # +watcha
 
     async def send_add_threepid_mail(
         self, email_address: str, token: str, client_secret: str, sid: str
