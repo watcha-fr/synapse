@@ -1,5 +1,6 @@
 import os
 import sys
+import unicodedata
 
 # secrets is available since python 3.6
 if sys.version_info[0:2] >= (3, 6):
@@ -24,4 +25,5 @@ class Secrets:
 
     def passphrase(self, nwords=4):
         words = self._get_words()
-        return " ".join(crypto.choice(words) for i in range(nwords))
+        passphrase = " ".join(crypto.choice(words) for i in range(nwords))
+        return unicodedata.normalize("NFKC", passphrase)

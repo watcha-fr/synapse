@@ -45,7 +45,7 @@ class InvitePartnerHandler(BaseHandler):
             password = self.secrets.passphrase()
             password_hash = await self.auth_handler.hash(password)
             response = await self.keycloak_client.add_user(password_hash, invitee_email)
-
+            
             location = response.headers.getRawHeaders("location")[0]
             keycloak_user_id = location.split("/")[-1]
 
