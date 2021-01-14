@@ -1,7 +1,6 @@
 import logging
 
 from ._base import BaseHandler
-
 from synapse.api.errors import SynapseError
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.push.mailer import Mailer
