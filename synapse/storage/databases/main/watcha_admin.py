@@ -1,9 +1,10 @@
-# -*- coding: utf-8 -*-
-
-import time, json, calendar, logging
-from datetime import datetime
-from collections import defaultdict
+import calendar
 import inspect
+import json
+import logging
+import subprocess
+from collections import defaultdict
+from datetime import datetime
 
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
@@ -236,8 +237,34 @@ class AdministrationStore(SQLBaseStore):
             A dict of strings
         """
 
+        def _get_disk_usage():
+            try:
+                completed_process = subprocess.run(
+                    ["du", "-bsh", "/var/lib/matrix-synapse/media"],
+                    stdout=subprocess.PIPE,
+                    timeout=3,
+                    check=True,
+                )
+            except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
+                logger.warn("[watcha] collect disk usage - failed: %s", e)
+                return
+
+            stdout = completed_process.stdout
+            try:
+                stdout = stdout.decode()
+            except AttributeError as e:
+                logger.warn("[watcha] parse disk usage statistics - failed: %s", e)
+                return
+
+            tokens = stdout.split("\t")
+            if len(tokens) <= 1:
+                logger.warn("[watcha] parse disk usage statistics - failed")
+                return
+
+            return tokens[0]
+
         result = {
-            "disk": "",
+            "disk_usage": _get_disk_usage(),
             "watcha_release": "",
             "upgrade_date": "",
             "install_date": "",
