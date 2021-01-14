@@ -42,7 +42,7 @@ DEFAULT_SUBJECTS = {
     "invite_from_person_to_room": "[%(app)s] %(person)s has invited you to join the %(room)s room on %(app)s...",
     "password_reset": "[%(server_name)s] Password reset",
     "email_validation": "[%(server_name)s] Validate your email",
-    "watcha_registration": "[%(app)s] Invitation à l'espace de travail sécurisé Watcha", # watcha+
+    "watcha_registration": "[%(app)s] Invitation to the Secure Workspace", # watcha+
 }
 
 
