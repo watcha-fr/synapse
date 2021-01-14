@@ -213,6 +213,12 @@ class OIDCConfig(Config):
               #
               #display_name_template: "{{{{ user.given_name }}}} {{{{ user.last_name }}}}"
 
+              # Jinja2 template for the Nextcloud username used for share.
+              #
+              # If unset, the Nextcloud username will not be stored.
+              #
+              #nextcloud_username_template: "{{{{ user.nextcloud_username | default(user.sub, true) }}}}"
+
               # Jinja2 templates for extra attributes to send back to the client during
               # login.
               #

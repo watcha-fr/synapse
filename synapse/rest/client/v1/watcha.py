@@ -1,13 +1,13 @@
 import logging
+from jsonschema.exceptions import ValidationError, SchemaError
 from urllib.parse import urlparse
 
-from synapse.api.errors import AuthError, SynapseError
+from synapse.api.errors import AuthError, HttpResponseException, SynapseError
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.push.mailer import Mailer
 from synapse.rest.client.v2_alpha._base import client_patterns
-from synapse.types import UserID, create_requester, map_username_to_mxid_localpart
-from synapse.util.threepids import canonicalise_email
+from synapse.util.watcha import Secrets
 
 logger = logging.getLogger(__name__)
 
@@ -47,95 +47,6 @@ class WatchaRoomMembershipRestServlet(RestServlet):
         await _check_admin(self.auth, request)
         ret = await self.administration_handler.watcha_room_membership()
         return 200, ret
-
-
-class WatchaSendNextcloudActivityToWatchaRoomServlet(RestServlet):
-
-    PATTERNS = client_patterns("/watcha_room_nextcloud_activity", v1=True)
-
-    def __init__(self, hs):
-        super().__init__()
-        self.hs = hs
-        self.auth = hs.get_auth()
-        self.nextcloud_handler = hs.get_nextcloud_handler()
-
-    async def on_POST(self, request):
-        await _check_admin(
-            self.auth,
-            request,
-        )
-        params = parse_json_object_from_request(request)
-
-        file_name = params["file_name"]
-        file_url = params["file_url"]
-        notifications = params["notifications"]
-
-        if not file_name or not file_url or not notifications:
-            raise SynapseError(
-                400,
-                "Some data in payload have empty value.",
-            )
-
-        server_name = self.hs.get_config().server_name
-
-        if not server_name:
-            raise SynapseError(400, "No server name in homeserver config.")
-
-        file_url_parsed = urlparse(file_url)
-
-        if (
-            file_url_parsed.scheme not in ["http", "https"]
-            or file_url_parsed.netloc != server_name
-        ):
-            raise SynapseError(
-                400,
-                "The Nextcloud url is not recognized.",
-            )
-
-        notifications_sent = []
-
-        for notification in notifications:
-
-            if list(notification.keys()) != [
-                "activity_type",
-                "directory",
-                "limit_of_notification_propagation",
-            ]:
-                logger.warn("It missing some parameters to notify file operation")
-                continue
-
-            file_operation = notification["activity_type"]
-            if file_operation not in [
-                "file_created",
-                "file_deleted",
-                "file_moved",
-                "file_restored",
-            ]:
-                logger.warn("This nextcloud file operation is not handled")
-                continue
-
-            try:
-                rooms = await self.nextcloud_handler.get_rooms_to_send_notification(
-                    notification["directory"],
-                    notification["limit_of_notification_propagation"],
-                )
-            except SynapseError as e:
-                logger.error("Error during getting rooms to send notifications : %s", e)
-                continue
-
-            try:
-                notification_sent = (
-                    await self.nextcloud_handler.send_nextcloud_notification_to_rooms(
-                        rooms, file_name, file_url, file_operation
-                    )
-                )
-            except SynapseError as e:
-                logger.error("Error during sending notification to room : %s", e)
-                continue
-
-            notifications_sent.append(notification_sent)
-
-        return (200, notifications_sent)
 
 
 class WatchaRoomListRestServlet(RestServlet):
@@ -266,10 +177,6 @@ class WatchaUserIp(RestServlet):
 
 
 class WatchaRegisterRestServlet(RestServlet):
-    """
-    Registration of users.
-    Requester must either be logged in as an admin, or supply a valid HMAC (generated from the registration_shared_secret)
-    """
 
     PATTERNS = client_patterns("/watcha_register", v1=True)
 
@@ -278,10 +185,10 @@ class WatchaRegisterRestServlet(RestServlet):
         self.config = hs.config
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
-        self.nextcloud_handler = hs.get_nextcloud_handler()
-        self.profile_handler = hs.get_profile_handler()
         self.registration_handler = hs.get_registration_handler()
-        self.secret = hs.get_secrets()
+        self.keycloak_client = hs.get_keycloak_client()
+        self.nextcloud_client = hs.get_nextcloud_client()
+        self.secrets = Secrets(hs.config.word_list_path)
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self.mailer = Mailer(
@@ -293,69 +200,57 @@ class WatchaRegisterRestServlet(RestServlet):
 
     async def on_POST(self, request):
         await _check_admin(
-            self.auth,
-            request,
+            self.auth, request,
         )
         params = parse_json_object_from_request(request)
-        logger.info("Adding Watcha user...")
 
         email = params["email"].strip()
         if not email:
             raise SynapseError(
-                400,
-                "Email address cannot be empty",
+                400, "Email address cannot be empty",
             )
 
-        user_id = await self.auth_handler.find_user_id_by_email(email)
-        if user_id:
+        if await self.auth_handler.find_user_id_by_email(email):
             raise SynapseError(
                 400,
                 "A user with this email address already exists. Cannot create a new one.",
             )
 
-        requester = await self.auth.get_user_by_req(request)
-
-        send_email = False
-
-        if "password" in params and params["password"]:
-            password = params["password"]
-        else:
-            password = self.secret.token_hex(6)
-            send_email = True
-
+        password = params.get("password") or self.secrets.passphrase()
         password_hash = await self.auth_handler.hash(password)
-        admin = params["admin"]
+        is_admin = params["admin"]
+        response = await self.keycloak_client.add_user(password_hash, email, is_admin)
 
-        role = "admin" if admin else None
-        await self.nextcloud_handler.create_keycloak_and_nextcloud_user(email, password_hash, role)
+        location = response.headers.getRawHeaders("location")[0]
+        keycloak_user_id = location.split("/")[-1]
+        try:
+            await self.nextcloud_client.add_user(keycloak_user_id)
+        except (SynapseError, HttpResponseException, ValidationError, SchemaError):
+            await self.keycloak_client.delete_user(keycloak_user_id)
+            raise
 
-        user_id = await self.registration_handler.register_user(
-            localpart=map_username_to_mxid_localpart(email),
-            password_hash=None,
-            admin=admin,
-            bind_emails=[email],
+        try:
+            await self.registration_handler.register_user(
+                localpart=keycloak_user_id,
+                admin=is_admin,
+                default_display_name="",
+                bind_emails=[email],
+            )
+        except SynapseError:
+            await self.keycloak_client.delete_user(keycloak_user_id)
+            await self.nextcloud_client.delete_user(keycloak_user_id)
+            raise
+
+        sender = await self.auth.get_user_by_req(request)
+        sender_id = sender.user.to_string()
+
+        await self.mailer.send_watcha_registration_email(
+            email_address=email,
+            sender_id=sender_id,
+            password=password,
         )
 
-        user = UserID.from_string(user_id)
-        await self.profile_handler.set_displayname(
-            user, requester, params["displayname"], by_admin=True
-        )
-
-        display_name = await self.profile_handler.get_displayname(user)
-
-        if send_email:
-            await self.mailer.send_watcha_registration_email(
-                email_address=email,
-                sender_id=requester.user.to_string(),
-                password=password,
-            )
-        else:
-            logger.info(
-                "Not sending email for user password for user %s, password is defined by sender",
-                user_id,
-            )
-
-        return 200, {"display_name": display_name, "user_id": user_id}
+        return 200, {}
 
 
 def register_servlets(hs, http_server):
@@ -363,7 +258,6 @@ def register_servlets(hs, http_server):
     WatchaRegisterRestServlet(hs).register(http_server)
     WatchaRoomListRestServlet(hs).register(http_server)
     WatchaRoomMembershipRestServlet(hs).register(http_server)
-    WatchaSendNextcloudActivityToWatchaRoomServlet(hs).register(http_server)
     WatchaUpdateMailRestServlet(hs).register(http_server)
     WatchaUpdateUserRoleRestServlet(hs).register(http_server)
     WatchaUserIp(hs).register(http_server)

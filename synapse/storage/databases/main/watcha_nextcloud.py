@@ -17,17 +17,6 @@ class NextcloudStore(SQLBaseStore):
             desc="get_path_from_room_id",
         )
 
-    async def get_room_id_from_path(self, path):
-        """Get the room_id bound with Nextcloud folder path."""
-
-        return await self.db_pool.simple_select_one_onecol(
-            table="room_nextcloud_mapping",
-            keyvalues={"directory_path": path},
-            retcol="room_id",
-            allow_none=True,
-            desc="get_room_id_from_path",
-        )
-
     async def get_nextcloud_share_id_from_room_id(self, room_id):
         """Get Nextcloud share id of the room id."""
 
@@ -45,11 +34,7 @@ class NextcloudStore(SQLBaseStore):
         await self.db_pool.simple_upsert(
             table="room_nextcloud_mapping",
             keyvalues={"room_id": room_id},
-            values={
-                "room_id": room_id,
-                "directory_path": path,
-                "share_id": share_id,
-            },
+            values={"room_id": room_id, "directory_path": path, "share_id": share_id,},
             desc="bind",
         )
 
@@ -60,4 +45,21 @@ class NextcloudStore(SQLBaseStore):
             table="room_nextcloud_mapping",
             keyvalues={"room_id": room_id},
             desc="unbind",
+        )
+
+    async def get_nextcloud_username(self, user_id):
+        """Look up a Nextcloud username by their user_id
+
+        Args:
+            user_id: The matrix ID of the user
+
+        Returns:
+            the Nextcloud username of the user, or None if they are not known
+        """
+        return await self.db_pool.simple_select_one_onecol(
+            table="user_external_ids",
+            keyvalues={"user_id": user_id},
+            retcol="nextcloud_username",
+            allow_none=True,
+            desc="get_nextcloud_username",
         )

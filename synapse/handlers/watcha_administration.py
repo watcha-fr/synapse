@@ -70,10 +70,6 @@ class AdministrationHandler(BaseHandler):
 
         return role
 
-    async def watchaDeactivateAccount(self, user_id):
-        result = await self.store.watcha_deactivate_account(user_id)
-        return result
-
     async def watcha_admin_stat(self):
         result = await self.store.watcha_admin_stats()
         return result
