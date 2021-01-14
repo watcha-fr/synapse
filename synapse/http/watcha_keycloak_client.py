@@ -74,7 +74,7 @@ class KeycloakClient(SimpleHttpClient):
             user["attributes"]["isAdmin"] = True
 
         try:
-            return await self.post_json_get_json(
+            return await self.post_json(
                 uri=self._get_endpoint("admin/realms/{}/users", self.realm_name),
                 headers=await self._get_header(),
                 post_json=user,
