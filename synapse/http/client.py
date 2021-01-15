@@ -740,7 +740,7 @@ class SimpleHttpClient:
             return response
         else:
             raise HttpResponseException(
-                response.code, response.phrase.decode("ascii", errors="replace"), body
+                response.code, response.phrase.decode("ascii", errors="replace")
             )
 
     async def delete_get_json(
