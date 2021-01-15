@@ -736,11 +736,13 @@ class SimpleHttpClient:
             "POST", uri, headers=Headers(actual_headers), data=json_str
         )
 
+        body = await make_deferred_yieldable(readBody(response))
+
         if 200 <= response.code < 300:
             return response
         else:
             raise HttpResponseException(
-                response.code, response.phrase.decode("ascii", errors="replace")
+                response.code, response.phrase.decode("ascii", errors="replace"), body
             )
 
     async def delete_get_json(
