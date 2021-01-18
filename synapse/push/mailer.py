@@ -187,7 +187,7 @@ class Mailer:
             "email": email_address,
             "password": password,
             "server": self.hs.config.server_name,
-            "b64_watcha_logo": self._get_b64_image("watcha_logo.png"),
+            "b64_watcha_button": self._get_b64_image("watcha_button.png"),
             "b64_google_play_badge": self._get_b64_image(
                 "watcha_google_play_badge_fr.png"
             ),
