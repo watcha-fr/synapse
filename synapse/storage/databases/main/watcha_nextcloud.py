@@ -34,7 +34,11 @@ class NextcloudStore(SQLBaseStore):
         await self.db_pool.simple_upsert(
             table="room_nextcloud_mapping",
             keyvalues={"room_id": room_id},
-            values={"room_id": room_id, "directory_path": path, "share_id": share_id,},
+            values={
+                "room_id": room_id,
+                "directory_path": path,
+                "share_id": share_id,
+            },
             desc="bind",
         )
 
