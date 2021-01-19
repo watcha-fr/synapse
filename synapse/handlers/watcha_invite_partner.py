@@ -1,12 +1,13 @@
 import logging
 
-from ._base import BaseHandler
-from jsonschema.exceptions import ValidationError, SchemaError
+from jsonschema.exceptions import SchemaError, ValidationError
 
-from synapse.api.errors import SynapseError, HttpResponseException
+from synapse.api.errors import HttpResponseException, SynapseError
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.push.mailer import Mailer
 from synapse.util.watcha import Secrets
+
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
@@ -38,14 +39,16 @@ class InvitePartnerHandler(BaseHandler):
         if invitee_id:
             logger.info(
                 "Partner with email {email} already exists. His id is {invitee_id}. Inviting him to room {room_id}".format(
-                    email=invitee_email, invitee_id=invitee_id, room_id=room_id,
+                    email=invitee_email,
+                    invitee_id=invitee_id,
+                    room_id=room_id,
                 )
             )
         else:
             password = self.secrets.passphrase()
             password_hash = await self.auth_handler.hash(password)
             response = await self.keycloak_client.add_user(password_hash, invitee_email)
-            
+
             location = response.headers.getRawHeaders("location")[0]
             keycloak_user_id = location.split("/")[-1]
 
@@ -62,13 +65,17 @@ class InvitePartnerHandler(BaseHandler):
             )
 
             await self.mailer.send_watcha_registration_email(
-                email_address=invitee_email, sender_id=sender_id, password=password,
+                email_address=invitee_email,
+                sender_id=sender_id,
+                password=password,
             )
 
             email_sent = True
             logger.info(
                 "New partner with id {invitee_id} was created and an email has been sent to {email}. Inviting him to room {room_id}.".format(
-                    invitee_id=invitee_id, email=invitee_email, room_id=room_id,
+                    invitee_id=invitee_id,
+                    email=invitee_email,
+                    room_id=room_id,
                 )
             )
 

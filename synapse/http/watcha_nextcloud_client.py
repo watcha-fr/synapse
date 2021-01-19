@@ -1,5 +1,6 @@
 import logging
 from base64 import b64encode
+
 from jsonschema import validate
 
 from synapse.api.errors import Codes, SynapseError
@@ -107,7 +108,7 @@ class NextcloudClient(SimpleHttpClient):
             102 - username already exists
             103 - unknown error occurred whilst adding the user
         """
-        # A password is needed to create NC user, but it will not be used by KC login process. 
+        # A password is needed to create NC user, but it will not be used by KC login process.
         password = self.secrets.token_hex()
 
         response = await self.post_json_get_json(
@@ -120,7 +121,9 @@ class NextcloudClient(SimpleHttpClient):
         meta = response["ocs"]["meta"]
 
         if meta["statuscode"] == 102:
-            logger.info("User '{}' already exists on the Nextcloud server.".format(username))
+            logger.info(
+                "User '{}' already exists on the Nextcloud server.".format(username)
+            )
         else:
             self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_CREATE_USER)
 
@@ -222,7 +225,7 @@ class NextcloudClient(SimpleHttpClient):
 
         validate(response, WITHOUT_DATA_SCHEMA)
         meta = response["ocs"]["meta"]
-        
+
         errcode = (
             Codes.NEXTCLOUD_USER_DOES_NOT_EXIST
             if meta["statuscode"] == 103
