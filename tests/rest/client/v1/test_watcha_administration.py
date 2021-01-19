@@ -59,7 +59,6 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
                     "email_address": "admin@example.com",
                     "last_seen": None,
                     "role": "administrator",
-                    "status": "invited",
                     "user_id": "@admin:test",
                 },
                 {
@@ -68,7 +67,6 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
                     "email_address": "collaborator@example.com",
                     "last_seen": None,
                     "role": "collaborator",
-                    "status": "invited",
                     "user_id": "@collaborator:test",
                 },
                 {
@@ -77,7 +75,6 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
                     "email_address": "partner@example.com",
                     "last_seen": None,
                     "role": "partner",
-                    "status": "invited",
                     "user_id": "@partner:test",
                 },
             ],

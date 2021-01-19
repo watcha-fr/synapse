@@ -314,7 +314,6 @@ class AdministrationStore(SQLBaseStore):
                 "display_name",
                 "is_partner",
                 "is_admin",
-                "status",
                 "last_seen",
                 "creation_ts",
             ]
@@ -326,7 +325,6 @@ class AdministrationStore(SQLBaseStore):
                     , profiles.displayname
                     , users.is_partner
                     , users.admin
-                    , users.deactivated
                     , users_last_seen.last_seen
                     , users.creation_ts * 1000
                 FROM users
@@ -357,14 +355,6 @@ class AdministrationStore(SQLBaseStore):
             "watcha_user_list", watcha_user_list_txn
         )
 
-        for user in users:
-            user["status"] = (
-                "inactive"
-                if user["status"] == 0
-                else "invited"
-                if user["user_id"] in users_with_pending_invitation
-                else "active"
-            )
         return users
 
     async def watcha_email_list(self):
