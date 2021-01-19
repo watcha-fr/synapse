@@ -25,7 +25,6 @@ class AdministrationHandler(BaseHandler):
                     "email_address": user["email_address"],
                     "display_name": user["display_name"],
                     "role": role,
-                    "status": user["status"],
                     "last_seen": user["last_seen"],
                     "creation_ts": user["creation_ts"],
                 }
