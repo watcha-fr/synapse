@@ -73,7 +73,7 @@ from .user_directory import UserDirectoryStore
 from .user_erasure_store import UserErasureStore
 
 # watcha+
-from .watcha_admin import AdministrationStore
+from .watcha_administration import AdministrationStore
 from .watcha_invite_partner import ExternalInvitationStore
 from .watcha_nextcloud import NextcloudStore
 # +watcha

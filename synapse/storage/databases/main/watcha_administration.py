@@ -357,32 +357,6 @@ class AdministrationStore(SQLBaseStore):
 
         return users
 
-    async def watcha_email_list(self):
-        """Retrieve a list of couple user_id/email of al users.
-
-        Used for Watcha admin console.
-
-        Returns:
-            A list of tuples which contains user_id and email values for each users.
-        """
-
-        def watcha_email_list_txn(txn):
-            SQL_EMAIL_LIST = """
-                SELECT
-                    user_threepids.user_id
-                    , user_threepids.address
-                FROM user_threepids
-                WHERE medium = "email"
-                """
-
-            txn.execute(SQL_EMAIL_LIST)
-
-            return txn.fetchall()
-
-        return await self.db_pool.runInteraction(
-            "watcha_email_list", watcha_email_list_txn
-        )
-
     async def watcha_user_ip(self, user_id):
         def watcha_user_ip_txn(txn):
             txn.execute(
