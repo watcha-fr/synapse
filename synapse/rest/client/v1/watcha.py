@@ -1,6 +1,7 @@
 import logging
-from jsonschema.exceptions import ValidationError, SchemaError
 from urllib.parse import urlparse
+
+from jsonschema.exceptions import SchemaError, ValidationError
 
 from synapse.api.errors import AuthError, HttpResponseException, SynapseError
 from synapse.config.emailconfig import ThreepidBehaviour
@@ -201,14 +202,16 @@ class WatchaRegisterRestServlet(RestServlet):
 
     async def on_POST(self, request):
         await _check_admin(
-            self.auth, request,
+            self.auth,
+            request,
         )
         params = parse_json_object_from_request(request)
 
         email = params["email"].strip()
         if not email:
             raise SynapseError(
-                400, "Email address cannot be empty",
+                400,
+                "Email address cannot be empty",
             )
 
         if await self.store.get_user_id_by_threepid("email", email):
@@ -247,7 +250,9 @@ class WatchaRegisterRestServlet(RestServlet):
         sender_id = sender.user.to_string()
 
         await self.mailer.send_watcha_registration_email(
-            email_address=email, sender_id=sender_id, password=password,
+            email_address=email,
+            sender_id=sender_id,
+            password=password,
         )
 
         return 200, {}
