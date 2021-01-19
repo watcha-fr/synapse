@@ -186,6 +186,7 @@ class WatchaRegisterRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
+        self.store = hs.get_datastore()
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
         self.secrets = Secrets(hs.config.word_list_path)
@@ -210,7 +211,7 @@ class WatchaRegisterRestServlet(RestServlet):
                 400, "Email address cannot be empty",
             )
 
-        if await self.auth_handler.find_user_id_by_email(email):
+        if await self.store.get_user_id_by_threepid("email", email):
             raise SynapseError(
                 400,
                 "A user with this email address already exists. Cannot create a new one.",

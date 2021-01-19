@@ -31,7 +31,7 @@ class InvitePartnerHandler(BaseHandler):
 
     async def invite(self, room_id, sender_id, sender_device_id, invitee_email):
 
-        invitee_id = await self.auth_handler.find_user_id_by_email(invitee_email)
+        invitee_id = await self.store.get_user_id_by_threepid("email", invitee_email)
         invitee_email = invitee_email.strip()
         email_sent = False
 
