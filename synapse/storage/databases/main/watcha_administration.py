@@ -114,7 +114,9 @@ class AdministrationStore(SQLBaseStore):
         active_rooms = set(active_rooms).union(new_rooms)
 
         all_rooms = await self.db_pool.simple_select_onecol(
-            table="rooms", keyvalues=None, retcol="room_id",
+            table="rooms",
+            keyvalues=None,
+            retcol="room_id",
         )
 
         regular_rooms = set(all_rooms) & set(members_by_room.keys()) - set(dm_rooms)

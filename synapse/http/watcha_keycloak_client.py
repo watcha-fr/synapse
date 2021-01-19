@@ -1,6 +1,7 @@
 import logging
-from jsonschema import validate
 from typing import List
+
+from jsonschema import validate
 
 from synapse.api.errors import HttpResponseException
 from synapse.http.client import SimpleHttpClient
