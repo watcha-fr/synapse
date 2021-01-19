@@ -940,6 +940,10 @@ class OidcHandler:
 
             email = attributes["email"]
             if email:
+                if await self._datastore.get_user_id_by_threepid("email", email):
+                    raise MappingException(
+                        "A user with this email address already exists. Cannot create a new one.",
+                    )
                 optional_params["bind_emails"] = [email]
 
             is_admin = attributes["is_admin"]
