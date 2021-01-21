@@ -1064,13 +1064,6 @@ class AuthHandler(BaseHandler):
         # case sensitive).
         if medium == "email":
             address = canonicalise_email(address)
-            # watcha+ op251
-            emails = await self.store.watcha_email_list()
-            if address in (item[1] for item in emails):
-               raise SynapseError(
-                   400, "This email is already attached to another user account."
-               )
-            # +watcha
 
         await self.store.user_add_threepid(
             user_id, medium, address, validated_at, self.hs.get_clock().time_msec()
@@ -1188,13 +1181,6 @@ class AuthHandler(BaseHandler):
 
     async def is_admin(self, user_id):
         ret = await self.store.is_user_admin(user_id)
-        return ret
-
-    async def find_user_id_by_email(self, address):
-        ret = await self.store.get_user_id_by_threepid(
-            "email",
-            address
-        )
         return ret
     # +watcha
 
