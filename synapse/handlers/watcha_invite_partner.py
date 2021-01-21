@@ -16,6 +16,7 @@ class InvitePartnerHandler(BaseHandler):
     def __init__(self, hs):
         super().__init__(hs)
         self.auth_handler = hs.get_auth_handler()
+        self.administration_handler = hs.get_administration_handler()
         self.registration_handler = hs.get_registration_handler()
         self.store = hs.get_datastore()
         self.keycloak_client = hs.get_keycloak_client()
@@ -34,6 +35,11 @@ class InvitePartnerHandler(BaseHandler):
 
         invitee_email = invitee_email.strip()
         invitee_id = await self.store.get_user_id_by_threepid("email", invitee_email)
+        invitee_role = self.administration_handler.get_user_role(invitee_id)
+
+        if invitee_role != "partner":
+            return
+
         email_sent = False
 
         if invitee_id:
