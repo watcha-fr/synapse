@@ -764,6 +764,19 @@ class OidcHandlerTestCase(HomeserverTestCase):
             MappingException,
         )
         self.assertEqual(str(e.value), "is_admin 'not_a_boolean' is not a boolean")
+
+        userinfo = {
+            "sub": "test_user_8",
+            "username": "test_user_8",
+            "email": "test_user@test.com",
+        }
+        e = self.get_failure(
+            self.handler._map_userinfo_to_user(
+                userinfo, token, "user-agent", "10.10.10.10"
+            ),
+            MappingException,
+        )
+        self.assertEqual(str(e.value), "A user with this email address already exists. Cannot create a new one.")
         # +watcha
 
     @override_config({"oidc_config": {"allow_existing_users": True}})
