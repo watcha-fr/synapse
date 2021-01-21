@@ -19,7 +19,7 @@ def simple_async_mock(return_value=None, raises=None):
     return Mock(side_effect=cb)
 
 
-class InvitePartnerHandlerTestCase(unittest.HomeserverTestCase):
+class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
 
     servlets = [
         admin.register_servlets_for_client_rest_resource,
@@ -55,7 +55,9 @@ class InvitePartnerHandlerTestCase(unittest.HomeserverTestCase):
         return hs
 
     def prepare(self, reactor, clock, hs):
-        self.time = self.hs.get_clock().time_msec()
+        self.store =hs.get_datastore()
+        self.store.insert_partner_invitation = simple_async_mock()
+        self.time = hs.get_clock().time_msec()
 
         self.auth = hs.get_auth_handler()
         self.nextcloud_handler = hs.get_nextcloud_handler()
@@ -65,7 +67,7 @@ class InvitePartnerHandlerTestCase(unittest.HomeserverTestCase):
         self.get_success(
             self.auth.add_threepid(self.owner, "email", "owner@example.com", self.time)
         )
-        self.other_user = self.register_user("otheruser", "pass")
+        self.other_user = self.register_user("otheruser", "pass", is_partner=True)
         self.other_user_access_token = self.login("otheruser", "pass")
         self.get_success(
             self.auth.add_threepid(
@@ -85,12 +87,12 @@ class InvitePartnerHandlerTestCase(unittest.HomeserverTestCase):
         self.keycloak_client.add_user = simple_async_mock(return_value=response)
         self.nextcloud_client.add_user = simple_async_mock()
 
-        self.url = "/rooms/{}/invite".format(self.room_id)
+        self.invite_membership_uri = "/rooms/{}/invite".format(self.room_id)
 
     def test_invite_new_partner(self):
         request, channel = self.make_request(
             "POST",
-            self.url,
+            self.invite_membership_uri,
             {"id_server": "test", "medium": "email", "address": "partner@example.com"},
             self.owner_tok,
         )
@@ -107,7 +109,7 @@ class InvitePartnerHandlerTestCase(unittest.HomeserverTestCase):
     def test_invite_existing_partner(self):
         request, channel = self.make_request(
             "POST",
-            self.url,
+            self.invite_membership_uri,
             {
                 "id_server": "test",
                 "medium": "email",
@@ -123,4 +125,31 @@ class InvitePartnerHandlerTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(self.email_attempts), 0)
 
         self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.result["body"], b"{}")
+    
+    def test_invite_collaborator_as_partner(self):
+        self.collaborator = self.register_user("collaborator", "pass")
+        self.get_success(
+            self.auth.add_threepid(self.collaborator, "email", "collaborator@example.com", self.time)
+        )
+
+        request, channel = self.make_request(
+            "POST",
+            self.invite_membership_uri,
+            {
+                "id_server": "test",
+                "medium": "email",
+                "address": "collaborator@example.com",
+            },
+            self.owner_tok,
+        )
+        self.render(request)
+
+        self.keycloak_client.add_user.not_called()
+        self.nextcloud_client.add_user.not_called()
+        self.store.insert_partner_invitation.not_called()
+
+        self.assertEqual(len(self.email_attempts), 0)
+
+        # self.assertEqual(channel.code, 200)
         self.assertEqual(channel.result["body"], b"{}")
