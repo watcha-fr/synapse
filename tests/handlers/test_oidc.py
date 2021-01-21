@@ -776,7 +776,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             ),
             MappingException,
         )
-        self.assertEqual(str(e.value), "A user with this email address already exists. Cannot create a new one.")
+        self.assertEqual(str(e.value), "[watcha] register user with email test_user@test.com failed : email address already exists")
         # +watcha
 
     @override_config({"oidc_config": {"allow_existing_users": True}})
