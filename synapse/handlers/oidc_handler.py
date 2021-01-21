@@ -942,7 +942,9 @@ class OidcHandler:
             if email:
                 if await self._datastore.get_user_id_by_threepid("email", email):
                     raise MappingException(
-                        "A user with this email address already exists. Cannot create a new one.",
+                        "[watcha] Register user with email {email} failed : email address already exists.".format(
+                            email
+                        ),
                     )
                 optional_params["bind_emails"] = [email]
 
