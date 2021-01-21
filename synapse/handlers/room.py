@@ -77,7 +77,10 @@ class RoomCreationHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.config = hs.config
-        self.invite_partner_handler = hs.get_invite_partner_handler()  # watcha+
+        # watcha+
+        self.store = hs.get_datastore()
+        self.partner_handler = hs.get_partner_handler()  
+        # +watcha
 
         # Room state based off defined presets
         self._presets_dict = {
@@ -820,26 +823,26 @@ class RoomCreationHandler(BaseHandler):
             )
             !watcha """
             # watcha+
-            logger.info(
-                "invitation on creation: inviter id=%s, device_id=%s",
-                requester.user,
-                requester.device_id,
-            )
+            invitee_email = invite_3pid["address"].strip()
+            invitee_id = await self.store.get_user_id_by_threepid("email", invitee_email)
+            email_sent = False
 
-            invite_3pid["user_id"] = await self.invite_partner_handler.invite(
-                room_id=room_id,
-                sender_id=requester.user.to_string(),
-                sender_device_id=requester.device_id,
-                invitee_email=invite_3pid["address"],
-            )
+            if not invitee_id:
+                invitee_id = await self.partner_handler.register_partner(
+                    sender_id=requester.user.to_string(), invitee_email=invitee_email,
+                )
+                email_sent = True       
 
-            logger.info(
-                "invitee email=%s has been invited as %s at the creation of the room with id=%s",
-                invite_3pid["address"],
-                invite_3pid["user_id"],
-                room_id,
-            )
+            if await self.administration_handler.get_user_role(invitee_id) == "partner":
+                await self.store.insert_partner_invitation(
+                    partner_id=invitee_id,
+                    sender_id=requester.user.to_string(),
+                    sender_device_id=requester.device_id,
+                    email_sent=email_sent,
+                )
 
+            invite_3pid["user_id"] = invitee_id
+            
             content = {}
             is_direct = config.get("is_direct", None)
             if is_direct:
