@@ -940,21 +940,20 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         # watcha+
         if membership_action == "invite" and self._has_3pid_invite_keys(content):
             invitee_email = content["address"].strip()
-            invitee_id = await self.store.get_user_id_by_threepid("email", invitee_email)
-            email_sent = False
+            invitee_id = await self.store.get_user_id_by_threepid(
+                "email", invitee_email
+            )
 
             if not invitee_id:
                 invitee_id = await self.partner_handler.register_partner(
-                    sender_id=requester.user.to_string(), invitee_email=invitee_email,
+                    sender_id=requester.user.to_string(),
+                    invitee_email=invitee_email,
                 )
-                email_sent = True       
 
             if await self.administration_handler.get_user_role(invitee_id) == "partner":
-                await self.store.insert_partner_invitation(
+                await self.store.add_partner_invitation(
                     partner_id=invitee_id,
                     sender_id=requester.user.to_string(),
-                    sender_device_id=requester.device_id,
-                    email_sent=email_sent,
                 )
 
             content["user_id"] = invitee_id
