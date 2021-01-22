@@ -17,7 +17,7 @@ class PartnerStore(SQLBaseStore):
         Args:
             partner_id (str): the partner mxid
             sender_id (str): the mxid of the sender
-            device_id (str): the device id of the sender
+            sender_device_id (str): the device id of the sender
             email_sent (bool): True if email was sent to the partner
         """
         await self.db_pool.simple_insert(
