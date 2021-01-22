@@ -1,3 +1,4 @@
+import json
 import os
 import pkg_resources
 
@@ -55,7 +56,7 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
         return hs
 
     def prepare(self, reactor, clock, hs):
-        self.store =hs.get_datastore()
+        self.store = hs.get_datastore()
         self.store.insert_partner_invitation = simple_async_mock()
         self.time = hs.get_clock().time_msec()
 
@@ -67,6 +68,7 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
         self.get_success(
             self.auth.add_threepid(self.owner, "email", "owner@example.com", self.time)
         )
+
         self.other_user = self.register_user("otheruser", "pass", is_partner=True)
         self.other_user_access_token = self.login("otheruser", "pass")
         self.get_success(
@@ -74,6 +76,14 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
                 self.other_user, "email", "otheruser@example.com", self.time
             )
         )
+
+        self.collaborator = self.register_user("collaborator", "pass")
+        self.get_success(
+            self.auth.add_threepid(
+                self.collaborator, "email", "collaborator@example.com", self.time
+            )
+        )
+
         self.room_id = self.helper.create_room_as(self.owner, tok=self.owner_tok)
 
         self.keycloak_client = self.nextcloud_handler.keycloak_client
@@ -100,6 +110,7 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
 
         self.assertTrue(self.keycloak_client.add_user.called)
         self.assertTrue(self.nextcloud_client.add_user.called)
+        self.assertTrue(self.store.insert_partner_invitation.called)
 
         self.assertEqual(len(self.email_attempts), 1)
 
@@ -121,18 +132,14 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
 
         self.keycloak_client.add_user.not_called()
         self.nextcloud_client.add_user.not_called()
+        self.store.insert_partner_invitation.not_called()
 
         self.assertEqual(len(self.email_attempts), 0)
 
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.result["body"], b"{}")
-    
-    def test_invite_collaborator_as_partner(self):
-        self.collaborator = self.register_user("collaborator", "pass")
-        self.get_success(
-            self.auth.add_threepid(self.collaborator, "email", "collaborator@example.com", self.time)
-        )
 
+    def test_invite_collaborator_as_partner(self):
         request, channel = self.make_request(
             "POST",
             self.invite_membership_uri,
@@ -151,5 +158,80 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(len(self.email_attempts), 0)
 
-        # self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.code, 200)
         self.assertEqual(channel.result["body"], b"{}")
+
+    def test_create_room_and_invite_partner(self):
+        request, channel = self.make_request(
+            "POST",
+            "/createRoom",
+            {
+                "invite_3pid": [
+                    {
+                        "id_server": "test",
+                        "medium": "email",
+                        "address": "partner@example.com",
+                    }
+                ],
+            },
+            self.owner_tok,
+        )
+        self.render(request)
+
+        self.assertTrue(self.keycloak_client.add_user.called)
+        self.assertTrue(self.nextcloud_client.add_user.called)
+        self.assertTrue(self.store.insert_partner_invitation.called)
+
+        self.assertEqual(len(self.email_attempts), 1)
+
+        self.assertEqual(channel.code, 200)
+
+    def test_create_room_and_invite_existing_partner(self):
+        request, channel = self.make_request(
+            "POST",
+            "/createRoom",
+            {
+                "invite_3pid": [
+                    {
+                        "id_server": "test",
+                        "medium": "email",
+                        "address": "otheruser@example.com",
+                    }
+                ],
+            },
+            self.owner_tok,
+        )
+        self.render(request)
+
+        self.keycloak_client.add_user.not_called()
+        self.nextcloud_client.add_user.not_called()
+        self.store.insert_partner_invitation.not_called()
+
+        self.assertEqual(len(self.email_attempts), 0)
+
+        self.assertEqual(channel.code, 200)
+
+    def test_create_room_and_invitei_collaborator_as_partner(self):
+        request, channel = self.make_request(
+            "POST",
+            "/createRoom",
+            {
+                "invite_3pid": [
+                    {
+                        "id_server": "test",
+                        "medium": "email",
+                        "address": "collaborator@example.com",
+                    }
+                ],
+            },
+            self.owner_tok,
+        )
+        self.render(request)
+
+        self.keycloak_client.add_user.not_called()
+        self.nextcloud_client.add_user.not_called()
+        self.store.insert_partner_invitation.not_called()
+
+        self.assertEqual(len(self.email_attempts), 0)
+
+        self.assertEqual(channel.code, 200)
