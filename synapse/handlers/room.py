@@ -79,6 +79,7 @@ class RoomCreationHandler(BaseHandler):
         self.config = hs.config
         # watcha+
         self.store = hs.get_datastore()
+        self.administration_handler = hs.get_administration_handler()
         self.partner_handler = hs.get_partner_handler()  
         # +watcha
 
