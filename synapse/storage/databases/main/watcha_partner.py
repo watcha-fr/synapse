@@ -6,9 +6,7 @@ class PartnerStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
 
-    async def add_partner_invitation(
-        self, partner_id, sender_id
-    ):
+    async def add_partner_invitation(self, partner_id, sender_id):
         """Record a partner invitation
 
         Args:
