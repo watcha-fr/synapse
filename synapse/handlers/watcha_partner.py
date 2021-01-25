@@ -59,7 +59,7 @@ class PartnerHandler(BaseHandler):
             make_partner=True,
         )
 
-        logger.info("[watcha] creates new partner succeed")
+        logger.info("[watcha] create new partner - success")
 
         await self.mailer.send_watcha_registration_email(
             email_address=invitee_email,
