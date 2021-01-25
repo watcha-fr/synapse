@@ -834,7 +834,6 @@ class RoomCreationHandler(BaseHandler):
                     sender_id=requester.user.to_string(),
                     invitee_email=invitee_email,
                 )
-
             if await self.administration_handler.get_user_role(invitee_id) == "partner":
                 await self.store.add_partner_invitation(
                     partner_id=invitee_id,
