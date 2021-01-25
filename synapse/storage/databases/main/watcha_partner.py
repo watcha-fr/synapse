@@ -6,12 +6,12 @@ class PartnerStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
 
-    async def add_partner_invitation(self, partner_id, sender_id):
+    async def add_partner_invitation(self, partner_id: str, sender_id: str):
         """Record a partner invitation
 
         Args:
-            partner_id (str): the partner mxid
-            sender_id (str): the sender mxid
+            partner_id: the partner mxid
+            sender_id: the sender mxid
         """
         await self.db_pool.simple_insert(
             table="partners_invitations",
