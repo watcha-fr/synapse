@@ -55,7 +55,7 @@ class AdministrationHandler(BaseHandler):
         return role
 
     async def get_user_role(self, user_id):
-        """Retrieves user role. It can be 'administrator', 'collaborator' or 'partner'
+        """Retrieve user role [administrator|collaborator|partner]
 
         Returns:
             The user role.
