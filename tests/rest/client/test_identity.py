@@ -33,10 +33,7 @@ class IdentityTestCase(unittest.HomeserverTestCase):
 
         config = self.default_config()
         config["enable_3pid_lookup"] = False
-        # watcha+
-        # this tests the external invitation, in fact ! So adding the needed setting.
-        config["public_baseurl"] = "https://localhsot:8008"
-        # +watcha
+        config["public_baseurl"] = "https://localhsot:8008" # watcha+
         self.hs = self.setup_test_homeserver(config=config)
 
         return self.hs
@@ -47,10 +44,7 @@ class IdentityTestCase(unittest.HomeserverTestCase):
         self.register_user("kermit", "monkey")
         tok = self.login("kermit", "monkey")
 
-        request, channel = self.make_request(
-            b"POST", "/createRoom", b"{}", access_token=tok
-        )
-        self.render(request)
+        channel = self.make_request(b"POST", "/createRoom", b"{}", access_token=tok)
         self.assertEquals(channel.result["code"], b"200", channel.result)
         room_id = channel.json_body["room_id"]
 
@@ -61,14 +55,9 @@ class IdentityTestCase(unittest.HomeserverTestCase):
         }
         request_data = json.dumps(params)
         request_url = ("/rooms/%s/invite" % (room_id)).encode("ascii")
-        request, channel = self.make_request(
+        channel = self.make_request(
             b"POST", request_url, request_data, access_token=tok
         )
-        self.render(request)
-        """ watcha! 
-        this tests the external invitation, in fact !
         self.assertEquals(channel.result["code"], b"403", channel.result)
-        !watcha """
-        self.assertEquals(channel.result["code"], b"200", channel.result)  # watcha+
 
     test_3pid_lookup_disabled.skip = "Disabled for Watcha after OP553."

@@ -43,12 +43,11 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
         self.room2_id = self.helper.create_room_as(self.admin, tok=self.admin_tok)
 
     def test_watcha_user_list(self):
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             self.url + "watcha_user_list",
             access_token=self.admin_tok,
         )
-        self.render(request)
 
         self.assertEqual(
             json.loads(channel.result["body"]),
@@ -82,10 +81,9 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
 
     def test_get_watcha_admin_user_stats(self):
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", self.url + "watcha_admin_stats", access_token=self.admin_tok
         )
-        self.render(request)
 
         self.assertEquals(
             json.loads(channel.result["body"])["users"],
@@ -113,10 +111,10 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
 
     def test_get_watcha_admin_stats_room_type(self):
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", self.url + "watcha_admin_stats", access_token=self.admin_tok
         )
-        self.render(request)
+
         self.assertEquals(
             json.loads(channel.result["body"])["rooms"],
             {
@@ -131,10 +129,9 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
     def test_get_watcha_admin_stats_room_list(self):
         room_ids = sorted([self.room1_id, self.room2_id])
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", self.url + "watcha_room_list", access_token=self.admin_tok
         )
-        self.render(request)
 
         for room_id in room_ids:
             self.assertIn(

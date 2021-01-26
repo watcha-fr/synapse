@@ -31,7 +31,6 @@ from synapse.api.errors import (
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
-from synapse.storage.roommember import RoomsForUser
 from synapse.types import JsonDict, Requester, RoomAlias, RoomID, StateMap, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_left_room
@@ -204,7 +203,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
             # Only rate-limit if the user actually joined the room, otherwise we'll end
             # up blocking profile updates.
-            if newly_joined:
+            if newly_joined and ratelimit:
                 time_now_s = self.clock.time()
                 (
                     allowed,
@@ -347,7 +346,15 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             # later on.
             content = dict(content)
 
-        if not self.allow_per_room_profiles or requester.shadow_banned:
+        # allow the server notices mxid to set room-level profile
+        is_requester_server_notices_user = (
+            self._server_notices_mxid is not None
+            and requester.user.to_string() == self._server_notices_mxid
+        )
+
+        if (
+            not self.allow_per_room_profiles and not is_requester_server_notices_user
+        ) or requester.shadow_banned:
             # Strip profile data, knowing that new profile data will be added to the
             # event's content in event_creation_handler.create_event() using the target's
             # global profile.
@@ -401,7 +408,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     )
                     block_invite = True
 
-                if not self.spam_checker.user_may_invite(
+                if not await self.spam_checker.user_may_invite(
                     requester.user.to_string(), target.to_string(), room_id
                 ):
                     logger.info("Blocking invite due to spam checker")
@@ -481,16 +488,19 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     raise AuthError(403, "Guest access not allowed")
 
             if not is_host_in_room:
-                time_now_s = self.clock.time()
-                (
-                    allowed,
-                    time_allowed,
-                ) = self._join_rate_limiter_remote.can_requester_do_action(requester,)
-
-                if not allowed:
-                    raise LimitExceededError(
-                        retry_after_ms=int(1000 * (time_allowed - time_now_s))
+                if ratelimit:
+                    time_now_s = self.clock.time()
+                    (
+                        allowed,
+                        time_allowed,
+                    ) = self._join_rate_limiter_remote.can_requester_do_action(
+                        requester,
                     )
+
+                    if not allowed:
+                        raise LimitExceededError(
+                            retry_after_ms=int(1000 * (time_allowed - time_now_s))
+                        )
 
                 inviter = await self._get_inviter(target.to_string(), room_id)
                 if inviter and not self.hs.is_mine(inviter):
@@ -515,10 +525,16 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         elif effective_membership_state == Membership.LEAVE:
             if not is_host_in_room:
                 # perhaps we've been invited
-                invite = await self.store.get_invite_for_local_user_in_room(
-                    user_id=target.to_string(), room_id=room_id
-                )  # type: Optional[RoomsForUser]
-                if not invite:
+                (
+                    current_membership_type,
+                    current_membership_event_id,
+                ) = await self.store.get_local_current_membership_for_user_in_room(
+                    target.to_string(), room_id
+                )
+                if (
+                    current_membership_type != Membership.INVITE
+                    or not current_membership_event_id
+                ):
                     logger.info(
                         "%s sent a leave request to %s, but that is not an active room "
                         "on this server, and there is no pending invite",
@@ -528,6 +544,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
                     raise SynapseError(404, "Not a known room")
 
+                invite = await self.store.get_event(current_membership_event_id)
                 logger.info(
                     "%s rejects invite to %s from %s", target, room_id, invite.sender
                 )
@@ -965,6 +982,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         self.distributor = hs.get_distributor()
         self.distributor.declare("user_left_room")
+        self._server_name = hs.hostname
 
     async def _is_remote_room_too_complex(
         self, room_id: str, remote_room_hosts: List[str]
@@ -1059,7 +1077,9 @@ class RoomMemberMasterHandler(RoomMemberHandler):
                 return event_id, stream_id
 
             # The room is too large. Leave.
-            requester = types.create_requester(user, None, False, False, None)
+            requester = types.create_requester(
+                user, authenticated_entity=self._server_name
+            )
             await self.update_membership(
                 requester=requester, target=user, room_id=room_id, action="leave"
             )
@@ -1104,32 +1124,34 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             #
             logger.warning("Failed to reject invite: %s", e)
 
-            return await self._locally_reject_invite(
+            return await self._generate_local_out_of_band_leave(
                 invite_event, txn_id, requester, content
             )
 
-    async def _locally_reject_invite(
+    async def _generate_local_out_of_band_leave(
         self,
-        invite_event: EventBase,
+        previous_membership_event: EventBase,
         txn_id: Optional[str],
         requester: Requester,
         content: JsonDict,
     ) -> Tuple[str, int]:
-        """Generate a local invite rejection
+        """Generate a local leave event for a room
 
-        This is called after we fail to reject an invite via a remote server. It
-        generates an out-of-band membership event locally.
+        This can be called after we e.g fail to reject an invite via a remote server.
+        It generates an out-of-band membership event locally.
 
         Args:
-            invite_event: the invite to be rejected
+            previous_membership_event: the previous membership event for this user
             txn_id: optional transaction ID supplied by the client
-            requester:  user making the rejection request, according to the access token
-            content: additional content to include in the rejection event.
+            requester: user making the request, according to the access token
+            content: additional content to include in the leave event.
                Normally an empty dict.
-        """
 
-        room_id = invite_event.room_id
-        target_user = invite_event.state_key
+        Returns:
+            A tuple containing (event_id, stream_id of the leave event)
+        """
+        room_id = previous_membership_event.room_id
+        target_user = previous_membership_event.state_key
 
         content["membership"] = Membership.LEAVE
 
@@ -1141,12 +1163,12 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             "state_key": target_user,
         }
 
-        # the auth events for the new event are the same as that of the invite, plus
-        # the invite itself.
+        # the auth events for the new event are the same as that of the previous event, plus
+        # the event itself.
         #
-        # the prev_events are just the invite.
-        prev_event_ids = [invite_event.event_id]
-        auth_event_ids = invite_event.auth_event_ids() + prev_event_ids
+        # the prev_events consist solely of the previous membership event.
+        prev_event_ids = [previous_membership_event.event_id]
+        auth_event_ids = previous_membership_event.auth_event_ids() + prev_event_ids
 
         event, context = await self.event_creation_handler.create_event(
             requester,

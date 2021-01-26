@@ -55,6 +55,7 @@ from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
 from synapse.handlers._base import BaseHandler
+from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import (
     make_deferred_yieldable,
     nested_logging_context,
@@ -67,7 +68,7 @@ from synapse.replication.http.devices import ReplicationUserDevicesResyncRestSer
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationFederationSendEventsRestServlet,
-    ReplicationStoreRoomOnInviteRestServlet,
+    ReplicationStoreRoomOnOutlierMembershipRestServlet,
 )
 from synapse.state import StateResolutionStore
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
@@ -139,7 +140,7 @@ class FederationHandler(BaseHandler):
         self._message_handler = hs.get_message_handler()
         self._server_notices_mxid = hs.config.server_notices_mxid
         self.config = hs.config
-        self.http_client = hs.get_simple_http_client()
+        self.http_client = hs.get_proxied_blacklisted_http_client()
         self._instance_name = hs.get_instance_name()
         self._replication = hs.get_replication_data_handler()
 
@@ -152,12 +153,14 @@ class FederationHandler(BaseHandler):
             self._user_device_resync = ReplicationUserDevicesResyncRestServlet.make_client(
                 hs
             )
-            self._maybe_store_room_on_invite = ReplicationStoreRoomOnInviteRestServlet.make_client(
+            self._maybe_store_room_on_outlier_membership = ReplicationStoreRoomOnOutlierMembershipRestServlet.make_client(
                 hs
             )
         else:
             self._device_list_updater = hs.get_device_handler().device_list_updater
-            self._maybe_store_room_on_invite = self.store.maybe_store_room_on_invite
+            self._maybe_store_room_on_outlier_membership = (
+                self.store.maybe_store_room_on_outlier_membership
+            )
 
         # When joining a room we need to queue any events for that room up.
         # For each room, a list of (pdu, origin) tuples.
@@ -1590,7 +1593,7 @@ class FederationHandler(BaseHandler):
         if self.hs.config.block_non_admin_invites:
             raise SynapseError(403, "This server does not accept room invites")
 
-        if not self.spam_checker.user_may_invite(
+        if not await self.spam_checker.user_may_invite(
             event.sender, event.state_key, event.room_id
         ):
             raise SynapseError(
@@ -1617,7 +1620,7 @@ class FederationHandler(BaseHandler):
         # keep a record of the room version, if we don't yet know it.
         # (this may get overwritten if we later get a different room version in a
         # join dance).
-        await self._maybe_store_room_on_invite(
+        await self._maybe_store_room_on_outlier_membership(
             room_id=event.room_id, room_version=room_version
         )
 
@@ -2686,7 +2689,7 @@ class FederationHandler(BaseHandler):
             )
 
     async def on_exchange_third_party_invite_request(
-        self, room_id: str, event_dict: JsonDict
+        self, event_dict: JsonDict
     ) -> None:
         """Handle an exchange_third_party_invite request from a remote server
 
@@ -2694,12 +2697,11 @@ class FederationHandler(BaseHandler):
         into a normal m.room.member invite.
 
         Args:
-            room_id: The ID of the room.
-
-            event_dict (dict[str, Any]): Dictionary containing the event body.
+            event_dict: Dictionary containing the event body.
 
         """
-        room_version = await self.store.get_room_version_id(room_id)
+        assert_params_in_dict(event_dict, ["room_id"])
+        room_version = await self.store.get_room_version_id(event_dict["room_id"])
 
         # NB: event_dict has a particular specced format we might need to fudge
         # if we change event formats too much.

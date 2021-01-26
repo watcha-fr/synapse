@@ -32,6 +32,10 @@ logger = logging.getLogger(__name__)
 class BaseHandler:
     """
     Common base class for the event handlers.
+
+    Deprecated: new code should not use this. Instead, Handler classes should define the
+    fields they actually need. The utility methods should either be factored out to
+    standalone helper functions, or to different Handler classes.
     """
 
     def __init__(self, hs: "HomeServer"):
@@ -169,7 +173,9 @@ class BaseHandler:
                 # and having homeservers have their own users leave keeps more
                 # of that decision-making and control local to the guest-having
                 # homeserver.
-                requester = synapse.types.create_requester(target_user, is_guest=True)
+                requester = synapse.types.create_requester(
+                    target_user, is_guest=True, authenticated_entity=self.server_name
+                )
                 handler = self.hs.get_room_member_handler()
                 await handler.update_membership(
                     requester,

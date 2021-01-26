@@ -88,13 +88,12 @@ class InvitePartnerHandlerTestCase(unittest.HomeserverTestCase):
         self.url = "/rooms/{}/invite".format(self.room_id)
 
     def test_invite_new_partner(self):
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             self.url,
             {"id_server": "test", "medium": "email", "address": "partner@example.com"},
             self.owner_tok,
         )
-        self.render(request)
 
         self.assertTrue(self.keycloak_client.add_user.called)
         self.assertTrue(self.nextcloud_client.add_user.called)
@@ -105,7 +104,7 @@ class InvitePartnerHandlerTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.result["body"], b"{}")
 
     def test_invite_existing_partner(self):
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             self.url,
             {
@@ -115,7 +114,6 @@ class InvitePartnerHandlerTestCase(unittest.HomeserverTestCase):
             },
             self.owner_tok,
         )
-        self.render(request)
 
         self.keycloak_client.add_user.not_called()
         self.nextcloud_client.add_user.not_called()

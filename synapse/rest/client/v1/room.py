@@ -18,7 +18,7 @@
 
 import logging
 import re
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from urllib import parse as urlparse
 
 from synapse.api.constants import EventTypes, Membership
@@ -48,8 +48,7 @@ from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, 
 from synapse.util import json_decoder
 from synapse.util.stringutils import random_string
 
-MYPY = False
-if MYPY:
+if TYPE_CHECKING:
     import synapse.server
 
 logger = logging.getLogger(__name__)
@@ -1221,25 +1220,28 @@ def register_txn_path(servlet, regex_string, http_server, with_get=False):
         )
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs, http_server, is_worker=False):
     RoomStateEventRestServlet(hs).register(http_server)
-    RoomCreateRestServlet(hs).register(http_server)
     RoomMemberListRestServlet(hs).register(http_server)
     JoinedRoomMemberListRestServlet(hs).register(http_server)
     RoomMessageListRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
-    RoomForgetRestServlet(hs).register(http_server)
     RoomMembershipRestServlet(hs).register(http_server)
     RoomSendEventRestServlet(hs).register(http_server)
     PublicRoomListRestServlet(hs).register(http_server)
     RoomStateRestServlet(hs).register(http_server)
     RoomRedactEventRestServlet(hs).register(http_server)
     RoomTypingRestServlet(hs).register(http_server)
-    SearchRestServlet(hs).register(http_server)
-    JoinedRoomsRestServlet(hs).register(http_server)
-    RoomEventServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
-    RoomAliasListServlet(hs).register(http_server)
+
+    # Some servlets only get registered for the main process.
+    if not is_worker:
+        RoomCreateRestServlet(hs).register(http_server)
+        RoomForgetRestServlet(hs).register(http_server)
+        SearchRestServlet(hs).register(http_server)
+        JoinedRoomsRestServlet(hs).register(http_server)
+        RoomEventServlet(hs).register(http_server)
+        RoomAliasListServlet(hs).register(http_server)
 
 
 def register_deprecated_servlets(hs, http_server):

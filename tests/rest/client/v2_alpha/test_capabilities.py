@@ -36,8 +36,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         return hs
 
     def test_check_auth_required(self):
-        request, channel = self.make_request("GET", self.url)
-        self.render(request)
+        channel = self.make_request("GET", self.url)
 
         self.assertEqual(channel.code, 401)
 
@@ -45,8 +44,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         self.register_user("user", "pass")
         access_token = self.login("user", "pass")
 
-        request, channel = self.make_request("GET", self.url, access_token=access_token)
-        self.render(request)
+        channel = self.make_request("GET", self.url, access_token=access_token)
         capabilities = channel.json_body["capabilities"]
 
         self.assertEqual(channel.code, 200)
@@ -64,8 +62,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         user = self.register_user(localpart, password)
         access_token = self.login(user, password)
 
-        request, channel = self.make_request("GET", self.url, access_token=access_token)
-        self.render(request)
+        channel = self.make_request("GET", self.url, access_token=access_token)
         capabilities = channel.json_body["capabilities"]
 
         self.assertEqual(channel.code, 200)
@@ -73,8 +70,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         # Test case where password is handled outside of Synapse
         self.assertTrue(capabilities["m.change_password"]["enabled"])
         self.get_success(self.store.user_set_password_hash(user, None))
-        request, channel = self.make_request("GET", self.url, access_token=access_token)
-        self.render(request)
+        channel = self.make_request("GET", self.url, access_token=access_token)
         capabilities = channel.json_body["capabilities"]
 
         self.assertEqual(channel.code, 200)
@@ -85,8 +81,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         self.register_user("partner", "pass", is_partner=True)
         access_token = self.login("partner", "pass")
 
-        request, channel = self.make_request("GET", self.url, access_token=access_token)
-        self.render(request)
+        channel = self.make_request("GET", self.url, access_token=access_token)
         capabilities = channel.json_body["capabilities"]
 
         self.assertEqual(channel.code, 200)
@@ -105,8 +100,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         user = self.register_user(localpart, password, is_partner=True)
         access_token = self.login(user, password)
 
-        request, channel = self.make_request("GET", self.url, access_token=access_token)
-        self.render(request)
+        channel = self.make_request("GET", self.url, access_token=access_token)
         capabilities = channel.json_body["capabilities"]
 
         self.assertEqual(channel.code, 200)
@@ -114,8 +108,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         # Test case where password is handled outside of Synapse
         self.assertTrue(capabilities["m.change_password"]["enabled"])
         self.get_success(self.store.user_set_password_hash(user, None))
-        request, channel = self.make_request("GET", self.url, access_token=access_token)
-        self.render(request)
+        channel = self.make_request("GET", self.url, access_token=access_token)
         capabilities = channel.json_body["capabilities"]
 
         self.assertEqual(channel.code, 200)

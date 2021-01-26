@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Tuple
 
 from synapse.api.constants import (
     EventTypes,
+    HistoryVisibility,
     JoinRules,
     Membership,
     RoomCreationPreset,
@@ -83,21 +84,21 @@ class RoomCreationHandler(BaseHandler):
         self._presets_dict = {
             RoomCreationPreset.PRIVATE_CHAT: {
                 "join_rules": JoinRules.INVITE,
-                "history_visibility": "shared",
+                "history_visibility": HistoryVisibility.SHARED,
                 "original_invitees_have_ops": False,
                 "guest_can_join": True,
                 "power_level_content_override": {"invite": 0},
             },
             RoomCreationPreset.TRUSTED_PRIVATE_CHAT: {
                 "join_rules": JoinRules.INVITE,
-                "history_visibility": "shared",
+                "history_visibility": HistoryVisibility.SHARED,
                 "original_invitees_have_ops": True,
                 "guest_can_join": True,
                 "power_level_content_override": {"invite": 0},
             },
             RoomCreationPreset.PUBLIC_CHAT: {
                 "join_rules": JoinRules.PUBLIC,
-                "history_visibility": "shared",
+                "history_visibility": HistoryVisibility.SHARED,
                 "original_invitees_have_ops": False,
                 "guest_can_join": False,
                 "power_level_content_override": {},
@@ -360,7 +361,7 @@ class RoomCreationHandler(BaseHandler):
         """
         user_id = requester.user.to_string()
 
-        if not self.spam_checker.user_may_create_room(user_id):
+        if not await self.spam_checker.user_may_create_room(user_id):
             raise SynapseError(403, "You are not permitted to create rooms")
 
         creation_content = {
@@ -442,6 +443,7 @@ class RoomCreationHandler(BaseHandler):
             invite_list=[],
             initial_state=initial_state,
             creation_content=creation_content,
+            ratelimit=False,
         )
 
         # Transfer membership events
@@ -589,7 +591,7 @@ class RoomCreationHandler(BaseHandler):
         """
         user_id = requester.user.to_string()
 
-        await self.auth.check_auth_blocking(user_id)
+        await self.auth.check_auth_blocking(requester=requester)
 
         if (
             self._server_notices_mxid is not None
@@ -610,7 +612,7 @@ class RoomCreationHandler(BaseHandler):
                 403, "You are not permitted to create rooms", Codes.FORBIDDEN
             )
 
-        if not is_requester_admin and not self.spam_checker.user_may_create_room(
+        if not is_requester_admin and not await self.spam_checker.user_may_create_room(
             user_id
         ):
             raise SynapseError(403, "You are not permitted to create rooms")
@@ -740,6 +742,7 @@ class RoomCreationHandler(BaseHandler):
             room_alias=room_alias,
             power_level_content_override=power_level_content_override,
             creator_join_profile=creator_join_profile,
+            ratelimit=ratelimit,
         )
 
         if "name" in config:
@@ -880,6 +883,7 @@ class RoomCreationHandler(BaseHandler):
         room_alias: Optional[RoomAlias] = None,
         power_level_content_override: Optional[JsonDict] = None,
         creator_join_profile: Optional[JsonDict] = None,
+        ratelimit: bool = True,
     ) -> int:
         """Sends the initial events into a new room.
 
@@ -926,7 +930,7 @@ class RoomCreationHandler(BaseHandler):
             creator.user,
             room_id,
             "join",
-            ratelimit=False,
+            ratelimit=ratelimit,
             content=creator_join_profile,
         )
 
@@ -1323,7 +1327,9 @@ class RoomShutdownHandler:
                     400, "User must be our own: %s" % (new_room_user_id,)
                 )
 
-            room_creator_requester = create_requester(new_room_user_id)
+            room_creator_requester = create_requester(
+                new_room_user_id, authenticated_entity=requester_user_id
+            )
 
             info, stream_id = await self._room_creation_handler.create_room(
                 room_creator_requester,
@@ -1363,7 +1369,9 @@ class RoomShutdownHandler:
 
             try:
                 # Kick users from room
-                target_requester = create_requester(user_id)
+                target_requester = create_requester(
+                    user_id, authenticated_entity=requester_user_id
+                )
                 _, stream_id = await self.room_member_handler.update_membership(
                     requester=target_requester,
                     target=target_requester.user,

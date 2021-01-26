@@ -98,10 +98,9 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         # that we can make sure that the check is done on the whole alias.
         data = {"room_alias_name": random_string(256 - len(self.hs.hostname))}
         request_data = json.dumps(data)
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", url, request_data, access_token=self.user_tok
         )
-        self.render(request)
         self.assertEqual(channel.code, 400, channel.result)
 
     def test_room_creation(self):
@@ -112,10 +111,9 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         # as cautious as possible here.
         data = {"room_alias_name": random_string(5)}
         request_data = json.dumps(data)
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", url, request_data, access_token=self.user_tok
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
     def set_alias_via_state_event(self, expected_code, alias_length=5):
@@ -127,10 +125,9 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         data = {"aliases": [self.random_alias(alias_length)]}
         request_data = json.dumps(data)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT", url, request_data, access_token=self.user_tok
         )
-        self.render(request)
         self.assertEqual(channel.code, expected_code, channel.result)
 
     def set_alias_via_directory(self, expected_code, alias_length=5):
@@ -138,10 +135,9 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         data = {"room_id": self.room_id}
         request_data = json.dumps(data)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT", url, request_data, access_token=self.user_tok
         )
-        self.render(request)
         self.assertEqual(channel.code, expected_code, channel.result)
 
     def random_alias(self, length):

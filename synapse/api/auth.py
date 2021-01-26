@@ -23,7 +23,7 @@ from twisted.web.server import Request
 import synapse.types
 from synapse import event_auth
 from synapse.api.auth_blocking import AuthBlocking
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -31,7 +31,9 @@ from synapse.api.errors import (
     MissingClientTokenError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.appservice import ApplicationService
 from synapse.events import EventBase
+from synapse.http.site import SynapseRequest
 from synapse.logging import opentracing as opentracing
 from synapse.storage.databases.main.registration import TokenLookupResult
 from synapse.types import StateMap, UserID
@@ -166,7 +168,7 @@ class Auth:
         rights: str = "access",
         allow_expired: bool = False,
     ) -> synapse.types.Requester:
-        """Get a registered user's ID.
+        """ Get a registered user's ID.
 
         Args:
             request: An HTTP request with an access_token query parameter.
@@ -316,12 +318,9 @@ class Auth:
         return user_id, app_service
 
     async def get_user_by_access_token(
-        self,
-        token: str,
-        rights: str = "access",
-        allow_expired: bool = False,
+        self, token: str, rights: str = "access", allow_expired: bool = False,
     ) -> TokenLookupResult:
-        """Validate access token and get user_id from it
+        """ Validate access token and get user_id from it
 
         Args:
             token: The access token to get the user by
@@ -502,7 +501,7 @@ class Auth:
         now = self.hs.get_clock().time_msec()
         return now < expiry
 
-    def get_appservice_by_req(self, request):
+    def get_appservice_by_req(self, request: SynapseRequest) -> ApplicationService:
         token = self.get_access_token_from_request(request)
         service = self.store.get_app_service_by_token(token)
         if not service:
@@ -514,7 +513,7 @@ class Auth:
         return service
 
     async def is_server_admin(self, user: UserID) -> bool:
-        """Check if the given user is a local server admin.
+        """ Check if the given user is a local server admin.
 
         Args:
             user: user to check
@@ -525,10 +524,7 @@ class Auth:
         return await self.store.is_server_admin(user)
 
     def compute_auth_events(
-        self,
-        event,
-        current_state_ids: StateMap[str],
-        for_verification: bool = False,
+        self, event, current_state_ids: StateMap[str], for_verification: bool = False,
     ) -> List[str]:
         """Given an event and current state return the list of event IDs used
         to auth an event.
@@ -677,7 +673,8 @@ class Auth:
             )
             if (
                 visibility
-                and visibility.content["history_visibility"] == "world_readable"
+                and visibility.content.get("history_visibility")
+                == HistoryVisibility.WORLD_READABLE
             ):
                 return Membership.JOIN, None
             raise AuthError(

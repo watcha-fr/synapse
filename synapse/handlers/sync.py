@@ -31,6 +31,7 @@ from synapse.types import (
     Collection,
     JsonDict,
     MutableStateMap,
+    Requester,
     RoomStreamToken,
     StateMap,
     StreamToken,
@@ -260,6 +261,7 @@ class SyncHandler:
 
     async def wait_for_sync_for_user(
         self,
+        requester: Requester,
         sync_config: SyncConfig,
         since_token: Optional[StreamToken] = None,
         timeout: int = 0,
@@ -273,7 +275,7 @@ class SyncHandler:
         # not been exceeded (if not part of the group by this point, almost certain
         # auth_blocking will occur)
         user_id = sync_config.user.to_string()
-        await self.auth.check_auth_blocking(user_id)
+        await self.auth.check_auth_blocking(requester=requester)
 
         res = await self.response_cache.wrap(
             sync_config.request_key,
@@ -552,7 +554,7 @@ class SyncHandler:
             event.event_id, state_filter=state_filter
         )
         if event.is_state():
-            state_ids = state_ids.copy()
+            state_ids = dict(state_ids)
             state_ids[(event.type, event.state_key)] = event.event_id
         return state_ids
 
