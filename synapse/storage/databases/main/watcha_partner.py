@@ -3,9 +3,6 @@ from synapse.storage.database import DatabasePool
 
 
 class PartnerStore(SQLBaseStore):
-    def __init__(self, database: DatabasePool, db_conn, hs):
-        super().__init__(database, db_conn, hs)
-
     async def add_partner_invitation(self, partner_id: str, sender_id: str):
         """Record a partner invitation
 
