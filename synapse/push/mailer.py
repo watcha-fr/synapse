@@ -159,9 +159,9 @@ class Mailer:
         """Send an email with temporary password and connexion link to Watcha.
 
         Args:
-            email_address (str): Email address we're sending the invitation
-            sender_id (str): the user id of the user who invite the partner
-            password (str): a temporay password
+            email_address: email address we're sending the invitation
+            sender_id: the user id of the user who invite the partner
+            password: a temporary password
         """
         subject = self.email_subjects.watcha_registration % {"app": self.app_name}
 
