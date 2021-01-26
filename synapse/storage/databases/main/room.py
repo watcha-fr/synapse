@@ -379,14 +379,14 @@ class RoomWorkerStore(SQLBaseStore):
         # Filter room names by a string
         where_statement = ""
         if search_term:
-            where_statement = "WHERE state.name LIKE ?"
+            where_statement = "WHERE LOWER(state.name) LIKE ?"
 
             # Our postgres db driver converts ? -> %s in SQL strings as that's the
             # placeholder for postgres.
             # HOWEVER, if you put a % into your SQL then everything goes wibbly.
             # To get around this, we're going to surround search_term with %'s
             # before giving it to the database in python instead
-            search_term = "%" + search_term + "%"
+            search_term = "%" + search_term.lower() + "%"
 
         # Set ordering
         if RoomSortOrder(order_by) == RoomSortOrder.SIZE:
@@ -1240,13 +1240,15 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             logger.error("store_room with room_id=%s failed: %s", room_id, e)
             raise StoreError(500, "Problem creating room.")
 
-    async def maybe_store_room_on_invite(self, room_id: str, room_version: RoomVersion):
+    async def maybe_store_room_on_outlier_membership(
+        self, room_id: str, room_version: RoomVersion
+    ):
         """
-        When we receive an invite over federation, store the version of the room if we
-        don't already know the room version.
+        When we receive an invite or any other event over federation that may relate to a room
+        we are not in, store the version of the room if we don't already know the room version.
         """
         await self.db_pool.simple_upsert(
-            desc="maybe_store_room_on_invite",
+            desc="maybe_store_room_on_outlier_membership",
             table="rooms",
             keyvalues={"room_id": room_id},
             values={},

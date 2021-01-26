@@ -59,13 +59,12 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         self.nextcloud_client.remove_user_from_group = simple_async_mock()
 
     def send_room_nextcloud_mapping_event(self, request_content):
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/rooms/{}/state/im.vector.web.settings".format(self.room_id),
             content=json.dumps(request_content),
             access_token=self.creator_tok,
         )
-        self.render(request)
 
         return channel
 
@@ -130,12 +129,11 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
             self.room_id, self.creator, self.inviter, tok=self.creator_tok
         )
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/{}/join".format(self.room_id),
             access_token=self.inviter_tok,
         )
-        self.render(request)
 
         self.assertEquals(self.nextcloud_client.add_user_to_group.call_count, 2)
         self.assertEqual(200, channel.code)
@@ -145,12 +143,11 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
             self.room_id, self.creator, self.inviter, tok=self.creator_tok
         )
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/{}/leave".format(self.room_id),
             access_token=self.inviter_tok,
         )
-        self.render(request)
 
         self.nextcloud_client.add_user_to_group.assert_called_once()
         self.nextcloud_client.remove_user_from_group.assert_called_once()
@@ -162,13 +159,12 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         )
         self.helper.join(self.room_id, user=self.inviter, tok=self.inviter_tok)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/{}/kick".format(self.room_id),
             content={"user_id": self.inviter},
             access_token=self.inviter_tok,
         )
-        self.render(request)
 
         self.assertEquals(self.nextcloud_client.add_user_to_group.call_count, 2)
         self.nextcloud_client.remove_user_from_group.assert_called_once()

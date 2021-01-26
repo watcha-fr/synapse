@@ -26,6 +26,7 @@ from mock import Mock
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.handlers.pagination import PurgeStatus
+from synapse.rest import admin
 from synapse.rest.client.v1 import directory, login, profile, room
 from synapse.rest.client.v2_alpha import account
 from synapse.types import JsonDict, RoomAlias, UserID
@@ -47,9 +48,7 @@ class RoomBase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         self.hs = self.setup_test_homeserver(
-            "red",
-            http_client=None,
-            federation_client=Mock(),
+            "red", federation_http_client=None, federation_client=Mock(),
         )
 
         self.hs.get_federation_handler = Mock()
@@ -87,19 +86,17 @@ class RoomPermissionsTestCase(RoomBase):
         self.created_rmid_msg_path = (
             "rooms/%s/send/m.room.message/a1" % (self.created_rmid)
         ).encode("ascii")
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT", self.created_rmid_msg_path, b'{"msgtype":"m.text","body":"test msg"}'
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
 
         # set topic for public room
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             ("rooms/%s/state/m.room.topic" % self.created_public_rmid).encode("ascii"),
             b'{"topic":"Public Room Topic"}',
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
 
         # auth as user_id now
@@ -117,37 +114,32 @@ class RoomPermissionsTestCase(RoomBase):
             )
 
         # send message in uncreated room, expect 403
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/rooms/%s/send/m.room.message/mid2" % (self.uncreated_rmid,),
             msg_content,
         )
-        self.render(request)
         self.assertEquals(403, channel.code, msg=channel.result["body"])
 
         # send message in created room not joined (no state), expect 403
-        request, channel = self.make_request("PUT", send_msg_path(), msg_content)
-        self.render(request)
+        channel = self.make_request("PUT", send_msg_path(), msg_content)
         self.assertEquals(403, channel.code, msg=channel.result["body"])
 
         # send message in created room and invited, expect 403
         self.helper.invite(
             room=self.created_rmid, src=self.rmcreator_id, targ=self.user_id
         )
-        request, channel = self.make_request("PUT", send_msg_path(), msg_content)
-        self.render(request)
+        channel = self.make_request("PUT", send_msg_path(), msg_content)
         self.assertEquals(403, channel.code, msg=channel.result["body"])
 
         # send message in created room and joined, expect 200
         self.helper.join(room=self.created_rmid, user=self.user_id)
-        request, channel = self.make_request("PUT", send_msg_path(), msg_content)
-        self.render(request)
+        channel = self.make_request("PUT", send_msg_path(), msg_content)
         self.assertEquals(200, channel.code, msg=channel.result["body"])
 
         # send message in created room and left, expect 403
         self.helper.leave(room=self.created_rmid, user=self.user_id)
-        request, channel = self.make_request("PUT", send_msg_path(), msg_content)
-        self.render(request)
+        channel = self.make_request("PUT", send_msg_path(), msg_content)
         self.assertEquals(403, channel.code, msg=channel.result["body"])
 
     def test_topic_perms(self):
@@ -155,36 +147,30 @@ class RoomPermissionsTestCase(RoomBase):
         topic_path = "/rooms/%s/state/m.room.topic" % self.created_rmid
 
         # set/get topic in uncreated room, expect 403
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT", "/rooms/%s/state/m.room.topic" % self.uncreated_rmid, topic_content
         )
-        self.render(request)
         self.assertEquals(403, channel.code, msg=channel.result["body"])
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/rooms/%s/state/m.room.topic" % self.uncreated_rmid
         )
-        self.render(request)
         self.assertEquals(403, channel.code, msg=channel.result["body"])
 
         # set/get topic in created PRIVATE room not joined, expect 403
-        request, channel = self.make_request("PUT", topic_path, topic_content)
-        self.render(request)
+        channel = self.make_request("PUT", topic_path, topic_content)
         self.assertEquals(403, channel.code, msg=channel.result["body"])
-        request, channel = self.make_request("GET", topic_path)
-        self.render(request)
+        channel = self.make_request("GET", topic_path)
         self.assertEquals(403, channel.code, msg=channel.result["body"])
 
         # set topic in created PRIVATE room and invited, expect 403
         self.helper.invite(
             room=self.created_rmid, src=self.rmcreator_id, targ=self.user_id
         )
-        request, channel = self.make_request("PUT", topic_path, topic_content)
-        self.render(request)
+        channel = self.make_request("PUT", topic_path, topic_content)
         self.assertEquals(403, channel.code, msg=channel.result["body"])
 
         # get topic in created PRIVATE room and invited, expect 403
-        request, channel = self.make_request("GET", topic_path)
-        self.render(request)
+        channel = self.make_request("GET", topic_path)
         self.assertEquals(403, channel.code, msg=channel.result["body"])
 
         # set/get topic in created PRIVATE room and joined, expect 200
@@ -192,46 +178,39 @@ class RoomPermissionsTestCase(RoomBase):
 
         # Only room ops can set topic by default
         self.helper.auth_user_id = self.rmcreator_id
-        request, channel = self.make_request("PUT", topic_path, topic_content)
-        self.render(request)
+        channel = self.make_request("PUT", topic_path, topic_content)
         self.assertEquals(200, channel.code, msg=channel.result["body"])
         self.helper.auth_user_id = self.user_id
 
-        request, channel = self.make_request("GET", topic_path)
-        self.render(request)
+        channel = self.make_request("GET", topic_path)
         self.assertEquals(200, channel.code, msg=channel.result["body"])
         self.assert_dict(json.loads(topic_content.decode("utf8")), channel.json_body)
 
         # set/get topic in created PRIVATE room and left, expect 403
         self.helper.leave(room=self.created_rmid, user=self.user_id)
-        request, channel = self.make_request("PUT", topic_path, topic_content)
-        self.render(request)
+        channel = self.make_request("PUT", topic_path, topic_content)
         self.assertEquals(403, channel.code, msg=channel.result["body"])
-        request, channel = self.make_request("GET", topic_path)
-        self.render(request)
+        channel = self.make_request("GET", topic_path)
         self.assertEquals(200, channel.code, msg=channel.result["body"])
 
         # get topic in PUBLIC room, not joined, expect 403
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/rooms/%s/state/m.room.topic" % self.created_public_rmid
         )
-        self.render(request)
         self.assertEquals(403, channel.code, msg=channel.result["body"])
 
         # set topic in PUBLIC room, not joined, expect 403
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/rooms/%s/state/m.room.topic" % self.created_public_rmid,
             topic_content,
         )
-        self.render(request)
         self.assertEquals(403, channel.code, msg=channel.result["body"])
 
     def _test_get_membership(self, room=None, members=[], expect_code=None):
         for member in members:
             path = "/rooms/%s/state/m.room.member/%s" % (room, member)
-            request, channel = self.make_request("GET", path)
-            self.render(request)
+            channel = self.make_request("GET", path)
             self.assertEquals(expect_code, channel.code)
 
     def test_membership_basic_room_perms(self):
@@ -403,19 +382,16 @@ class RoomsMemberListTestCase(RoomBase):
 
     def test_get_member_list(self):
         room_id = self.helper.create_room_as(self.user_id)
-        request, channel = self.make_request("GET", "/rooms/%s/members" % room_id)
-        self.render(request)
+        channel = self.make_request("GET", "/rooms/%s/members" % room_id)
         self.assertEquals(200, channel.code, msg=channel.result["body"])
 
     def test_get_member_list_no_room(self):
-        request, channel = self.make_request("GET", "/rooms/roomdoesnotexist/members")
-        self.render(request)
+        channel = self.make_request("GET", "/rooms/roomdoesnotexist/members")
         self.assertEquals(403, channel.code, msg=channel.result["body"])
 
     def test_get_member_list_no_permission(self):
         room_id = self.helper.create_room_as("@some_other_guy:red")
-        request, channel = self.make_request("GET", "/rooms/%s/members" % room_id)
-        self.render(request)
+        channel = self.make_request("GET", "/rooms/%s/members" % room_id)
         self.assertEquals(403, channel.code, msg=channel.result["body"])
 
     def test_get_member_list_mixed_memberships(self):
@@ -424,20 +400,17 @@ class RoomsMemberListTestCase(RoomBase):
         room_path = "/rooms/%s/members" % room_id
         self.helper.invite(room=room_id, src=room_creator, targ=self.user_id)
         # can't see list if you're just invited.
-        request, channel = self.make_request("GET", room_path)
-        self.render(request)
+        channel = self.make_request("GET", room_path)
         self.assertEquals(403, channel.code, msg=channel.result["body"])
 
         self.helper.join(room=room_id, user=self.user_id)
         # can see list now joined
-        request, channel = self.make_request("GET", room_path)
-        self.render(request)
+        channel = self.make_request("GET", room_path)
         self.assertEquals(200, channel.code, msg=channel.result["body"])
 
         self.helper.leave(room=room_id, user=self.user_id)
         # can see old list once left
-        request, channel = self.make_request("GET", room_path)
-        self.render(request)
+        channel = self.make_request("GET", room_path)
         self.assertEquals(200, channel.code, msg=channel.result["body"])
 
 
@@ -448,56 +421,45 @@ class RoomsCreateTestCase(RoomBase):
 
     def test_post_room_no_keys(self):
         # POST with no config keys, expect new room id
-        request, channel = self.make_request("POST", "/createRoom", "{}")
+        channel = self.make_request("POST", "/createRoom", "{}")
 
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
         self.assertTrue("room_id" in channel.json_body)
 
     def test_post_room_visibility_key(self):
         # POST with visibility config key, expect new room id
-        request, channel = self.make_request(
-            "POST", "/createRoom", b'{"visibility":"private"}'
-        )
-        self.render(request)
+        channel = self.make_request("POST", "/createRoom", b'{"visibility":"private"}')
         self.assertEquals(200, channel.code)
         self.assertTrue("room_id" in channel.json_body)
 
     def test_post_room_custom_key(self):
         # POST with custom config keys, expect new room id
-        request, channel = self.make_request(
-            "POST", "/createRoom", b'{"custom":"stuff"}'
-        )
-        self.render(request)
+        channel = self.make_request("POST", "/createRoom", b'{"custom":"stuff"}')
         self.assertEquals(200, channel.code)
         self.assertTrue("room_id" in channel.json_body)
 
     def test_post_room_known_and_unknown_keys(self):
         # POST with custom + known config keys, expect new room id
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", "/createRoom", b'{"visibility":"private","custom":"things"}'
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
         self.assertTrue("room_id" in channel.json_body)
 
     def test_post_room_invalid_content(self):
         # POST with invalid content / paths, expect 400
-        request, channel = self.make_request("POST", "/createRoom", b'{"visibili')
-        self.render(request)
+        channel = self.make_request("POST", "/createRoom", b'{"visibili')
         self.assertEquals(400, channel.code)
 
-        request, channel = self.make_request("POST", "/createRoom", b'["hello"]')
-        self.render(request)
+        channel = self.make_request("POST", "/createRoom", b'["hello"]')
         self.assertEquals(400, channel.code)
 
     def test_post_room_invitees_invalid_mxid(self):
         # POST with invalid invitee, see https://github.com/matrix-org/synapse/issues/4088
         # Note the trailing space in the MXID here!
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", "/createRoom", b'{"invite":["@alice:example.com "]}'
         )
-        self.render(request)
         self.assertEquals(400, channel.code)
 
 
@@ -513,66 +475,54 @@ class RoomTopicTestCase(RoomBase):
 
     def test_invalid_puts(self):
         # missing keys or invalid json
-        request, channel = self.make_request("PUT", self.path, "{}")
-        self.render(request)
+        channel = self.make_request("PUT", self.path, "{}")
         self.assertEquals(400, channel.code, msg=channel.result["body"])
 
-        request, channel = self.make_request("PUT", self.path, '{"_name":"bo"}')
-        self.render(request)
+        channel = self.make_request("PUT", self.path, '{"_name":"bo"}')
         self.assertEquals(400, channel.code, msg=channel.result["body"])
 
-        request, channel = self.make_request("PUT", self.path, '{"nao')
-        self.render(request)
+        channel = self.make_request("PUT", self.path, '{"nao')
         self.assertEquals(400, channel.code, msg=channel.result["body"])
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT", self.path, '[{"_name":"bo"},{"_name":"jill"}]'
         )
-        self.render(request)
         self.assertEquals(400, channel.code, msg=channel.result["body"])
 
-        request, channel = self.make_request("PUT", self.path, "text only")
-        self.render(request)
+        channel = self.make_request("PUT", self.path, "text only")
         self.assertEquals(400, channel.code, msg=channel.result["body"])
 
-        request, channel = self.make_request("PUT", self.path, "")
-        self.render(request)
+        channel = self.make_request("PUT", self.path, "")
         self.assertEquals(400, channel.code, msg=channel.result["body"])
 
         # valid key, wrong type
         content = '{"topic":["Topic name"]}'
-        request, channel = self.make_request("PUT", self.path, content)
-        self.render(request)
+        channel = self.make_request("PUT", self.path, content)
         self.assertEquals(400, channel.code, msg=channel.result["body"])
 
     def test_rooms_topic(self):
         # nothing should be there
-        request, channel = self.make_request("GET", self.path)
-        self.render(request)
+        channel = self.make_request("GET", self.path)
         self.assertEquals(404, channel.code, msg=channel.result["body"])
 
         # valid put
         content = '{"topic":"Topic name"}'
-        request, channel = self.make_request("PUT", self.path, content)
-        self.render(request)
+        channel = self.make_request("PUT", self.path, content)
         self.assertEquals(200, channel.code, msg=channel.result["body"])
 
         # valid get
-        request, channel = self.make_request("GET", self.path)
-        self.render(request)
+        channel = self.make_request("GET", self.path)
         self.assertEquals(200, channel.code, msg=channel.result["body"])
         self.assert_dict(json.loads(content), channel.json_body)
 
     def test_rooms_topic_with_extra_keys(self):
         # valid put with extra keys
         content = '{"topic":"Seasons","subtopic":"Summer"}'
-        request, channel = self.make_request("PUT", self.path, content)
-        self.render(request)
+        channel = self.make_request("PUT", self.path, content)
         self.assertEquals(200, channel.code, msg=channel.result["body"])
 
         # valid get
-        request, channel = self.make_request("GET", self.path)
-        self.render(request)
+        channel = self.make_request("GET", self.path)
         self.assertEquals(200, channel.code, msg=channel.result["body"])
         self.assert_dict(json.loads(content), channel.json_body)
 
@@ -588,30 +538,22 @@ class RoomMemberStateTestCase(RoomBase):
     def test_invalid_puts(self):
         path = "/rooms/%s/state/m.room.member/%s" % (self.room_id, self.user_id)
         # missing keys or invalid json
-        request, channel = self.make_request("PUT", path, "{}")
-        self.render(request)
+        channel = self.make_request("PUT", path, "{}")
         self.assertEquals(400, channel.code, msg=channel.result["body"])
 
-        request, channel = self.make_request("PUT", path, '{"_name":"bo"}')
-        self.render(request)
+        channel = self.make_request("PUT", path, '{"_name":"bo"}')
         self.assertEquals(400, channel.code, msg=channel.result["body"])
 
-        request, channel = self.make_request("PUT", path, '{"nao')
-        self.render(request)
+        channel = self.make_request("PUT", path, '{"nao')
         self.assertEquals(400, channel.code, msg=channel.result["body"])
 
-        request, channel = self.make_request(
-            "PUT", path, b'[{"_name":"bo"},{"_name":"jill"}]'
-        )
-        self.render(request)
+        channel = self.make_request("PUT", path, b'[{"_name":"bo"},{"_name":"jill"}]')
         self.assertEquals(400, channel.code, msg=channel.result["body"])
 
-        request, channel = self.make_request("PUT", path, "text only")
-        self.render(request)
+        channel = self.make_request("PUT", path, "text only")
         self.assertEquals(400, channel.code, msg=channel.result["body"])
 
-        request, channel = self.make_request("PUT", path, "")
-        self.render(request)
+        channel = self.make_request("PUT", path, "")
         self.assertEquals(400, channel.code, msg=channel.result["body"])
 
         # valid keys, wrong types
@@ -620,8 +562,7 @@ class RoomMemberStateTestCase(RoomBase):
             Membership.JOIN,
             Membership.LEAVE,
         )
-        request, channel = self.make_request("PUT", path, content.encode("ascii"))
-        self.render(request)
+        channel = self.make_request("PUT", path, content.encode("ascii"))
         self.assertEquals(400, channel.code, msg=channel.result["body"])
 
     def test_rooms_members_self(self):
@@ -632,12 +573,10 @@ class RoomMemberStateTestCase(RoomBase):
 
         # valid join message (NOOP since we made the room)
         content = '{"membership":"%s"}' % Membership.JOIN
-        request, channel = self.make_request("PUT", path, content.encode("ascii"))
-        self.render(request)
+        channel = self.make_request("PUT", path, content.encode("ascii"))
         self.assertEquals(200, channel.code, msg=channel.result["body"])
 
-        request, channel = self.make_request("GET", path, None)
-        self.render(request)
+        channel = self.make_request("GET", path, None)
         self.assertEquals(200, channel.code, msg=channel.result["body"])
 
         expected_response = {"membership": Membership.JOIN}
@@ -652,12 +591,10 @@ class RoomMemberStateTestCase(RoomBase):
 
         # valid invite message
         content = '{"membership":"%s"}' % Membership.INVITE
-        request, channel = self.make_request("PUT", path, content)
-        self.render(request)
+        channel = self.make_request("PUT", path, content)
         self.assertEquals(200, channel.code, msg=channel.result["body"])
 
-        request, channel = self.make_request("GET", path, None)
-        self.render(request)
+        channel = self.make_request("GET", path, None)
         self.assertEquals(200, channel.code, msg=channel.result["body"])
         self.assertEquals(json.loads(content), channel.json_body)
 
@@ -673,12 +610,10 @@ class RoomMemberStateTestCase(RoomBase):
             Membership.INVITE,
             "Join us!",
         )
-        request, channel = self.make_request("PUT", path, content)
-        self.render(request)
+        channel = self.make_request("PUT", path, content)
         self.assertEquals(200, channel.code, msg=channel.result["body"])
 
-        request, channel = self.make_request("GET", path, None)
-        self.render(request)
+        channel = self.make_request("GET", path, None)
         self.assertEquals(200, channel.code, msg=channel.result["body"])
         self.assertEquals(json.loads(content), channel.json_body)
 
@@ -687,6 +622,7 @@ class RoomJoinRatelimitTestCase(RoomBase):
     user_id = "@sid1:red"
 
     servlets = [
+        admin.register_servlets,
         profile.register_servlets,
         room.register_servlets,
     ]
@@ -728,8 +664,7 @@ class RoomJoinRatelimitTestCase(RoomBase):
 
         # Update the display name for the user.
         path = "/_matrix/client/r0/profile/%s/displayname" % self.user_id
-        request, channel = self.make_request("PUT", path, {"displayname": "John Doe"})
-        self.render(request)
+        channel = self.make_request("PUT", path, {"displayname": "John Doe"})
         self.assertEquals(channel.code, 200, channel.json_body)
 
         # Check that all the rooms have been sent a profile update into.
@@ -739,8 +674,7 @@ class RoomJoinRatelimitTestCase(RoomBase):
                 self.user_id,
             )
 
-            request, channel = self.make_request("GET", path)
-            self.render(request)
+            channel = self.make_request("GET", path)
             self.assertEquals(channel.code, 200)
 
             self.assertIn("displayname", channel.json_body)
@@ -764,9 +698,22 @@ class RoomJoinRatelimitTestCase(RoomBase):
             # Make sure we send more requests than the rate-limiting config would allow
             # if all of these requests ended up joining the user to a room.
             for i in range(4):
-                request, channel = self.make_request("POST", path % room_id, {})
-                self.render(request)
+                channel = self.make_request("POST", path % room_id, {})
                 self.assertEquals(channel.code, 200)
+
+    @unittest.override_config(
+        {
+            "rc_joins": {"local": {"per_second": 0.5, "burst_count": 3}},
+            "auto_join_rooms": ["#room:red", "#room2:red", "#room3:red", "#room4:red"],
+            "autocreate_auto_join_rooms": True,
+        },
+    )
+    def test_autojoin_rooms(self):
+        user_id = self.register_user("testuser", "password")
+
+        # Check that the new user successfully joined the four rooms
+        rooms = self.get_success(self.hs.get_datastore().get_rooms_for_user(user_id))
+        self.assertEqual(len(rooms), 4)
 
 
 class RoomMessagesTestCase(RoomBase):
@@ -780,51 +727,40 @@ class RoomMessagesTestCase(RoomBase):
     def test_invalid_puts(self):
         path = "/rooms/%s/send/m.room.message/mid1" % (urlparse.quote(self.room_id))
         # missing keys or invalid json
-        request, channel = self.make_request("PUT", path, b"{}")
-        self.render(request)
+        channel = self.make_request("PUT", path, b"{}")
         self.assertEquals(400, channel.code, msg=channel.result["body"])
 
-        request, channel = self.make_request("PUT", path, b'{"_name":"bo"}')
-        self.render(request)
+        channel = self.make_request("PUT", path, b'{"_name":"bo"}')
         self.assertEquals(400, channel.code, msg=channel.result["body"])
 
-        request, channel = self.make_request("PUT", path, b'{"nao')
-        self.render(request)
+        channel = self.make_request("PUT", path, b'{"nao')
         self.assertEquals(400, channel.code, msg=channel.result["body"])
 
-        request, channel = self.make_request(
-            "PUT", path, b'[{"_name":"bo"},{"_name":"jill"}]'
-        )
-        self.render(request)
+        channel = self.make_request("PUT", path, b'[{"_name":"bo"},{"_name":"jill"}]')
         self.assertEquals(400, channel.code, msg=channel.result["body"])
 
-        request, channel = self.make_request("PUT", path, b"text only")
-        self.render(request)
+        channel = self.make_request("PUT", path, b"text only")
         self.assertEquals(400, channel.code, msg=channel.result["body"])
 
-        request, channel = self.make_request("PUT", path, b"")
-        self.render(request)
+        channel = self.make_request("PUT", path, b"")
         self.assertEquals(400, channel.code, msg=channel.result["body"])
 
     def test_rooms_messages_sent(self):
         path = "/rooms/%s/send/m.room.message/mid1" % (urlparse.quote(self.room_id))
 
         content = b'{"body":"test","msgtype":{"type":"a"}}'
-        request, channel = self.make_request("PUT", path, content)
-        self.render(request)
+        channel = self.make_request("PUT", path, content)
         self.assertEquals(400, channel.code, msg=channel.result["body"])
 
         # custom message types
         content = b'{"body":"test","msgtype":"test.custom.text"}'
-        request, channel = self.make_request("PUT", path, content)
-        self.render(request)
+        channel = self.make_request("PUT", path, content)
         self.assertEquals(200, channel.code, msg=channel.result["body"])
 
         # m.text message type
         path = "/rooms/%s/send/m.room.message/mid2" % (urlparse.quote(self.room_id))
         content = b'{"body":"test2","msgtype":"m.text"}'
-        request, channel = self.make_request("PUT", path, content)
-        self.render(request)
+        channel = self.make_request("PUT", path, content)
         self.assertEquals(200, channel.code, msg=channel.result["body"])
 
 
@@ -838,10 +774,7 @@ class RoomInitialSyncTestCase(RoomBase):
         self.room_id = self.helper.create_room_as(self.user_id)
 
     def test_initial_sync(self):
-        request, channel = self.make_request(
-            "GET", "/rooms/%s/initialSync" % self.room_id
-        )
-        self.render(request)
+        channel = self.make_request("GET", "/rooms/%s/initialSync" % self.room_id)
         self.assertEquals(200, channel.code)
 
         self.assertEquals(self.room_id, channel.json_body["room_id"])
@@ -882,10 +815,9 @@ class RoomMessageListTestCase(RoomBase):
 
     def test_topo_token_is_accepted(self):
         token = "t1-0_0_0_0_0_0_0_0_0"
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/rooms/%s/messages?access_token=x&from=%s" % (self.room_id, token)
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
         self.assertTrue("start" in channel.json_body)
         self.assertEquals(token, channel.json_body["start"])
@@ -894,10 +826,9 @@ class RoomMessageListTestCase(RoomBase):
 
     def test_stream_token_is_accepted_for_fwd_pagianation(self):
         token = "s0_0_0_0_0_0_0_0_0"
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/rooms/%s/messages?access_token=x&from=%s" % (self.room_id, token)
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
         self.assertTrue("start" in channel.json_body)
         self.assertEquals(token, channel.json_body["start"])
@@ -928,7 +859,7 @@ class RoomMessageListTestCase(RoomBase):
         self.helper.send(self.room_id, "message 3")
 
         # Check that we get the first and second message when querying /messages.
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/rooms/%s/messages?access_token=x&from=%s&dir=b&filter=%s"
             % (
@@ -937,7 +868,6 @@ class RoomMessageListTestCase(RoomBase):
                 json.dumps({"types": [EventTypes.Message]}),
             ),
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.json_body)
 
         chunk = channel.json_body["chunk"]
@@ -957,7 +887,7 @@ class RoomMessageListTestCase(RoomBase):
 
         # Check that we only get the second message through /message now that the first
         # has been purged.
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/rooms/%s/messages?access_token=x&from=%s&dir=b&filter=%s"
             % (
@@ -966,7 +896,6 @@ class RoomMessageListTestCase(RoomBase):
                 json.dumps({"types": [EventTypes.Message]}),
             ),
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.json_body)
 
         chunk = channel.json_body["chunk"]
@@ -975,7 +904,7 @@ class RoomMessageListTestCase(RoomBase):
         # Check that we get no event, but also no error, when querying /messages with
         # the token that was pointing at the first event, because we don't have it
         # anymore.
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/rooms/%s/messages?access_token=x&from=%s&dir=b&filter=%s"
             % (
@@ -984,7 +913,6 @@ class RoomMessageListTestCase(RoomBase):
                 json.dumps({"types": [EventTypes.Message]}),
             ),
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.json_body)
 
         chunk = channel.json_body["chunk"]
@@ -1035,7 +963,7 @@ class RoomSearchTestCase(unittest.HomeserverTestCase):
         self.helper.send(self.room, body="Hi!", tok=self.other_access_token)
         self.helper.send(self.room, body="There!", tok=self.other_access_token)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/search?access_token=%s" % (self.access_token,),
             {
@@ -1044,7 +972,6 @@ class RoomSearchTestCase(unittest.HomeserverTestCase):
                 }
             },
         )
-        self.render(request)
 
         # Check we get the results we expect -- one search result, of the sent
         # messages
@@ -1065,7 +992,7 @@ class RoomSearchTestCase(unittest.HomeserverTestCase):
         self.helper.send(self.room, body="Hi!", tok=self.other_access_token)
         self.helper.send(self.room, body="There!", tok=self.other_access_token)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/search?access_token=%s" % (self.access_token,),
             {
@@ -1078,7 +1005,6 @@ class RoomSearchTestCase(unittest.HomeserverTestCase):
                 }
             },
         )
-        self.render(request)
 
         # Check we get the results we expect -- one search result, of the sent
         # messages
@@ -1114,18 +1040,15 @@ class PublicRoomsRestrictedTestCase(unittest.HomeserverTestCase):
         return self.hs
 
     def test_restricted_no_auth(self):
-        request, channel = self.make_request("GET", self.url)
-        self.render(request)
+        channel = self.make_request("GET", self.url)
         self.assertEqual(channel.code, 401, channel.result)
 
     def test_restricted_auth(self):
         self.register_user("user", "pass")
         tok = self.login("user", "pass")
 
-        request, channel = self.make_request("GET", self.url, access_token=tok)
-        self.render(request)
+        channel = self.make_request("GET", self.url, access_token=tok)
         """ watcha!
-        # directory disabled
         self.assertEqual(channel.code, 200, channel.result)
         !watcha """
         self.assertEqual(channel.code, 403, channel.result)  # watcha+
@@ -1155,13 +1078,12 @@ class PerRoomProfilesForbiddenTestCase(unittest.HomeserverTestCase):
         self.displayname = "test user"
         data = {"displayname": self.displayname}
         request_data = json.dumps(data)
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/profile/%s/displayname" % (self.user_id,),
             request_data,
             access_token=self.tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
@@ -1169,23 +1091,21 @@ class PerRoomProfilesForbiddenTestCase(unittest.HomeserverTestCase):
     def test_per_room_profile_forbidden(self):
         data = {"membership": "join", "displayname": "other test user"}
         request_data = json.dumps(data)
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/rooms/%s/state/m.room.member/%s"
             % (self.room_id, self.user_id),
             request_data,
             access_token=self.tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
         event_id = channel.json_body["event_id"]
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/_matrix/client/r0/rooms/%s/event/%s" % (self.room_id, event_id),
             access_token=self.tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         res_displayname = channel.json_body["content"]["displayname"]
@@ -1213,97 +1133,99 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         self.room_id = self.helper.create_room_as(self.creator, tok=self.creator_tok)
 
     def test_join_reason(self):
+        # watcha+
         self.helper.invite(
             self.room_id, self.creator, self.second_user_id, tok=self.creator_tok
-        )  # watcha+
+        )
+        # +watcha
         reason = "hello"
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/{}/join".format(self.room_id),
             content={"reason": reason},
             access_token=self.second_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         self._check_for_reason(reason)
 
     def test_leave_reason(self):
+        # watcha+
         self.helper.invite(
             self.room_id, self.creator, self.second_user_id, tok=self.creator_tok
-        )  # watcha+
+        )  
+        # +watcha
         self.helper.join(self.room_id, user=self.second_user_id, tok=self.second_tok)
 
         reason = "hello"
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/{}/leave".format(self.room_id),
             content={"reason": reason},
             access_token=self.second_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         self._check_for_reason(reason)
 
     def test_kick_reason(self):
+        # watcha+
         self.helper.invite(
             self.room_id, self.creator, self.second_user_id, tok=self.creator_tok
-        )  # watcha+
+        )  
+        # +watcha
         self.helper.join(self.room_id, user=self.second_user_id, tok=self.second_tok)
 
         reason = "hello"
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/{}/kick".format(self.room_id),
             content={"reason": reason, "user_id": self.second_user_id},
             access_token=self.second_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         self._check_for_reason(reason)
 
     def test_ban_reason(self):
+        # watcha+
         self.helper.invite(
             self.room_id, self.creator, self.second_user_id, tok=self.creator_tok
-        )  # watcha+
+        )  
+        # +watcha
         self.helper.join(self.room_id, user=self.second_user_id, tok=self.second_tok)
 
         reason = "hello"
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/{}/ban".format(self.room_id),
             content={"reason": reason, "user_id": self.second_user_id},
             access_token=self.creator_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         self._check_for_reason(reason)
 
     def test_unban_reason(self):
         reason = "hello"
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/{}/unban".format(self.room_id),
             content={"reason": reason, "user_id": self.second_user_id},
             access_token=self.creator_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         self._check_for_reason(reason)
 
     def test_invite_reason(self):
         reason = "hello"
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/{}/invite".format(self.room_id),
             content={"reason": reason, "user_id": self.second_user_id},
             access_token=self.creator_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         self._check_for_reason(reason)
@@ -1317,26 +1239,24 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         )
 
         reason = "hello"
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/{}/leave".format(self.room_id),
             content={"reason": reason},
             access_token=self.second_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         self._check_for_reason(reason)
 
     def _check_for_reason(self, reason):
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/_matrix/client/r0/rooms/{}/state/m.room.member/{}".format(
                 self.room_id, self.second_user_id
             ),
             access_token=self.creator_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         event_content = channel.json_body
@@ -1379,13 +1299,12 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         """Test that we can filter by a label on a /context request."""
         event_id = self._send_labelled_messages_in_room()
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/rooms/%s/context/%s?filter=%s"
             % (self.room_id, event_id, json.dumps(self.FILTER_LABELS)),
             access_token=self.tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         events_before = channel.json_body["events_before"]
@@ -1410,13 +1329,12 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         """Test that we can filter by the absence of a label on a /context request."""
         event_id = self._send_labelled_messages_in_room()
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/rooms/%s/context/%s?filter=%s"
             % (self.room_id, event_id, json.dumps(self.FILTER_NOT_LABELS)),
             access_token=self.tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         events_before = channel.json_body["events_before"]
@@ -1446,13 +1364,12 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         """
         event_id = self._send_labelled_messages_in_room()
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/rooms/%s/context/%s?filter=%s"
             % (self.room_id, event_id, json.dumps(self.FILTER_LABELS_NOT_LABELS)),
             access_token=self.tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         events_before = channel.json_body["events_before"]
@@ -1475,12 +1392,11 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         self._send_labelled_messages_in_room()
 
         token = "s0_0_0_0_0_0_0_0_0"
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/rooms/%s/messages?access_token=%s&from=%s&filter=%s"
             % (self.room_id, self.tok, token, json.dumps(self.FILTER_LABELS)),
         )
-        self.render(request)
 
         events = channel.json_body["chunk"]
 
@@ -1493,12 +1409,11 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         self._send_labelled_messages_in_room()
 
         token = "s0_0_0_0_0_0_0_0_0"
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/rooms/%s/messages?access_token=%s&from=%s&filter=%s"
             % (self.room_id, self.tok, token, json.dumps(self.FILTER_NOT_LABELS)),
         )
-        self.render(request)
 
         events = channel.json_body["chunk"]
 
@@ -1517,7 +1432,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         self._send_labelled_messages_in_room()
 
         token = "s0_0_0_0_0_0_0_0_0"
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/rooms/%s/messages?access_token=%s&from=%s&filter=%s"
             % (
@@ -1527,7 +1442,6 @@ class LabelsTestCase(unittest.HomeserverTestCase):
                 json.dumps(self.FILTER_LABELS_NOT_LABELS),
             ),
         )
-        self.render(request)
 
         events = channel.json_body["chunk"]
 
@@ -1549,17 +1463,14 @@ class LabelsTestCase(unittest.HomeserverTestCase):
 
         self._send_labelled_messages_in_room()
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", "/search?access_token=%s" % self.tok, request_data
         )
-        self.render(request)
 
         results = channel.json_body["search_categories"]["room_events"]["results"]
 
         self.assertEqual(
-            len(results),
-            2,
-            [result["result"]["content"] for result in results],
+            len(results), 2, [result["result"]["content"] for result in results],
         )
         self.assertEqual(
             results[0]["result"]["content"]["body"],
@@ -1587,17 +1498,14 @@ class LabelsTestCase(unittest.HomeserverTestCase):
 
         self._send_labelled_messages_in_room()
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", "/search?access_token=%s" % self.tok, request_data
         )
-        self.render(request)
 
         results = channel.json_body["search_categories"]["room_events"]["results"]
 
         self.assertEqual(
-            len(results),
-            4,
-            [result["result"]["content"] for result in results],
+            len(results), 4, [result["result"]["content"] for result in results],
         )
         self.assertEqual(
             results[0]["result"]["content"]["body"],
@@ -1637,17 +1545,14 @@ class LabelsTestCase(unittest.HomeserverTestCase):
 
         self._send_labelled_messages_in_room()
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST", "/search?access_token=%s" % self.tok, request_data
         )
-        self.render(request)
 
         results = channel.json_body["search_categories"]["room_events"]["results"]
 
         self.assertEqual(
-            len(results),
-            1,
-            [result["result"]["content"] for result in results],
+            len(results), 1, [result["result"]["content"] for result in results],
         )
         self.assertEqual(
             results[0]["result"]["content"]["body"],
@@ -1761,13 +1666,12 @@ class ContextTestCase(unittest.HomeserverTestCase):
 
         # Check that we can still see the messages before the erasure request.
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             '/rooms/%s/context/%s?filter={"types":["m.room.message"]}'
             % (self.room_id, event_id),
             access_token=self.tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         events_before = channel.json_body["events_before"]
@@ -1826,13 +1730,12 @@ class ContextTestCase(unittest.HomeserverTestCase):
         # Check that a user that joined the room after the erasure request can't see
         # the messages anymore.
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             '/rooms/%s/context/%s?filter={"types":["m.room.message"]}'
             % (self.room_id, event_id),
             access_token=invited_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
         events_before = channel.json_body["events_before"]
@@ -1917,13 +1820,12 @@ class RoomAliasListTestCase(unittest.HomeserverTestCase):
 
     def _get_aliases(self, access_token: str, expected_code: int = 200) -> JsonDict:
         """Calls the endpoint under test. returns the json response object."""
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/_matrix/client/unstable/org.matrix.msc2432/rooms/%s/aliases"
             % (self.room_id,),
             access_token=access_token,
         )
-        self.render(request)
         self.assertEqual(channel.code, expected_code, channel.result)
         res = channel.json_body
         self.assertIsInstance(res, dict)
@@ -1939,10 +1841,9 @@ class RoomAliasListTestCase(unittest.HomeserverTestCase):
         data = {"room_id": self.room_id}
         request_data = json.dumps(data)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT", url, request_data, access_token=self.room_owner_tok
         )
-        self.render(request)
         self.assertEqual(channel.code, expected_code, channel.result)
 
     test_peekable_room.skip = "Disable for Watcha"  # watcha+
@@ -1972,20 +1873,18 @@ class RoomCanonicalAliasTestCase(unittest.HomeserverTestCase):
         data = {"room_id": self.room_id}
         request_data = json.dumps(data)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT", url, request_data, access_token=self.room_owner_tok
         )
-        self.render(request)
         self.assertEqual(channel.code, expected_code, channel.result)
 
     def _get_canonical_alias(self, expected_code: int = 200) -> JsonDict:
         """Calls the endpoint under test. returns the json response object."""
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "rooms/%s/state/m.room.canonical_alias" % (self.room_id,),
             access_token=self.room_owner_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, expected_code, channel.result)
         res = channel.json_body
         self.assertIsInstance(res, dict)
@@ -1993,13 +1892,12 @@ class RoomCanonicalAliasTestCase(unittest.HomeserverTestCase):
 
     def _set_canonical_alias(self, content: str, expected_code: int = 200) -> JsonDict:
         """Calls the endpoint under test. returns the json response object."""
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "rooms/%s/state/m.room.canonical_alias" % (self.room_id,),
             json.dumps(content),
             access_token=self.room_owner_tok,
         )
-        self.render(request)
         self.assertEqual(channel.code, expected_code, channel.result)
         res = channel.json_body
         self.assertIsInstance(res, dict)

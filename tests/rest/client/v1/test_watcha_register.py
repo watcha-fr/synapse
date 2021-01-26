@@ -81,39 +81,36 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         self.nextcloud_client.add_user = simple_async_mock()
 
     def test_register_user(self):
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             self.url,
             {"email": "user1@example.com", "admin": False, "password": "",},
             self.owner_tok,
         )
-        self.render(request)
 
         self.assertTrue(self.keycloak_client.add_user.called)
         self.assertTrue(self.nextcloud_client.add_user.called)
         self.assertEqual(channel.code, 200)
 
     def test_register_user_with_password(self):
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             self.url,
             {"email": "user1@example.com", "admin": False, "password": "pass",},
             self.owner_tok,
         )
-        self.render(request)
 
         self.assertTrue(self.keycloak_client.add_user.called)
         self.assertTrue(self.nextcloud_client.add_user.called)
         self.assertEqual(channel.code, 200)
 
     def test_register_user_with_empty_email(self):
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             self.url,
             {"email": "", "admin": False, "password": "",},
             self.owner_tok,
         )
-        self.render(request)
 
         self.keycloak_client.add_user.not_called()
         self.nextcloud_client.add_user.not_called()
@@ -125,13 +122,12 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         )
 
     def test_register_user_with_same_email_adress(self):
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             self.url,
             {"email": "owner@example.com", "admin": False, "password": "",},
             self.owner_tok,
         )
-        self.render(request)
 
         self.keycloak_client.add_user.not_called()
         self.nextcloud_client.add_user.not_called()

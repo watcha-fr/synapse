@@ -78,7 +78,6 @@ class PowerLevelsTestCase(HomeserverTestCase):
 
         # Update existing power levels with mod at PL50
         """ watcha!
-        # no mod in watcha rn
         room_power_levels["users"].update({self.mod_user_id: 50})
         !watcha """
 
