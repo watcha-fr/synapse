@@ -97,12 +97,12 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
         self.keycloak_client.add_user = simple_async_mock(return_value=response)
         self.nextcloud_client.add_user = simple_async_mock()
 
-        self.invite_membership_uri = "/rooms/{}/invite".format(self.room_id)
+        self.invite_uri = "/rooms/{}/invite".format(self.room_id)
 
     def test_invite_new_partner(self):
         request, channel = self.make_request(
             "POST",
-            self.invite_membership_uri,
+            self.invite_uri,
             {"id_server": "test", "medium": "email", "address": "partner@example.com"},
             self.owner_tok,
         )
@@ -120,7 +120,7 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
     def test_invite_existing_partner(self):
         request, channel = self.make_request(
             "POST",
-            self.invite_membership_uri,
+            self.invite_uri,
             {
                 "id_server": "test",
                 "medium": "email",
@@ -142,7 +142,7 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
     def test_invite_collaborator_as_partner(self):
         request, channel = self.make_request(
             "POST",
-            self.invite_membership_uri,
+            self.invite_uri,
             {
                 "id_server": "test",
                 "medium": "email",
