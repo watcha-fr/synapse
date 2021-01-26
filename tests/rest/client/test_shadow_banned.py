@@ -133,6 +133,14 @@ class RoomTestCase(_ShadowBannedBase):
         )
 
         # The user should be in the room.
+        # watcha+
+        self.helper.invite(
+            room_id,
+            self.other_user_id,
+            self.banned_user_id,
+            tok=self.other_access_token,
+        )
+        # +watcha
         self.helper.join(room_id, self.banned_user_id, tok=self.banned_access_token)
 
         # Sending a message should complete successfully.
@@ -222,6 +230,19 @@ class RoomTestCase(_ShadowBannedBase):
             ],
         )
 
+    # watcha+
+    # Watcha rooms are private by default. So it's necessary to invite a user in the room before he could join it.
+    # In case of 'test_create_room' and 'test_typing', this is the  shadow banned user which created the room, so invitation of other user doesn't work.
+    # Indeed, these tests could not work at all, so they are disabled.
+    test_create_room.skip = (
+        "Disabled for Watcha because Watcha rooms are private by default."
+    )
+    test_typing.skip = (
+        "Disabled for Watcha because Watcha rooms are private by default."
+    )
+    test_invite_3pid.skip = "Disabled for Watcha after OP553."
+    # +watcha
+
 
 # To avoid the tests timing out don't add a delay to "annoy the requester".
 @patch("random.randint", new=lambda a, b: 0)
@@ -264,7 +285,10 @@ class ProfileTestCase(_ShadowBannedBase):
         message_handler = self.hs.get_message_handler()
         event = self.get_success(
             message_handler.get_room_data(
-                self.banned_user_id, room_id, "m.room.member", self.banned_user_id,
+                self.banned_user_id,
+                room_id,
+                "m.room.member",
+                self.banned_user_id,
             )
         )
         self.assertEqual(
@@ -296,7 +320,10 @@ class ProfileTestCase(_ShadowBannedBase):
         message_handler = self.hs.get_message_handler()
         event = self.get_success(
             message_handler.get_room_data(
-                self.banned_user_id, room_id, "m.room.member", self.banned_user_id,
+                self.banned_user_id,
+                room_id,
+                "m.room.member",
+                self.banned_user_id,
             )
         )
         self.assertEqual(

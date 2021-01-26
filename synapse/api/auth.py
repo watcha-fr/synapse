@@ -164,10 +164,11 @@ class Auth:
         self,
         request: Request,
         allow_guest: bool = False,
+        allow_partner: bool = False,  # watcha+
         rights: str = "access",
         allow_expired: bool = False,
     ) -> synapse.types.Requester:
-        """ Get a registered user's ID.
+        """Get a registered user's ID.
 
         Args:
             request: An HTTP request with an access_token query parameter.
@@ -219,6 +220,7 @@ class Auth:
             token_id = user_info.token_id
             is_guest = user_info.is_guest
             shadow_banned = user_info.shadow_banned
+            is_partner = user_info.is_partner  # watcha+
 
             # Deny the request if the user account has expired.
             if self._account_validity.enabled and not allow_expired:
@@ -247,6 +249,16 @@ class Auth:
                     errcode=Codes.GUEST_ACCESS_FORBIDDEN,
                 )
 
+            # watcha+
+            if is_partner and not allow_partner:
+                raise AuthError(
+                    403,
+                    "Partner access not allowed",
+                    errcode=Codes.GUEST_ACCESS_FORBIDDEN,
+                )
+            # +watcha
+
+            """ watcha!
             requester = synapse.types.create_requester(
                 user_info.user_id,
                 token_id,
@@ -256,6 +268,19 @@ class Auth:
                 app_service=app_service,
                 authenticated_entity=user_info.token_owner,
             )
+            !watcha """
+            # watcha+
+            requester = synapse.types.create_requester(
+                user_info.user_id,
+                token_id,
+                is_guest,
+                shadow_banned,
+                device_id,
+                app_service=app_service,
+                authenticated_entity=user_info.token_owner,
+                is_partner=is_partner,
+            )
+            # +watcha
 
             request.requester = requester
             opentracing.set_tag("authenticated_entity", user_info.token_owner)
@@ -293,9 +318,12 @@ class Auth:
         return user_id, app_service
 
     async def get_user_by_access_token(
-        self, token: str, rights: str = "access", allow_expired: bool = False,
+        self,
+        token: str,
+        rights: str = "access",
+        allow_expired: bool = False,
     ) -> TokenLookupResult:
-        """ Validate access token and get user_id from it
+        """Validate access token and get user_id from it
 
         Args:
             token: The access token to get the user by
@@ -488,7 +516,7 @@ class Auth:
         return service
 
     async def is_server_admin(self, user: UserID) -> bool:
-        """ Check if the given user is a local server admin.
+        """Check if the given user is a local server admin.
 
         Args:
             user: user to check
@@ -499,7 +527,10 @@ class Auth:
         return await self.store.is_server_admin(user)
 
     def compute_auth_events(
-        self, event, current_state_ids: StateMap[str], for_verification: bool = False,
+        self,
+        event,
+        current_state_ids: StateMap[str],
+        for_verification: bool = False,
     ) -> List[str]:
         """Given an event and current state return the list of event IDs used
         to auth an event.

@@ -54,6 +54,8 @@ else:
         __slots__ = ()
 
 
+from binascii import a2b_hex  # watcha+
+
 # Define a state map type from type/state_key to T (usually an event ID or
 # event)
 T = TypeVar("T")
@@ -66,6 +68,7 @@ MutableStateMap = MutableMapping[StateKey, T]
 JsonDict = Dict[str, Any]
 
 
+""" watcha!
 class Requester(
     namedtuple(
         "Requester",
@@ -80,6 +83,24 @@ class Requester(
         ],
     )
 ):
+!watcha """
+# watcha+
+class Requester(
+    namedtuple(
+        "Requester",
+        [
+            "user",
+            "access_token_id",
+            "is_guest",
+            "shadow_banned",
+            "device_id",
+            "app_service",
+            "authenticated_entity",
+            "is_partner",
+        ],
+    )
+):
+    # +watcha
     """
     Represents the user making a request
 
@@ -108,6 +129,7 @@ class Requester(
             "device_id": self.device_id,
             "app_server_id": self.app_service.id if self.app_service else None,
             "authenticated_entity": self.authenticated_entity,
+            "is_partner": self.is_partner,  # watcha+
         }
 
     @staticmethod
@@ -134,6 +156,7 @@ class Requester(
             device_id=input["device_id"],
             app_service=appservice,
             authenticated_entity=input["authenticated_entity"],
+            is_partner=input["is_partner"],  # watcha+
         )
 
 
@@ -145,6 +168,7 @@ def create_requester(
     device_id: Optional[str] = None,
     app_service: Optional["ApplicationService"] = None,
     authenticated_entity: Optional[str] = None,
+    is_partner: Optional[bool] = False,  # watcha+
 ):
     """
     Create a new ``Requester`` object
@@ -170,6 +194,7 @@ def create_requester(
     if authenticated_entity is None:
         authenticated_entity = user_id.to_string()
 
+    """ watcha!
     return Requester(
         user_id,
         access_token_id,
@@ -179,6 +204,19 @@ def create_requester(
         app_service,
         authenticated_entity,
     )
+    !watcha """
+    # watcha+
+    return Requester(
+        user_id,
+        access_token_id,
+        is_guest,
+        shadow_banned,
+        device_id,
+        app_service,
+        authenticated_entity,
+        is_partner,
+    )
+    # +watcha
 
 
 def get_domain_from_id(string):

@@ -110,6 +110,11 @@ CONDITIONAL_REQUIREMENTS = {
     # hiredis is not a *strict* dependency, but it makes things much faster.
     # (if it is not installed, we fall back to slow code.)
     "redis": ["txredisapi>=1.4.7", "hiredis"],
+    # watcha+
+    "shared-secret-authenticator": [
+        "shared-secret-authenticator @ git+https://github.com/devture/matrix-synapse-shared-secret-auth@1.0.2#egg=shared-secret-authenticator"
+    ],
+    # +watcha
 }
 
 ALL_OPTIONAL_REQUIREMENTS = set()  # type: Set[str]

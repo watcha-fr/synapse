@@ -35,6 +35,8 @@ from synapse.util.stringutils import random_string
 from tests import unittest
 from tests.test_utils import make_awaitable
 
+from synapse.api.errors import SynapseError  # watcha+
+
 PATH_PREFIX = b"/_matrix/client/api/v1"
 
 
@@ -1046,7 +1048,10 @@ class PublicRoomsRestrictedTestCase(unittest.HomeserverTestCase):
         tok = self.login("user", "pass")
 
         channel = self.make_request("GET", self.url, access_token=tok)
+        """ watcha!
         self.assertEqual(channel.code, 200, channel.result)
+        !watcha """
+        self.assertEqual(channel.code, 403, channel.result)  # watcha+
 
 
 class PerRoomProfilesForbiddenTestCase(unittest.HomeserverTestCase):
@@ -1128,6 +1133,9 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         self.room_id = self.helper.create_room_as(self.creator, tok=self.creator_tok)
 
     def test_join_reason(self):
+        self.helper.invite(
+            self.room_id, self.creator, self.second_user_id, tok=self.creator_tok
+        )  # watcha+
         reason = "hello"
         channel = self.make_request(
             "POST",
@@ -1140,6 +1148,9 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         self._check_for_reason(reason)
 
     def test_leave_reason(self):
+        self.helper.invite(
+            self.room_id, self.creator, self.second_user_id, tok=self.creator_tok
+        )  # watcha+
         self.helper.join(self.room_id, user=self.second_user_id, tok=self.second_tok)
 
         reason = "hello"
@@ -1154,6 +1165,9 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         self._check_for_reason(reason)
 
     def test_kick_reason(self):
+        self.helper.invite(
+            self.room_id, self.creator, self.second_user_id, tok=self.creator_tok
+        )  # watcha+
         self.helper.join(self.room_id, user=self.second_user_id, tok=self.second_tok)
 
         reason = "hello"
@@ -1168,6 +1182,9 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         self._check_for_reason(reason)
 
     def test_ban_reason(self):
+        self.helper.invite(
+            self.room_id, self.creator, self.second_user_id, tok=self.creator_tok
+        )  # watcha+
         self.helper.join(self.room_id, user=self.second_user_id, tok=self.second_tok)
 
         reason = "hello"
@@ -1445,7 +1462,9 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         results = channel.json_body["search_categories"]["room_events"]["results"]
 
         self.assertEqual(
-            len(results), 2, [result["result"]["content"] for result in results],
+            len(results),
+            2,
+            [result["result"]["content"] for result in results],
         )
         self.assertEqual(
             results[0]["result"]["content"]["body"],
@@ -1480,7 +1499,9 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         results = channel.json_body["search_categories"]["room_events"]["results"]
 
         self.assertEqual(
-            len(results), 4, [result["result"]["content"] for result in results],
+            len(results),
+            4,
+            [result["result"]["content"] for result in results],
         )
         self.assertEqual(
             results[0]["result"]["content"]["body"],
@@ -1527,7 +1548,9 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         results = channel.json_body["search_categories"]["room_events"]["results"]
 
         self.assertEqual(
-            len(results), 1, [result["result"]["content"] for result in results],
+            len(results),
+            1,
+            [result["result"]["content"] for result in results],
         )
         self.assertEqual(
             results[0]["result"]["content"]["body"],
@@ -1820,6 +1843,8 @@ class RoomAliasListTestCase(unittest.HomeserverTestCase):
             "PUT", url, request_data, access_token=self.room_owner_tok
         )
         self.assertEqual(channel.code, expected_code, channel.result)
+
+    test_peekable_room.skip = "Disable for Watcha"  # watcha+
 
 
 class RoomCanonicalAliasTestCase(unittest.HomeserverTestCase):

@@ -546,6 +546,8 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
             expect_code, int(channel.result["code"]), msg=channel.result["body"]
         )
 
+    test_shutdown_room_block_peek.skip = "Disable for Watcha" # watcha+
+
 
 class PurgeRoomTestCase(unittest.HomeserverTestCase):
     """Test /purge_room admin API.
@@ -761,6 +763,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         # Have another user join the room
         user_2 = self.register_user("user4", "pass")
         user_tok_2 = self.login("user4", "pass")
+        self.helper.invite(room_id, self.admin_user, user_2, tok=self.admin_user_tok) # watcha+
         self.helper.join(room_id, user_2, tok=user_tok_2)
 
         # Create a new alias to this room
@@ -926,14 +929,17 @@ class RoomTestCase(unittest.HomeserverTestCase):
         # Set room member size in the reverse order. room 1 -> 1 member, 2 -> 2, 3 -> 3
         user_1 = self.register_user("bob1", "pass")
         user_1_tok = self.login("bob1", "pass")
+        self.helper.invite(room_id_2, self.admin_user, user_1, tok=self.admin_user_tok) # watcha+
         self.helper.join(room_id_2, user_1, tok=user_1_tok)
 
         user_2 = self.register_user("bob2", "pass")
         user_2_tok = self.login("bob2", "pass")
+        self.helper.invite(room_id_3, self.admin_user, user_2, tok=self.admin_user_tok) # watcha+
         self.helper.join(room_id_3, user_2, tok=user_2_tok)
 
         user_3 = self.register_user("bob3", "pass")
         user_3_tok = self.login("bob3", "pass")
+        self.helper.invite(room_id_3, self.admin_user, user_3, tok=self.admin_user_tok) # watcha+
         self.helper.join(room_id_3, user_3, tok=user_3_tok)
 
         # Test different sort orders, with forward and reverse directions
@@ -1119,6 +1125,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         # Have another user join the room
         user_1 = self.register_user("foo", "pass")
         user_tok_1 = self.login("foo", "pass")
+        self.helper.invite(room_id_1, self.admin_user, user_1, tok=self.admin_user_tok) # watcha+
         self.helper.join(room_id_1, user_1, tok=user_tok_1)
 
         url = "/_synapse/admin/v1/rooms/%s" % (room_id_1,)
@@ -1147,17 +1154,23 @@ class RoomTestCase(unittest.HomeserverTestCase):
         # Have another user join the room
         user_1 = self.register_user("foo", "pass")
         user_tok_1 = self.login("foo", "pass")
+        self.helper.invite(room_id_1, self.admin_user, user_1, tok=self.admin_user_tok) # watcha+
         self.helper.join(room_id_1, user_1, tok=user_tok_1)
 
         # Have another user join the room
         user_2 = self.register_user("bar", "pass")
         user_tok_2 = self.login("bar", "pass")
+        # watcha+
+        self.helper.invite(room_id_1, self.admin_user, user_2, tok=self.admin_user_tok)
+        self.helper.invite(room_id_2, self.admin_user, user_2, tok=self.admin_user_tok)
+        # +watcha
         self.helper.join(room_id_1, user_2, tok=user_tok_2)
         self.helper.join(room_id_2, user_2, tok=user_tok_2)
 
         # Have another user join the room
         user_3 = self.register_user("foobar", "pass")
         user_tok_3 = self.login("foobar", "pass")
+        self.helper.invite(room_id_2, self.admin_user, user_3, tok=self.admin_user_tok) # watcha+
         self.helper.join(room_id_2, user_3, tok=user_tok_3)
 
         url = "/_synapse/admin/v1/rooms/%s/members" % (room_id_1,)
@@ -1432,6 +1445,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(private_room_id, channel.json_body["joined_rooms"][0])
 
+    test_join_public_room.skip = "Disable for Watcha" # watcha+
 
 class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
     servlets = [
