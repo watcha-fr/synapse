@@ -138,7 +138,7 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.result["body"], b"{}")
 
     def test_invite_collaborator_as_partner(self):
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             self.invite_uri,
             {
@@ -148,7 +148,6 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
             },
             self.owner_tok,
         )
-        self.render(request)
 
         self.keycloak_client.add_user.not_called()
         self.nextcloud_client.add_user.not_called()
@@ -160,7 +159,7 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.result["body"], b"{}")
 
     def test_create_room_and_invite_partner(self):
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/createRoom",
             {
@@ -174,7 +173,6 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
             },
             self.owner_tok,
         )
-        self.render(request)
 
         self.assertTrue(self.keycloak_client.add_user.called)
         self.assertTrue(self.nextcloud_client.add_user.called)
@@ -185,7 +183,7 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
 
     def test_create_room_and_invite_existing_partner(self):
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/createRoom",
             {
@@ -199,7 +197,6 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
             },
             self.owner_tok,
         )
-        self.render(request)
 
         self.keycloak_client.add_user.not_called()
         self.nextcloud_client.add_user.not_called()
@@ -209,8 +206,8 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 200)
 
-    def test_create_room_and_invitei_collaborator_as_partner(self):
-        request, channel = self.make_request(
+    def test_create_room_and_invite_collaborator_as_partner(self):
+        channel = self.make_request(
             "POST",
             "/createRoom",
             {
@@ -224,7 +221,6 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
             },
             self.owner_tok,
         )
-        self.render(request)
 
         self.keycloak_client.add_user.not_called()
         self.nextcloud_client.add_user.not_called()
