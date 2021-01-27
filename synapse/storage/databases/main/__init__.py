@@ -74,7 +74,7 @@ from .user_erasure_store import UserErasureStore
 
 # watcha+
 from .watcha_administration import AdministrationStore
-from .watcha_invite_partner import ExternalInvitationStore
+from .watcha_partner import PartnerStore
 from .watcha_nextcloud import NextcloudStore
 # +watcha
 
@@ -126,7 +126,7 @@ class DataStore(
     ServerMetricsStore,
     # watcha+
     AdministrationStore,
-    ExternalInvitationStore,
+    PartnerStore,
     NextcloudStore,
     # +watcha
 ):

@@ -126,7 +126,7 @@ from synapse.util.stringutils import random_string
 
 # watcha+
 from synapse.handlers.watcha_administration import AdministrationHandler
-from synapse.handlers.watcha_invite_partner import InvitePartnerHandler
+from synapse.handlers.watcha_partner import PartnerHandler
 from synapse.handlers.watcha_nextcloud import NextcloudHandler
 from synapse.http.watcha_keycloak_client import KeycloakClient
 from synapse.http.watcha_nextcloud_client import NextcloudClient
@@ -750,8 +750,8 @@ class HomeServer(metaclass=abc.ABCMeta):
         return AdministrationHandler(self)
 
     @cache_in_self
-    def get_invite_partner_handler(self) -> InvitePartnerHandler:
-        return InvitePartnerHandler(self)
+    def get_partner_handler(self) -> PartnerHandler:
+        return PartnerHandler(self)
 
     @cache_in_self
     def get_nextcloud_handler(self) -> NextcloudHandler:
