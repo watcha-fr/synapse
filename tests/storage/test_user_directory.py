@@ -219,7 +219,7 @@ class WatchaUserDirectoryStoreTestCase(unittest.TestCase):
     def test_search_user_dir_with_user_invite_partner(self):
         # User invite partner :
         yield defer.ensureDeferred(
-            self.store.insert_partner_invitation(self.partner_id, self.user_id, 0, 0)
+            self.store.add_partner_invitation(self.partner_id, self.user_id)
         )
         yield defer.ensureDeferred(
             self.store.user_add_threepid(

@@ -935,8 +935,8 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                     , coalesce(p.state, "invited") as presence
                     , t.address as email
                 FROM users AS u
-                INNER JOIN partners_invited_by AS pib
-                    ON pib.partner = u.name AND pib.invited_by = ?
+                INNER JOIN partners_invitations AS pib
+                    ON pib.user_id = u.name AND pib.invited_by = ?
                 LEFT OUTER JOIN
                     (SELECT
                         t.user_id

@@ -17,7 +17,7 @@ class AdministrationHandler(BaseHandler):
 
         result = []
         for user in users:
-            role = await self.watcha_get_user_role(user["user_id"])
+            role = await self.get_user_role(user["user_id"])
 
             result.append(
                 {
@@ -45,7 +45,7 @@ class AdministrationHandler(BaseHandler):
         return result
 
     async def watcha_update_user_role(self, user_id, role):
-        user_role = await self.watcha_get_user_role(user_id)
+        user_role = await self.get_user_role(user_id)
 
         if user_role == role:
             raise SynapseError(400, "This user has already the %s role" % role)
@@ -54,7 +54,12 @@ class AdministrationHandler(BaseHandler):
 
         return role
 
-    async def watcha_get_user_role(self, user_id):
+    async def get_user_role(self, user_id):
+        """Retrieve user role [administrator|collaborator|partner]
+
+        Returns:
+            The user role.
+        """
         is_partner = await self.auth_handler.is_partner(user_id)
         is_admin = await self.auth_handler.is_admin(user_id)
 

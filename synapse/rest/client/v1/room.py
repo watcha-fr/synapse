@@ -873,8 +873,9 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         self.auth = hs.get_auth()
         # watcha+
         self.store = hs.get_datastore()
-        self.invite_partner_handler = hs.get_invite_partner_handler()
+        self.administration_handler = hs.get_administration_handler()
         self.nextcloud_handler = hs.get_nextcloud_handler()
+        self.partner_handler = hs.get_partner_handler() 
         # +watcha
 
     def register(self, http_server):
@@ -937,24 +938,24 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         !watcha """
         # watcha+
         if membership_action == "invite" and self._has_3pid_invite_keys(content):
-            logger.info(
-                "invitation: inviter id=%s, device_id=%s",
-                requester.user,
-                requester.device_id,
+            invitee_email = content["address"].strip()
+            invitee_id = await self.store.get_user_id_by_threepid(
+                "email", invitee_email
             )
 
-            content["user_id"] = await self.invite_partner_handler.invite(
-                room_id=room_id,
-                sender_id=requester.user.to_string(),
-                sender_device_id=requester.device_id,
-                invitee_email=content["address"],
-            )
-            logger.info(
-                "invitee email=%s has been invited as %s in room_id=%s",
-                content["address"],
-                content["user_id"],
-                room_id,
-            )
+            if not invitee_id:
+                invitee_id = await self.partner_handler.register_partner(
+                    sender_id=requester.user.to_string(),
+                    invitee_email=invitee_email,
+                )
+
+            if await self.administration_handler.get_user_role(invitee_id) == "partner":
+                await self.store.add_partner_invitation(
+                    partner_id=invitee_id,
+                    sender_id=requester.user.to_string(),
+                )
+
+            content["user_id"] = invitee_id
         # +watcha
 
         target = requester.user
