@@ -98,9 +98,8 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
                 "connected_users": {
                     "number_of_last_month_logged_users": 0,
                     "number_of_last_week_logged_users": 0,
-                    "number_of_users_logged_at_least_once": 0,
+                    "number_of_users_logged_at_least_once": 3,
                 },
-                "other_statistics": {"number_of_users_with_pending_invitation": 3},
                 "users_per_role": {
                     "administrators": 1,
                     "collaborators": 1,

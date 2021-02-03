@@ -131,7 +131,7 @@ class AdministrationStore(SQLBaseStore):
         return result
 
     async def _get_users_stats(self):
-        """Retrieve the count of users per role (administrators, members and partners) and some stats about activity of users and pending invitations
+        """Retrieve the count of users per role (administrators, members and partners) and some stats about activity of users
 
         Used for Watcha admin console.
 
@@ -208,8 +208,6 @@ class AdministrationStore(SQLBaseStore):
             if user_ts[1] > WEEK_TRESHOLD
         ]
 
-        users_with_pending_invitation = await self._get_users_with_pending_invitation()
-
         return {
             "administrators_users": administrators_users,
             "users_per_role": {
@@ -220,15 +218,9 @@ class AdministrationStore(SQLBaseStore):
             "connected_users": {
                 "number_of_users_logged_at_least_once": number_of_collaborators
                 + number_of_partners
-                + number_of_administrators
-                - len(users_with_pending_invitation),
+                + number_of_administrators,
                 "number_of_last_month_logged_users": len(last_month_logged_users),
                 "number_of_last_week_logged_users": len(last_week_logged_users),
-            },
-            "other_statistics": {
-                "number_of_users_with_pending_invitation": len(
-                    users_with_pending_invitation
-                ),
             },
         }
 
@@ -306,8 +298,6 @@ class AdministrationStore(SQLBaseStore):
         Returns:
             A list of tuples which contains users informations
         """
-
-        users_with_pending_invitation = await self._get_users_with_pending_invitation()
 
         def watcha_user_list_txn(txn):
             FIELDS = [
@@ -497,63 +487,6 @@ class AdministrationStore(SQLBaseStore):
             return await self._update_user(user_id, admin=1, is_partner=0)
         elif role == "partner":
             return await self._update_user(user_id, admin=0, is_partner=1)
-
-    async def _get_users_with_pending_invitation(self):
-        """Retrieve a list of users who have a pending invitation.
-
-        Used for Watcha admin console.
-
-        Returns:
-            A set of user_id.
-        """
-
-        def _get_users_with_pending_invitation_txn(txn):
-            txn.execute(
-                """
-                SELECT
-                    users.name
-                FROM users
-                LEFT JOIN(
-                        SELECT
-                            user_ips.user_id
-                            , max(user_ips.last_seen) as last_seen
-                        FROM user_ips
-                        GROUP BY user_ips.user_id) as logged_users
-                    ON logged_users.user_id = users.name
-                WHERE logged_users.user_id is null
-                ORDER BY users.name ASC;
-            """
-            )
-            never_logged_users = [user[0] for user in txn.fetchall()]
-
-            txn.execute(
-                """
-                SELECT distinct
-                    devices.user_id
-                FROM devices
-                LEFT JOIN (
-                        SELECT DISTINCT
-                            devices.user_id
-                        FROM devices
-                        WHERE devices.display_name != "Web setup account") as users_logged_with_password_defined
-                    ON users_logged_with_password_defined.user_id = devices.user_id
-                WHERE users_logged_with_password_defined.user_id is null
-                    AND devices.display_name = "Web setup account"
-                ORDER BY devices.user_id ASC;
-            """
-            )
-            never_logged_users_with_defined_password = [
-                user[0] for user in txn.fetchall()
-            ]
-
-            return set(never_logged_users) | set(
-                never_logged_users_with_defined_password
-            )
-
-        return await self.db_pool.runInteraction(
-            "_get_users_with_pending_invitation",
-            _get_users_with_pending_invitation_txn,
-        )
 
     async def _get_user_admin(self):
         def _get_user_admin_txn(txn):
