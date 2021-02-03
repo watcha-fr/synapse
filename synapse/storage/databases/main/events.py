@@ -51,6 +51,8 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
     from synapse.storage.databases.main import DataStore
 
+from synapse.api.errors import StoreError, SynapseError # watcha+
+
 
 logger = logging.getLogger(__name__)
 

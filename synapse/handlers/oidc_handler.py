@@ -1055,9 +1055,24 @@ class OidcSessionData:
     ui_auth_session_id = attr.ib(type=Optional[str], default=None)
 
 
+""" watcha!
 UserAttributeDict = TypedDict(
     "UserAttributeDict", {"localpart": Optional[str], "display_name": Optional[str]}
 )
+!watcha """
+# watcha+ op524
+UserAttributeDict = TypedDict(
+    "UserAttributeDict",
+    {
+        "localpart": Optional[str],
+        "display_name": Optional[str],
+        "emails": List[str],
+        "is_admin": Optional[bool],
+        "locale": Optional[str],
+        "nextcloud_username": Optional[str],
+    },
+)
+# +watcha
 C = TypeVar("C")
 
 
@@ -1141,6 +1156,7 @@ class JinjaOidcMappingConfig:
     localpart_template = attr.ib(type=Optional[Template])
     display_name_template = attr.ib(type=Optional[Template])
     extra_attributes = attr.ib(type=Dict[str, Template])
+    nextcloud_username_template = attr.ib(type=Optional[Template]) # watcha+
 
 
 class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
@@ -1174,6 +1190,20 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
                     "invalid jinja template", path=["display_name_template"]
                 ) from e
 
+        # watcha+
+        nextcloud_username_template = None  # type: Optional[Template]
+        if "nextcloud_username_template" in config:
+            try:
+                nextcloud_username_template = env.from_string(
+                    config["nextcloud_username_template"]
+                )
+            except Exception as e:
+                raise ConfigError(
+                    "invalid jinja template for oidc_config.user_mapping_provider.config.nextcloud_username_template: %r"
+                    % (e,)
+                )
+        # +watcha
+
         extra_attributes = {}  # type Dict[str, Template]
         if "extra_attributes" in config:
             extra_attributes_config = config.get("extra_attributes") or {}
@@ -1193,6 +1223,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             localpart_template=localpart_template,
             display_name_template=display_name_template,
             extra_attributes=extra_attributes,
+            nextcloud_username_template=nextcloud_username_template,  # watcha+
         )
 
     def get_remote_user_id(self, userinfo: UserInfo) -> str:
@@ -1222,7 +1253,32 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             if display_name == "":
                 display_name = None
 
+        """ watcha!
         return UserAttributeDict(localpart=localpart, display_name=display_name)
+        !watcha """
+        # watcha+
+        email = userinfo.get("email")  # type: Optional[str]
+        is_admin = userinfo.get("is_admin")  # type: Optional[bool]
+        if not isinstance(is_admin, bool) and is_admin is not None:
+            raise MappingException("is_admin '{}' is not a boolean".format(is_admin))
+
+        locale = userinfo.get("locale")  # type: Optional[str]
+
+        nextcloud_username = None  # type: Optional[str]
+        if self._config.nextcloud_username_template is not None:
+            nextcloud_username = self._config.nextcloud_username_template.render(
+                user=userinfo
+            ).strip()
+
+        return UserAttributeDict(
+            localpart=localpart,
+            display_name=display_name,
+            emails=[email] if email else [],
+            is_admin=is_admin,
+            locale=locale,
+            nextcloud_username=nextcloud_username,
+        )
+        # +watcha
 
     async def get_extra_attributes(self, userinfo: UserInfo, token: Token) -> JsonDict:
         extras = {}  # type: Dict[str, str]
