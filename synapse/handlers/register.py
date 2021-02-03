@@ -582,7 +582,7 @@ class RegistrationHandler(BaseHandler):
         user_type: Optional[str] = None,
         address: Optional[str] = None,
         shadow_banned: bool = False,
-        make_partner: bool = False,
+        make_partner: bool = False, # watcha+
     ) -> None:
         """Register user in the datastore.
 
