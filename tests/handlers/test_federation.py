@@ -210,11 +210,6 @@ class FederationTestCase(unittest.HomeserverTestCase):
 
         return join_event
 
-    # watcha+
-    test_rejected_message_event_state.skip = "Disable for Watcha"
-    test_rejected_state_event_state. skip = "Disable for Watcha"
-    # +watcha
-
 
 class EventFromPduTestCase(TestCase):
     def test_valid_json(self):

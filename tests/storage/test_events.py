@@ -332,9 +332,3 @@ class ExtremPruneTestCase(HomeserverTestCase):
 
         # Check the new extremity is just the new remote event.
         self.assert_extremities([local_message_event_id, remote_event_2.event_id])
-
-    # watcha+
-    test_prune_gap.skip = "Disabled for Watcha because private visibility of room scuttle the test. We have to find another way to force private visibility of rooms."
-    test_prune_gap_if_dummy_remote.skip = "Disabled for Watcha because private visibility of room scuttle the test. We have to find another way to force private visibility of rooms."
-    test_prune_gap_if_old.skip = "Disabled for Watcha because private visibility of room scuttle the test. We have to find another way to force private visibility of rooms."
-    # +watcha

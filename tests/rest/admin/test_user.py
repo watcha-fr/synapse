@@ -2112,7 +2112,6 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
         # Create a room as the admin user. This will bump the monthly active users to 1.
         room_id = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
 
-        self.helper.invite(room_id, self.admin_user, self.other_user, tok=self.admin_user_tok) # watcha+
         # Trying to join as the other user should fail due to reaching MAU limit.
         self.helper.join(
             room_id, user=self.other_user, tok=self.other_user_tok, expect_code=403
