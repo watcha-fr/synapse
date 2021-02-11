@@ -490,11 +490,6 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             if server:
                 raise e
 
-        # watcha+
-        # disable pubic room
-        raise AuthError(403, "Directory is not available")
-        # +watcha
-
         limit = parse_integer(request, "limit", 0)
         since_token = parse_string(request, "since", None)
 
@@ -527,11 +522,6 @@ class PublicRoomListRestServlet(TransactionRestServlet):
 
     async def on_POST(self, request):
         await self.auth.get_user_by_req(request, allow_guest=True)
-
-        # watcha+
-        # disable pubic room
-        raise AuthError(403, "Directory is not available")
-        # +watcha
 
         server = parse_string(request, "server", default=None)
         content = parse_json_object_from_request(request)

@@ -681,10 +681,7 @@ class RoomCreationHandler(BaseHandler):
                 % (user_id,),
             )
 
-        """ watcha!
         visibility = config.get("visibility", None)
-        !watcha """
-        visibility = "private"  # watcha+
         is_public = visibility == "public"
 
         room_id = await self._generate_room_id(

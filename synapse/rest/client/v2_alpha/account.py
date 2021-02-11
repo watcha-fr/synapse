@@ -625,7 +625,6 @@ class ThreepidRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self.datastore = self.hs.get_datastore()
-        self.account_activity_handler = hs.get_account_validity_handler() # watcha+
 
     async def on_GET(self, request):
         """ watcha!

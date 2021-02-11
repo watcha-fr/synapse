@@ -1048,10 +1048,7 @@ class PublicRoomsRestrictedTestCase(unittest.HomeserverTestCase):
         tok = self.login("user", "pass")
 
         channel = self.make_request("GET", self.url, access_token=tok)
-        """ watcha!
         self.assertEqual(channel.code, 200, channel.result)
-        !watcha """
-        self.assertEqual(channel.code, 403, channel.result)  # watcha+
 
 
 class PerRoomProfilesForbiddenTestCase(unittest.HomeserverTestCase):

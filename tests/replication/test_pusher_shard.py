@@ -77,7 +77,6 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         room = self.helper.create_room_as(user_id, tok=access_token)
 
         # The other user joins
-        self.helper.invite(room, user_id, self.other_user_id, tok=access_token) # watcha+
         self.helper.join(
             room=room, user=self.other_user_id, tok=self.other_access_token
         )
