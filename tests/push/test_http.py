@@ -132,7 +132,6 @@ class HTTPPusherTests(HomeserverTestCase):
         room = self.helper.create_room_as(user_id, tok=access_token)
 
         # The other user joins
-        self.helper.invite (room, user_id, other_user_id, tok=access_token) # watcha+
         self.helper.join(room=room, user=other_user_id, tok=other_access_token)
 
         # The other user sends some messages
@@ -236,8 +235,6 @@ class HTTPPusherTests(HomeserverTestCase):
         # Create a room
         room = self.helper.create_room_as(user_id, tok=access_token)
 
-        self.helper.invite (room, user_id, other_user_id, tok=access_token) # watcha+
-
         # The other user joins
         self.helper.join(room=room, user=other_user_id, tok=other_access_token)
 
@@ -305,7 +302,6 @@ class HTTPPusherTests(HomeserverTestCase):
         # (as encrypted messages in a 1:1 currently have tweaks applied
         #  so it doesn't properly exercise the condition of all encrypted
         #  messages need to be high).
-        self.helper.invite(room, user_id, yet_another_user_id, tok=access_token) # watcha+
         self.helper.join(
             room=room, user=yet_another_user_id, tok=yet_another_access_token
         )
@@ -364,7 +360,6 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Create a room
         room = self.helper.create_room_as(user_id, tok=access_token)
-        self.helper.invite (room, user_id, other_user_id, tok=access_token) # watcha+
 
         # The other user joins
         self.helper.join(room=room, user=other_user_id, tok=other_access_token)
@@ -408,7 +403,6 @@ class HTTPPusherTests(HomeserverTestCase):
         !watcha """
         self.assertEqual(self.push_attempts[0][1], "http://127.0.0.1:5000/_matrix/push/v1/notify") # watcha+
         self.assertEqual(self.push_attempts[0][2]["notification"]["prio"], "high")
-        self.helper.invite(room, user_id, yet_another_user_id, tok=access_token) # watcha+
 
         # Yet another user joins
         self.helper.join(
@@ -457,9 +451,7 @@ class HTTPPusherTests(HomeserverTestCase):
         room = self.helper.create_room_as(user_id, tok=access_token)
 
         # The other users join
-        self.helper.invite (room, user_id, other_user_id, tok=access_token) # watcha+
         self.helper.join(room=room, user=other_user_id, tok=other_access_token)
-        self.helper.invite (room, user_id, yet_another_user_id, tok=access_token) # watcha+
         self.helper.join(
             room=room, user=yet_another_user_id, tok=yet_another_access_token
         )
@@ -542,9 +534,7 @@ class HTTPPusherTests(HomeserverTestCase):
         room = self.helper.create_room_as(other_user_id, tok=other_access_token)
 
         # The other users join
-        self.helper.invite (room, other_user_id, user_id, tok=other_access_token) # watcha+
         self.helper.join(room=room, user=user_id, tok=access_token)
-        self.helper.invite (room, user_id, yet_another_user_id, tok=access_token) # watcha+
         self.helper.join(
             room=room, user=yet_another_user_id, tok=yet_another_access_token
         )
@@ -662,7 +652,6 @@ class HTTPPusherTests(HomeserverTestCase):
         room_id = self.helper.create_room_as(other_user_id, tok=other_access_token)
 
         # The user to get notified joins
-        self.helper.invite(room_id, other_user_id, user_id, tok=other_access_token) # watcha+
         self.helper.join(room=room_id, user=user_id, tok=access_token)
 
         # Register the pusher
