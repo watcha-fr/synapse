@@ -226,31 +226,6 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     )
                 # +watcha
             else:
-                # override room permissions config requests
-                # 0 means a generic user - 50 means a moderator - 100 means an administrator
-                if event_type == EventTypes.PowerLevels:
-                    logger.info("PowerLevelsEvent. Original content=" + str(content))
-                    content["events"] = {
-                        EventTypes.RoomAvatar: 50,  # change avatar of the room
-                        EventTypes.CanonicalAlias: 50,  # change the alias of the room
-                        EventTypes.Name: 50,  # change the name of the room
-                        EventTypes.PowerLevels: 100,  # change the permissions (name, revoke moderators)
-                        EventTypes.Topic: 50,  # change topic in the room
-                    }
-                    content["invite"] = 50
-                    # invite users
-                    content["kick"] = 50
-                    # kick users
-                    content["ban"] = 50
-                    # permanently kick users from the room
-                    content["redact"] = 50
-                    # TODO option to prevent people from removing their posts.
-                    content["state_default"] = 50
-                    # change config of the room
-                    content["users_default"] = 0
-                    # default permission for new users.
-                    logger.info("PowerLevelsEvent. New content=" + str(content))
-
                 if event_type == "org.matrix.room.preview_urls":
                     logger.info("PreviewUrlsEvent. Original content=" + str(content))
                     content["disable"] = True
