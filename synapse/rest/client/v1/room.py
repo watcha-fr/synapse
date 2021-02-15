@@ -226,16 +226,6 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     )
                 # +watcha
             else:
-                # watcha+
-                # override history visibility incoming config requests.
-                if event_type == EventTypes.RoomHistoryVisibility:
-                    logger.info("RoomHistoryEvent. Original content=" + str(content))
-                    if content["history_visibility"] == "world_readable":
-                        content["history_visibility"] = "shared"
-                    if content["history_visibility"] == "joined":
-                        content["history_visibility"] = "invited"
-                    logger.info("RoomHistoryEvent. New content=" + str(content))
-
                 # override room permissions config requests
                 # 0 means a generic user - 50 means a moderator - 100 means an administrator
                 if event_type == EventTypes.PowerLevels:
