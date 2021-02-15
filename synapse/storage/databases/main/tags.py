@@ -44,7 +44,6 @@ class TagsWorkerStore(AccountDataWorkerStore):
         )
 
         tags_by_room = {}  # type: Dict[str, Dict[str, JsonDict]]
-        rows = {} # watcha+
         for row in rows:
             room_tags = tags_by_room.setdefault(row["room_id"], {})
             room_tags[row["tag"]] = db_to_json(row["content"])
