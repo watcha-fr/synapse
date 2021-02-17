@@ -165,12 +165,6 @@ async def filter_events_for_client(
         else:
             visibility = HistoryVisibility.SHARED
 
-        # watcha+
-        if visibility == "joined":
-            visibility = "invited"
-        if visibility == "world_readable":
-            visibility = "shared"
-        # +watcha
         if visibility not in VISIBILITY_PRIORITY:
             visibility = HistoryVisibility.SHARED
 

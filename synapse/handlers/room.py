@@ -940,7 +940,6 @@ class RoomCreationHandler(BaseHandler):
                 etype=EventTypes.PowerLevels, content=pl_content
             )
         else:
-            """ watcha!
             power_level_content = {
                 "users": {creator_id: 100},
                 "users_default": 0,
@@ -961,29 +960,6 @@ class RoomCreationHandler(BaseHandler):
                 "redact": 50,
                 "invite": 50,
             }  # type: JsonDict
-            !watcha """
-            # watcha+
-            power_level_content = {
-                "users": {creator_id: 100},
-                "users_default": 0,
-                "events": {
-                    EventTypes.Name: 50,
-                    EventTypes.PowerLevels: 100,
-                    EventTypes.RoomHistoryVisibility: 50,
-                    EventTypes.CanonicalAlias: 50,
-                    EventTypes.RoomAvatar: 50,
-                    EventTypes.Tombstone: 100,
-                    EventTypes.ServerACL: 100,
-                    EventTypes.RoomEncryption: 100,
-                },
-                "events_default": 0,
-                "state_default": 50,
-                "ban": 50,
-                "kick": 50,
-                "redact": 50,
-                "invite": 50,
-            }
-            # +watcha
 
             if config["original_invitees_have_ops"]:
                 for invitee in invite_list:
