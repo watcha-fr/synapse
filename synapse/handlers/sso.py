@@ -388,14 +388,22 @@ class SsoHandler:
                 user_id = await grandfather_existing_users()
                 if user_id:
                     # Future logins should also match this user ID.
+                    """ watcha!
                     await self._store.record_user_external_id(
                         auth_provider_id, remote_user_id, user_id
                     )
+                    !watcha """
+                    # watcha+
+                    attributes = await sso_to_matrix_id_mapper(0)
+                    await self._store.record_user_external_id(
+                        auth_provider_id, remote_user_id, user_id, attributes.nextcloud_username
+                    )
+                    # +watcha
 
             # Otherwise, generate a new user.
             if not user_id:
                 attributes = await self._call_attribute_mapper(sso_to_matrix_id_mapper)
-
+    
                 if attributes.localpart is None:
                     # the mapper doesn't return a username. bail out with a redirect to
                     # the username picker.
