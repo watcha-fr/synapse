@@ -683,77 +683,6 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "Mapping provider does not support de-duplicating Matrix IDs",
         )
 
-        # watcha+
-        userinfo = {
-            "sub": "test_user_4",
-            "username": "test_user_4",
-            "email": "test_user@test.com",
-            "locale": "fr",
-            "nextcloud_username": "test_nc_user",
-        }
-        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
-        auth_handler.complete_sso_login.assert_called_once_with(
-            "@test_user_4:test",
-            ANY,
-            ANY,
-            None,
-        )
-        auth_handler.complete_sso_login.reset_mock()
-
-        userinfo = {
-            "sub": "test_user_5",
-            "username": "test_user_5",
-            "is_admin": True,
-        }
-        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
-        auth_handler.complete_sso_login.assert_called_once_with(
-            "@test_user_5:test",
-            ANY,
-            ANY,
-            None,
-        )
-        auth_handler.complete_sso_login.reset_mock()
-
-        userinfo = {
-            "sub": "test_user_6",
-            "username": "test_user_6",
-            "is_admin": False,
-        }
-        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
-        auth_handler.complete_sso_login.assert_called_once_with(
-            "@test_user_6:test",
-            ANY,
-            ANY,
-            None,
-        )
-        auth_handler.complete_sso_login.reset_mock()
-
-        userinfo = {
-            "sub": "test_user_7",
-            "username": "test_user_7",
-            "is_admin": "not_a_boolean",
-        }
-        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
-        auth_handler.complete_sso_login.assert_not_called()
-        self.assertRenderedError(
-            "mapping_error",
-            "is_admin 'not_a_boolean' is not a boolean",
-        )
-
-        userinfo = {
-            "sub": "test_user_8",
-            "username": "test_user_8",
-            "email": "test_user@test.com",
-        }
-        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
-        auth_handler.complete_sso_login.assert_not_called()
-        self.assertRenderedError(
-            "mapping_error",
-            "[watcha] register user with email test_user@test.com failed : email address already exists",
-        )
-
-        # +watcha
-
     @override_config({"oidc_config": {"allow_existing_users": True}})
     def test_map_userinfo_to_existing_user(self):
         """Existing users can log in with OpenID Connect when allow_existing_users is True."""
@@ -833,6 +762,100 @@ class OidcHandlerTestCase(HomeserverTestCase):
         auth_handler.complete_sso_login.assert_called_once_with(
             "@TEST_USER_2:test", ANY, ANY, None,
         )
+
+        # watcha+
+        auth_handler.complete_sso_login.reset_mock()
+
+        user3 = UserID.from_string("@test_user_3:test")
+        self.get_success(
+            store.register_user(user_id=user3.to_string(), password_hash=None)
+        )
+        userinfo = {
+            "sub": "test_user_3",
+            "username": "test_user_3",
+            "email": "test_user@test.com",
+            "locale": "fr",
+            "nextcloud_username": "test_nc_user",
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+        auth_handler.complete_sso_login.assert_called_once_with(
+            user3.to_string(),
+            ANY,
+            ANY,
+            None,
+        )
+        auth_handler.complete_sso_login.reset_mock()
+
+        user4 = UserID.from_string("@test_user_4:test")
+        self.get_success(
+            store.register_user(user_id=user4.to_string(), password_hash=None)
+        )
+        userinfo = {
+            "sub": "test_user_4",
+            "username": "test_user_4",
+            "is_admin": True,
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+        auth_handler.complete_sso_login.assert_called_once_with(
+            user4.to_string(),
+            ANY,
+            ANY,
+            None,
+        )
+        auth_handler.complete_sso_login.reset_mock()
+
+        user5 = UserID.from_string("@test_user_5:test")
+        self.get_success(
+            store.register_user(user_id=user5.to_string(), password_hash=None)
+        )
+        userinfo = {
+            "sub": "test_user_5",
+            "username": "test_user_5",
+            "is_admin": False,
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+        auth_handler.complete_sso_login.assert_called_once_with(
+            user5.to_string(),
+            ANY,
+            ANY,
+            None,
+        )
+        auth_handler.complete_sso_login.reset_mock()
+
+        userinfo = {
+            "sub": "test_user_6",
+            "username": "test_user_6",
+            "is_admin": "not_a_boolean",
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+        auth_handler.complete_sso_login.assert_not_called()
+        self.assertRenderedError(
+            "mapping_error",
+            "is_admin 'not_a_boolean' is not a boolean",
+        )
+
+        auth_handler.complete_sso_login.reset_mock()
+
+        user7 = UserID.from_string("@test_user_7:test")
+        self.get_success(
+            store.register_user(user_id=user7.to_string(), password_hash=None)
+        )
+        self.get_success(
+            auth_handler.add_threepid(user7.to_string(), "email", "test_user@test.com", self.hs.get_clock().time_msec())
+        )
+        userinfo = {
+            "sub": "test_user_8",
+            "username": "test_user_8",
+            "email": "test_user@test.com",
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+        auth_handler.complete_sso_login.assert_not_called()
+        self.assertRenderedError(
+            "mapping_error",
+            "[watcha] register user with email test_user@test.com failed : email address already exists",
+        )
+
+        # +watcha
 
     def test_map_userinfo_to_invalid_localpart(self):
         """If the mapping provider generates an invalid localpart it should be rejected."""
