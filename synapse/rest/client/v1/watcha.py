@@ -31,23 +31,8 @@ class WatchaUserlistRestServlet(RestServlet):
 
     async def on_GET(self, request):
         await _check_admin(self.auth, request)
-        ret = await self.administration_handler.watcha_user_list()
-        return 200, ret
-
-
-class WatchaRoomMembershipRestServlet(RestServlet):
-
-    PATTERNS = client_patterns("/watcha_room_membership", v1=True)
-
-    def __init__(self, hs):
-        super().__init__()
-        self.auth = hs.get_auth()
-        self.administration_handler = hs.get_administration_handler()
-
-    async def on_GET(self, request):
-        await _check_admin(self.auth, request)
-        ret = await self.administration_handler.watcha_room_membership()
-        return 200, ret
+        result = await self.administration_handler.watcha_user_list()
+        return 200, result
 
 
 class WatchaRoomListRestServlet(RestServlet):
@@ -56,57 +41,12 @@ class WatchaRoomListRestServlet(RestServlet):
     def __init__(self, hs):
         super().__init__()
         self.auth = hs.get_auth()
-        self.administration_handler = hs.get_administration_handler()
+        self.store = hs.get_datastore()
 
     async def on_GET(self, request):
         await _check_admin(self.auth, request)
-        ret = await self.administration_handler.watcha_room_list()
-        return 200, ret
-
-
-class WatchaUpdateMailRestServlet(RestServlet):
-    PATTERNS = client_patterns(
-        "/watcha_update_email/(?P<target_user_id>[^/]*)", v1=True
-    )
-
-    def __init__(self, hs):
-        super().__init__()
-        self.hs = hs
-        self.auth = hs.get_auth()
-        self.admin_handler = hs.get_admin_handler()
-        self.auth_handler = hs.get_auth_handler()
-        self.account_activity_handler = hs.get_account_validity_handler()
-
-    async def on_PUT(self, request, target_user_id):
-        await _check_admin(self.auth, request)
-        params = parse_json_object_from_request(request)
-        new_email = params["new_email"]
-
-        if not new_email:
-            raise SynapseError(400, "Missing 'new_email' arg")
-
-        users = await self.admin_handler.get_users()
-        if not target_user_id in [user["name"] for user in users]:
-            raise SynapseError(
-                400, "The target user is not registered in this homeserver."
-            )
-
-        try:
-            email = await self.account_activity_handler.get_email_address_for_user(
-                target_user_id
-            )
-        except SynapseError:
-            logger.error("No email are defined for this user.")
-            raise
-
-        await self.auth_handler.delete_threepid(
-            target_user_id, "email", email, id_server=None
-        )
-        await self.auth_handler.add_threepid(
-            target_user_id, "email", new_email, self.hs.get_clock().time_msec()
-        )
-
-        return 200, {}
+        result = await self.store.watcha_room_list()
+        return 200, result
 
 
 class WatchaUpdateUserRoleRestServlet(RestServlet):
@@ -154,28 +94,12 @@ class WatchaAdminStatsRestServlet(RestServlet):
     def __init__(self, hs):
         super().__init__()
         self.auth = hs.get_auth()
-        self.administration_handler = hs.get_administration_handler()
+        self.store = hs.get_datastore()
 
     async def on_GET(self, request):
         await _check_admin(self.auth, request)
-        ret = await self.administration_handler.watcha_admin_stat()
-        return 200, ret
-
-
-class WatchaUserIp(RestServlet):
-
-    PATTERNS = client_patterns("/watcha_user_ip/(?P<target_user_id>[^/]*)", v1=True)
-
-    def __init__(self, hs):
-        super().__init__()
-        self.auth = hs.get_auth()
-        self.administration_handler = hs.get_administration_handler()
-
-    async def on_GET(self, request, target_user_id):
-        await _check_admin(self.auth, request)
-        ret = await self.administration_handler.watcha_user_ip(target_user_id)
-        return 200, ret
-
+        result = await self.store.watcha_admin_stats()
+        return 200, result
 
 class WatchaRegisterRestServlet(RestServlet):
 
@@ -262,8 +186,5 @@ def register_servlets(hs, http_server):
     WatchaAdminStatsRestServlet(hs).register(http_server)
     WatchaRegisterRestServlet(hs).register(http_server)
     WatchaRoomListRestServlet(hs).register(http_server)
-    WatchaRoomMembershipRestServlet(hs).register(http_server)
-    WatchaUpdateMailRestServlet(hs).register(http_server)
     WatchaUpdateUserRoleRestServlet(hs).register(http_server)
-    WatchaUserIp(hs).register(http_server)
     WatchaUserlistRestServlet(hs).register(http_server)
