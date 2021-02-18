@@ -349,24 +349,6 @@ class AdministrationStore(SQLBaseStore):
 
         return users
 
-    async def watcha_user_ip(self, user_id):
-        def watcha_user_ip_txn(txn):
-            txn.execute(
-                """
-                SELECT ip
-                    , user_agent
-                    , last_seen
-                FROM user_ips
-                WHERE user_id = ?
-                ORDER BY last_seen DESC
-                """,
-                (user_id,),
-            )
-
-            return txn.fetchall()
-
-        return await self.db_pool.runInteraction("watcha_user_ip", watcha_user_ip_txn)
-
     async def members_by_room(self):
         """Retrieve a list of all users with membership 'join' or 'invite' for each rooms.
 
@@ -461,14 +443,6 @@ class AdministrationStore(SQLBaseStore):
             in members_by_room  # don't show empty room (and avoid a possible exception)
         ]
 
-    async def watcha_room_membership(self):
-        return await self.db_pool.simple_select_list(
-            table="room_memberships",
-            keyvalues={},
-            retcols=["room_id", "user_id", "membership"],
-            desc="get_rooms",
-        )
-
     async def _update_user(self, user_id, **updatevalues):
         return await self.db_pool.simple_update(
             table="users",
@@ -476,9 +450,6 @@ class AdministrationStore(SQLBaseStore):
             updatevalues=updatevalues,
             desc=_caller_name(),
         )
-
-    async def watcha_update_mail(self, user_id, email):
-        return await self._update_user(user_id, email=email)
 
     async def watcha_update_user_role(self, user_id, role):
         if role == "collaborator":

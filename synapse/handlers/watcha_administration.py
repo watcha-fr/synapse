@@ -32,18 +32,6 @@ class AdministrationHandler(BaseHandler):
 
         return result
 
-    async def watcha_room_membership(self):
-        result = await self.store.watcha_room_membership()
-        return result
-
-    async def watcha_room_list(self):
-        result = await self.store.watcha_room_list()
-        return result
-
-    async def watcha_update_mail(self, user_id, email):
-        result = await self.store.watcha_update_mail(user_id, email)
-        return result
-
     async def watcha_update_user_role(self, user_id, role):
         user_role = await self.get_user_role(user_id)
 
@@ -73,11 +61,3 @@ class AdministrationHandler(BaseHandler):
             role = "collaborator"
 
         return role
-
-    async def watcha_admin_stat(self):
-        result = await self.store.watcha_admin_stats()
-        return result
-
-    async def watcha_user_ip(self, user_id):
-        result = await self.store.watcha_user_ip(user_id)
-        return result
