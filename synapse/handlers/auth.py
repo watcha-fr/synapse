@@ -1523,6 +1523,18 @@ class AuthHandler(BaseHandler):
         url_parts[4] = urllib.parse.urlencode(query)
         return urllib.parse.urlunparse(url_parts)
 
+    # watcha+
+    async def is_partner(self, user_id):
+        ret = await self.store.is_user_partner(
+            user_id,
+        )
+        return ret
+
+    async def is_admin(self, user_id):
+        ret = await self.store.is_user_admin(user_id)
+        return ret
+    # +watcha
+
 
 @attr.s(slots=True)
 class MacaroonGenerator:
