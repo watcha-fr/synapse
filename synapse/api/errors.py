@@ -404,8 +404,7 @@ class InvalidCaptchaError(SynapseError):
 
 
 class LimitExceededError(SynapseError):
-    """A client has sent too many requests and is being throttled.
-    """
+    """A client has sent too many requests and is being throttled."""
 
     def __init__(
         self,
@@ -422,8 +421,7 @@ class LimitExceededError(SynapseError):
 
 
 class RoomKeysVersionError(SynapseError):
-    """A client has tried to upload to a non-current version of the room_keys store
-    """
+    """A client has tried to upload to a non-current version of the room_keys store"""
 
     def __init__(self, current_version: str):
         """
@@ -440,7 +438,9 @@ class UnsupportedRoomVersionError(SynapseError):
 
     def __init__(self, msg: str = "Homeserver does not support this room version"):
         super().__init__(
-            code=400, msg=msg, errcode=Codes.UNSUPPORTED_ROOM_VERSION,
+            code=400,
+            msg=msg,
+            errcode=Codes.UNSUPPORTED_ROOM_VERSION,
         )
 
 
@@ -475,8 +475,7 @@ class IncompatibleRoomVersionError(SynapseError):
 
 
 class PasswordRefusedError(SynapseError):
-    """A password has been refused, either during password reset/change or registration.
-    """
+    """A password has been refused, either during password reset/change or registration."""
 
     def __init__(
         self,
@@ -484,7 +483,9 @@ class PasswordRefusedError(SynapseError):
         errcode: str = Codes.WEAK_PASSWORD,
     ):
         super().__init__(
-            code=400, msg=msg, errcode=errcode,
+            code=400,
+            msg=msg,
+            errcode=errcode,
         )
 
 
@@ -507,7 +508,7 @@ class RequestSendFailed(RuntimeError):
 
 
 def cs_error(msg: str, code: str = Codes.UNKNOWN, **kwargs):
-    """ Utility method for constructing an error response for client-server
+    """Utility method for constructing an error response for client-server
     interactions.
 
     Args:
@@ -524,7 +525,7 @@ def cs_error(msg: str, code: str = Codes.UNKNOWN, **kwargs):
 
 
 class FederationError(RuntimeError):
-    """  This class is used to inform remote homeservers about erroneous
+    """This class is used to inform remote homeservers about erroneous
     PDUs they sent us.
 
     FATAL: The remote server could not interpret the source event.

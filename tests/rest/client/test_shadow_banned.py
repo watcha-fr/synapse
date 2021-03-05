@@ -281,7 +281,10 @@ class ProfileTestCase(_ShadowBannedBase):
         message_handler = self.hs.get_message_handler()
         event = self.get_success(
             message_handler.get_room_data(
-                self.banned_user_id, room_id, "m.room.member", self.banned_user_id,
+                self.banned_user_id,
+                room_id,
+                "m.room.member",
+                self.banned_user_id,
             )
         )
         self.assertEqual(
@@ -313,7 +316,10 @@ class ProfileTestCase(_ShadowBannedBase):
         message_handler = self.hs.get_message_handler()
         event = self.get_success(
             message_handler.get_room_data(
-                self.banned_user_id, room_id, "m.room.member", self.banned_user_id,
+                self.banned_user_id,
+                room_id,
+                "m.room.member",
+                self.banned_user_id,
             )
         )
         self.assertEqual(

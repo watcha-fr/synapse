@@ -469,7 +469,9 @@ class PublicRoomListRestServlet(TransactionRestServlet):
                 parse_and_validate_server_name(server)
             except ValueError:
                 raise SynapseError(
-                    400, "Invalid server name: %s" % (server,), Codes.INVALID_PARAM,
+                    400,
+                    "Invalid server name: %s" % (server,),
+                    Codes.INVALID_PARAM,
                 )
 
             try:
@@ -520,7 +522,9 @@ class PublicRoomListRestServlet(TransactionRestServlet):
                 parse_and_validate_server_name(server)
             except ValueError:
                 raise SynapseError(
-                    400, "Invalid server name: %s" % (server,), Codes.INVALID_PARAM,
+                    400,
+                    "Invalid server name: %s" % (server,),
+                    Codes.INVALID_PARAM,
                 )
 
             try:
@@ -786,7 +790,7 @@ class RoomEventContextServlet(RestServlet):
             event_filter = None
 
         results = await self.room_context_handler.get_event_context(
-            requester.user, room_id, event_id, limit, event_filter
+            requester, room_id, event_id, limit, event_filter
         )
 
         if not results:

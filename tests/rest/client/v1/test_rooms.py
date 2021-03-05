@@ -48,7 +48,9 @@ class RoomBase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         self.hs = self.setup_test_homeserver(
-            "red", federation_http_client=None, federation_client=Mock(),
+            "red",
+            federation_http_client=None,
+            federation_client=Mock(),
         )
 
         self.hs.get_federation_handler = Mock()
@@ -1502,7 +1504,9 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         results = channel.json_body["search_categories"]["room_events"]["results"]
 
         self.assertEqual(
-            len(results), 2, [result["result"]["content"] for result in results],
+            len(results),
+            2,
+            [result["result"]["content"] for result in results],
         )
         self.assertEqual(
             results[0]["result"]["content"]["body"],
@@ -1537,7 +1541,9 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         results = channel.json_body["search_categories"]["room_events"]["results"]
 
         self.assertEqual(
-            len(results), 4, [result["result"]["content"] for result in results],
+            len(results),
+            4,
+            [result["result"]["content"] for result in results],
         )
         self.assertEqual(
             results[0]["result"]["content"]["body"],
@@ -1584,7 +1590,9 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         results = channel.json_body["search_categories"]["room_events"]["results"]
 
         self.assertEqual(
-            len(results), 1, [result["result"]["content"] for result in results],
+            len(results),
+            1,
+            [result["result"]["content"] for result in results],
         )
         self.assertEqual(
             results[0]["result"]["content"]["body"],
