@@ -34,6 +34,8 @@ from synapse.types import JsonDict, UserID
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
+from synapse.http.server import set_cors_headers # watcha+ op479
+
 logger = logging.getLogger(__name__)
 
 
@@ -373,6 +375,7 @@ class SsoRedirectServlet(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, idp_id: Optional[str] = None
     ) -> None:
+        set_cors_headers(request) # watcha+ op479
         client_redirect_url = parse_string(
             request, "redirectUrl", required=True, encoding=None
         )

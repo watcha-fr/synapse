@@ -551,6 +551,8 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
             expect_code, int(channel.result["code"]), msg=channel.result["body"]
         )
 
+    test_shutdown_room_block_peek.skip = "Disable for Watcha" # watcha+
+
 
 class PurgeRoomTestCase(unittest.HomeserverTestCase):
     """Test /purge_room admin API."""
