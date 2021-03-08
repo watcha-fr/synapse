@@ -5,87 +5,94 @@
     <head>
         <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
         <title>{{ title }}</title>
-        <style>
-            {% include "watcha_registration.css" %}
-        </style>
     </head>
-    <body>
+    <body style="font-family: sans-serif; max-width: 600px; padding: 1em">
         <p>Bonjour,</p>
-        <p class="intro">
-            <em>{{ sender_name }}</em> vous invite à rejoindre l'espace de
-            travail sécurisé Watcha.
-        </p>
-        <h3>
-            Connectez-vous depuis votre navigateur, en vous rendant sur la
-            platforme&nbsp;:
-        </h3>
-        <p>
-            <a href="{{ login_url }}">
-                <img
-                    class="centered"
-                    src="data:image/png;base64,{{ b64_watcha_button }}"
-                    alt="Se connecter à Watcha"
-                    width="300"
-                />
-                <span class="centered">{{ login_url }}</span>
-            </a>
-        </p>
-        <h3>
-            Connectez-vous depuis votre mobile, en téléchargeant
-            l'application&nbsp;:
-        </h3>
-        <p>
-            <a
-                href="https://play.google.com/store/apps/details?id=im.watcha.app"
-            >
-                <img
-                    class="centered"
-                    src="data:image/png;base64,{{ b64_google_play_badge }}"
-                    alt="Télécharger l'application Android sur Google Play"
-                />
-                <span class="centered">
-                    https://play.google.com/store/apps/details?id=im.watcha.app
-                </span>
-            </a>
-        </p>
-        <p>
-            <a href="https://apps.apple.com/fr/app/watcha/id1383732254">
-                <img
-                    class="centered"
-                    src="data:image/png;base64,{{ b64_app_store_badge }}"
-                    alt="Télécharger l'application iOS sur l'App Store"
-                />
-                <span class="centered">
-                    https://apps.apple.com/fr/app/watcha/id1383732254
-                </span>
-            </a>
-        </p>
-        <h3>Paramètres de connexion&nbsp;:</h3>
-        <table>
+        <p>{{ sender_name }} vous invite à rejoindre l'espace de travail sécurisé Watcha.</p>
+
+        <br />
+
+        <h3>Paramètres de connexion</h3>
+
+        <table
+            style="
+                width: 100%;
+                padding: 1em 1em 0 1em;
+                border: 1px solid black;
+                border-radius: 0.25rem;
+                border-spacing: 0;
+            "
+            width="100%"
+            cellpadding="10px"
+        >
             <tbody>
                 <tr>
-                    <td class="credential-title"><b>Email&nbsp;:</b></td>
-                </tr>
-                <tr>
-                    <td class="credential">{{ email }}</td>
-                </tr>
-                <tr>
-                    <td class="credential-title">
-                        <b>Mot de passe provisoire&nbsp;:</b>
+                    <td colspan="2">
+                        <b>Email</b>
                     </td>
                 </tr>
                 <tr>
-                    <td class="credential">{{ password }}</td>
+                    <td></td>
+                    <td>{{ email }}</td>
                 </tr>
                 <tr>
-                    <td class="credential-title">
-                        <b>Espace de travail&nbsp;:</b>
+                    <td colspan="2">
+                        <b>Mot de passe provisoire</b>
                     </td>
                 </tr>
                 <tr>
-                    <td class="credential">{{ server }}</td>
+                    <td></td>
+                    <td>{{ password }}</td>
+                </tr>
+                <tr>
+                    <td colspan="2">
+                        <b>Espace de travail</b>
+                    </td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td>{{ server }}</td>
                 </tr>
             </tbody>
         </table>
+
+        <br />
+        <br />
+
+        <h3>Connectez-vous depuis votre navigateur, en vous rendant sur la platforme</h3>
+
+        <p>
+            <a href="{{ login_url }}">
+                <img
+                    src="data:image/png;base64,{{ b64_watcha_button }}"
+                    alt="Se connecter à Watcha"
+                    width="300"
+                /><br />{{ login_url }}</a
+            >
+        </p>
+
+        <br />
+
+        <h3>Connectez-vous depuis votre mobile, en téléchargeant l'application</h3>
+
+        <p>
+            <a href="https://play.google.com/store/apps/details?id=im.watcha.app">
+                <img
+                    src="data:image/png;base64,{{ b64_google_play_badge }}"
+                    alt="Télécharger l'application Android sur Google Play"
+                    width="300"
+                /><br />https://play.google.com/store/apps/details?id=im.watcha.app</a
+            >
+        </p>
+
+        <p>
+            <a href="https://apps.apple.com/fr/app/watcha/id1383732254">
+                <img
+                    src="data:image/png;base64,{{ b64_app_store_badge }}"
+                    alt="Télécharger l'application iOS sur l'App Store"
+                    width="300"
+                /><br />https://apps.apple.com/fr/app/watcha/id1383732254</a
+            >
+        </p>
     </body>
 </html>
