@@ -226,21 +226,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     )
                 # +watcha
             else:
-                if event_type == "org.matrix.room.preview_urls":
-                    logger.info("PreviewUrlsEvent. Original content=" + str(content))
-                    content["disable"] = True
-                    logger.info("PreviewUrlsEvent. New content=" + str(content))
-
-                if event_type == EventTypes.JoinRules:
-                    logger.info("JoinRulesEvent. Original content=" + str(content))
-                    content["join_rule"] = "invite"
-                    logger.info("JoinRulesEvent. New content=" + str(content))
-
-                if event_type == EventTypes.GuestAccess:
-                    logger.info("GuestAccessEvent. Original content=" + str(content))
-                    content["guest_access"] = "forbidden"
-                    logger.info("GuestAccessEvent. New content=" + str(content))
-
+                # watcha+
                 if event_type == EventTypes.VectorSetting:
                     if "nextcloudShare" not in content:
                         raise SynapseError(
@@ -874,14 +860,11 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             request, allow_guest=True, allow_partner=True
         )
 
-        if (requester.is_guest or requester.is_partner) and membership_action not in {
+        if requester.is_partner and membership_action not in {
             Membership.JOIN,
             Membership.LEAVE,
         }:
-            if requester.is_guest:
-                raise AuthError(403, "Guest access not allowed")
-            else:
-                raise AuthError(403, "Partners can only join and leave rooms")
+            raise AuthError(403, "Partners can only join and leave rooms")
         # +watcha
 
         try:

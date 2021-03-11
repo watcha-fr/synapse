@@ -103,13 +103,6 @@ class RoomAccountDataServlet(RestServlet):
                 " Use /rooms/!roomId:server.name/read_markers",
             )
 
-        # watcha+
-        if account_data_type == "org.matrix.room.preview_urls":
-            logger.info("AccountDataPreviewUrls: original=" + str(body))
-            body["disable"] = True
-            logger.info("AccountDataPreviewUrls: new=" + str(body))
-        # +watcha
-
         await self.handler.add_account_data_to_room(
             user_id, room_id, account_data_type, body
         )

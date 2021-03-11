@@ -1888,8 +1888,6 @@ class RoomAliasListTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, expected_code, channel.result)
 
-    test_peekable_room.skip = "Disable for Watcha"  # watcha+
-
 
 class RoomCanonicalAliasTestCase(unittest.HomeserverTestCase):
     servlets = [
