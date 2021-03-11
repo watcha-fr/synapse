@@ -151,15 +151,9 @@ def add_file_headers(
         # correctly interpret those as of 0.99.2 and (b) they are a bit of a pain and we
         # may as well just do the filename* version.
         if _can_encode_filename_as_token(upload_name):
-            """ watcha!
             disposition = "inline; filename=%s" % (upload_name,)
-            !watcha """
-            disposition = "attachment; filename=%s" % (upload_name,) # watcha+
         else:
-            """ watcha!
             disposition = "inline; filename*=utf-8''%s" % (_quote(upload_name),)
-            !watcha """
-            disposition = "attachment; filename*=utf-8''%s" % (_quote(upload_name),) # watcha+
 
         request.setHeader(b"Content-Disposition", disposition.encode("ascii"))
 
