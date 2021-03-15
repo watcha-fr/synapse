@@ -96,6 +96,7 @@ class EventTypes:
     ServerACL = "m.room.server_acl"
     Pinned = "m.room.pinned_events"
 
+    VectorSetting = "im.vector.web.settings" # watcha+ op433
     Retention = "m.room.retention"
 
     Dummy = "org.matrix.dummy_event"

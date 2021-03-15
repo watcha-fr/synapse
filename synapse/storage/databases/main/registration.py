@@ -48,6 +48,7 @@ class TokenLookupResult:
         user_id: The user that this token authenticates as
         is_guest
         shadow_banned
+        is_partner # watcha+
         token_id: The ID of the access token looked up
         device_id: The device associated with the token, if any.
         valid_until_ms: The timestamp the token expires, if any.
@@ -58,6 +59,7 @@ class TokenLookupResult:
     user_id = attr.ib(type=str)
     is_guest = attr.ib(type=bool, default=False)
     shadow_banned = attr.ib(type=bool, default=False)
+    is_partner = attr.ib(type=bool, default=False) # watcha+
     token_id = attr.ib(type=Optional[int], default=None)
     device_id = attr.ib(type=Optional[str], default=None)
     valid_until_ms = attr.ib(type=Optional[int], default=None)
@@ -115,6 +117,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 "password_hash",
                 "is_guest",
                 "admin",
+                "is_partner", # watcha+
                 "consent_version",
                 "consent_server_notice_sent",
                 "appservice_id",
@@ -404,6 +407,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         await self.db_pool.runInteraction("set_shadow_banned", set_shadow_banned_txn)
 
     def _query_for_auth(self, txn, token: str) -> Optional[TokenLookupResult]:
+        ''' watcha!
         sql = """
             SELECT users.name as user_id,
                 users.is_guest,
@@ -416,6 +420,22 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             INNER JOIN access_tokens on users.name = COALESCE(puppets_user_id, access_tokens.user_id)
             WHERE token = ?
         """
+        !watcha'''
+        # watcha+
+        sql = """
+            SELECT users.name as user_id,
+                users.is_guest,
+                users.shadow_banned,
+                users.is_partner,
+                access_tokens.id as token_id,
+                access_tokens.device_id,
+                access_tokens.valid_until_ms,
+                access_tokens.user_id as token_owner
+            FROM users
+            INNER JOIN access_tokens on users.name = COALESCE(puppets_user_id, access_tokens.user_id)
+            WHERE token = ?
+        """
+        # +watcha
 
         txn.execute(sql, (token,))
         rows = self.db_pool.cursor_to_dict(txn)
@@ -486,15 +506,27 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
         return await self.db_pool.runInteraction("get_users_by_id_case_insensitive", f)
 
+    """ watcha!
     async def record_user_external_id(
         self, auth_provider: str, external_id: str, user_id: str
     ) -> None:
+    !watcha """
+    # watcha+
+    async def record_user_external_id(
+        self,
+        auth_provider: str,
+        external_id: str,
+        user_id: str,
+        nextcloud_username: str = None,
+    ) -> None:
+    # +watcha
         """Record a mapping from an external user id to a mxid
 
         Args:
             auth_provider: identifier for the remote auth provider
             external_id: id on that system
             user_id: complete mxid that it is mapped to
+            nextcloud_username: the Nextcloud username # watcha+
         """
         await self.db_pool.simple_insert(
             table="user_external_ids",
@@ -502,9 +534,11 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 "auth_provider": auth_provider,
                 "external_id": external_id,
                 "user_id": user_id,
+                "nextcloud_username": nextcloud_username, # watcha+
             },
             desc="record_user_external_id",
         )
+    # +watcha
 
     async def get_user_by_external_id(
         self, auth_provider: str, external_id: str
@@ -1308,6 +1342,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         password_hash: Optional[str] = None,
         was_guest: bool = False,
         make_guest: bool = False,
+        make_partner: bool = False, # watcha+
         appservice_id: Optional[str] = None,
         create_profile_with_displayname: Optional[str] = None,
         admin: bool = False,
@@ -1342,6 +1377,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             password_hash,
             was_guest,
             make_guest,
+            make_partner, # watcha+
             appservice_id,
             create_profile_with_displayname,
             admin,
@@ -1356,6 +1392,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         password_hash: Optional[str],
         was_guest: bool,
         make_guest: bool,
+        make_partner, # watcha+
         appservice_id: Optional[str],
         create_profile_with_displayname: Optional[str],
         admin: bool,
@@ -1402,6 +1439,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                         "password_hash": password_hash,
                         "creation_ts": now,
                         "is_guest": 1 if make_guest else 0,
+                        "is_partner": 1 if make_partner else 0, # watcha+
                         "appservice_id": appservice_id,
                         "admin": 1 if admin else 0,
                         "user_type": user_type,
@@ -1729,6 +1767,27 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             start_or_continue_validation_session_txn,
         )
 
+    # watcha+ op318
+    async def is_user_partner(self, user_id):
+
+        is_partner = await self.db_pool.simple_select_one_onecol(
+            "users",
+            keyvalues={"name": user_id},
+            retcol="is_partner",
+            desc="is_user_partner",
+        )
+        return is_partner
+
+    async def is_user_admin(self, user_id):
+
+        is_admin = await self.db_pool.simple_select_one_onecol(
+            "users",
+            keyvalues={"name": user_id},
+            retcol="admin",
+            desc="is_user_admin",
+        )
+        return is_admin
+    # +watcha
 
 def find_max_generated_user_id_localpart(cur: Cursor) -> int:
     """

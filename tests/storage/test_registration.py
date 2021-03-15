@@ -53,6 +53,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
                 "user_type": None,
                 "deactivated": 0,
                 "shadow_banned": 0,
+                "is_partner": 0, # watcha+
             },
             (yield defer.ensureDeferred(self.store.get_user_by_id(self.user_id))),
         )
