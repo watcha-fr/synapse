@@ -99,9 +99,12 @@ class EventTypes:
     VectorSetting = "im.vector.web.settings" # watcha+ op433
     Retention = "m.room.retention"
 
-    Presence = "m.presence"
-
     Dummy = "org.matrix.dummy_event"
+
+
+class EduTypes:
+    Presence = "m.presence"
+    RoomKeyRequest = "m.room_key_request"
 
 
 class RejectedReason:

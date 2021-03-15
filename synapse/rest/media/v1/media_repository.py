@@ -22,8 +22,8 @@ from typing import IO, TYPE_CHECKING, Dict, List, Optional, Set, Tuple
 
 import twisted.internet.error
 import twisted.web.http
-from twisted.web.http import Request
 from twisted.web.resource import Resource
+from twisted.web.server import Request
 
 from synapse.api.errors import (
     FederationDeniedError,
@@ -509,7 +509,7 @@ class MediaRepository:
         t_height: int,
         t_method: str,
         t_type: str,
-        url_cache: str,
+        url_cache: Optional[str],
     ) -> Optional[str]:
         input_path = await self.media_storage.ensure_media_is_in_local_cache(
             FileInfo(None, media_id, url_cache=url_cache)
