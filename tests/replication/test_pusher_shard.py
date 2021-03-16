@@ -105,18 +105,10 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         self.pump()
 
         http_client_mock.post_json_get_json.assert_called_once()
-        """ watcha!
         self.assertEqual(
             http_client_mock.post_json_get_json.call_args[0][0],
             "https://push.example.com/_matrix/push/v1/notify",
         )
-        !watcha """
-        # watcha+
-        self.assertEqual(
-            http_client_mock.post_json_get_json.call_args[0][0],
-            "http://127.0.0.1:5000/_matrix/push/v1/notify"
-        )
-        # +watcha
 
         self.assertEqual(
             event_id,
@@ -165,19 +157,10 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
 
         http_client_mock1.post_json_get_json.assert_called_once()
         http_client_mock2.post_json_get_json.assert_not_called()
-        """ watcha!
         self.assertEqual(
             http_client_mock1.post_json_get_json.call_args[0][0],
             "https://push.example.com/_matrix/push/v1/notify",
         )
-        !watcha """
-        # watcha+
-        self.assertEqual(
-            http_client_mock1.post_json_get_json.call_args[0][0],
-            "http://127.0.0.1:5000/_matrix/push/v1/notify",
-
-        )
-        # +watcha
 
         self.assertEqual(
             event_id,
@@ -197,18 +180,10 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
 
         http_client_mock1.post_json_get_json.assert_not_called()
         http_client_mock2.post_json_get_json.assert_called_once()
-        """ watcha!
         self.assertEqual(
             http_client_mock2.post_json_get_json.call_args[0][0],
             "https://push.example.com/_matrix/push/v1/notify",
         )
-        !watcha """
-        # watcha+
-        self.assertEqual(
-            http_client_mock2.post_json_get_json.call_args[0][0],
-            "http://127.0.0.1:5000/_matrix/push/v1/notify"
-        )
-        # +watcha
 
         self.assertEqual(
             event_id,
