@@ -27,6 +27,8 @@ from tests.utils import mock_getRawHeaders
 
 from .. import unittest
 
+from ..utils import setup_test_homeserver # watcha+ op251
+
 
 class RegistrationTestCase(unittest.HomeserverTestCase):
     """ Tests the RegistrationHandler. """

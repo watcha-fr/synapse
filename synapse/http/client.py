@@ -79,6 +79,18 @@ from synapse.util.async_helpers import timeout_deferred
 if TYPE_CHECKING:
     from synapse.app.homeserver import HomeServer
 
+# watcha+
+_json_decoder = json_decoder
+
+
+class JSONDecoderToleratingFalseArg:
+    def decode(self, string):
+        return _json_decoder.decode(string or "null")
+
+
+json_decoder = JSONDecoderToleratingFalseArg()
+# +watcha
+
 logger = logging.getLogger(__name__)
 
 outgoing_requests_counter = Counter("synapse_http_client_requests", "", ["method"])
@@ -582,7 +594,10 @@ class SimpleHttpClient:
         if headers:
             actual_headers.update(headers)  # type: ignore
 
+        """ watcha!
         body = await self.get_raw(uri, args, headers=headers)
+        !watcha """
+        body = await self.get_raw(uri, args, headers=actual_headers)  # watcha+
         return json_decoder.decode(body.decode("utf-8"))
 
     async def put_json(
@@ -741,6 +756,100 @@ class SimpleHttpClient:
             response.request.absoluteURI.decode("ascii"),
             response.code,
         )
+
+    # watcha+
+    async def post_json(
+        self, uri: str, post_json: Any, headers: Optional[RawHeaders] = None
+    ) -> Any:
+        """
+
+        Args:
+            uri: URI to query.
+            post_json: request body, to be encoded as json
+            headers: a map from header name to a list of values for that header
+
+        Returns:
+            a response object
+
+        Raises:
+            RequestTimedOutError: if there is a timeout before the response headers
+               are received. Note there is currently no timeout on reading the response
+               body.
+
+            HttpResponseException: On a non-2xx HTTP response.
+
+        """
+        json_str = encode_canonical_json(post_json)
+
+        logger.debug("HTTP POST %s -> %s", json_str, uri)
+
+        actual_headers = {
+            b"Content-Type": [b"application/json"],
+            b"User-Agent": [self.user_agent],
+            b"Accept": [b"application/json"],
+        }
+        if headers:
+            actual_headers.update(headers)
+
+        response = await self.request(
+            "POST", uri, headers=Headers(actual_headers), data=json_str
+        )
+
+        body = await make_deferred_yieldable(readBody(response))
+
+        if 200 <= response.code < 300:
+            return response
+        else:
+            raise HttpResponseException(
+                response.code, response.phrase.decode("ascii", errors="replace"), body
+            )
+
+    async def delete_get_json(
+        self,
+        uri: str,
+        json_body: Any = None,
+        headers: RawHeaders = None,
+    ) -> Any:
+        """DELETE to a given URL and get json.
+
+        Args:
+            uri: the URI to request, not including query parameters
+            json_body: the JSON to put in the HTTP body
+            headers: a map from header name to a list of values for that header
+
+        Returns:
+            object: parsed json
+
+        Raises:
+            HttpResponseException: On a non-2xx HTTP response.
+
+            ValueError: if the response was not JSON
+        """
+
+        actual_headers = {
+            b"Content-Type": [b"application/json"],
+            b"User-Agent": [self.user_agent],
+            b"Accept": [b"application/json"],
+        }
+        if headers:
+            actual_headers.update(headers)
+
+        optional_params = {"data": encode_canonical_json(json_body)} if json_body else {}
+
+        response = await self.request(
+            "DELETE", uri, headers=Headers(actual_headers), **optional_params
+        )
+
+        body = await make_deferred_yieldable(readBody(response))
+
+        if 200 <= response.code < 300:
+            return json_decoder.decode(body.decode("utf-8"))
+        else:
+            raise HttpResponseException(
+                response.code, response.phrase.decode("ascii", errors="replace"), body
+            )
+
+    # +watcha
 
 
 def _timeout_to_request_timed_out_error(f: Failure):

@@ -78,6 +78,11 @@ class RoomCreationHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.config = hs.config
+        # watcha+
+        self.store = hs.get_datastore()
+        self.administration_handler = hs.get_administration_handler()
+        self.partner_handler = hs.get_partner_handler()  
+        # +watcha
 
         # Room state based off defined presets
         self._presets_dict = {
@@ -819,6 +824,7 @@ class RoomCreationHandler(BaseHandler):
                 )
 
         for invite_3pid in invite_3pid_list:
+            """ watcha!
             id_server = invite_3pid["id_server"]
             id_access_token = invite_3pid.get("id_access_token")  # optional
             address = invite_3pid["address"]
@@ -835,6 +841,40 @@ class RoomCreationHandler(BaseHandler):
                 txn_id=None,
                 id_access_token=id_access_token,
             )
+            !watcha """
+            # watcha+
+            invitee_email = invite_3pid["address"].strip()
+            invitee_id = await self.store.get_user_id_by_threepid(
+                "email", invitee_email
+            )
+
+            if not invitee_id:
+                invitee_id = await self.partner_handler.register_partner(
+                    sender_id=requester.user.to_string(),
+                    invitee_email=invitee_email,
+                )
+            if await self.administration_handler.get_user_role(invitee_id) == "partner":
+                await self.store.add_partner_invitation(
+                    partner_id=invitee_id,
+                    sender_id=requester.user.to_string(),
+                )
+
+            invite_3pid["user_id"] = invitee_id
+
+            content = {}
+            is_direct = config.get("is_direct", None)
+            if is_direct:
+                content["is_direct"] = is_direct
+
+            await self.room_member_handler.update_membership(
+                requester,
+                UserID.from_string(invite_3pid["user_id"]),
+                room_id,
+                "invite",
+                ratelimit=False,
+                content=content,
+            )
+            # +watcha
 
         result = {"room_id": room_id}
 

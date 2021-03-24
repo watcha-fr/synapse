@@ -53,6 +53,8 @@ from .user_directory import UserDirectoryConfig
 from .voip import VoipConfig
 from .workers import WorkerConfig
 
+from .watcha_nextcloud import NextcloudConfig # watcha+ op544
+
 
 class HomeServerConfig(RootConfig):
 
@@ -94,4 +96,5 @@ class HomeServerConfig(RootConfig):
         TracerConfig,
         WorkerConfig,
         RedisConfig,
+        NextcloudConfig # watcha+ op544
     ]
