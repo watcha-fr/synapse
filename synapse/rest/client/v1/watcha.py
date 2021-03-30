@@ -161,7 +161,7 @@ class WatchaRegisterRestServlet(RestServlet):
             user_id = await self.registration_handler.register_user(
                 localpart=keycloak_user_id,
                 admin=is_admin,
-                default_display_name=displayname if displayname else email,
+                default_display_name=displayname or email,
                 bind_emails=[email],
             )
         except SynapseError:
