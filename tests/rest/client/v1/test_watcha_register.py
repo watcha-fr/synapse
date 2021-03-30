@@ -1,12 +1,13 @@
 import os
-import pkg_resources
 
+import pkg_resources
 from mock import Mock
 
 from synapse.rest import admin
 from synapse.rest.client.v1 import watcha, login, room
+from synapse.types import UserID
 from tests import unittest
-from tests.utils import mock_getRawHeaders, setup_test_homeserver
+from tests.utils import mock_getRawHeaders
 
 
 def simple_async_mock(return_value=None, raises=None):
@@ -20,7 +21,6 @@ def simple_async_mock(return_value=None, raises=None):
 
 
 class RegisterTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
@@ -61,6 +61,7 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         self.time = self.hs.get_clock().time_msec()
 
         self.auth = hs.get_auth_handler()
+        self.profile = hs.get_profile_handler()
 
         self.owner = self.register_user("owner", "pass", admin=True)
         self.owner_tok = self.login("owner", "pass")
@@ -84,10 +85,13 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST",
             self.url,
-            {"email": "user1@example.com", "admin": False, "password": "",},
+            {"email": "user1@example.com", "admin": False, "password": ""},
             self.owner_tok,
         )
+        user_id = UserID.from_string(channel.json_body["user_id"])
+        displayname = self.get_success(self.profile.get_displayname(user_id))
 
+        self.assertEqual(displayname, "user1@example.com")
         self.assertTrue(self.keycloak_client.add_user.called)
         self.assertTrue(self.nextcloud_client.add_user.called)
         self.assertEqual(channel.code, 200)
@@ -96,7 +100,7 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST",
             self.url,
-            {"email": "user1@example.com", "admin": False, "password": "pass",},
+            {"email": "user1@example.com", "admin": False, "password": "pass"},
             self.owner_tok,
         )
 
@@ -108,7 +112,7 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST",
             self.url,
-            {"email": "", "admin": False, "password": "",},
+            {"email": "", "admin": False, "password": ""},
             self.owner_tok,
         )
 
@@ -125,7 +129,7 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST",
             self.url,
-            {"email": "owner@example.com", "admin": False, "password": "",},
+            {"email": "owner@example.com", "admin": False, "password": ""},
             self.owner_tok,
         )
 
@@ -137,3 +141,18 @@ class RegisterTestCase(unittest.HomeserverTestCase):
             channel.result["body"],
             b'{"errcode":"M_UNKNOWN","error":"A user with this email address already exists. Cannot create a new one."}',
         )
+
+    def test_register_user_with_displayname(self):
+        channel = self.make_request(
+            "POST",
+            self.url,
+            {"email": "user1@example.com", "admin": False, "password": "", "displayname": "user1"},
+            self.owner_tok,
+        )
+        user_id = UserID.from_string(channel.json_body["user_id"])
+        displayname = self.get_success(self.profile.get_displayname(user_id))
+
+        self.assertEqual(displayname, "user1")
+        self.assertTrue(self.keycloak_client.add_user.called)
+        self.assertTrue(self.nextcloud_client.add_user.called)
+        self.assertEqual(channel.code, 200)
