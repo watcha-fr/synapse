@@ -1,5 +1,4 @@
 import logging
-from urllib.parse import urlparse
 
 from jsonschema.exceptions import SchemaError, ValidationError
 
@@ -21,7 +20,6 @@ async def _check_admin(auth, request):
 
 
 class WatchaUserlistRestServlet(RestServlet):
-
     PATTERNS = client_patterns("/watcha_user_list", v1=True)
 
     def __init__(self, hs):
@@ -101,8 +99,8 @@ class WatchaAdminStatsRestServlet(RestServlet):
         result = await self.store.watcha_admin_stats()
         return 200, result
 
-class WatchaRegisterRestServlet(RestServlet):
 
+class WatchaRegisterRestServlet(RestServlet):
     PATTERNS = client_patterns("/watcha_register", v1=True)
 
     def __init__(self, hs):
@@ -131,6 +129,7 @@ class WatchaRegisterRestServlet(RestServlet):
         )
         params = parse_json_object_from_request(request)
 
+        displayname = params.get("displayname", "").strip()
         email = params["email"].strip()
         if not email:
             raise SynapseError(
@@ -159,10 +158,10 @@ class WatchaRegisterRestServlet(RestServlet):
             raise
 
         try:
-            await self.registration_handler.register_user(
+            user_id = await self.registration_handler.register_user(
                 localpart=keycloak_user_id,
                 admin=is_admin,
-                default_display_name=email,
+                default_display_name=displayname if displayname else email,
                 bind_emails=[email],
             )
         except SynapseError:
@@ -179,7 +178,7 @@ class WatchaRegisterRestServlet(RestServlet):
             password=password,
         )
 
-        return 200, {}
+        return 200, {"user_id": user_id}
 
 
 def register_servlets(hs, http_server):
