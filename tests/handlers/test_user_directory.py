@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from mock import Mock
+from mock import AsyncMock # watcha+
 
 from twisted.internet import defer
 
@@ -644,10 +645,10 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             self.hs.get_storage().persistence.persist_event(event, context)
         )
 
-    # # watcha+
+    # watcha+
     test_initial_share_all_users.skip = "Disabled for watcha because of user directory modification for partners"
     test_private_room.skip = "Disabled for watcha because of user directory modification for partners"
-    # # +watcha
+    # +watcha
 
 class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
     user_id = "@test:test"
@@ -669,6 +670,7 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         return hs
 
     def test_disabling_room_list(self):
+        self.hs.get_auth_handler().is_partner = AsyncMock(return_value=False) # watcha+
         self.config.user_directory_search_enabled = True
 
         # First we create a room with another user so that user dir is non-empty
@@ -692,5 +694,3 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         )
         self.assertEquals(200, channel.code, channel.result)
         self.assertTrue(len(channel.json_body["results"]) == 0)
-
-    test_disabling_room_list.skip = "Disabled for watcha because of user directory modification for partners" # watcha+
