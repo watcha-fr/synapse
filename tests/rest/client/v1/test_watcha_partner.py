@@ -2,22 +2,12 @@ import json
 import os
 import pkg_resources
 
-from mock import Mock
+from mock import AsyncMock
 
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 from tests import unittest
 from tests.utils import mock_getRawHeaders
-
-
-def simple_async_mock(return_value=None, raises=None):
-    # AsyncMock is not available in python3.5, this mimics part of its behaviour
-    async def cb(*args, **kwargs):
-        if raises:
-            raise raises
-        return return_value
-
-    return Mock(side_effect=cb)
 
 
 class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
@@ -57,7 +47,7 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
-        self.store.add_partner_invitation = simple_async_mock()
+        self.store.add_partner_invitation = AsyncMock()
         self.time = hs.get_clock().time_msec()
 
         self.auth = hs.get_auth_handler()
@@ -88,14 +78,14 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
 
         self.keycloak_client = self.nextcloud_handler.keycloak_client
         self.nextcloud_client = self.nextcloud_handler.nextcloud_client
-        response = simple_async_mock()
+        response = AsyncMock()
         response.headers.getRawHeaders = mock_getRawHeaders(
             {
                 "location": "https://keycloak_url/auth/admin/realms/realm_name/users/c76bff5e-dd38-4100-bad2-ed2aa4dc9c6f"
             }
         )
-        self.keycloak_client.add_user = simple_async_mock(return_value=response)
-        self.nextcloud_client.add_user = simple_async_mock()
+        self.keycloak_client.add_user = AsyncMock(return_value=response)
+        self.nextcloud_client.add_user = AsyncMock()
 
         self.invite_uri = "/rooms/{}/invite".format(self.room_id)
 
@@ -128,9 +118,9 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
             self.owner_tok,
         )
 
-        self.keycloak_client.add_user.not_called()
-        self.nextcloud_client.add_user.not_called()
-        self.store.add_partner_invitation.not_called()
+        self.keycloak_client.add_user.assert_not_called()
+        self.nextcloud_client.add_user.assert_not_called()
+        self.store.add_partner_invitation.assert_called_once()
 
         self.assertEqual(len(self.email_attempts), 0)
 
@@ -149,9 +139,9 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
             self.owner_tok,
         )
 
-        self.keycloak_client.add_user.not_called()
-        self.nextcloud_client.add_user.not_called()
-        self.store.add_partner_invitation.not_called()
+        self.keycloak_client.add_user.assert_not_called()
+        self.nextcloud_client.add_user.assert_not_called()
+        self.store.add_partner_invitation.assert_not_called()
 
         self.assertEqual(len(self.email_attempts), 0)
 
@@ -198,9 +188,9 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
             self.owner_tok,
         )
 
-        self.keycloak_client.add_user.not_called()
-        self.nextcloud_client.add_user.not_called()
-        self.store.add_partner_invitation.not_called()
+        self.keycloak_client.add_user.assert_not_called()
+        self.nextcloud_client.add_user.assert_not_called()
+        self.store.add_partner_invitation.assert_called_once()
 
         self.assertEqual(len(self.email_attempts), 0)
 
@@ -222,9 +212,9 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
             self.owner_tok,
         )
 
-        self.keycloak_client.add_user.not_called()
-        self.nextcloud_client.add_user.not_called()
-        self.store.add_partner_invitation.not_called()
+        self.keycloak_client.add_user.assert_not_called()
+        self.nextcloud_client.add_user.assert_not_called()
+        self.store.add_partner_invitation.assert_not_called()
 
         self.assertEqual(len(self.email_attempts), 0)
 
