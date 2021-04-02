@@ -692,3 +692,5 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         )
         self.assertEquals(200, channel.code, channel.result)
         self.assertTrue(len(channel.json_body["results"]) == 0)
+
+    test_disabling_room_list.skip = "Disabled for watcha because of user directory modification for partners" # watcha+
