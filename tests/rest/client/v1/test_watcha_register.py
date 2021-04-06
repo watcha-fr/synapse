@@ -1,23 +1,13 @@
 import os
 
 import pkg_resources
-from mock import Mock
+from mock import AsyncMock
 
 from synapse.rest import admin
 from synapse.rest.client.v1 import watcha, login, room
 from synapse.types import UserID
 from tests import unittest
 from tests.utils import mock_getRawHeaders
-
-
-def simple_async_mock(return_value=None, raises=None):
-    # AsyncMock is not available in python3.5, this mimics part of its behaviour
-    async def cb(*args, **kwargs):
-        if raises:
-            raise raises
-        return return_value
-
-    return Mock(side_effect=cb)
 
 
 class RegisterTestCase(unittest.HomeserverTestCase):
@@ -72,14 +62,14 @@ class RegisterTestCase(unittest.HomeserverTestCase):
 
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
-        response = simple_async_mock()
+        response = AsyncMock()
         response.headers.getRawHeaders = mock_getRawHeaders(
             {
                 "location": "https://keycloak_url/auth/admin/realms/realm_name/users/c76bff5e-dd38-4100-bad2-ed2aa4dc9c6f"
             }
         )
-        self.keycloak_client.add_user = simple_async_mock(return_value=response)
-        self.nextcloud_client.add_user = simple_async_mock()
+        self.keycloak_client.add_user = AsyncMock(return_value=response)
+        self.nextcloud_client.add_user = AsyncMock()
 
     def test_register_user(self):
         channel = self.make_request(
@@ -116,8 +106,8 @@ class RegisterTestCase(unittest.HomeserverTestCase):
             self.owner_tok,
         )
 
-        self.keycloak_client.add_user.not_called()
-        self.nextcloud_client.add_user.not_called()
+        self.keycloak_client.add_user.assert_not_called()
+        self.nextcloud_client.add_user.assert_not_called()
 
         self.assertEqual(channel.code, 400)
         self.assertEqual(
@@ -133,8 +123,8 @@ class RegisterTestCase(unittest.HomeserverTestCase):
             self.owner_tok,
         )
 
-        self.keycloak_client.add_user.not_called()
-        self.nextcloud_client.add_user.not_called()
+        self.keycloak_client.add_user.assert_not_called()
+        self.nextcloud_client.add_user.assert_not_called()
 
         self.assertEqual(channel.code, 400)
         self.assertEqual(
