@@ -65,6 +65,8 @@ class UserDirectoryHandler(StateDeltasHandler):
             # We kick this off so that we don't have to wait for a change before
             # we start populating the user directory
             self.clock.call_later(0, self.notify_new_event)
+        
+        self.auth_handler = hs.get_auth_handler() # watcha+
 
     async def search_users(
         self, user_id: str, search_term: str, limit: int
@@ -89,6 +91,13 @@ class UserDirectoryHandler(StateDeltasHandler):
                     ]
                 }
         """
+        # watcha+
+        if await self.auth_handler.is_partner(user_id):
+            return {
+                "limited": False,
+                "results": []
+            }
+        # +watcha
         results = await self.store.search_user_dir(user_id, search_term, limit)
 
         # Remove any spammy users from the results.

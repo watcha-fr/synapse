@@ -1,5 +1,5 @@
 import json
-from mock import Mock
+from mock import AsyncMock
 
 from synapse.api.errors import SynapseError
 from synapse.rest import admin
@@ -7,16 +7,6 @@ from synapse.rest.client.v1 import login, room, watcha
 from synapse.types import UserID, create_requester
 
 from tests import unittest
-
-
-def simple_async_mock(return_value=None, raises=None):
-    # AsyncMock is not available in python3.5, this mimics part of its behaviour
-    async def cb(*args, **kwargs):
-        if raises:
-            raise raises
-        return return_value
-
-    return Mock(side_effect=cb)
 
 
 class NextcloudShareTestCase(unittest.HomeserverTestCase):
@@ -46,17 +36,17 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
 
         self.keycloak_client = self.nextcloud_handler.keycloak_client
         self.nextcloud_client = self.nextcloud_handler.nextcloud_client
-        self.nextcloud_handler.bind = simple_async_mock()
-        self.nextcloud_handler.unbind = simple_async_mock()
+        self.nextcloud_handler.bind = AsyncMock()
+        self.nextcloud_handler.unbind = AsyncMock()
         self.nextcloud_directory_url = (
             "https://test/nextcloud/apps/files/?dir=/directory"
         )
 
-        self.keycloak_client.get_user = simple_async_mock(
+        self.keycloak_client.get_user = AsyncMock(
             return_value={"id": "1234", "username": "creator"},
         )
-        self.nextcloud_client.add_user_to_group = simple_async_mock()
-        self.nextcloud_client.remove_user_from_group = simple_async_mock()
+        self.nextcloud_client.add_user_to_group = AsyncMock()
+        self.nextcloud_client.remove_user_from_group = AsyncMock()
 
     def send_room_nextcloud_mapping_event(self, request_content):
         channel = self.make_request(
@@ -171,9 +161,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, channel.code)
 
     def test_update_nextcloud_share_with_an_unmapped_room(self):
-        self.nextcloud_handler.update_existing_nextcloud_share_for_user = (
-            simple_async_mock()
-        )
+        self.nextcloud_handler.update_existing_nextcloud_share_for_user = AsyncMock()
 
         room_id = self.helper.create_room_as(self.creator, tok=self.creator_tok)
 
