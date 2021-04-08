@@ -308,7 +308,10 @@ class DeactivateAccountRestServlet(RestServlet):
                 Codes.BAD_JSON,
             )
 
+        """ watcha!
         requester = await self.auth.get_user_by_req(request)
+        !watcha """
+        requester = await self.auth.get_user_by_req(request, allow_partner=True) # watcha+
 
         # allow ASes to deactivate their own users
         if requester.app_service:
