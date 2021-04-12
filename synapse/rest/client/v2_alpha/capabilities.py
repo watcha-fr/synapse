@@ -41,10 +41,7 @@ class CapabilitiesRestServlet(RestServlet):
         self.auth_handler = hs.get_auth_handler()
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        """ watcha!
         await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha """
-        await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True) # watcha+
         change_password = self.auth_handler.can_change_password()
 
         response = {

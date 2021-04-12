@@ -278,7 +278,7 @@ class HomeserverTestCase(TestCase):
                 """ watcha!
                 async def get_user_by_req(request, allow_guest=False, rights="access"):
                 !watcha """
-                async def get_user_by_req(request, allow_guest=False, allow_partner=False, rights="access"): # watcha+
+                async def get_user_by_req(request, allow_guest=False, allow_partner=True, rights="access"): # watcha+
                     return create_requester(
                         UserID.from_string(self.helper.auth_user_id),
                         token_id,

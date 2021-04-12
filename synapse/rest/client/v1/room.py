@@ -86,12 +86,11 @@ class RoomCreateRestServlet(TransactionRestServlet):
         return self.txns.fetch_or_execute_request(request, self.on_POST, request)
 
     async def on_POST(self, request):
+        """ watcha!
         requester = await self.auth.get_user_by_req(request)
+        !watcha """
+        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
 
-        # watcha+
-        if requester.is_partner:
-            raise AuthError(403, "Partners are not allowed to create rooms")
-        # +watcha
         info, _ = await self._room_creation_handler.create_room(
             requester, self.get_room_config(request)
         )
@@ -158,14 +157,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         return self.on_PUT(request, room_id, event_type, "")
 
     async def on_GET(self, request, room_id, event_type, state_key):
-        """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha """
-        # watcha+
-        requester = await self.auth.get_user_by_req(
-            request, allow_guest=True, allow_partner=True
-        )
-        # +watcha
         format = parse_string(
             request, "format", default="content", allowed_values=["content", "event"]
         )
@@ -294,14 +286,7 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         register_txn_path(self, PATTERNS, http_server, with_get=True)
 
     async def on_POST(self, request, room_id, event_type, txn_id=None):
-        """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha """
-        # watcha+
-        requester = await self.auth.get_user_by_req(
-            request, allow_guest=True, allow_partner=True
-        )
-        # +watcha
         content = parse_json_object_from_request(request)
 
         event_dict = {
@@ -356,14 +341,7 @@ class JoinRoomAliasServlet(TransactionRestServlet):
         register_txn_path(self, PATTERNS, http_server)
 
     async def on_POST(self, request, room_identifier, txn_id=None):
-        """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha """
-        # watcha+
-        requester = await self.auth.get_user_by_req(
-            request, allow_guest=True, allow_partner=True
-        )
-        # +watcha
 
         try:
             content = parse_json_object_from_request(request)
@@ -626,14 +604,7 @@ class RoomMessageListRestServlet(RestServlet):
         self.store = hs.get_datastore()
 
     async def on_GET(self, request, room_id):
-        """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha """
-        # watcha+
-        requester = await self.auth.get_user_by_req(
-            request, allow_guest=True, allow_partner=True
-        )
-        # +watcha
         pagination_config = await PaginationConfig.from_request(
             self.store, request, default_limit=10
         )
@@ -674,14 +645,7 @@ class RoomStateRestServlet(RestServlet):
         self.auth = hs.get_auth()
 
     async def on_GET(self, request, room_id):
-        """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha """
-        # watcha+
-        requester = await self.auth.get_user_by_req(
-            request, allow_guest=True, allow_partner=True
-        )
-        # +watcha
         # Get all the current state for this room
         events = await self.message_handler.get_state_events(
             room_id=room_id,
@@ -703,14 +667,7 @@ class RoomInitialSyncRestServlet(RestServlet):
         self.store = hs.get_datastore()
 
     async def on_GET(self, request, room_id):
-        """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha """
-        # watcha+
-        requester = await self.auth.get_user_by_req(
-            request, allow_guest=True, allow_partner=True
-        )
-        # +watcha
         pagination_config = await PaginationConfig.from_request(self.store, request)
         content = await self.initial_sync_handler.room_initial_sync(
             room_id=room_id, requester=requester, pagin_config=pagination_config
@@ -763,14 +720,7 @@ class RoomEventContextServlet(RestServlet):
         self.auth = hs.get_auth()
 
     async def on_GET(self, request, room_id, event_id):
-        """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha """
-        # watcha+
-        requester = await self.auth.get_user_by_req(
-            request, allow_guest=True, allow_partner=True
-        )
-        # +watcha
 
         limit = parse_integer(request, "limit", default=10)
 
@@ -858,7 +808,6 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         register_txn_path(self, PATTERNS, http_server)
 
     async def on_POST(self, request, room_id, membership_action, txn_id=None):
-        """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
         if requester.is_guest and membership_action not in {
@@ -866,12 +815,8 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             Membership.LEAVE,
         }:
             raise AuthError(403, "Guest access not allowed")
-        !watcha """
-        # watcha+
-        requester = await self.auth.get_user_by_req(
-            request, allow_guest=True, allow_partner=True
-        )
 
+        # watcha+
         if requester.is_partner and membership_action not in {
             Membership.JOIN,
             Membership.LEAVE,
@@ -1052,12 +997,7 @@ class RoomTypingRestServlet(RestServlet):
         )
 
     async def on_PUT(self, request, room_id, user_id):
-        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        # watcha+
-        requester = await self.auth.get_user_by_req(request, allow_partner=True)
-        # +watcha
 
         if not self._is_typing_writer:
             raise Exception("Got /typing request on instance that is not typing writer")
@@ -1145,14 +1085,7 @@ class JoinedRoomsRestServlet(RestServlet):
         self.auth = hs.get_auth()
 
     async def on_GET(self, request):
-        """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha """
-        # watcha+
-        requester = await self.auth.get_user_by_req(
-            request, allow_guest=True, allow_partner=True
-        )
-        # +watcha
 
         room_ids = await self.store.get_rooms_for_user(requester.user.to_string())
         return 200, {"joined_rooms": list(room_ids)}

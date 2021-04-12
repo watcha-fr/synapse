@@ -72,10 +72,7 @@ class KeyUploadServlet(RestServlet):
 
     @trace(opname="upload_keys")
     async def on_POST(self, request, device_id):
-        """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True) # watcha+
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
 
@@ -162,10 +159,7 @@ class KeyQueryServlet(RestServlet):
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
 
     async def on_POST(self, request):
-        """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True) # watcha+
         user_id = requester.user.to_string()
         timeout = parse_integer(request, "timeout", 10 * 1000)
         body = parse_json_object_from_request(request)
@@ -272,10 +266,7 @@ class SigningKeyUploadServlet(RestServlet):
 
     @interactive_auth_handler
     async def on_POST(self, request):
-        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=True) # watcha+
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
 
