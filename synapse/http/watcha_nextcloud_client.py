@@ -96,11 +96,12 @@ class NextcloudClient(SimpleHttpClient):
                 errcode,
             )
 
-    async def add_user(self, username):
+    async def add_user(self, username, displayname):
         """Create a new user.
 
         Args:
             username: the username of the user to create.
+            displayname: the displayname of the users. By default, this is the user email.
 
         Status codes:
             100 - successful
@@ -113,7 +114,11 @@ class NextcloudClient(SimpleHttpClient):
 
         response = await self.post_json_get_json(
             uri="{}/ocs/v1.php/cloud/users".format(self.nextcloud_url),
-            post_json={"userid": username, "password": password},
+            post_json={
+                "userid": username,
+                "password": password,
+                "displayName": displayname,
+            },
             headers=self._headers,
         )
 
