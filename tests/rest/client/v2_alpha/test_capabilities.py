@@ -103,3 +103,71 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 200)
         self.assertFalse(capabilities["m.change_password"]["enabled"])
+
+    # watcha+
+    def test_get_room_version_capabilities_with_partner(self):
+        self.register_user("partner", "pass", is_partner=True)
+        access_token = self.login("partner", "pass")
+
+        channel = self.make_request("GET", self.url, access_token=access_token)
+        capabilities = channel.json_body["capabilities"]
+
+        self.assertEqual(channel.code, 200)
+        for room_version in capabilities["m.room_versions"]["available"].keys():
+            self.assertTrue(room_version in KNOWN_ROOM_VERSIONS, "" + room_version)
+
+        self.assertEqual(
+            self.config.default_room_version.identifier,
+            capabilities["m.room_versions"]["default"],
+        )
+
+    def test_get_change_password_capabilities_with_partner(self):
+        localpart = "partner"
+        password = "pass"
+        user = self.register_user(localpart, password, is_partner=True)
+        access_token = self.get_success(
+            self.auth_handler.get_access_token_for_user_id(
+                user, device_id=None, valid_until_ms=None
+            )
+        )
+
+        channel = self.make_request("GET", self.url, access_token=access_token)
+        capabilities = channel.json_body["capabilities"]
+
+        self.assertEqual(channel.code, 200)
+        self.assertTrue(capabilities["m.change_password"]["enabled"])
+
+    @override_config({"password_config": {"localdb_enabled": False}})
+    def test_get_change_password_capabilities_localdb_disabled(self):
+        localpart = "partner"
+        password = "pass"
+        user = self.register_user(localpart, password, is_partner=True)
+        access_token = self.get_success(
+            self.auth_handler.get_access_token_for_user_id(
+                user, device_id=None, valid_until_ms=None
+            )
+        )
+
+        channel = self.make_request("GET", self.url, access_token=access_token)
+        capabilities = channel.json_body["capabilities"]
+
+        self.assertEqual(channel.code, 200)
+        self.assertFalse(capabilities["m.change_password"]["enabled"])
+
+    @override_config({"password_config": {"enabled": False}})
+    def test_get_change_password_capabilities_password_disabled_with_partners(self):
+        localpart = "partner"
+        password = "pass"
+        user = self.register_user(localpart, password, is_partner=True)
+        access_token = self.get_success(
+            self.auth_handler.get_access_token_for_user_id(
+                user, device_id=None, valid_until_ms=None
+            )
+        )
+
+        channel = self.make_request("GET", self.url, access_token=access_token)
+        capabilities = channel.json_body["capabilities"]
+
+        self.assertEqual(channel.code, 200)
+        self.assertFalse(capabilities["m.change_password"]["enabled"])
+    # +watcha
