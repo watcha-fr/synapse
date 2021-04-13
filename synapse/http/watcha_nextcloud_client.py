@@ -1,7 +1,7 @@
 import logging
 from base64 import b64encode
-
 from jsonschema import validate
+from typing import Any, List
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SimpleHttpClient
@@ -86,7 +86,7 @@ class NextcloudClient(SimpleHttpClient):
             ],
         }
 
-    def _raise_for_status(self, meta, errcode):
+    def _raise_for_status(self, meta: List[Any], errcode: Codes):
         if meta["status"] == "failure":
             raise SynapseError(
                 400,
@@ -96,11 +96,12 @@ class NextcloudClient(SimpleHttpClient):
                 errcode,
             )
 
-    async def add_user(self, username):
+    async def add_user(self, username: str, displayname: str = None):
         """Create a new user.
 
         Args:
             username: the username of the user to create.
+            displayname: displayname of invitee. Defaults to user keycloak id.
 
         Status codes:
             100 - successful
@@ -110,10 +111,17 @@ class NextcloudClient(SimpleHttpClient):
         """
         # A password is needed to create NC user, but it will not be used by KC login process.
         password = self.secrets.token_hex()
+        payload = {
+            "userid": username,
+            "password": password,
+        }
+
+        if displayname:
+            payload["displayName"] = displayname
 
         response = await self.post_json_get_json(
             uri="{}/ocs/v1.php/cloud/users".format(self.nextcloud_url),
-            post_json={"userid": username, "password": password},
+            post_json=payload,
             headers=self._headers,
         )
 
@@ -127,7 +135,7 @@ class NextcloudClient(SimpleHttpClient):
         else:
             self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_CREATE_USER)
 
-    async def delete_user(self, username):
+    async def delete_user(self, username: str):
         """Delete an existing user.
 
         Args:
@@ -149,7 +157,7 @@ class NextcloudClient(SimpleHttpClient):
             response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_DELETE_USER
         )
 
-    async def add_group(self, group_name):
+    async def add_group(self, group_name: str):
         """Adds a new Nextcloud group.
 
         Args:
@@ -176,7 +184,7 @@ class NextcloudClient(SimpleHttpClient):
         else:
             self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_CREATE_GROUP)
 
-    async def delete_group(self, group_name):
+    async def delete_group(self, group_name: str):
         """Removes a existing Nextcloud group.
 
         Args:
@@ -199,7 +207,7 @@ class NextcloudClient(SimpleHttpClient):
             response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_DELETE_GROUP
         )
 
-    async def add_user_to_group(self, username, group_name):
+    async def add_user_to_group(self, username: str, group_name: str):
         """Add user to the Nextcloud group.
 
         Args:
@@ -234,7 +242,7 @@ class NextcloudClient(SimpleHttpClient):
 
         self._raise_for_status(meta, errcode)
 
-    async def remove_user_from_group(self, username, group_name):
+    async def remove_user_from_group(self, username: str, group_name: str):
         """Removes the specified user from the specified group.
 
         Args:
@@ -269,7 +277,7 @@ class NextcloudClient(SimpleHttpClient):
 
         self._raise_for_status(meta, errcode)
 
-    async def share(self, requester, path, group_name):
+    async def share(self, requester: str, path: str, group_name: str):
         """Share an existing file or folder with all permissions for a group.
 
         Args:
@@ -323,7 +331,7 @@ class NextcloudClient(SimpleHttpClient):
 
         return response["ocs"]["data"]["id"]
 
-    async def unshare(self, requester, share_id):
+    async def unshare(self, requester: str, share_id: str):
         """Remove a given Nextcloud share
 
         Args:

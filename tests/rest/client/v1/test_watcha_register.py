@@ -79,11 +79,12 @@ class RegisterTestCase(unittest.HomeserverTestCase):
             self.owner_tok,
         )
         user_id = UserID.from_string(channel.json_body["user_id"])
+        nextcloud_username = user_id.localpart
         displayname = self.get_success(self.profile.get_displayname(user_id))
 
         self.assertEqual(displayname, "user1@example.com")
         self.assertTrue(self.keycloak_client.add_user.called)
-        self.assertTrue(self.nextcloud_client.add_user.called)
+        self.nextcloud_client.add_user.assert_called_with(nextcloud_username, "")
         self.assertEqual(channel.code, 200)
 
     def test_register_user_with_password(self):
@@ -140,9 +141,10 @@ class RegisterTestCase(unittest.HomeserverTestCase):
             self.owner_tok,
         )
         user_id = UserID.from_string(channel.json_body["user_id"])
+        nextcloud_username = user_id.localpart
         displayname = self.get_success(self.profile.get_displayname(user_id))
 
         self.assertEqual(displayname, "user1")
         self.assertTrue(self.keycloak_client.add_user.called)
-        self.assertTrue(self.nextcloud_client.add_user.called)
+        self.nextcloud_client.add_user.assert_called_with(nextcloud_username, displayname)
         self.assertEqual(channel.code, 200)
