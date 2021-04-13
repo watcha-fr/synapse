@@ -78,18 +78,22 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
 
         self.keycloak_client = self.nextcloud_handler.keycloak_client
         self.nextcloud_client = self.nextcloud_handler.nextcloud_client
+
         response = AsyncMock()
         response.headers.getRawHeaders = mock_getRawHeaders(
             {
-                "location": "https://keycloak_url/auth/admin/realms/realm_name/users/c76bff5e-dd38-4100-bad2-ed2aa4dc9c6f"
+                "location": [
+                    "https://keycloak_url/auth/admin/realms/realm_name/users/c76bff5e-dd38-4100-bad2-ed2aa4dc9c6f"
+                ]
             }
         )
+
         self.keycloak_client.add_user = AsyncMock(return_value=response)
         self.nextcloud_client.add_user = AsyncMock()
 
         self.invite_uri = "/rooms/{}/invite".format(self.room_id)
 
-    def test_invite_new_partner(self):
+    def test_invite_partner(self):
         channel = self.make_request(
             "POST",
             self.invite_uri,
