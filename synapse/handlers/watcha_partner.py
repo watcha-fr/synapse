@@ -47,7 +47,7 @@ class PartnerHandler(BaseHandler):
         keycloak_user_id = location.split("/")[-1]
 
         try:
-            await self.nextcloud_client.add_user(keycloak_user_id, invitee_email)
+            await self.nextcloud_client.add_user(keycloak_user_id)
         except (SynapseError, HttpResponseException, ValidationError, SchemaError):
             await self.keycloak_client.delete_user(keycloak_user_id)
             raise

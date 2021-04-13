@@ -96,7 +96,7 @@ class NextcloudClient(SimpleHttpClient):
                 errcode,
             )
 
-    async def add_user(self, username: str, displayname: str):
+    async def add_user(self, username: str, displayname: str = None):
         """Create a new user.
 
         Args:
@@ -111,14 +111,21 @@ class NextcloudClient(SimpleHttpClient):
         """
         # A password is needed to create NC user, but it will not be used by KC login process.
         password = self.secrets.token_hex()
+        payload = {
+            "userid": username,
+            "password": password,
+        }
+
+        if displayname:
+            payload.update(
+                {
+                    "displayName": displayname,
+                }
+            )
 
         response = await self.post_json_get_json(
             uri="{}/ocs/v1.php/cloud/users".format(self.nextcloud_url),
-            post_json={
-                "userid": username,
-                "password": password,
-                "displayName": displayname,
-            },
+            post_json=payload,
             headers=self._headers,
         )
 

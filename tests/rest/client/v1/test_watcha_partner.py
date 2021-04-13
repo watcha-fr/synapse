@@ -79,15 +79,11 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
         self.keycloak_client = self.nextcloud_handler.keycloak_client
         self.nextcloud_client = self.nextcloud_handler.nextcloud_client
 
-        self.partner_keycloak_id = "c76bff5e-dd38-4100-bad2-ed2aa4dc9c6f"
-        self.partner_email = "partner@example.com"
         response = AsyncMock()
         response.headers.getRawHeaders = mock_getRawHeaders(
             {
                 "location": [
-                    "https://keycloak_url/auth/admin/realms/realm_name/users/{}".format(
-                        self.partner_keycloak_id
-                    )
+                    "https://keycloak_url/auth/admin/realms/realm_name/users/c76bff5e-dd38-4100-bad2-ed2aa4dc9c6f"
                 ]
             }
         )
@@ -101,14 +97,12 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST",
             self.invite_uri,
-            {"id_server": "test", "medium": "email", "address": self.partner_email},
+            {"id_server": "test", "medium": "email", "address": "partner@example.com"},
             self.owner_tok,
         )
 
         self.assertTrue(self.keycloak_client.add_user.called)
-        self.nextcloud_client.add_user.assert_called_with(
-            self.partner_keycloak_id, self.partner_email
-        )
+        self.assertTrue(self.nextcloud_client.add_user.called)
         self.assertTrue(self.store.add_partner_invitation.called)
 
         self.assertEqual(len(self.email_attempts), 1)
@@ -167,7 +161,7 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
                     {
                         "id_server": "test",
                         "medium": "email",
-                        "address": self.partner_email,
+                        "address": "partner@example.com",
                     }
                 ],
             },
@@ -175,9 +169,7 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertTrue(self.keycloak_client.add_user.called)
-        self.nextcloud_client.add_user.assert_called_with(
-            self.partner_keycloak_id, self.partner_email
-        )
+        self.assertTrue(self.nextcloud_client.add_user.called)
         self.assertTrue(self.store.add_partner_invitation.called)
 
         self.assertEqual(len(self.email_attempts), 1)

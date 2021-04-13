@@ -152,7 +152,7 @@ class WatchaRegisterRestServlet(RestServlet):
         keycloak_user_id = location.split("/")[-1]
 
         try:
-            await self.nextcloud_client.add_user(keycloak_user_id, displayname or email)
+            await self.nextcloud_client.add_user(keycloak_user_id, displayname)
         except (SynapseError, HttpResponseException, ValidationError, SchemaError):
             await self.keycloak_client.delete_user(keycloak_user_id)
             raise

@@ -72,11 +72,10 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         self.nextcloud_client.add_user = AsyncMock()
 
     def test_register_user(self):
-        email = "user1@example.com"
         channel = self.make_request(
             "POST",
             self.url,
-            {"email": email, "admin": False, "password": ""},
+            {"email": "user1@example.com", "admin": False, "password": ""},
             self.owner_tok,
         )
         user_id = UserID.from_string(channel.json_body["user_id"])
@@ -85,7 +84,7 @@ class RegisterTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(displayname, "user1@example.com")
         self.assertTrue(self.keycloak_client.add_user.called)
-        self.nextcloud_client.add_user.assert_called_with(nextcloud_username, email)
+        self.nextcloud_client.add_user.assert_called_with(nextcloud_username, "")
         self.assertEqual(channel.code, 200)
 
     def test_register_user_with_password(self):
