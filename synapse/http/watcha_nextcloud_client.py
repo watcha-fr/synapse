@@ -101,7 +101,7 @@ class NextcloudClient(SimpleHttpClient):
 
         Args:
             username: the username of the user to create.
-            displayname: the displayname of the users. By default, this is the user email.
+            displayname: displayname of invitee. Defaults to user keycloak id.
 
         Status codes:
             100 - successful
