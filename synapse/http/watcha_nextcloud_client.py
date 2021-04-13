@@ -117,11 +117,7 @@ class NextcloudClient(SimpleHttpClient):
         }
 
         if displayname:
-            payload.update(
-                {
-                    "displayName": displayname,
-                }
-            )
+            payload["displayName"] = displayname
 
         response = await self.post_json_get_json(
             uri="{}/ocs/v1.php/cloud/users".format(self.nextcloud_url),
