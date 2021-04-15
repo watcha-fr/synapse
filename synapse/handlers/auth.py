@@ -413,7 +413,10 @@ class AuthHandler(BaseHandler):
         # also allow auth from password providers
         for provider in self.password_providers:
             for t in provider.get_supported_login_types().keys():
+                """ watcha!
                 if t == LoginType.PASSWORD and not self._password_enabled:
+                !watcha """
+                if t == LoginType.PASSWORD: # watcha+
                     continue
                 ui_auth_types.add(t)
 
