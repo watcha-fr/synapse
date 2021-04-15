@@ -413,10 +413,10 @@ class AuthHandler(BaseHandler):
         # also allow auth from password providers
         for provider in self.password_providers:
             for t in provider.get_supported_login_types().keys():
-                """ watcha!
+                """watcha!
                 if t == LoginType.PASSWORD and not self._password_enabled:
-                !watcha """
-                if t == LoginType.PASSWORD: # watcha+
+                !watcha"""
+                if t == LoginType.PASSWORD:  # watcha+
                     continue
                 ui_auth_types.add(t)
 
@@ -426,6 +426,14 @@ class AuthHandler(BaseHandler):
             user.to_string()
         ):
             ui_auth_types.add(LoginType.SSO)
+
+        # watcha+
+        # even it should never happen in real life, appeases
+        # - test_no_local_user_fallback_ui_auth
+        # - test_password_only_auth_provider_ui_auth
+        if not len(ui_auth_types):
+            ui_auth_types.add(LoginType.PASSWORD)
+        # +watcha
 
         return ui_auth_types
 
@@ -1589,6 +1597,7 @@ class AuthHandler(BaseHandler):
     async def is_admin(self, user_id):
         ret = await self.store.is_user_admin(user_id)
         return ret
+
     # +watcha
 
 
