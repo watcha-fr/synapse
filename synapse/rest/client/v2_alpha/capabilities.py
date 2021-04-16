@@ -39,13 +39,22 @@ class CapabilitiesRestServlet(RestServlet):
         self.config = hs.config
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
+        self.store = hs.get_datastore()  # watcha+
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        """ watcha!
+        """watcha!
         await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha """
-        await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True) # watcha+
         change_password = self.auth_handler.can_change_password()
+        !watcha"""
+        # watcha+
+        requester = await self.auth.get_user_by_req(
+            request, allow_guest=True, allow_partner=True
+        )
+        user = await self.store.get_user_by_id(requester.user.to_string())
+        change_password = (
+            bool(user["password_hash"]) and self.auth_handler.can_change_password()
+        )
+        # +watcha
 
         response = {
             "capabilities": {

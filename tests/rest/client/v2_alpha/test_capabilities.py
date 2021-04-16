@@ -138,7 +138,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         self.assertTrue(capabilities["m.change_password"]["enabled"])
 
     @override_config({"password_config": {"localdb_enabled": False}})
-    def test_get_change_password_capabilities_localdb_disabled(self):
+    def test_get_change_password_capabilities_localdb_disabled_partners(self):
         localpart = "partner"
         password = "pass"
         user = self.register_user(localpart, password, is_partner=True)
