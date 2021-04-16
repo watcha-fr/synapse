@@ -412,7 +412,10 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         server = parse_string(request, "server", default=None)
 
         try:
+            """ watcha!
             await self.auth.get_user_by_req(request, allow_guest=True)
+            !watcha """
+            await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=False) # watcha+
         except InvalidClientCredentialsError as e:
             # Option to allow servers to require auth when accessing
             # /publicRooms via CS API. This is especially helpful in private
@@ -461,7 +464,10 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         return 200, data
 
     async def on_POST(self, request):
+        """ watcha!
         await self.auth.get_user_by_req(request, allow_guest=True)
+        !watcha """
+        await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=False) # watcha+
 
         server = parse_string(request, "server", default=None)
         content = parse_json_object_from_request(request)
