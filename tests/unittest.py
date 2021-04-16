@@ -541,16 +541,6 @@ class HomeserverTestCase(TestCase):
 
         return result
 
-    """ watcha!
-    def register_user(
-        self,
-        username: str,
-        password: str,
-        admin: Optional[bool] = False,
-        displayname: Optional[str] = None,
-    ) -> str:
-    !watcha """
-    # watcha+
     def register_user(
         self,
         username: str,
@@ -559,7 +549,6 @@ class HomeserverTestCase(TestCase):
         displayname: Optional[str] = None,
         is_partner: Optional[bool] = False, # watcha+
     ) -> str:
-    # +watcha
         """
         Register a user. Requires the Admin API be registered.
 
