@@ -87,10 +87,7 @@ class GroupServlet(RestServlet):
     async def on_POST(
         self, request: SynapseRequest, group_id: str
     ) -> Tuple[int, JsonDict]:
-        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
@@ -160,10 +157,7 @@ class GroupSummaryRoomsCatServlet(RestServlet):
         category_id: Optional[str],
         room_id: str,
     ):
-        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
         requester_user_id = requester.user.to_string()
 
         if category_id == "":
@@ -195,10 +189,7 @@ class GroupSummaryRoomsCatServlet(RestServlet):
     async def on_DELETE(
         self, request: SynapseRequest, group_id: str, category_id: str, room_id: str
     ):
-        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
         requester_user_id = requester.user.to_string()
 
         assert isinstance(
@@ -241,10 +232,7 @@ class GroupCategoryServlet(RestServlet):
     async def on_PUT(
         self, request: SynapseRequest, group_id: str, category_id: str
     ) -> Tuple[int, JsonDict]:
-        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
         requester_user_id = requester.user.to_string()
 
         if not category_id:
@@ -272,10 +260,7 @@ class GroupCategoryServlet(RestServlet):
     async def on_DELETE(
         self, request: SynapseRequest, group_id: str, category_id: str
     ) -> Tuple[int, JsonDict]:
-        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
         requester_user_id = requester.user.to_string()
 
         assert isinstance(
@@ -341,10 +326,7 @@ class GroupRoleServlet(RestServlet):
     async def on_PUT(
         self, request: SynapseRequest, group_id: str, role_id: str
     ) -> Tuple[int, JsonDict]:
-        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
         requester_user_id = requester.user.to_string()
 
         if not role_id:
@@ -372,10 +354,7 @@ class GroupRoleServlet(RestServlet):
     async def on_DELETE(
         self, request: SynapseRequest, group_id: str, role_id: str
     ) -> Tuple[int, JsonDict]:
-        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
         requester_user_id = requester.user.to_string()
 
         assert isinstance(
@@ -441,10 +420,7 @@ class GroupSummaryUsersRoleServlet(RestServlet):
         role_id: Optional[str],
         user_id: str,
     ) -> Tuple[int, JsonDict]:
-        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
         requester_user_id = requester.user.to_string()
 
         if role_id == "":
@@ -476,10 +452,7 @@ class GroupSummaryUsersRoleServlet(RestServlet):
     async def on_DELETE(
         self, request: SynapseRequest, group_id: str, role_id: str, user_id: str
     ):
-        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
         requester_user_id = requester.user.to_string()
 
         assert isinstance(
@@ -581,10 +554,7 @@ class GroupSettingJoinPolicyServlet(RestServlet):
     async def on_PUT(
         self, request: SynapseRequest, group_id: str
     ) -> Tuple[int, JsonDict]:
-        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
@@ -612,10 +582,7 @@ class GroupCreateServlet(RestServlet):
         self.server_name = hs.hostname
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
         requester_user_id = requester.user.to_string()
 
         # TODO: Create group on remote server
@@ -660,10 +627,7 @@ class GroupAdminRoomsServlet(RestServlet):
     async def on_PUT(
         self, request: SynapseRequest, group_id: str, room_id: str
     ) -> Tuple[int, JsonDict]:
-        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
@@ -680,10 +644,7 @@ class GroupAdminRoomsServlet(RestServlet):
     async def on_DELETE(
         self, request: SynapseRequest, group_id: str, room_id: str
     ) -> Tuple[int, JsonDict]:
-        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
         requester_user_id = requester.user.to_string()
 
         assert isinstance(
@@ -714,10 +675,7 @@ class GroupAdminRoomsConfigServlet(RestServlet):
     async def on_PUT(
         self, request: SynapseRequest, group_id: str, room_id: str, config_key: str
     ):
-        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
@@ -750,10 +708,7 @@ class GroupAdminUsersInviteServlet(RestServlet):
     async def on_PUT(
         self, request: SynapseRequest, group_id, user_id
     ) -> Tuple[int, JsonDict]:
-        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
@@ -785,10 +740,7 @@ class GroupAdminUsersKickServlet(RestServlet):
     async def on_PUT(
         self, request: SynapseRequest, group_id, user_id
     ) -> Tuple[int, JsonDict]:
-        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
