@@ -62,10 +62,7 @@ class ProfileDisplaynameRestServlet(RestServlet):
         return 200, ret
 
     async def on_PUT(self, request, user_id):
-        """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=True, allow_guest=True) # watcha+
         user = UserID.from_string(user_id)
         is_admin = await self.auth.is_server_admin(requester.user)
 
@@ -114,10 +111,7 @@ class ProfileAvatarURLRestServlet(RestServlet):
         return 200, ret
 
     async def on_PUT(self, request, user_id):
-        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=True) # watcha+
         user = UserID.from_string(user_id)
         is_admin = await self.auth.is_server_admin(requester.user)
 
