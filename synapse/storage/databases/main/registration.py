@@ -1779,15 +1779,6 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         )
         return is_partner
 
-    async def is_user_admin(self, user_id):
-
-        is_admin = await self.db_pool.simple_select_one_onecol(
-            "users",
-            keyvalues={"name": user_id},
-            retcol="admin",
-            desc="is_user_admin",
-        )
-        return is_admin
     # +watcha
 
 def find_max_generated_user_id_localpart(cur: Cursor) -> int:

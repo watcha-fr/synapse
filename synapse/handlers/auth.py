@@ -1594,10 +1594,6 @@ class AuthHandler(BaseHandler):
         )
         return ret
 
-    async def is_admin(self, user_id):
-        ret = await self.store.is_user_admin(user_id)
-        return ret
-
     # +watcha
 
 
