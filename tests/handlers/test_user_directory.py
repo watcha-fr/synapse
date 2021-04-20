@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from mock import Mock
-from mock import AsyncMock # watcha+
 
 from twisted.internet import defer
 
@@ -670,7 +669,6 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         return hs
 
     def test_disabling_room_list(self):
-        self.hs.get_auth_handler().is_partner = AsyncMock(return_value=False) # watcha+
         self.config.user_directory_search_enabled = True
 
         # First we create a room with another user so that user dir is non-empty
