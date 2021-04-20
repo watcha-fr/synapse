@@ -260,7 +260,6 @@ class Auth:
                 )
             # +watcha
 
-            """ watcha!
             requester = synapse.types.create_requester(
                 user_info.user_id,
                 token_id,
@@ -269,20 +268,8 @@ class Auth:
                 device_id,
                 app_service=app_service,
                 authenticated_entity=user_info.token_owner,
+                is_partner=is_partner, # watcha+
             )
-            !watcha """
-            # watcha+
-            requester = synapse.types.create_requester(
-                user_info.user_id,
-                token_id,
-                is_guest,
-                shadow_banned,
-                device_id,
-                app_service=app_service,
-                authenticated_entity=user_info.token_owner,
-                is_partner=is_partner,
-            )
-            # +watcha
 
             request.requester = requester
             opentracing.set_tag("authenticated_entity", user_info.token_owner)
