@@ -1778,7 +1778,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             allow_none=True,
             desc="is_partner",
         )
-        return bool(is_partner) if is_partner else False
+        return bool(is_partner)
 
     async def is_user_admin(self, user_id):
 
