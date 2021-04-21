@@ -1768,7 +1768,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             start_or_continue_validation_session_txn,
         )
 
-    # watcha+ op318
+    # watcha+
     async def is_partner(self, user_id):
 
         is_partner = await self.db_pool.simple_select_one_onecol(
