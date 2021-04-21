@@ -1627,7 +1627,6 @@ class MacaroonGenerator:
         )
         for caveat in extra_caveats:
             macaroon.add_first_party_caveat(caveat)
-        logger.info("MACAROON : ", macaroon.inspect())
         return macaroon.serialize()
 
     def generate_short_term_login_token(
