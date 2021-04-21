@@ -827,7 +827,15 @@ class AuthHandler(BaseHandler):
         ):
             await self.auth.check_auth_blocking(user_id)
 
+        """ watcha!
         access_token = self.macaroon_gen.generate_access_token(user_id)
+        !watcha """
+        # watcha+
+        if await self.is_partner(user_id):
+            access_token = self.macaroon_gen.generate_access_token(user_id, ["partner = true"])
+        else:
+            access_token = self.macaroon_gen.generate_access_token(user_id)
+        # +watcha
         await self.store.add_access_token_to_user(
             user_id=user_id,
             token=access_token,
@@ -1589,7 +1597,7 @@ class AuthHandler(BaseHandler):
 
     # watcha+
     async def is_partner(self, user_id):
-        ret = await self.store.is_user_partner(
+        ret = await self.store.is_partner(
             user_id,
         )
         return ret
@@ -1619,6 +1627,7 @@ class MacaroonGenerator:
         )
         for caveat in extra_caveats:
             macaroon.add_first_party_caveat(caveat)
+        logger.info("MACAROON : ", macaroon.inspect())
         return macaroon.serialize()
 
     def generate_short_term_login_token(
