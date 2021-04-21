@@ -234,24 +234,14 @@ class AdministrationStore(SQLBaseStore):
         """
 
         def _get_disk_usage():
-            try:
-                completed_process = subprocess.run(
-                    ["du", "-bsh", "/var/lib/matrix-synapse/media"],
-                    stdout=subprocess.PIPE,
-                    timeout=3,
-                    check=True,
-                )
-            except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
-                logger.warn("[watcha] collect disk usage - failed: %s", e)
-                return
+            completed_process = subprocess.run(
+                ["du", "-bsh", "/var/lib/matrix-synapse/media"],
+                stdout=subprocess.PIPE,
+                timeout=3,
+                check=True,
+            )
 
-            stdout = completed_process.stdout
-            try:
-                stdout = stdout.decode()
-            except AttributeError as e:
-                logger.warn("[watcha] parse disk usage statistics - failed: %s", e)
-                return
-
+            stdout = completed_process.stdout.decode()
             tokens = stdout.split("\t")
             if len(tokens) <= 1:
                 logger.warn("[watcha] parse disk usage statistics - failed")
@@ -259,36 +249,40 @@ class AdministrationStore(SQLBaseStore):
 
             return tokens[0]
 
-        result = {
-            "disk_usage": _get_disk_usage(),
-            "watcha_release": "",
-            "upgrade_date": "",
-            "install_date": "",
-        }
+        def _get_install_information(lines):
+            result = {}
+            for line in lines:
+                if "WATCHA_RELEASE" in line:
+                    result[line.split("=")[0]] = line.split("=")[1]
+                elif "UPGRADE_DATE" in line or "INSTALL_DATE" in line:
+                    result[line.split("=")[0]] = _parse_date(line.split("=")[1])
 
+            return result
+
+        def _parse_date(date):
+            return datetime.strptime(date, "%Y-%m-%dT%H:%M:%S").strftime("%d/%m/%Y")
+
+        install_information = {}
         try:
             with open(WATCHA_CONF_FILE_PATH, "r") as f:
-                watcha_conf_content = f.read().splitlines()
-
+                file_content = f.read().splitlines()
+            install_information = _get_install_information(file_content)
         except FileNotFoundError:
-            logger.info("No such file : %s" % WATCHA_CONF_FILE_PATH)
-        else:
+            logger.info("[watcha] read file %s - failed" % WATCHA_CONF_FILE_PATH)
 
-            def _parse_date(label, value):
-                return (
-                    datetime.strptime(value, "%Y-%m-%dT%H:%M:%S").strftime("%d/%m/%Y")
-                    if ((label == "UPGRADE_DATE" or label == "INSTALL_DATE") and value)
-                    else value
-                )
+        try:
+            disk_usage = _get_disk_usage()
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
+            logger.warn("[watcha] collect disk usage - failed: %s", e)
+        except AttributeError as e:
+            logger.warn("[watcha] parse disk usage statistics - failed: %s", e)
 
-            for value in ["WATCHA_RELEASE", "UPGRADE_DATE", "INSTALL_DATE"]:
-                result[value.lower()] = [
-                    _parse_date(line.split("=")[0], line.split("=")[1])
-                    for line in watcha_conf_content
-                    if value in line
-                ][0]
-
-        return result
+        return {
+            "disk_usage": disk_usage,
+            "watcha_release": install_information.get("watcha_release", ""),
+            "upgrade_date": install_information.get("upgrade_date", ""),
+            "install_date": install_information.get("install_date", ""),
+        }
 
     async def watcha_user_list(self):
         """Retrieve a list of all users with some informations.
