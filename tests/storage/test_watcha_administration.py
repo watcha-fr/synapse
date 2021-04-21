@@ -102,7 +102,7 @@ class WatchaAdminTestCase(unittest.TestCase):
 
         for element in expected_values:
             yield self.store.watcha_update_user_role(user_id, element["role"])
-            is_partner = yield self.store.is_user_partner(user_id)
+            is_partner = yield self.store.is_partner(user_id)
             is_admin = yield self.store.is_user_admin(user_id)
             self.assertEquals(is_partner, element["values"]["is_partner"])
             self.assertEquals(is_admin, element["values"]["is_admin"])

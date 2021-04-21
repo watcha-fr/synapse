@@ -1769,15 +1769,16 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         )
 
     # watcha+ op318
-    async def is_user_partner(self, user_id):
+    async def is_partner(self, user_id):
 
         is_partner = await self.db_pool.simple_select_one_onecol(
             "users",
             keyvalues={"name": user_id},
             retcol="is_partner",
-            desc="is_user_partner",
+            allow_none=True,
+            desc="is_partner",
         )
-        return is_partner
+        return bool(is_partner) if is_partner else False
 
     async def is_user_admin(self, user_id):
 
