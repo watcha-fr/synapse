@@ -232,46 +232,16 @@ class AdministrationStore(SQLBaseStore):
         Returns:
             A dict of strings
         """
-
-        def _get_disk_usage():
-            completed_process = subprocess.run(
-                ["du", "-bsh", "/var/lib/matrix-synapse/media"],
-                stdout=subprocess.PIPE,
-                timeout=3,
-                check=True,
-            )
-
-            stdout = completed_process.stdout.decode()
-            tokens = stdout.split("\t")
-            if len(tokens) <= 1:
-                logger.warn("[watcha] parse disk usage statistics - failed")
-                return
-
-            return tokens[0]
-
-        def _get_install_information(lines):
-            result = {}
-            for line in lines:
-                if "WATCHA_RELEASE" in line:
-                    result[line.split("=")[0]] = line.split("=")[1]
-                elif "UPGRADE_DATE" in line or "INSTALL_DATE" in line:
-                    result[line.split("=")[0]] = _parse_date(line.split("=")[1])
-
-            return result
-
-        def _parse_date(date):
-            return datetime.strptime(date, "%Y-%m-%dT%H:%M:%S").strftime("%d/%m/%Y")
-
         install_information = {}
+        disk_usage = ""
+
         try:
-            with open(WATCHA_CONF_FILE_PATH, "r") as f:
-                file_content = f.read().splitlines()
-            install_information = _get_install_information(file_content)
+            install_information = self._get_install_information_from_file()
         except FileNotFoundError:
             logger.info("[watcha] read file %s - failed" % WATCHA_CONF_FILE_PATH)
 
         try:
-            disk_usage = _get_disk_usage()
+            disk_usage = await self._get_disk_usage()
         except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
             logger.warn("[watcha] collect disk usage - failed: %s", e)
         except AttributeError as e:
@@ -283,6 +253,41 @@ class AdministrationStore(SQLBaseStore):
             "upgrade_date": install_information.get("upgrade_date", ""),
             "install_date": install_information.get("install_date", ""),
         }
+
+    def _get_install_information_from_file(self):
+        """Get watcha version number, last upgrade date and install date from watcha config file"""
+
+        with open(WATCHA_CONF_FILE_PATH, "r") as f:
+            file_content = f.read().splitlines()
+
+        install_information = {}
+        expected_labels = ("WATCHA_RELEASE", "UPGRADE_DATE", "INSTALL_DATE")
+        for line in file_content:
+            if any(expected_label in line for expected_label in expected_labels):
+                splited_line = line.split("=")
+                label = splited_line[0].lower()
+                value = splited_line[1]
+                install_information[label] = value
+
+        return install_information
+
+    async def _get_disk_usage(self):
+        """Recover data volume from media files"""
+
+        completed_process = subprocess.run(
+            ["du", "-bsh", "/var/lib/matrix-synapse/media"],
+            stdout=subprocess.PIPE,
+            timeout=3,
+            check=True,
+        )
+
+        stdout = completed_process.stdout.decode()
+        tokens = stdout.split("\t")
+        if len(tokens) <= 1:
+            logger.warn("[watcha] parse disk usage statistics - failed")
+            return
+
+        return tokens[0]
 
     async def watcha_user_list(self):
         """Retrieve a list of all users with some informations.

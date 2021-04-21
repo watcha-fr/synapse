@@ -1,12 +1,16 @@
-import tempfile
-from os.path import join
+from mock import patch, mock_open
 
 from synapse.types import UserID
 
 from tests import unittest
 
+WATCHA_CONFIG_FILE = """
+WATCHA_RELEASE=1.0
+INSTALL_DATE=2020-03-16T18:32:18
+UPGRADE_DATE=2020-06-16T22:43:29
+"""
 
-class WatchaAdminTestCase(unittest.HomeserverTestCase):
+class AdministrationTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
         self.time = int(hs.get_clock().time_msec())
@@ -110,46 +114,16 @@ class WatchaAdminTestCase(unittest.HomeserverTestCase):
             self.get_success(
                 self.store.watcha_update_user_role(user_id, element["role"])
             )
-            is_partner = self.get_success(self.store.is_user_partner(user_id))
+            is_partner = self.get_success(self.store.is_partner(user_id))
             is_admin = self.get_success(
                 self.store.is_server_admin(UserID.from_string(user_id))
             )
             self.assertEquals(is_partner, element["values"]["is_partner"])
             self.assertEquals(is_admin, element["values"]["is_admin"])
 
-    def test_get_server_state(self):
-
-        with tempfile.TemporaryDirectory() as temp_dirname:
-            test_configfile = join(temp_dirname, "watcha.conf")
-            with open(test_configfile, "w") as fd:
-                fd.write(
-                    """WATCHA_RELEASE=1.7.0
-WATCHA_REVISION=8e185
-SYGNAL_RELEASE=0.0.1_g20180417_1954_efd7389
-RIOT_RELEASE=20200602-1516-8984de36-9352f5888-a9e324aa
-SYNAPSE_RELEASE=1.3.1_g20200525_0731_dev_11061ab90
-WATCHA_ADMIN_RELEASE=20200615-1157-dev-3bcb74c-a9e324aa
-INSTALL_DATE=
-UPGRADE_DATE=2020-06-16T22:43:29
-"""
-                )
-            from synapse.storage.databases.main import watcha_administration
-
-            initial_WATCHA_CONF_FILE_PATH = watcha_administration.WATCHA_CONF_FILE_PATH
-            try:
-                watcha_administration.WATCHA_CONF_FILE_PATH = test_configfile
-                server_state = self.get_success(self.store._get_server_state())
-            finally:
-                watcha_administration.WATCHA_CONF_FILE_PATH = initial_WATCHA_CONF_FILE_PATH
-
-            self.assertEquals(len(server_state), 4)
-            self.assertEquals(
-                list(server_state.keys()),
-                ["disk_usage", "watcha_release", "upgrade_date", "install_date"],
-            )
-            self.assertEquals(
-                list(server_state["disk_usage"].keys()), ["total", "used", "free", "percent"]
-            )
-
-            self.assertEquals(server_state["install_date"], "")
-            self.assertEquals(server_state["upgrade_date"], "16/06/2020")
+    @patch("builtins.open", new_callable=mock_open, read_data=WATCHA_CONFIG_FILE)
+    def test_get_install_information_from_file(self, mock_file):
+        install_information = self.get_success(self.store._get_install_information_from_file())
+        self.assertEqual("1.0", install_information["watcha_release"])
+        self.assertEqual("2020-03-16T18:32:18", install_information["install_date"])
+        self.assertEqual("2020-06-16T22:43:29", install_information["upgrade_date"])

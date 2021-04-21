@@ -827,7 +827,13 @@ class AuthHandler(BaseHandler):
         ):
             await self.auth.check_auth_blocking(user_id)
 
+        """ watcha!
         access_token = self.macaroon_gen.generate_access_token(user_id)
+        !watcha """
+        # watcha+
+        extra_caveats = ["partner = true"] if await self.is_partner(user_id) else None
+        access_token = self.macaroon_gen.generate_access_token(user_id, extra_caveats)
+        # +watcha
         await self.store.add_access_token_to_user(
             user_id=user_id,
             token=access_token,
@@ -1589,7 +1595,7 @@ class AuthHandler(BaseHandler):
 
     # watcha+
     async def is_partner(self, user_id):
-        ret = await self.store.is_user_partner(
+        ret = await self.store.is_partner(
             user_id,
         )
         return ret
