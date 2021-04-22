@@ -4,7 +4,7 @@ from synapse.types import UserID
 
 from tests import unittest
 
-WATCHA_CONFIG_FILE = """
+SETUP_PROPERTIES = """
 WATCHA_RELEASE=1.0
 INSTALL_DATE=2020-03-16T18:32:18
 UPGRADE_DATE=2020-06-16T22:43:29
