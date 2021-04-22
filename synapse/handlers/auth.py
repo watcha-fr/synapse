@@ -1598,7 +1598,7 @@ class AuthHandler(BaseHandler):
         ret = await self.store.is_partner(
             user_id,
         )
-        return ret
+        return await self.store.is_partner(user_id)
 
     # +watcha
 
