@@ -4,7 +4,7 @@ from synapse.types import UserID
 
 from tests import unittest
 
-SETUP_PROPERTIES = """
+SETUP_PROPERTIES = """\
 WATCHA_RELEASE=1.0
 INSTALL_DATE=2020-03-16T18:32:18
 UPGRADE_DATE=2020-06-16T22:43:29
@@ -19,29 +19,22 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
 
         register_users_list = [
             {
-                "user_id": "@admin:test",
+                "user_id": "@administrator:test",
                 "make_partner": False,
                 "admin": True,
                 "create_profile_with_displayname": None,
                 "email": None,
             },
             {
-                "user_id": "@active_user:test",
+                "user_id": "@collaborator:test",
                 "make_partner": False,
                 "admin": False,
-                "create_profile_with_displayname": "active_user",
+                "create_profile_with_displayname": "collaborator",
                 "email": "example@example.com",
             },
             {
                 "user_id": "@partner:test",
                 "make_partner": True,
-                "admin": False,
-                "create_profile_with_displayname": None,
-                "email": None,
-            },
-            {
-                "user_id": "@non_active_user:test",
-                "make_partner": False,
                 "admin": False,
                 "create_profile_with_displayname": None,
                 "email": None,
@@ -62,11 +55,9 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
             )
 
             if user["email"]:
-
-                # Addition of email as threepids for @active_user:test :
                 self.get_success(
                     self.store.user_add_threepid(
-                        "@active_user:test",
+                        "@collaborator:test",
                         "email",
                         "example@example.com",
                         self.time,
@@ -101,7 +92,7 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
             self.assertEquals(self.time, users_informations[user_index]["creation_ts"])
 
     def test_watcha_update_user_role(self):
-        user_id = "@admin:test"
+        user_id = "@administrator:test"
         self.get_success(self.store.register_user(user_id, admin=True))
 
         expected_values = [
@@ -121,7 +112,7 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
             self.assertEquals(is_partner, element["values"]["is_partner"])
             self.assertEquals(is_admin, element["values"]["is_admin"])
 
-    @patch("builtins.open", new_callable=mock_open, read_data=WATCHA_CONFIG_FILE)
+    @patch("builtins.open", new_callable=mock_open, read_data=SETUP_PROPERTIES)
     def test_get_install_information_from_file(self, mock_file):
         install_information = self.get_success(self.store._get_install_information_from_file())
         self.assertEqual("1.0", install_information["watcha_release"])

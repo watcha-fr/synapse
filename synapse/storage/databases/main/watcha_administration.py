@@ -11,7 +11,7 @@ from synapse.storage.database import DatabasePool
 
 logger = logging.getLogger(__name__)
 
-WATCHA_CONF_FILE_PATH = "/etc/watcha.conf"
+SETUP_PROPERTIES_PATH = "/etc/watcha.conf"
 
 
 def _caller_name():
@@ -232,62 +232,63 @@ class AdministrationStore(SQLBaseStore):
         Returns:
             A dict of strings
         """
-        install_information = {}
-        disk_usage = ""
+        setup_properties = {}
 
         try:
-            install_information = self._get_install_information_from_file()
+            setup_properties = self._get_install_information_from_file()
         except FileNotFoundError:
-            logger.info("[watcha] read file %s - failed" % WATCHA_CONF_FILE_PATH)
-
-        try:
-            disk_usage = await self._get_disk_usage()
-        except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
-            logger.warn("[watcha] collect disk usage - failed: %s", e)
-        except AttributeError as e:
-            logger.warn("[watcha] parse disk usage statistics - failed: %s", e)
+            logger.info("[watcha] read file %s - failed" % SETUP_PROPERTIES_PATH)
 
         return {
-            "disk_usage": disk_usage,
-            "watcha_release": install_information.get("watcha_release", ""),
-            "upgrade_date": install_information.get("upgrade_date", ""),
-            "install_date": install_information.get("install_date", ""),
+            "disk_usage": await self._get_disk_usage(),
+            "watcha_release": setup_properties.get("watcha_release", ""),
+            "upgrade_date": setup_properties.get("upgrade_date", ""),
+            "install_date": setup_properties.get("install_date", ""),
         }
 
     def _get_install_information_from_file(self):
         """Get watcha version number, last upgrade date and install date from watcha config file"""
 
-        with open(WATCHA_CONF_FILE_PATH, "r") as f:
-            file_content = f.read().splitlines()
-
-        install_information = {}
+        setup_properties = {}
         expected_labels = ("WATCHA_RELEASE", "UPGRADE_DATE", "INSTALL_DATE")
-        for line in file_content:
-            if any(expected_label in line for expected_label in expected_labels):
-                splited_line = line.split("=")
-                label = splited_line[0].lower()
-                value = splited_line[1]
-                install_information[label] = value
 
-        return install_information
+        with open(SETUP_PROPERTIES_PATH, "r") as file:
+            for line in file:
+                property_label, property_value = line.split("=")
+                if property_label in expected_labels:
+                    property_label = property_label.lower()
+                    setup_properties[property_label] = property_value.rstrip("\n")
+
+        return setup_properties
 
     async def _get_disk_usage(self):
         """Recover data volume from media files"""
 
-        completed_process = subprocess.run(
-            ["du", "-bsh", "/var/lib/matrix-synapse/media"],
-            stdout=subprocess.PIPE,
-            timeout=3,
-            check=True,
-        )
+        try:
+            completed_process = subprocess.run(
+                ["du", "-bsh", "/var/lib/matrix-synapse/media"],
+                stdout=subprocess.PIPE,
+                timeout=3,
+                check=True,
+            )
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
+            logger.warn("[watcha] collect disk usage - failed: %s", e)
+            return
 
-        stdout = completed_process.stdout.decode()
+        stdout = completed_process.stdout
+        try:
+            stdout = stdout.decode()
+        except AttributeError as e:
+            logger.warn("[watcha] parse disk usage statistics - failed: %s", e)
+            return
+
         tokens = stdout.split("\t")
-        if len(tokens) <= 1:
+        if len(tokens) == 1:
             logger.warn("[watcha] parse disk usage statistics - failed")
             return
 
-        return tokens[0]
+        disk_usage = tokens[0]
+        return disk_usage
 
     async def watcha_user_list(self):
         """Retrieve a list of all users with some informations.
