@@ -11,7 +11,7 @@ from synapse.storage.database import DatabasePool
 
 logger = logging.getLogger(__name__)
 
-WATCHA_CONF_FILE_PATH = "/etc/watcha.conf"
+SETUP_PROPERTIES_PATH = "/etc/watcha.conf"
 
 
 def _caller_name():
@@ -232,63 +232,63 @@ class AdministrationStore(SQLBaseStore):
         Returns:
             A dict of strings
         """
-
-        def _get_disk_usage():
-            try:
-                completed_process = subprocess.run(
-                    ["du", "-bsh", "/var/lib/matrix-synapse/media"],
-                    stdout=subprocess.PIPE,
-                    timeout=3,
-                    check=True,
-                )
-            except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
-                logger.warn("[watcha] collect disk usage - failed: %s", e)
-                return
-
-            stdout = completed_process.stdout
-            try:
-                stdout = stdout.decode()
-            except AttributeError as e:
-                logger.warn("[watcha] parse disk usage statistics - failed: %s", e)
-                return
-
-            tokens = stdout.split("\t")
-            if len(tokens) <= 1:
-                logger.warn("[watcha] parse disk usage statistics - failed")
-                return
-
-            return tokens[0]
-
-        result = {
-            "disk_usage": _get_disk_usage(),
-            "watcha_release": "",
-            "upgrade_date": "",
-            "install_date": "",
-        }
+        setup_properties = {}
 
         try:
-            with open(WATCHA_CONF_FILE_PATH, "r") as f:
-                watcha_conf_content = f.read().splitlines()
-
+            setup_properties = self._get_install_information_from_file()
         except FileNotFoundError:
-            logger.info("No such file : %s" % WATCHA_CONF_FILE_PATH)
-        else:
+            logger.info("[watcha] read file %s - failed" % SETUP_PROPERTIES_PATH)
 
-            def _parse_date(label, value):
-                return (
-                    datetime.strptime(value, "%Y-%m-%dT%H:%M:%S").strftime("%d/%m/%Y")
-                    if ((label == "UPGRADE_DATE" or label == "INSTALL_DATE") and value)
-                    else value
-                )
+        return {
+            "disk_usage": await self._get_disk_usage(),
+            "watcha_release": setup_properties.get("watcha_release", ""),
+            "upgrade_date": setup_properties.get("upgrade_date", ""),
+            "install_date": setup_properties.get("install_date", ""),
+        }
 
-            for value in ["WATCHA_RELEASE", "UPGRADE_DATE", "INSTALL_DATE"]:
-                result[value.lower()] = [
-                    _parse_date(line.split("=")[0], line.split("=")[1])
-                    for line in watcha_conf_content
-                    if value in line
-                ][0]
+    def _get_install_information_from_file(self):
+        """Get watcha version number, last upgrade date and install date from watcha config file"""
 
-        return result
+        setup_properties = {}
+        expected_labels = ("WATCHA_RELEASE", "UPGRADE_DATE", "INSTALL_DATE")
+
+        with open(SETUP_PROPERTIES_PATH, "r") as file:
+            for line in file:
+                property_label, property_value = line.split("=")
+                if property_label in expected_labels:
+                    property_label = property_label.lower()
+                    setup_properties[property_label] = property_value.rstrip("\n")
+
+        return setup_properties
+
+    async def _get_disk_usage(self):
+        """Recover data volume from media files"""
+
+        try:
+            completed_process = subprocess.run(
+                ["du", "-bsh", "/var/lib/matrix-synapse/media"],
+                stdout=subprocess.PIPE,
+                timeout=3,
+                check=True,
+            )
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
+            logger.warn("[watcha] collect disk usage - failed: %s", e)
+            return
+
+        stdout = completed_process.stdout
+        try:
+            stdout = stdout.decode()
+        except AttributeError as e:
+            logger.warn("[watcha] parse disk usage statistics - failed: %s", e)
+            return
+
+        tokens = stdout.split("\t")
+        if len(tokens) == 1:
+            logger.warn("[watcha] parse disk usage statistics - failed")
+            return
+
+        disk_usage = tokens[0]
+        return disk_usage
 
     async def watcha_user_list(self):
         """Retrieve a list of all users with some informations.

@@ -1,6 +1,7 @@
 import logging
 
 from synapse.api.errors import SynapseError
+from synapse.types import UserID
 
 from ._base import BaseHandler
 
@@ -10,6 +11,7 @@ logger = logging.getLogger(__name__)
 class AdministrationHandler(BaseHandler):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
+        self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
 
     async def watcha_user_list(self):
@@ -49,7 +51,7 @@ class AdministrationHandler(BaseHandler):
             The user role.
         """
         is_partner = await self.auth_handler.is_partner(user_id)
-        is_admin = await self.auth_handler.is_admin(user_id)
+        is_admin = await self.auth.is_server_admin(UserID.from_string(user_id))
 
         if is_partner and is_admin:
             raise SynapseError(400, "A user can't be admin and partner too.")
