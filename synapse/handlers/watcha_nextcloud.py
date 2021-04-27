@@ -1,10 +1,8 @@
 import logging
-from pathlib import Path
 
 from jsonschema.exceptions import SchemaError, ValidationError
 
-from synapse.api.constants import EventTypes
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import SynapseError
 
 from ._base import BaseHandler
 
