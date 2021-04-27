@@ -231,7 +231,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                 if event_type == EventTypes.VectorSetting:
                     if "nextcloudShare" not in content:
                         raise SynapseError(
-                            400, "VectorSetting is only used for Nextcloud integration."
+                            400, "[watcha] binding Nextcloud folder with room - failed : VectorSetting is only used for Nextcloud integration"
                         )
 
                     nextcloud_url = content["nextcloudShare"]
@@ -249,7 +249,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                         if "dir" not in url_query:
                             raise SynapseError(
                                 400,
-                                "The url doesn't point to a valid nextcloud directory path.",
+                                "[watcha] binding Nextcloud folder with room - failed : wrong folder path",
                             )
 
                         nextcloud_folder_path = url_query["dir"][0]
