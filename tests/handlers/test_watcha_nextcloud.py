@@ -79,7 +79,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
 
         with self.assertLogs("synapse.handlers.watcha_nextcloud", level="WARN") as cm:
             self.get_success(
-                self.nextcloud_handler.add_room_users_to_nextcloud_group(self.room_id)
+                self.nextcloud_handler.add_room_members_to_group(self.room_id)
             )
 
         self.assertIn(
@@ -105,7 +105,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
 
         with self.assertLogs("synapse.handlers.watcha_nextcloud", level="WARN") as cm:
             self.get_success(
-                self.nextcloud_handler.add_room_users_to_nextcloud_group(self.room_id)
+                self.nextcloud_handler.add_room_members_to_group(self.room_id)
             )
 
         self.assertIn(

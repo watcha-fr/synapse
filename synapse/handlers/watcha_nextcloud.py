@@ -38,7 +38,7 @@ class NextcloudHandler(BaseHandler):
         """
         group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
         await self.nextcloud_client.add_group(group_name)
-        await self.add_room_users_to_nextcloud_group(room_id)
+        await self.add_room_members_to_group(room_id)
 
         nextcloud_username = await self.store.get_username(requester_id)
 
@@ -51,8 +51,8 @@ class NextcloudHandler(BaseHandler):
         )
         await self.store.register_share(room_id, new_share_id)
 
-    async def add_room_users_to_nextcloud_group(self, room_id: str):
-        """Add all users of a room to a Nextcloud group.
+    async def add_room_members_to_group(self, room_id: str):
+        """Add all members of a room to a Nextcloud group.
 
         Args:
             room_id: the id of the room which the Nextcloud group name is infered from.
