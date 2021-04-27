@@ -68,9 +68,7 @@ class NextcloudHandler(BaseHandler):
                 )
             except (SynapseError, ValidationError, SchemaError) as error:
                 logger.warn(
-                    "[watcha] add user {} to group {} - failed".format(
-                        user_id, group_name
-                    )
+                    f"[watcha] add user {user_id} to group {group_name} - failed"
                 )
 
     async def update_group(self, user_id: str, room_id: str, membership: str):
@@ -93,9 +91,7 @@ class NextcloudHandler(BaseHandler):
                 )
             except (SynapseError, ValidationError, SchemaError):
                 logger.warn(
-                    "[watcha] add user {} to group {} - failed".format(
-                        user_id, group_name
-                    ),
+                    f"[watcha] add user {user_id} to group {group_name} - failed"
                 )
         else:
             try:
@@ -104,7 +100,5 @@ class NextcloudHandler(BaseHandler):
                 )
             except (SynapseError, ValidationError, SchemaError):
                 logger.warn(
-                    "[watcha] remove user {} from group {} - failed".format(
-                        user_id, group_name
-                    ),
+                    f"[watcha] remove user {user_id} from group {group_name} - failed"
                 )

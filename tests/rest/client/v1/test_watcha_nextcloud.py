@@ -45,7 +45,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
     def send_room_nextcloud_mapping_event(self, request_content):
         channel = self.make_request(
             "PUT",
-            "/rooms/{}/state/im.vector.web.settings".format(self.room_id),
+            f"/rooms/{self.room_id}/state/im.vector.web.settings",
             content=json.dumps(request_content),
             access_token=self.creator_tok,
         )
@@ -113,7 +113,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         )
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/join".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/join",
             access_token=self.inviter_tok,
         )
 
@@ -126,7 +126,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         )
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/leave".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/leave",
             access_token=self.inviter_tok,
         )
 
@@ -141,7 +141,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         self.helper.join(self.room_id, user=self.inviter, tok=self.inviter_tok)
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/kick".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/kick",
             content={"user_id": self.inviter},
             access_token=self.inviter_tok,
         )
