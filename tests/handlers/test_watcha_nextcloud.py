@@ -1,6 +1,6 @@
 from mock import AsyncMock
 
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import SynapseError
 from synapse.rest.client.v1 import login, room
 from synapse.rest import admin
 from tests.unittest import HomeserverTestCase
@@ -18,14 +18,11 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
         self.nextcloud_handler = hs.get_nextcloud_handler()
-
         self.keycloak_client = self.nextcloud_handler.keycloak_client
         self.nextcloud_client = self.nextcloud_handler.nextcloud_client
 
-        # Create a room with two users :
         self.creator = self.register_user("creator", "pass", admin=True)
         self.creator_tok = self.login("creator", "pass")
-
         self.inviter = self.register_user("inviter", "pass")
         inviter_tok = self.login("inviter", "pass")
 
@@ -35,7 +32,6 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         )
         self.helper.join(self.room_id, self.inviter, tok=inviter_tok)
 
-        # Mock Nextcloud client functions :
         self.nextcloud_client.add_group = AsyncMock()
         self.nextcloud_client.delete_group = AsyncMock()
         self.nextcloud_client.add_user_to_group = AsyncMock()
@@ -47,24 +43,17 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.get_success(
             self.nextcloud_handler.bind(self.creator, self.room_id, "/directory")
         )
-
         share_id = self.get_success(
             self.store.get_share_id(self.room_id)
         )
 
-        # Verify that mocked functions are called once
         self.nextcloud_client.add_group.assert_called_once()
         self.nextcloud_client.share.assert_called_once()
-
-        # Verify that mocked functions are called twice
         self.assertEquals(self.nextcloud_client.add_user_to_group.call_count, 2)
-
-        # Verify that mocked functions are not called
         self.nextcloud_client.unshare.assert_not_called()
 
     def test_update_an_existing_bind(self):
         self.get_success(self.store.register_share(self.room_id, 2))
-
         old_share_id = self.get_success(
             self.store.get_share_id(self.room_id)
         )
@@ -74,19 +63,16 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.get_success(
             self.nextcloud_handler.bind(self.creator, self.room_id, "/directory2")
         )
-
         new_share_id = self.get_success(
             self.store.get_share_id(self.room_id)
         )
 
-        # Verify that mocked functions has called :
         self.nextcloud_client.unshare.assert_called()
         self.assertEqual(new_share_id, 1)
 
     def test_delete_an_existing_bind(self):
         self.get_success(self.store.register_share(self.room_id, 2))
         self.get_success(self.nextcloud_handler.unbind(self.room_id))
-
         share_id = self.get_success(
             self.store.get_share_id(self.room_id)
         )
@@ -105,15 +91,14 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
             )
 
         self.assertIn(
-            "Unable to add the user {} to the Nextcloud group {}".format(
+            "[watcha] add user {} to group {} - failed".format(
                 self.creator,
                 NEXTCLOUD_GROUP_NAME_PREFIX + self.room_id,
             ),
             cm.output[0],
         )
-
         self.assertIn(
-            "Unable to add the user {} to the Nextcloud group {}".format(
+            "[watcha] add user {} to group {} - failed".format(
                 self.inviter,
                 NEXTCLOUD_GROUP_NAME_PREFIX + self.room_id,
             ),
@@ -132,14 +117,13 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
             )
 
         self.assertIn(
-            "Unable to add the user {} to the Nextcloud group {}.".format(
+            "[watcha] add user {} to group {} - failed".format(
                 self.creator, group_name
             ),
             cm.output[0],
         )
-
         self.assertIn(
-            "Unable to add the user {} to the Nextcloud group {}.".format(
+            "[watcha] add user {} to group {} - failed".format(
                 self.inviter, group_name
             ),
             cm.output[1],
@@ -197,9 +181,8 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
                     second_inviter, self.room_id, "invite"
                 )
             )
-
         self.assertIn(
-            "Unable to add the user {} to the Nextcloud group {}.".format(
+            "[watcha] add user {} to group {} - failed".format(
                 second_inviter, NEXTCLOUD_GROUP_NAME_PREFIX + self.room_id
             ),
             cm.output[0],
@@ -217,9 +200,8 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
                     second_inviter, self.room_id, "leave"
                 )
             )
-
         self.assertIn(
-            "Unable to remove the user {} from the Nextcloud group {}.".format(
+            "[watcha] remove user {} from group {} - failed".format(
                 second_inviter, NEXTCLOUD_GROUP_NAME_PREFIX + self.room_id
             ),
             cm.output[0],
