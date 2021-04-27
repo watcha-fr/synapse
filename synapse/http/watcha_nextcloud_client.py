@@ -3,7 +3,7 @@ from base64 import b64encode
 from jsonschema import validate
 from typing import Any, List
 
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import Codes, NextcloudError
 from synapse.http.client import SimpleHttpClient
 
 logger = logging.getLogger(__name__)
@@ -86,10 +86,9 @@ class NextcloudClient(SimpleHttpClient):
 
     def _raise_for_status(self, meta: List[Any], errcode: Codes):
         if meta["status"] == "failure":
-            raise SynapseError(
-                400,
-                f"OCS error : status code {meta["statuscode"]} - message {meta["message"]}",
-                errcode,
+            raise NextcloudError(
+                meta["statuscode"],
+                meta["message"],
             )
 
     async def add_user(self, username: str, displayname: str = None):
@@ -120,13 +119,9 @@ class NextcloudClient(SimpleHttpClient):
             post_json=payload,
             headers=self._headers,
         )
+        
         validate(response, WITH_DATA_SCHEMA)
-
-        meta = response["ocs"]["meta"]
-        if meta["statuscode"] == 102:
-            logger.info(f"[watcha] user {username} already exists")
-        else:
-            self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_CREATE_USER)
+        self._raise_for_status(response["ocs"]["meta"])
 
     async def delete_user(self, username: str):
         """Delete an existing user.
@@ -142,11 +137,9 @@ class NextcloudClient(SimpleHttpClient):
             uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/users/{username}",
             headers=self._headers,
         )
-        validate(response, WITHOUT_DATA_SCHEMA)
 
-        self._raise_for_status(
-            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_DELETE_USER
-        )
+        validate(response, WITHOUT_DATA_SCHEMA)
+        self._raise_for_status(response["ocs"]["meta"])
 
     async def add_group(self, group_name: str):
         """Adds a new Nextcloud group.
@@ -165,13 +158,9 @@ class NextcloudClient(SimpleHttpClient):
             post_json={"groupid": group_name},
             headers=self._headers,
         )
-        validate(response, WITHOUT_DATA_SCHEMA)
 
-        meta = response["ocs"]["meta"]
-        if meta["statuscode"] == 102:
-            logger.info(f"[watcha] group {group_name} already exists"
-        else:
-            self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_CREATE_GROUP)
+        validate(response, WITHOUT_DATA_SCHEMA)
+        self._raise_for_status(response["ocs"]["meta"])
 
     async def delete_group(self, group_name: str):
         """Removes a existing Nextcloud group.
@@ -188,11 +177,9 @@ class NextcloudClient(SimpleHttpClient):
             uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/groups/{group_name}",
             headers=self._headers,
         )
-        validate(response, WITHOUT_DATA_SCHEMA)
 
-        self._raise_for_status(
-            response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_DELETE_GROUP
-        )
+        validate(response, WITHOUT_DATA_SCHEMA)
+        self._raise_for_status(response["ocs"]["meta"])
 
     async def add_user_to_group(self, username: str, group_name: str):
         """Add user to the Nextcloud group.
@@ -214,15 +201,9 @@ class NextcloudClient(SimpleHttpClient):
             post_json={"groupid": group_name},
             headers=self._headers,
         )
-        validate(response, WITHOUT_DATA_SCHEMA)
 
-        meta = response["ocs"]["meta"]
-        errcode = (
-            Codes.NEXTCLOUD_USER_DOES_NOT_EXIST
-            if meta["statuscode"] == 103
-            else Codes.NEXTCLOUD_CAN_NOT_ADD_USER_TO_GROUP
-        )
-        self._raise_for_status(meta, errcode)
+        validate(response, WITHOUT_DATA_SCHEMA)
+        self._raise_for_status(response["ocs"]["meta"])
 
     async def remove_user_from_group(self, username: str, group_name: str):
         """Removes the specified user from the specified group.
@@ -244,15 +225,9 @@ class NextcloudClient(SimpleHttpClient):
             headers=self._headers,
             json_body={"groupid": group_name},
         )
-        validate(response, WITHOUT_DATA_SCHEMA)
 
-        meta = response["ocs"]["meta"]
-        errcode = (
-            Codes.NEXTCLOUD_USER_DOES_NOT_EXIST
-            if meta["statuscode"] == 103
-            else Codes.NEXTCLOUD_CAN_NOT_REMOVE_USER_FROM_GROUP
-        )
-        self._raise_for_status(meta, errcode)
+        validate(response, WITHOUT_DATA_SCHEMA)
+        self._raise_for_status(response["ocs"]["meta"])
 
     async def share(self, requester: str, path: str, group_name: str):
         """Share an existing file or folder with all permissions for a group.
@@ -298,9 +273,9 @@ class NextcloudClient(SimpleHttpClient):
                 "requester": requester,
             },
         )
-        validate(response, WITH_DATA_SCHEMA)
 
-        self._raise_for_status(response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_SHARE)
+        validate(response, WITH_DATA_SCHEMA)
+        self._raise_for_status(response["ocs"]["meta"])
 
         return response["ocs"]["data"]["id"]
 
@@ -320,6 +295,6 @@ class NextcloudClient(SimpleHttpClient):
             headers=self._headers,
             json_body={"requester": requester},
         )
-        validate(response, WITHOUT_DATA_SCHEMA)
 
-        self._raise_for_status(response["ocs"]["meta"], Codes.NEXTCLOUD_CAN_NOT_UNSHARE)
+        validate(response, WITHOUT_DATA_SCHEMA)
+        self._raise_for_status(response["ocs"]["meta"])
