@@ -64,7 +64,7 @@ class NextcloudClient(SimpleHttpClient):
     https://docs.nextcloud.com/server/latest/developer_manual/client_apis/index.html
     """
 
-    def __init__(self, hs):
+    def __init__(self, hs: "Homeserver"):
         super().__init__(hs)
 
         self.nextcloud_url = hs.config.nextcloud_url

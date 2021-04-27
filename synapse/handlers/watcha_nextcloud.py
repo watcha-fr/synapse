@@ -15,13 +15,13 @@ NEXTCLOUD_GROUP_NAME_PREFIX = "c4d96a06b7_"
 
 
 class NextcloudHandler(BaseHandler):
-    def __init__(self, hs):
+    def __init__(self, hs: "Homeserver"):
         self.store = hs.get_datastore()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
 
-    async def unbind(self, room_id):
+    async def unbind(self, room_id: str):
         """Unbind a Nextcloud folder from a room.
 
         Args :
@@ -32,7 +32,7 @@ class NextcloudHandler(BaseHandler):
 
         await self.store.unbind(room_id)
 
-    async def bind(self, user_id, room_id, path):
+    async def bind(self, user_id: str, room_id: str, path: str):
         """Bind a Nextcloud folder with a room.
 
         Args :
@@ -58,7 +58,7 @@ class NextcloudHandler(BaseHandler):
 
         await self.store.bind(room_id, path, new_share_id)
 
-    async def add_room_users_to_nextcloud_group(self, room_id):
+    async def add_room_users_to_nextcloud_group(self, room_id: str):
         """Add all users of a room to a Nextcloud.
 
         Args:
@@ -80,7 +80,7 @@ class NextcloudHandler(BaseHandler):
                     )
                 )
 
-    async def update_share(self, user_id, room_id, membership):
+    async def update_share(self, user_id: str, room_id: str, membership: str):
 
         group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
         nextcloud_username = await self.store.get_nextcloud_username(user_id)

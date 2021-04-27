@@ -3,10 +3,10 @@ from synapse.storage.database import DatabasePool
 
 
 class NextcloudStore(SQLBaseStore):
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs: "Homeserver"):
         super().__init__(database, db_conn, hs)
 
-    async def get_path_from_room_id(self, room_id):
+    async def get_path_from_room_id(self, room_id: str):
         """Get the Nextcloud folder path which is bound with room_id."""
 
         return await self.db_pool.simple_select_one_onecol(
@@ -17,7 +17,7 @@ class NextcloudStore(SQLBaseStore):
             desc="get_path_from_room_id",
         )
 
-    async def get_nextcloud_share_id_from_room_id(self, room_id):
+    async def get_nextcloud_share_id_from_room_id(self, room_id: str):
         """Get Nextcloud share id of the room id."""
 
         return await self.db_pool.simple_select_one_onecol(
@@ -28,7 +28,7 @@ class NextcloudStore(SQLBaseStore):
             desc="get_nextcloud_share_id_from_room_id",
         )
 
-    async def bind(self, room_id, path, share_id):
+    async def bind(self, room_id: str, path: str, share_id: str):
         """Bind a room with a Nextcloud folder."""
 
         await self.db_pool.simple_upsert(
@@ -42,7 +42,7 @@ class NextcloudStore(SQLBaseStore):
             desc="bind",
         )
 
-    async def unbind(self, room_id):
+    async def unbind(self, room_id: str):
         """Delete mapping between Watcha room and Nextcloud directory for room_id."""
 
         await self.db_pool.simple_delete(
@@ -51,7 +51,7 @@ class NextcloudStore(SQLBaseStore):
             desc="unbind",
         )
 
-    async def get_nextcloud_username(self, user_id):
+    async def get_nextcloud_username(self, user_id: str):
         """Look up a Nextcloud username by their user_id
 
         Args:
