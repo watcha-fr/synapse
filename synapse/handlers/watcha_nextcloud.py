@@ -28,11 +28,11 @@ class NextcloudHandler(BaseHandler):
         await self.nextcloud_client.delete_group(NEXTCLOUD_GROUP_NAME_PREFIX + room_id)
         await self.store.delete_share(room_id)
 
-    async def bind(self, user_id: str, room_id: str, path: str):
+    async def bind(self, requester_id: str, room_id: str, path: str):
         """Bind a Nextcloud folder with a room.
 
         Args :
-           user_id: the matrix user id of the requester.
+           requester_id: the mxid of the requester.
            room_id: the id of the room to bind.
            path: the path of the Nextcloud folder to bind.
         """
@@ -40,7 +40,7 @@ class NextcloudHandler(BaseHandler):
         await self.nextcloud_client.add_group(group_name)
         await self.add_room_users_to_nextcloud_group(room_id)
 
-        nextcloud_username = await self.store.get_username(user_id)
+        nextcloud_username = await self.store.get_username(requester_id)
 
         old_share_id = await self.store.get_share_id(room_id)
         if old_share_id:
@@ -52,7 +52,7 @@ class NextcloudHandler(BaseHandler):
         await self.store.register_share(room_id, new_share_id)
 
     async def add_room_users_to_nextcloud_group(self, room_id: str):
-        """Add all users of a room to a Nextcloud.
+        """Add all users of a room to a Nextcloud group.
 
         Args:
             room_id: the id of the room which the Nextcloud group name is infered from.
@@ -74,7 +74,15 @@ class NextcloudHandler(BaseHandler):
                 )
 
     async def update_share(self, user_id: str, room_id: str, membership: str):
+        """Update a Nextcloud group by adding or removing users.
+        If membership is 'join' or 'invite', the user is add to the Nextcloud group infered from the room.
+        Else, the users is removed from the group.
 
+        Args:
+            user_id: mxid of the user concerned by the membership event
+            room_id: the id of the room where the membership event was sent
+            membership: membership event. Can be 'invite', 'join', 'kick' or 'leave'
+        """
         group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
         nextcloud_username = await self.store.get_username(user_id)
 

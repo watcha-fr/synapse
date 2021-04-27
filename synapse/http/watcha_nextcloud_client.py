@@ -101,7 +101,7 @@ class NextcloudClient(SimpleHttpClient):
 
         Args:
             username: the username of the user to create.
-            displayname: displayname of invitee. Defaults to user keycloak id.
+            displayname: displayname of the user. Defaults to user keycloak id.
 
         Status codes:
             100 - successful
@@ -144,7 +144,6 @@ class NextcloudClient(SimpleHttpClient):
             100 - successful
             101 - failure
         """
-
         response = await self.delete_get_json(
             uri="{}/ocs/v1.php/cloud/users/{}".format(self.nextcloud_url, username),
             headers=self._headers,
@@ -167,7 +166,6 @@ class NextcloudClient(SimpleHttpClient):
             102: group already exists
             103: failed to add the group
         """
-
         response = await self.post_json_get_json(
             uri="{}/ocs/v1.php/cloud/groups".format(self.nextcloud_url),
             post_json={"groupid": group_name},
@@ -192,7 +190,6 @@ class NextcloudClient(SimpleHttpClient):
             101: group does not exist
             102: failed to delete group
         """
-
         response = await self.delete_get_json(
             uri="{}/ocs/v1.php/cloud/groups/{}".format(self.nextcloud_url, group_name),
             headers=self._headers,
@@ -218,7 +215,6 @@ class NextcloudClient(SimpleHttpClient):
             104: insufficient privileges
             105: failed to add user to group
         """
-
         response = await self.post_json_get_json(
             uri="{}/ocs/v1.php/cloud/users/{}/groups".format(
                 self.nextcloud_url, username
@@ -251,7 +247,6 @@ class NextcloudClient(SimpleHttpClient):
             104: insufficient privileges
             105: failed to remove user from group
         """
-
         response = await self.delete_get_json(
             uri="{}/ocs/v1.php/cloud/users/{}/groups".format(
                 self.nextcloud_url, username
@@ -274,7 +269,7 @@ class NextcloudClient(SimpleHttpClient):
 
         Args:
             requester: the user who want to create the share
-            path: the path of folder to share
+            path: the path of the folder to share
             group_name: the name of group which will share the folder
 
         Payload:
@@ -302,7 +297,6 @@ class NextcloudClient(SimpleHttpClient):
         Returns:
             the id of Nextcloud share
         """
-
         response = await self.post_json_get_json(
             uri="{}/ocs/v2.php/apps/watcha_integrator/api/v1/shares".format(
                 self.nextcloud_url
@@ -333,7 +327,6 @@ class NextcloudClient(SimpleHttpClient):
             100: successful
             404: Share couldn’t be deleted.
         """
-
         response = await self.delete_get_json(
             uri="{}/ocs/v2.php/apps/watcha_integrator/api/v1/shares/{}".format(
                 self.nextcloud_url, share_id

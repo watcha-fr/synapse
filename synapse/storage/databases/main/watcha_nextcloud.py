@@ -7,8 +7,11 @@ class NextcloudStore(SQLBaseStore):
         super().__init__(database, db_conn, hs)
 
     async def get_share_id(self, room_id: str):
-        """Get Nextcloud share id of the room id."""
-
+        """Get Nextcloud share id of a room.
+        
+        Args:
+            room_id: id of the room
+        """
         return await self.db_pool.simple_select_one_onecol(
             table="room_nextcloud_mapping",
             keyvalues={"room_id": room_id},
@@ -18,8 +21,12 @@ class NextcloudStore(SQLBaseStore):
         )
 
     async def register_share(self, room_id: str, share_id: str):
-        """Register a share between a room and a Nextcloud folder"""
-
+        """Register a share between a room and a Nextcloud folder
+        
+        Args:
+            room_id: id of the room
+            share_id: id of the Nextcloud share
+        """
         await self.db_pool.simple_upsert(
             table="room_nextcloud_mapping",
             keyvalues={"room_id": room_id},
@@ -31,8 +38,11 @@ class NextcloudStore(SQLBaseStore):
         )
 
     async def delete_share(self, room_id: str):
-        """Delete mapping between Watcha room and Nextcloud directory for room_id."""
-
+        """Delete an existing share of a room
+        
+        Args:
+            room_id: id of the room where the share is associated
+        """
         await self.db_pool.simple_delete(
             table="room_nextcloud_mapping",
             keyvalues={"room_id": room_id},
