@@ -48,10 +48,6 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
             self.nextcloud_handler.bind(self.creator, self.room_id, "/directory")
         )
 
-        mapped_directory = self.get_success(
-            self.store.get_path_folder(self.room_id)
-        )
-
         share_id = self.get_success(
             self.store.get_share_id(self.room_id)
         )
@@ -66,28 +62,17 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         # Verify that mocked functions are not called
         self.nextcloud_client.unshare.assert_not_called()
 
-        self.assertEqual(mapped_directory, "/directory")
-
     def test_update_an_existing_bind(self):
         self.get_success(self.store.register_share(self.room_id, "/directory", 2))
-
-        old_mapped_directory = self.get_success(
-            self.store.get_path_folder(self.room_id)
-        )
 
         old_share_id = self.get_success(
             self.store.get_share_id(self.room_id)
         )
 
-        self.assertEqual(old_mapped_directory, "/directory")
         self.assertEqual(old_share_id, 2)
 
         self.get_success(
             self.nextcloud_handler.bind(self.creator, self.room_id, "/directory2")
-        )
-
-        mapped_directory = self.get_success(
-            self.store.get_path_folder(self.room_id)
         )
 
         new_share_id = self.get_success(
@@ -96,24 +81,17 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
 
         # Verify that mocked functions has called :
         self.nextcloud_client.unshare.assert_called()
-
-        self.assertEqual(mapped_directory, "/directory2")
         self.assertEqual(new_share_id, 1)
 
     def test_delete_an_existing_bind(self):
         self.get_success(self.store.register_share(self.room_id, "/directory", 2))
         self.get_success(self.nextcloud_handler.unbind(self.room_id))
 
-        mapped_directory = self.get_success(
-            self.store.get_path_folder(self.room_id)
-        )
-
         share_id = self.get_success(
             self.store.get_share_id(self.room_id)
         )
 
         self.nextcloud_client.delete_group.assert_called()
-        self.assertIsNone(mapped_directory)
         self.assertIsNone(share_id)
 
     def test_add_user_to_nextcloud_group_without_nextcloud_account(self):

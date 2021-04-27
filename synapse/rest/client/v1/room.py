@@ -208,10 +208,10 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     content=content,
                 )
                 # watcha+
-                mapped_directory = await self.store.get_path_folder(
+                existing_sharing = await self.store.get_share_id(
                     room_id
                 )
-                if mapped_directory and membership in [
+                if existing_sharing and membership in [
                     "invite",
                     "join",
                     "kick",
@@ -380,10 +380,10 @@ class JoinRoomAliasServlet(TransactionRestServlet):
         )
 
         # watcha+
-        mapped_directory = await self.store.get_path_folder(
+        existing_sharing = await self.store.get_share_id(
             room_id
         )
-        if mapped_directory:
+        if existing_sharing:
             await self.nextcloud_handler.update_share(
                 requester.user.to_string(), room_id, "join"
             )
@@ -901,10 +901,10 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             pass
 
         # watcha+
-        mapped_directory = await self.store.get_path_folder(
+        existing_sharing = await self.store.get_share_id(
             room_id
         )
-        if mapped_directory and membership_action in [
+        if existing_sharing and membership_action in [
             "invite",
             "join",
             "kick",

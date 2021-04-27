@@ -6,17 +6,6 @@ class NextcloudStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs: "Homeserver"):
         super().__init__(database, db_conn, hs)
 
-    async def get_path_folder(self, room_id: str):
-        """Get the Nextcloud folder path which is bound with room_id."""
-
-        return await self.db_pool.simple_select_one_onecol(
-            table="room_nextcloud_mapping",
-            keyvalues={"room_id": room_id},
-            retcol="directory_path",
-            allow_none=True,
-            desc="get_path_folder",
-        )
-
     async def get_share_id(self, room_id: str):
         """Get Nextcloud share id of the room id."""
 
