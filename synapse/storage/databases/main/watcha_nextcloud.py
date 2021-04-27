@@ -13,7 +13,7 @@ class NextcloudStore(SQLBaseStore):
             room_id: id of the room
         """
         return await self.db_pool.simple_select_one_onecol(
-            table="room_nextcloud_mapping",
+            table="watcha_nextcloud_shares",
             keyvalues={"room_id": room_id},
             retcol="share_id",
             allow_none=True,
@@ -28,7 +28,7 @@ class NextcloudStore(SQLBaseStore):
             share_id: id of the Nextcloud share
         """
         await self.db_pool.simple_upsert(
-            table="room_nextcloud_mapping",
+            table="watcha_nextcloud_shares",
             keyvalues={"room_id": room_id},
             values={
                 "room_id": room_id,
@@ -44,7 +44,7 @@ class NextcloudStore(SQLBaseStore):
             room_id: id of the room where the share is associated
         """
         await self.db_pool.simple_delete(
-            table="room_nextcloud_mapping",
+            table="watcha_nextcloud_shares",
             keyvalues={"room_id": room_id},
             desc="unbind",
         )
