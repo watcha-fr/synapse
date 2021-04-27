@@ -17,15 +17,14 @@ class NextcloudStore(SQLBaseStore):
             desc="get_share_id",
         )
 
-    async def register_share(self, room_id: str, path: str, share_id: str):
-        """Bind a room with a Nextcloud folder."""
+    async def register_share(self, room_id: str, share_id: str):
+        """Register a share between a room and a Nextcloud folder"""
 
         await self.db_pool.simple_upsert(
             table="room_nextcloud_mapping",
             keyvalues={"room_id": room_id},
             values={
                 "room_id": room_id,
-                "directory_path": path,
                 "share_id": share_id,
             },
             desc="bind",

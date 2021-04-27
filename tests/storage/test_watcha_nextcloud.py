@@ -10,13 +10,12 @@ class NextcloudStorageTestCase(unittest.HomeserverTestCase):
         hs = setup_test_homeserver(self.addCleanup)
         self.store = hs.get_datastore()
         self.room_id = "room1"
-        self.directory_path = "/directory"
         self.share_id = 1
 
         # Set mapping between a room and a nextcloud directory :
         yield defer.ensureDeferred(
             self.store.register_share(
-                self.room_id, self.directory_path, self.share_id
+                self.room_id, self.share_id
             )
         )
 
@@ -40,12 +39,11 @@ class NextcloudStorageTestCase(unittest.HomeserverTestCase):
 
     @defer.inlineCallbacks
     def test_update_share(self):
-        new_directory_path = "/directory2"
         new_share_id = 2
 
         yield defer.ensureDeferred(
             self.store.register_share(
-                self.room_id, new_directory_path, new_share_id
+                self.room_id, new_share_id
             )
         )
         share_id = yield defer.ensureDeferred(

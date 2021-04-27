@@ -252,10 +252,10 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                                 "The url doesn't point to a valid nextcloud directory path.",
                             )
 
-                        nextcloud_directory_path = url_query["dir"][0]
+                        nextcloud_folder_path = url_query["dir"][0]
 
                         await self.nextcloud_handler.bind(
-                            requester_id, room_id, nextcloud_directory_path
+                            requester_id, room_id, nextcloud_folder_path
                         )
                 # +watcha
                 (

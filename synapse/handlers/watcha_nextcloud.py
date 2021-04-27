@@ -54,7 +54,7 @@ class NextcloudHandler(BaseHandler):
             nextcloud_username, path, group_name
         )
 
-        await self.store.register_share(room_id, path, new_share_id)
+        await self.store.register_share(room_id, new_share_id)
 
     async def add_room_users_to_nextcloud_group(self, room_id: str):
         """Add all users of a room to a Nextcloud.
