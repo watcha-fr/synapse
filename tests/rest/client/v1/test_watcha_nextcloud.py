@@ -29,7 +29,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         self.room_id = self.helper.create_room_as(self.creator, tok=self.creator_tok)
 
         # map a room with a Nextcloud directory :
-        self.get_success(self.store.bind(self.room_id, "/directory", 1))
+        self.get_success(self.store.register_share(self.room_id, "/directory", 1))
 
         # mock some functions of WatchaRoomNextcloudMappingHandler
         self.nextcloud_handler = hs.get_nextcloud_handler()

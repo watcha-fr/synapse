@@ -6,7 +6,7 @@ class NextcloudStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs: "Homeserver"):
         super().__init__(database, db_conn, hs)
 
-    async def get_path_from_room_id(self, room_id: str):
+    async def get_path_folder(self, room_id: str):
         """Get the Nextcloud folder path which is bound with room_id."""
 
         return await self.db_pool.simple_select_one_onecol(
@@ -14,10 +14,10 @@ class NextcloudStore(SQLBaseStore):
             keyvalues={"room_id": room_id},
             retcol="directory_path",
             allow_none=True,
-            desc="get_path_from_room_id",
+            desc="get_path_folder",
         )
 
-    async def get_nextcloud_share_id_from_room_id(self, room_id: str):
+    async def get_share_id(self, room_id: str):
         """Get Nextcloud share id of the room id."""
 
         return await self.db_pool.simple_select_one_onecol(
@@ -25,10 +25,10 @@ class NextcloudStore(SQLBaseStore):
             keyvalues={"room_id": room_id},
             retcol="share_id",
             allow_none=True,
-            desc="get_nextcloud_share_id_from_room_id",
+            desc="get_share_id",
         )
 
-    async def bind(self, room_id: str, path: str, share_id: str):
+    async def register_share(self, room_id: str, path: str, share_id: str):
         """Bind a room with a Nextcloud folder."""
 
         await self.db_pool.simple_upsert(
@@ -42,7 +42,7 @@ class NextcloudStore(SQLBaseStore):
             desc="bind",
         )
 
-    async def unbind(self, room_id: str):
+    async def delete_share(self, room_id: str):
         """Delete mapping between Watcha room and Nextcloud directory for room_id."""
 
         await self.db_pool.simple_delete(
@@ -51,7 +51,7 @@ class NextcloudStore(SQLBaseStore):
             desc="unbind",
         )
 
-    async def get_nextcloud_username(self, user_id: str):
+    async def get_username(self, user_id: str):
         """Look up a Nextcloud username by their user_id
 
         Args:
@@ -65,5 +65,5 @@ class NextcloudStore(SQLBaseStore):
             keyvalues={"user_id": user_id},
             retcol="nextcloud_username",
             allow_none=True,
-            desc="get_nextcloud_username",
+            desc="get_username",
         )

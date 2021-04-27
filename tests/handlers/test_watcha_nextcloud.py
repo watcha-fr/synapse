@@ -49,11 +49,11 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         )
 
         mapped_directory = self.get_success(
-            self.store.get_path_from_room_id(self.room_id)
+            self.store.get_path_folder(self.room_id)
         )
 
         share_id = self.get_success(
-            self.store.get_nextcloud_share_id_from_room_id(self.room_id)
+            self.store.get_share_id(self.room_id)
         )
 
         # Verify that mocked functions are called once
@@ -69,14 +69,14 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.assertEqual(mapped_directory, "/directory")
 
     def test_update_an_existing_bind(self):
-        self.get_success(self.store.bind(self.room_id, "/directory", 2))
+        self.get_success(self.store.register_share(self.room_id, "/directory", 2))
 
         old_mapped_directory = self.get_success(
-            self.store.get_path_from_room_id(self.room_id)
+            self.store.get_path_folder(self.room_id)
         )
 
         old_share_id = self.get_success(
-            self.store.get_nextcloud_share_id_from_room_id(self.room_id)
+            self.store.get_share_id(self.room_id)
         )
 
         self.assertEqual(old_mapped_directory, "/directory")
@@ -87,11 +87,11 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         )
 
         mapped_directory = self.get_success(
-            self.store.get_path_from_room_id(self.room_id)
+            self.store.get_path_folder(self.room_id)
         )
 
         new_share_id = self.get_success(
-            self.store.get_nextcloud_share_id_from_room_id(self.room_id)
+            self.store.get_share_id(self.room_id)
         )
 
         # Verify that mocked functions has called :
@@ -101,15 +101,15 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.assertEqual(new_share_id, 1)
 
     def test_delete_an_existing_bind(self):
-        self.get_success(self.store.bind(self.room_id, "/directory", 2))
+        self.get_success(self.store.register_share(self.room_id, "/directory", 2))
         self.get_success(self.nextcloud_handler.unbind(self.room_id))
 
         mapped_directory = self.get_success(
-            self.store.get_path_from_room_id(self.room_id)
+            self.store.get_path_folder(self.room_id)
         )
 
         share_id = self.get_success(
-            self.store.get_nextcloud_share_id_from_room_id(self.room_id)
+            self.store.get_share_id(self.room_id)
         )
 
         self.nextcloud_client.delete_group.assert_called()

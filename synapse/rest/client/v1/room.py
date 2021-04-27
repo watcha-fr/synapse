@@ -208,7 +208,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     content=content,
                 )
                 # watcha+
-                mapped_directory = await self.store.get_path_from_room_id(
+                mapped_directory = await self.store.get_path_folder(
                     room_id
                 )
                 if mapped_directory and membership in [
@@ -380,7 +380,7 @@ class JoinRoomAliasServlet(TransactionRestServlet):
         )
 
         # watcha+
-        mapped_directory = await self.store.get_path_from_room_id(
+        mapped_directory = await self.store.get_path_folder(
             room_id
         )
         if mapped_directory:
@@ -901,7 +901,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             pass
 
         # watcha+
-        mapped_directory = await self.store.get_path_from_room_id(
+        mapped_directory = await self.store.get_path_folder(
             room_id
         )
         if mapped_directory and membership_action in [

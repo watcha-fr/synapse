@@ -30,7 +30,7 @@ class NextcloudHandler(BaseHandler):
 
         await self.nextcloud_client.delete_group(NEXTCLOUD_GROUP_NAME_PREFIX + room_id)
 
-        await self.store.unbind(room_id)
+        await self.store.delete_share(room_id)
 
     async def bind(self, user_id: str, room_id: str, path: str):
         """Bind a Nextcloud folder with a room.
@@ -41,13 +41,13 @@ class NextcloudHandler(BaseHandler):
            path: the path of the Nextcloud folder to bind.
         """
         group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
-        nextcloud_username = await self.store.get_nextcloud_username(user_id)
+        nextcloud_username = await self.store.get_username(user_id)
 
         await self.nextcloud_client.add_group(group_name)
 
         await self.add_room_users_to_nextcloud_group(room_id)
 
-        old_share_id = await self.store.get_nextcloud_share_id_from_room_id(room_id)
+        old_share_id = await self.store.get_share_id(room_id)
 
         if old_share_id:
             await self.nextcloud_client.unshare(nextcloud_username, old_share_id)
@@ -56,7 +56,7 @@ class NextcloudHandler(BaseHandler):
             nextcloud_username, path, group_name
         )
 
-        await self.store.bind(room_id, path, new_share_id)
+        await self.store.register_share(room_id, path, new_share_id)
 
     async def add_room_users_to_nextcloud_group(self, room_id: str):
         """Add all users of a room to a Nextcloud.
@@ -68,7 +68,7 @@ class NextcloudHandler(BaseHandler):
         user_ids = await self.store.get_users_in_room(room_id)
 
         for user_id in user_ids:
-            nextcloud_username = await self.store.get_nextcloud_username(user_id)
+            nextcloud_username = await self.store.get_username(user_id)
             try:
                 await self.nextcloud_client.add_user_to_group(
                     nextcloud_username, group_name
@@ -83,7 +83,7 @@ class NextcloudHandler(BaseHandler):
     async def update_share(self, user_id: str, room_id: str, membership: str):
 
         group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
-        nextcloud_username = await self.store.get_nextcloud_username(user_id)
+        nextcloud_username = await self.store.get_username(user_id)
 
         if membership in ("invite", "join"):
             try:
