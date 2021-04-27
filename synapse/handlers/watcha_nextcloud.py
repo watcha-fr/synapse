@@ -2,7 +2,13 @@ import logging
 
 from jsonschema.exceptions import SchemaError, ValidationError
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import SynapseError, NextcloudError
+from synapse.api.errors import (
+    Codes,
+    HttpResponseException,
+    NextcloudError,
+    SynapseError,
+)
 
 from ._base import BaseHandler
 
@@ -10,6 +16,12 @@ logger = logging.getLogger(__name__)
 
 # echo -n watcha | md5sum  | head -c 10
 NEXTCLOUD_GROUP_NAME_PREFIX = "c4d96a06b7_"
+NEXTCLOUD_CLIENT_ERRORS = (
+    NextcloudError,
+    SchemaError,
+    ValidationError,
+    HttpResponseException,
+)
 
 
 class NextcloudHandler(BaseHandler):
@@ -25,11 +37,21 @@ class NextcloudHandler(BaseHandler):
         Args :
             room_id: the id of the room to bind.
         """
-        await self.nextcloud_client.delete_group(NEXTCLOUD_GROUP_NAME_PREFIX + room_id)
+        group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
+        try:
+            await self.nextcloud_client.delete_group(group_name)
+        except NEXTCLOUD_CLIENT_ERRORS as error:
+            logger.error(
+                f"[watcha] delete nextcloud group {group_name} - failed: {error}"
+            )
+
         await self.store.delete_share(room_id)
 
     async def bind(self, requester_id: str, room_id: str, path: str):
-        """Bind a Nextcloud folder with a room.
+        """Bind a Nextcloud folder with a room in three steps :
+            1 - create a new Nextcloud group
+            2 - add all room members in the new group
+            3 - create a share on folder for the new group
 
         Args :
            requester_id: the mxid of the requester.
@@ -37,19 +59,23 @@ class NextcloudHandler(BaseHandler):
            path: the path of the Nextcloud folder to bind.
         """
         group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
-        await self.nextcloud_client.add_group(group_name)
+
+        try:
+            await self.nextcloud_client.add_group(group_name)
+        except NEXTCLOUD_CLIENT_ERRORS as error:
+            if isinstance(error, NextcloudError) and error.code == 102:
+                logger.warn(
+                    f"[watcha] add nextcloud group {group_name} - failed : the group already exists"
+                )
+            else:
+                raise SynapseError(
+                    400,
+                    f"[watcha] add nextcloud group {group_name} - failed : {error}",
+                    Codes.NEXTCLOUD_CAN_NOT_CREATE_GROUP,
+                )
+
         await self.add_room_members_to_group(room_id)
-
-        nextcloud_username = await self.store.get_username(requester_id)
-
-        old_share_id = await self.store.get_share_id(room_id)
-        if old_share_id:
-            await self.nextcloud_client.unshare(nextcloud_username, old_share_id)
-
-        new_share_id = await self.nextcloud_client.share(
-            nextcloud_username, path, group_name
-        )
-        await self.store.register_share(room_id, new_share_id)
+        await self.create_share(requester_id, room_id, path)
 
     async def add_room_members_to_group(self, room_id: str):
         """Add all members of a room to a Nextcloud group.
@@ -66,10 +92,47 @@ class NextcloudHandler(BaseHandler):
                 await self.nextcloud_client.add_user_to_group(
                     nextcloud_username, group_name
                 )
-            except (SynapseError, ValidationError, SchemaError) as error:
-                logger.warn(
-                    f"[watcha] add user {user_id} to group {group_name} - failed"
-                )
+            except NEXTCLOUD_CLIENT_ERRORS as error:
+                error_msg = f"[watcha] add user {user_id} to group {group_name} - failed: {error}"
+                if isinstance(error, NextcloudError) and (error.code in (103, 105)):
+                    logger.error(error_msg)
+                else:
+                    raise SynapseError(
+                        400, error_msg, Codes.NEXTCLOUD_CAN_NOT_ADD_USER_TO_GROUP
+                    )
+
+    async def create_share(self, requester_id: str, room_id: str, path: str):
+        """Create a new share on folder for a specific Nextcloud group.
+        Before that, delete old existing share for this group if it exist.
+
+        Args:
+            requester_id: the mxid of the requester.
+            room_id: the id of the room to bind.
+            path: the path of the Nextcloud folder to bind.
+        """
+        group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
+        nextcloud_username = await self.store.get_username(requester_id)
+
+        old_share_id = await self.store.get_share_id(room_id)
+        if old_share_id:
+            try:
+                await self.nextcloud_client.unshare(nextcloud_username, old_share_id)
+            except NEXTCLOUD_CLIENT_ERRORS as error:
+                logger.error(f"[watcha] unshare {old_share_id} - failed: {error}")
+
+        try:
+            new_share_id = await self.nextcloud_client.share(
+                nextcloud_username, path, group_name
+            )
+        except NEXTCLOUD_CLIENT_ERRORS as error:
+            self.unbind(room_id)
+            raise SynapseError(
+                400,
+                f"[watcha] share folder {path} with group {group_name} - failed: {error}",
+                Codes.NEXTCLOUD_CAN_NOT_SHARE,
+            )
+
+        await self.store.register_share(room_id, new_share_id)
 
     async def update_group(self, user_id: str, room_id: str, membership: str):
         """Update a Nextcloud group by adding or removing users.
@@ -89,16 +152,16 @@ class NextcloudHandler(BaseHandler):
                 await self.nextcloud_client.add_user_to_group(
                     nextcloud_username, group_name
                 )
-            except (SynapseError, ValidationError, SchemaError):
+            except NEXTCLOUD_CLIENT_ERRORS as error:
                 logger.warn(
-                    f"[watcha] add user {user_id} to group {group_name} - failed"
+                    f"[watcha] add user {user_id} to group {group_name} - failed: {error}"
                 )
         else:
             try:
                 await self.nextcloud_client.remove_user_from_group(
                     nextcloud_username, group_name
                 )
-            except (SynapseError, ValidationError, SchemaError):
+            except NEXTCLOUD_CLIENT_ERRORS as error:
                 logger.warn(
-                    f"[watcha] remove user {user_id} from group {group_name} - failed"
+                    f"[watcha] remove user {user_id} from group {group_name} - failed: {error}"
                 )
