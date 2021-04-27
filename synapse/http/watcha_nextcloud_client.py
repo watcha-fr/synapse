@@ -130,7 +130,7 @@ class NextcloudClient(SimpleHttpClient):
 
         if meta["statuscode"] == 102:
             logger.info(
-                "User '{}' already exists on the Nextcloud server.".format(username)
+                "[watcha] user {} already exists".format(username)
             )
         else:
             self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_CREATE_USER)
@@ -180,7 +180,7 @@ class NextcloudClient(SimpleHttpClient):
         meta = response["ocs"]["meta"]
 
         if meta["statuscode"] == 102:
-            logger.info("Nextcloud group {} already exists.".format(group_name))
+            logger.info("[watcha] group {} already exists".format(group_name))
         else:
             self._raise_for_status(meta, Codes.NEXTCLOUD_CAN_NOT_CREATE_GROUP)
 

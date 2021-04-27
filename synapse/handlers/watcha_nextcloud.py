@@ -75,7 +75,7 @@ class NextcloudHandler(BaseHandler):
                 )
             except (SynapseError, ValidationError, SchemaError) as error:
                 logger.warn(
-                    "Unable to add the user {} to the Nextcloud group {}.".format(
+                    "[watcha] add user {} to group {} - failed".format(
                         user_id, group_name
                     )
                 )
@@ -92,7 +92,7 @@ class NextcloudHandler(BaseHandler):
                 )
             except (SynapseError, ValidationError, SchemaError):
                 logger.warn(
-                    "Unable to add the user {} to the Nextcloud group {}.".format(
+                    "[watcha] add user {} to group {} - failed".format(
                         user_id, group_name
                     ),
                 )
@@ -103,7 +103,7 @@ class NextcloudHandler(BaseHandler):
                 )
             except (SynapseError, ValidationError, SchemaError):
                 logger.warn(
-                    "Unable to remove the user {} from the Nextcloud group {}.".format(
+                    "[watcha] remove user {} from group {} - failed".format(
                         user_id, group_name
                     ),
                 )
