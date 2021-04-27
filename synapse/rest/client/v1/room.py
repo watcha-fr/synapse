@@ -222,7 +222,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                         if membership in ["join", "leave"]
                         else state_key
                     )
-                    await self.nextcloud_handler.update_share(
+                    await self.nextcloud_handler.update_group(
                         user, room_id, membership
                     )
                 # +watcha
@@ -384,7 +384,7 @@ class JoinRoomAliasServlet(TransactionRestServlet):
             room_id
         )
         if existing_sharing:
-            await self.nextcloud_handler.update_share(
+            await self.nextcloud_handler.update_group(
                 requester.user.to_string(), room_id, "join"
             )
         # +watcha
@@ -915,7 +915,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 if membership_action in ["join", "leave"]
                 else content["user_id"]
             )
-            await self.nextcloud_handler.update_share(
+            await self.nextcloud_handler.update_group(
                 user, room_id, membership_action
             )
         # +watcha

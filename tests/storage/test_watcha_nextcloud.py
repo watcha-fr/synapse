@@ -38,7 +38,7 @@ class NextcloudStorageTestCase(unittest.HomeserverTestCase):
         self.assertIsNone(share_id)
 
     @defer.inlineCallbacks
-    def test_update_share(self):
+    def test_update_group(self):
         new_share_id = 2
 
         yield defer.ensureDeferred(

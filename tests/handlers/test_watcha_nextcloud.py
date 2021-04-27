@@ -147,7 +147,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
 
     def test_update_existing_nextcloud_share_on_invite_membership(self):
         self.get_success(
-            self.nextcloud_handler.update_share(
+            self.nextcloud_handler.update_group(
                 "@second_inviter:test", self.room_id, "invite"
             )
         )
@@ -157,7 +157,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
 
     def test_update_existing_nextcloud_share_on_join_membership(self):
         self.get_success(
-            self.nextcloud_handler.update_share(
+            self.nextcloud_handler.update_group(
                 "@second_inviter:test", self.room_id, "join"
             )
         )
@@ -167,7 +167,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
 
     def test_update_existing_nextcloud_share_on_leave_membership(self):
         self.get_success(
-            self.nextcloud_handler.update_share(
+            self.nextcloud_handler.update_group(
                 "@second_inviter:test", self.room_id, "leave"
             )
         )
@@ -177,7 +177,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
 
     def test_update_existing_nextcloud_share_on_kick_membership(self):
         self.get_success(
-            self.nextcloud_handler.update_share(
+            self.nextcloud_handler.update_group(
                 "@second_inviter:test", self.room_id, "kick"
             )
         )
@@ -193,7 +193,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
 
         with self.assertLogs("synapse.handlers.watcha_nextcloud", level="WARN") as cm:
             self.get_success(
-                self.nextcloud_handler.update_share(
+                self.nextcloud_handler.update_group(
                     second_inviter, self.room_id, "invite"
                 )
             )
@@ -213,7 +213,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
 
         with self.assertLogs("synapse.handlers.watcha_nextcloud", level="WARN") as cm:
             self.get_success(
-                self.nextcloud_handler.update_share(
+                self.nextcloud_handler.update_group(
                     second_inviter, self.room_id, "leave"
                 )
             )

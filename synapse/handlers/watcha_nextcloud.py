@@ -73,7 +73,7 @@ class NextcloudHandler(BaseHandler):
                     )
                 )
 
-    async def update_share(self, user_id: str, room_id: str, membership: str):
+    async def update_group(self, user_id: str, room_id: str, membership: str):
         """Update a Nextcloud group by adding or removing users.
         If membership is 'join' or 'invite', the user is add to the Nextcloud group infered from the room.
         Else, the users is removed from the group.
