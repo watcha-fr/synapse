@@ -8,7 +8,7 @@ class NextcloudStore(SQLBaseStore):
 
     async def get_share_id(self, room_id: str):
         """Get Nextcloud share id of a room.
-        
+
         Args:
             room_id: id of the room
         """
@@ -22,7 +22,7 @@ class NextcloudStore(SQLBaseStore):
 
     async def register_share(self, room_id: str, share_id: str):
         """Register a share between a room and a Nextcloud folder
-        
+
         Args:
             room_id: id of the room
             share_id: id of the Nextcloud share
@@ -39,7 +39,7 @@ class NextcloudStore(SQLBaseStore):
 
     async def delete_share(self, room_id: str):
         """Delete an existing share of a room
-        
+
         Args:
             room_id: id of the room where the share is associated
         """

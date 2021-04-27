@@ -43,9 +43,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.get_success(
             self.nextcloud_handler.bind(self.creator, self.room_id, "/directory")
         )
-        share_id = self.get_success(
-            self.store.get_share_id(self.room_id)
-        )
+        share_id = self.get_success(self.store.get_share_id(self.room_id))
 
         self.nextcloud_client.add_group.assert_called_once()
         self.nextcloud_client.share.assert_called_once()
@@ -54,18 +52,14 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
 
     def test_update_an_existing_bind(self):
         self.get_success(self.store.register_share(self.room_id, 2))
-        old_share_id = self.get_success(
-            self.store.get_share_id(self.room_id)
-        )
+        old_share_id = self.get_success(self.store.get_share_id(self.room_id))
 
         self.assertEqual(old_share_id, 2)
 
         self.get_success(
             self.nextcloud_handler.bind(self.creator, self.room_id, "/directory2")
         )
-        new_share_id = self.get_success(
-            self.store.get_share_id(self.room_id)
-        )
+        new_share_id = self.get_success(self.store.get_share_id(self.room_id))
 
         self.nextcloud_client.unshare.assert_called()
         self.assertEqual(new_share_id, 1)
@@ -73,9 +67,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
     def test_delete_an_existing_bind(self):
         self.get_success(self.store.register_share(self.room_id, 2))
         self.get_success(self.nextcloud_handler.unbind(self.room_id))
-        share_id = self.get_success(
-            self.store.get_share_id(self.room_id)
-        )
+        share_id = self.get_success(self.store.get_share_id(self.room_id))
 
         self.nextcloud_client.delete_group.assert_called()
         self.assertIsNone(share_id)

@@ -86,10 +86,12 @@ class RoomCreateRestServlet(TransactionRestServlet):
         return self.txns.fetch_or_execute_request(request, self.on_POST, request)
 
     async def on_POST(self, request):
-        """ watcha!
+        """watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
+        !watcha"""
+        requester = await self.auth.get_user_by_req(
+            request, allow_partner=False
+        )  # watcha+
 
         info, _ = await self._room_creation_handler.create_room(
             requester, self.get_room_config(request)
@@ -208,9 +210,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     content=content,
                 )
                 # watcha+
-                existing_sharing = await self.store.get_share_id(
-                    room_id
-                )
+                existing_sharing = await self.store.get_share_id(room_id)
                 if existing_sharing and membership in [
                     "invite",
                     "join",
@@ -222,25 +222,22 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                         if membership in ["join", "leave"]
                         else state_key
                     )
-                    await self.nextcloud_handler.update_group(
-                        user, room_id, membership
-                    )
+                    await self.nextcloud_handler.update_group(user, room_id, membership)
                 # +watcha
             else:
                 # watcha+
                 if event_type == EventTypes.VectorSetting:
                     if "nextcloudShare" not in content:
                         raise SynapseError(
-                            400, "[watcha] binding Nextcloud folder with room - failed : VectorSetting is only used for Nextcloud integration"
+                            400,
+                            "[watcha] binding Nextcloud folder with room - failed : VectorSetting is only used for Nextcloud integration",
                         )
 
                     nextcloud_url = content["nextcloudShare"]
                     requester_id = requester.user.to_string()
 
                     if not nextcloud_url:
-                        await self.nextcloud_handler.unbind(
-                            room_id
-                        )
+                        await self.nextcloud_handler.unbind(room_id)
                     else:
                         url_query = urlparse.parse_qs(
                             urlparse.urlparse(nextcloud_url).query
@@ -380,9 +377,7 @@ class JoinRoomAliasServlet(TransactionRestServlet):
         )
 
         # watcha+
-        existing_sharing = await self.store.get_share_id(
-            room_id
-        )
+        existing_sharing = await self.store.get_share_id(room_id)
         if existing_sharing:
             await self.nextcloud_handler.update_group(
                 requester.user.to_string(), room_id, "join"
@@ -412,10 +407,12 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         server = parse_string(request, "server", default=None)
 
         try:
-            """ watcha!
+            """watcha!
             await self.auth.get_user_by_req(request, allow_guest=True)
-            !watcha """
-            await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=False) # watcha+
+            !watcha"""
+            await self.auth.get_user_by_req(
+                request, allow_guest=True, allow_partner=False
+            )  # watcha+
         except InvalidClientCredentialsError as e:
             # Option to allow servers to require auth when accessing
             # /publicRooms via CS API. This is especially helpful in private
@@ -464,10 +461,12 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         return 200, data
 
     async def on_POST(self, request):
-        """ watcha!
+        """watcha!
         await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha """
-        await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=False) # watcha+
+        !watcha"""
+        await self.auth.get_user_by_req(
+            request, allow_guest=True, allow_partner=False
+        )  # watcha+
 
         server = parse_string(request, "server", default=None)
         content = parse_json_object_from_request(request)
@@ -802,7 +801,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         self.store = hs.get_datastore()
         self.administration_handler = hs.get_administration_handler()
         self.nextcloud_handler = hs.get_nextcloud_handler()
-        self.partner_handler = hs.get_partner_handler() 
+        self.partner_handler = hs.get_partner_handler()
         # +watcha
 
     def register(self, http_server):
@@ -901,9 +900,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             pass
 
         # watcha+
-        existing_sharing = await self.store.get_share_id(
-            room_id
-        )
+        existing_sharing = await self.store.get_share_id(room_id)
         if existing_sharing and membership_action in [
             "invite",
             "join",
@@ -915,9 +912,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 if membership_action in ["join", "leave"]
                 else content["user_id"]
             )
-            await self.nextcloud_handler.update_group(
-                user, room_id, membership_action
-            )
+            await self.nextcloud_handler.update_group(user, room_id, membership_action)
         # +watcha
 
         return_value = {}
