@@ -25,9 +25,7 @@ class NextcloudHandler(BaseHandler):
         Args :
             room_id: the id of the room to bind.
         """
-
         await self.nextcloud_client.delete_group(NEXTCLOUD_GROUP_NAME_PREFIX + room_id)
-
         await self.store.delete_share(room_id)
 
     async def bind(self, user_id: str, room_id: str, path: str):
@@ -39,21 +37,18 @@ class NextcloudHandler(BaseHandler):
            path: the path of the Nextcloud folder to bind.
         """
         group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
-        nextcloud_username = await self.store.get_username(user_id)
-
         await self.nextcloud_client.add_group(group_name)
-
         await self.add_room_users_to_nextcloud_group(room_id)
 
-        old_share_id = await self.store.get_share_id(room_id)
+        nextcloud_username = await self.store.get_username(user_id)
 
+        old_share_id = await self.store.get_share_id(room_id)
         if old_share_id:
             await self.nextcloud_client.unshare(nextcloud_username, old_share_id)
 
         new_share_id = await self.nextcloud_client.share(
             nextcloud_username, path, group_name
         )
-
         await self.store.register_share(room_id, new_share_id)
 
     async def add_room_users_to_nextcloud_group(self, room_id: str):
