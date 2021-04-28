@@ -77,18 +77,10 @@ class Codes:
     USER_DEACTIVATED = "M_USER_DEACTIVATED"
     BAD_ALIAS = "M_BAD_ALIAS"
     # watcha+
-    NEXTCLOUD_USER_DOES_NOT_EXIST = "W_NEXTCLOUD_USER_DOES_NOT_EXIST"
-    NEXTCLOUD_CAN_NOT_CREATE_USER = "W_NEXTCLOUD_CAN_NOT_CREATE_USER"
-    NEXTCLOUD_CAN_NOT_DELETE_USER = "W_NEXTCLOUD_CAN_NOT_DELETE_USER"
+    NEXTCLOUD_CAN_NOT_ADD_MEMBERS_TO_GROUP = "W_NEXTCLOUD_CAN_NOT_ADD_MEMBERS_TO_GROUP"
     NEXTCLOUD_CAN_NOT_CREATE_GROUP = "W_NEXTCLOUD_CAN_NOT_CREATE_GROUP"
-    NEXTCLOUD_CAN_NOT_DELETE_GROUP = "W_NEXTCLOUD_CAN_NOT_DELETE_GROUP"
-    NEXTCLOUD_CAN_NOT_ADD_USER_TO_GROUP = "W_NEXTCLOUD_CAN_NOT_ADD_USER_TO_GROUP"
-    NEXTCLOUD_CAN_NOT_REMOVE_USER_FROM_GROUP = (
-        "W_NEXTCLOUD_CAN_NOT_REMOVE_USER_FROM_GROUP"
-    )
-    NEXTCLOUD_CAN_NOT_GET_SHARES = "W_NEXTCLOUD_CAN_NOT_GET_SHARES"
     NEXTCLOUD_CAN_NOT_SHARE = "W_NEXTCLOUD_CAN_NOT_SHARE"
-    NEXTCLOUD_CAN_NOT_UNSHARE = "W_NEXTCLOUD_CAN_NOT_UNSHARE"
+
     # +watcha
 
 
@@ -157,6 +149,25 @@ class SynapseError(CodeMessageException):
 
     def error_dict(self):
         return cs_error(self.msg, self.errcode)
+
+
+# watcha+
+class NextcloudError(CodeMessageException):
+    """A base exception type for Nextcloud errors which have an error code and error
+    message (corresponding to status code and status message from Nextcloud API documentation).
+    """
+
+    def __init__(self, code: int, msg: str):
+        """Constructs a Nextcloud error.
+
+        Args:
+            code: The integer error code (corresponding to status code in response body)
+            msg: The human-readable error message.
+        """
+        super().__init__(code, msg)
+
+
+# +watcha
 
 
 class ProxiedRequestError(SynapseError):

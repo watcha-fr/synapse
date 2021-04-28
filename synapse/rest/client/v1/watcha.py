@@ -2,7 +2,12 @@ import logging
 
 from jsonschema.exceptions import SchemaError, ValidationError
 
-from synapse.api.errors import AuthError, HttpResponseException, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    HttpResponseException,
+    SynapseError,
+    NextcloudError,
+)
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.push.mailer import Mailer
@@ -153,9 +158,17 @@ class WatchaRegisterRestServlet(RestServlet):
 
         try:
             await self.nextcloud_client.add_user(keycloak_user_id, displayname)
-        except (SynapseError, HttpResponseException, ValidationError, SchemaError):
-            await self.keycloak_client.delete_user(keycloak_user_id)
-            raise
+        except (
+            NextcloudError,
+            HttpResponseException,
+            ValidationError,
+            SchemaError,
+        ) as error:
+            if isinstance(error, NextcloudError) and error.code == 102:
+                logger.warn(f"[watcha] add user {keycloak_user_id} - failed: {error}")
+            else:
+                await self.keycloak_client.delete_user(keycloak_user_id)
+                raise
 
         try:
             user_id = await self.registration_handler.register_user(
