@@ -93,7 +93,7 @@ class NextcloudHandler(BaseHandler):
                     nextcloud_username, group_name
                 )
             except NEXTCLOUD_CLIENT_ERRORS as error:
-                # Do not raise error if a specific user can not be added to group
+                # Do not raise error if some users can not be added to group
                 if isinstance(error, NextcloudError) and (error.code in (103, 105)):
                     logger.error(
                         f"[watcha] add user {user_id} to group {group_name} - failed: {error}"
