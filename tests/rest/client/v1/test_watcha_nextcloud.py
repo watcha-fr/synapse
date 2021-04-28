@@ -87,12 +87,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertFalse(self.nextcloud_handler.bind.called)
-        self.assertRaises(SynapseError)
-        self.assertEquals(400, channel.code)
-        self.assertEquals(
-            "[watcha] binding Nextcloud folder with room - failed: VectorSetting is only used for Nextcloud integration",
-            json.loads(channel.result["body"])["error"],
-        )
+        self.assertEquals(200, channel.code)
 
     def test_create_new_room_nextcloud_mapping_with_wrong_url(self):
         channel = self.send_room_nextcloud_mapping_event(
