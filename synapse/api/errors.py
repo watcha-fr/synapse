@@ -154,7 +154,7 @@ class SynapseError(CodeMessageException):
 
 # watcha+
 class NextcloudError(CodeMessageException):
-    """A base exception type for nextcloud errors which have an error code and error
+    """A base exception type for Nextcloud errors which have an error code and error
     message (corresponding to status code and status message from Nextcloud API documentation).
     """
 

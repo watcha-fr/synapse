@@ -2,7 +2,6 @@ import logging
 
 from jsonschema.exceptions import SchemaError, ValidationError
 
-from synapse.api.errors import SynapseError, NextcloudError
 from synapse.api.errors import (
     Codes,
     HttpResponseException,
@@ -65,12 +64,12 @@ class NextcloudHandler(BaseHandler):
         except NEXTCLOUD_CLIENT_ERRORS as error:
             if isinstance(error, NextcloudError) and error.code == 102:
                 logger.warn(
-                    f"[watcha] add nextcloud group {group_name} - failed : the group already exists"
+                    f"[watcha] add nextcloud group {group_name} - failed: the group already exists"
                 )
             else:
                 raise SynapseError(
                     400,
-                    f"[watcha] add nextcloud group {group_name} - failed : {error}",
+                    f"[watcha] add nextcloud group {group_name} - failed: {error}",
                     Codes.NEXTCLOUD_CAN_NOT_CREATE_GROUP,
                 )
 

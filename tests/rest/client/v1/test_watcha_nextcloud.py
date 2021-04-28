@@ -90,7 +90,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         self.assertRaises(SynapseError)
         self.assertEquals(400, channel.code)
         self.assertEquals(
-            "[watcha] binding Nextcloud folder with room - failed : VectorSetting is only used for Nextcloud integration",
+            "[watcha] binding Nextcloud folder with room - failed: VectorSetting is only used for Nextcloud integration",
             json.loads(channel.result["body"])["error"],
         )
 
@@ -103,7 +103,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         self.assertRaises(SynapseError)
         self.assertEquals(400, channel.code)
         self.assertEquals(
-            "[watcha] binding Nextcloud folder with room - failed : wrong folder path",
+            "[watcha] binding Nextcloud folder with room - failed: wrong folder path",
             json.loads(channel.result["body"])["error"],
         )
 

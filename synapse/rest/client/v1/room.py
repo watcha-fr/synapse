@@ -89,9 +89,9 @@ class RoomCreateRestServlet(TransactionRestServlet):
         """watcha!
         requester = await self.auth.get_user_by_req(request)
         !watcha"""
-        requester = await self.auth.get_user_by_req(
-            request, allow_partner=False
-        )  # watcha+
+        # watcha+
+        requester = await self.auth.get_user_by_req(request, allow_partner=False)
+        # +watcha
 
         info, _ = await self._room_creation_handler.create_room(
             requester, self.get_room_config(request)
@@ -230,7 +230,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     if "nextcloudShare" not in content:
                         raise SynapseError(
                             400,
-                            "[watcha] binding Nextcloud folder with room - failed : VectorSetting is only used for Nextcloud integration",
+                            "[watcha] binding Nextcloud folder with room - failed: VectorSetting is only used for Nextcloud integration",
                         )
 
                     nextcloud_url = content["nextcloudShare"]
@@ -246,7 +246,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                         if "dir" not in url_query:
                             raise SynapseError(
                                 400,
-                                "[watcha] binding Nextcloud folder with room - failed : wrong folder path",
+                                "[watcha] binding Nextcloud folder with room - failed: wrong folder path",
                             )
 
                         nextcloud_folder_path = url_query["dir"][0]
@@ -410,9 +410,11 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             """watcha!
             await self.auth.get_user_by_req(request, allow_guest=True)
             !watcha"""
+            # watcha+
             await self.auth.get_user_by_req(
                 request, allow_guest=True, allow_partner=False
-            )  # watcha+
+            )
+            # +watcha
         except InvalidClientCredentialsError as e:
             # Option to allow servers to require auth when accessing
             # /publicRooms via CS API. This is especially helpful in private
@@ -464,9 +466,9 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         """watcha!
         await self.auth.get_user_by_req(request, allow_guest=True)
         !watcha"""
-        await self.auth.get_user_by_req(
-            request, allow_guest=True, allow_partner=False
-        )  # watcha+
+        # watcha+
+        await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=False)
+        # +watcha
 
         server = parse_string(request, "server", default=None)
         content = parse_json_object_from_request(request)

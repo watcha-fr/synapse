@@ -165,7 +165,7 @@ class WatchaRegisterRestServlet(RestServlet):
             SchemaError,
         ) as error:
             if isinstance(error, NextcloudError) and error.code == 102:
-                logger.warn(f"[watcha] add user {keycloak_user_id} - failed : {error}")
+                logger.warn(f"[watcha] add user {keycloak_user_id} - failed: {error}")
             else:
                 await self.keycloak_client.delete_user(keycloak_user_id)
                 raise
