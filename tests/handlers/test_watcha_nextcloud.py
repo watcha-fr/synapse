@@ -127,7 +127,29 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
             cm.output[1],
         )
 
-    def test_create_share_with_exceptions(self):
+    def test_create_share_with_unexisting_folder(self):
+        old_share_id = self.get_success(self.store.get_share_id(self.room_id))
+        self.nextcloud_client.share = AsyncMock(
+            side_effect=NextcloudError(code=404, msg="")
+        )
+        self.nextcloud_client.unshare = AsyncMock(
+            side_effect=NextcloudError(code=404, msg="")
+        )
+        self.nextcloud_handler.unbind = AsyncMock()
+
+        with self.assertLogs("synapse.handlers.watcha_nextcloud", level="WARN") as cm:
+            error = self.get_failure(
+                self.nextcloud_handler.create_share(
+                    self.creator, self.room_id, "/new_folder"
+                ),
+                SynapseError,
+            )
+
+        self.assertEquals(error.value.code, 404)
+        self.nextcloud_handler.unbind.assert_called_once()
+        self.assertIn(f"[watcha] unshare {old_share_id} - failed", cm.output[0])
+
+    def test_create_share_with_other_exceptions(self):
         old_share_id = self.get_success(self.store.get_share_id(self.room_id))
         self.nextcloud_client.share = AsyncMock(
             side_effect=NextcloudError(code=400, msg="")
@@ -138,13 +160,14 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.nextcloud_handler.unbind = AsyncMock()
 
         with self.assertLogs("synapse.handlers.watcha_nextcloud", level="WARN") as cm:
-            self.get_failure(
+            error = self.get_failure(
                 self.nextcloud_handler.create_share(
                     self.creator, self.room_id, "/new_folder"
                 ),
                 SynapseError,
             )
 
+        self.assertEquals(error.value.code, 500)
         self.nextcloud_handler.unbind.assert_called_once()
         self.assertIn(f"[watcha] unshare {old_share_id} - failed", cm.output[0])
 

@@ -69,7 +69,7 @@ class NextcloudHandler(BaseHandler):
                 )
             else:
                 raise SynapseError(
-                    400,
+                    500,
                     f"[watcha] add nextcloud group {group_name} - failed: {error}",
                     Codes.NEXTCLOUD_CAN_NOT_CREATE_GROUP,
                 )
@@ -100,7 +100,7 @@ class NextcloudHandler(BaseHandler):
                     )
                 else:
                     raise SynapseError(
-                        400,
+                        500,
                         f"[watcha] add members of room {room_id} to group {group_name} - failed: {error}",
                         Codes.NEXTCLOUD_CAN_NOT_ADD_MEMBERS_TO_GROUP,
                     )
@@ -130,8 +130,14 @@ class NextcloudHandler(BaseHandler):
             )
         except NEXTCLOUD_CLIENT_ERRORS as error:
             await self.unbind(room_id)
+            # raise 404 error if folder to share do not exist
+            http_code = (
+                error.code
+                if isinstance(error, NextcloudError) and error.code == 404
+                else 500
+            )
             raise SynapseError(
-                400,
+                http_code,
                 f"[watcha] share folder {path} with group {group_name} - failed: {error}",
                 Codes.NEXTCLOUD_CAN_NOT_SHARE,
             )
