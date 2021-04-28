@@ -129,7 +129,7 @@ class NextcloudHandler(BaseHandler):
                 nextcloud_username, path, group_name
             )
         except NEXTCLOUD_CLIENT_ERRORS as error:
-            self.unbind(room_id)
+            await self.unbind(room_id)
             raise SynapseError(
                 400,
                 f"[watcha] share folder {path} with group {group_name} - failed: {error}",
