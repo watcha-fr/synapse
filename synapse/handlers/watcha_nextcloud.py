@@ -62,6 +62,7 @@ class NextcloudHandler(BaseHandler):
         try:
             await self.nextcloud_client.add_group(group_name)
         except NEXTCLOUD_CLIENT_ERRORS as error:
+            # Do not raise error if Nextcloud group already exist
             if isinstance(error, NextcloudError) and error.code == 102:
                 logger.warn(
                     f"[watcha] add nextcloud group {group_name} - failed: the group already exists"
@@ -92,12 +93,16 @@ class NextcloudHandler(BaseHandler):
                     nextcloud_username, group_name
                 )
             except NEXTCLOUD_CLIENT_ERRORS as error:
-                error_msg = f"[watcha] add user {user_id} to group {group_name} - failed: {error}"
+                # Do not raise error if a specific user can not be added to group
                 if isinstance(error, NextcloudError) and (error.code in (103, 105)):
-                    logger.error(error_msg)
+                    logger.error(
+                        f"[watcha] add user {user_id} to group {group_name} - failed: {error}"
+                    )
                 else:
                     raise SynapseError(
-                        400, error_msg, Codes.NEXTCLOUD_CAN_NOT_ADD_USER_TO_GROUP
+                        400,
+                        f"[watcha] add members of room {room_id} to group {group_name} - failed: {error}",
+                        Codes.NEXTCLOUD_CAN_NOT_ADD_MEMBERS_TO_GROUP,
                     )
 
     async def create_share(self, requester_id: str, room_id: str, path: str):
