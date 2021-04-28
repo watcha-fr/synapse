@@ -3,8 +3,7 @@ from mock import AsyncMock
 
 from synapse.api.errors import SynapseError
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room, watcha
-from synapse.types import UserID, create_requester
+from synapse.rest.client.v1 import login, room
 
 from tests import unittest
 
@@ -20,22 +19,17 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
-        self.creator = self.register_user("creator", "pass")
-        self.creator_tok = self.login("creator", "pass")
-
-        self.inviter = self.register_user("inviter", "pass")
-        self.inviter_tok = self.login("inviter", "pass")
-
-        self.room_id = self.helper.create_room_as(self.creator, tok=self.creator_tok)
-
-        # map a room with a Nextcloud directory :
-        self.get_success(self.store.bind(self.room_id, "/directory", 1))
-
-        # mock some functions of WatchaRoomNextcloudMappingHandler
         self.nextcloud_handler = hs.get_nextcloud_handler()
-
         self.keycloak_client = self.nextcloud_handler.keycloak_client
         self.nextcloud_client = self.nextcloud_handler.nextcloud_client
+
+        self.creator = self.register_user("creator", "pass")
+        self.creator_tok = self.login("creator", "pass")
+        self.inviter = self.register_user("inviter", "pass")
+        self.inviter_tok = self.login("inviter", "pass")
+        self.room_id = self.helper.create_room_as(self.creator, tok=self.creator_tok)
+        self.get_success(self.store.register_share(self.room_id, 1))
+
         self.nextcloud_handler.bind = AsyncMock()
         self.nextcloud_handler.unbind = AsyncMock()
         self.nextcloud_directory_url = (
@@ -51,7 +45,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
     def send_room_nextcloud_mapping_event(self, request_content):
         channel = self.make_request(
             "PUT",
-            "/rooms/{}/state/im.vector.web.settings".format(self.room_id),
+            f"/rooms/{self.room_id}/state/im.vector.web.settings",
             content=json.dumps(request_content),
             access_token=self.creator_tok,
         )
@@ -70,11 +64,10 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         self.send_room_nextcloud_mapping_event(
             {"nextcloudShare": self.nextcloud_directory_url}
         )
-        self.assertTrue(self.nextcloud_handler.bind.called)
-
         channel = self.send_room_nextcloud_mapping_event({"nextcloudShare": ""})
-        self.assertTrue(self.nextcloud_handler.unbind.called)
 
+        self.assertTrue(self.nextcloud_handler.bind.called)
+        self.assertTrue(self.nextcloud_handler.unbind.called)
         self.assertEquals(200, channel.code)
 
     def test_update_existing_room_nextcloud_mapping(self):
@@ -94,12 +87,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertFalse(self.nextcloud_handler.bind.called)
-        self.assertRaises(SynapseError)
-        self.assertEquals(400, channel.code)
-        self.assertEquals(
-            "VectorSetting is only used for Nextcloud integration.",
-            json.loads(channel.result["body"])["error"],
-        )
+        self.assertEquals(200, channel.code)
 
     def test_create_new_room_nextcloud_mapping_with_wrong_url(self):
         channel = self.send_room_nextcloud_mapping_event(
@@ -110,7 +98,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         self.assertRaises(SynapseError)
         self.assertEquals(400, channel.code)
         self.assertEquals(
-            "The url doesn't point to a valid nextcloud directory path.",
+            "[watcha] binding Nextcloud folder with room - failed: wrong folder path",
             json.loads(channel.result["body"])["error"],
         )
 
@@ -118,10 +106,9 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         self.helper.invite(
             self.room_id, self.creator, self.inviter, tok=self.creator_tok
         )
-
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/join".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/join",
             access_token=self.inviter_tok,
         )
 
@@ -132,10 +119,9 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         self.helper.invite(
             self.room_id, self.creator, self.inviter, tok=self.creator_tok
         )
-
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/leave".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/leave",
             access_token=self.inviter_tok,
         )
 
@@ -148,10 +134,9 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
             self.room_id, self.creator, self.inviter, tok=self.creator_tok
         )
         self.helper.join(self.room_id, user=self.inviter, tok=self.inviter_tok)
-
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/kick".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/kick",
             content={"user_id": self.inviter},
             access_token=self.inviter_tok,
         )
@@ -162,9 +147,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
 
     def test_update_nextcloud_share_with_an_unmapped_room(self):
         self.nextcloud_handler.update_existing_nextcloud_share_for_user = AsyncMock()
-
         room_id = self.helper.create_room_as(self.creator, tok=self.creator_tok)
-
         self.helper.invite(room_id, self.creator, self.inviter, tok=self.creator_tok)
 
         self.nextcloud_handler.update_existing_nextcloud_share_for_user.assert_not_called()
