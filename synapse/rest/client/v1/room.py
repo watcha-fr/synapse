@@ -226,13 +226,10 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                 # +watcha
             else:
                 # watcha+
-                if event_type == EventTypes.VectorSetting:
-                    if "nextcloudShare" not in content:
-                        raise SynapseError(
-                            400,
-                            "[watcha] binding Nextcloud folder with room - failed: VectorSetting is only used for Nextcloud integration",
-                        )
-
+                if (
+                    event_type == EventTypes.VectorSetting
+                    and "nextcloudShare" in content
+                ):
                     nextcloud_url = content["nextcloudShare"]
                     requester_id = requester.user.to_string()
 
