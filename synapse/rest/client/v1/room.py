@@ -228,7 +228,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                 # watcha+
                 if (
                     event_type == EventTypes.VectorSetting
-                    and content == "nextcloudShare" 
+                    and "nextcloudShare" in content
                 ):
                     nextcloud_url = content["nextcloudShare"]
                     requester_id = requester.user.to_string()
