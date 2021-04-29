@@ -11,17 +11,11 @@ from synapse.api.errors import (
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.push.mailer import Mailer
+from synapse.rest.admin._base import assert_requester_is_admin
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.util.watcha import Secrets
 
 logger = logging.getLogger(__name__)
-
-
-async def _check_admin(auth, request):
-    requester = await auth.get_user_by_req(request)
-    is_admin = await auth.is_server_admin(requester.user)
-    if not is_admin:
-        raise AuthError(403, "You are not a server admin")
 
 
 class WatchaUserlistRestServlet(RestServlet):
@@ -33,7 +27,7 @@ class WatchaUserlistRestServlet(RestServlet):
         self.administration_handler = hs.get_administration_handler()
 
     async def on_GET(self, request):
-        await _check_admin(self.auth, request)
+        await assert_requester_is_admin(self.auth, request)
         result = await self.administration_handler.watcha_user_list()
         return 200, result
 
@@ -47,7 +41,7 @@ class WatchaRoomListRestServlet(RestServlet):
         self.store = hs.get_datastore()
 
     async def on_GET(self, request):
-        await _check_admin(self.auth, request)
+        await assert_requester_is_admin(self.auth, request)
         result = await self.store.watcha_room_list()
         return 200, result
 
@@ -63,7 +57,7 @@ class WatchaUpdateUserRoleRestServlet(RestServlet):
         self.administration_handler = hs.get_administration_handler()
 
     async def on_PUT(self, request, target_user_id):
-        await _check_admin(self.auth, request)
+        await assert_requester_is_admin(self.auth, request)
         params = parse_json_object_from_request(request)
 
         users = await self.administration_handler.get_users()
@@ -100,7 +94,7 @@ class WatchaAdminStatsRestServlet(RestServlet):
         self.store = hs.get_datastore()
 
     async def on_GET(self, request):
-        await _check_admin(self.auth, request)
+        await assert_requester_is_admin(self.auth, request)
         result = await self.store.watcha_admin_stats()
         return 200, result
 
@@ -128,10 +122,7 @@ class WatchaRegisterRestServlet(RestServlet):
             )
 
     async def on_POST(self, request):
-        await _check_admin(
-            self.auth,
-            request,
-        )
+        await assert_requester_is_admin(self.auth, request)
         params = parse_json_object_from_request(request)
 
         displayname = params.get("displayname", "").strip()
