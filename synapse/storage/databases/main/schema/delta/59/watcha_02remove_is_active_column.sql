@@ -49,3 +49,5 @@ FROM users;
 DROP TABLE users;
 
 ALTER TABLE new_users RENAME TO users;
+
+CREATE INDEX IF NOT EXISTS users_creation_ts ON users (creation_ts);
