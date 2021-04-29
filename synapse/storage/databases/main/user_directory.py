@@ -947,7 +947,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             sql = """
                 SELECT
                     u.name as user_id
-                    , u.is_active
+                    , u.deactivated
                     , u.is_partner
                     , d.display_name
                     , d.avatar_url
@@ -964,14 +964,14 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 LEFT OUTER JOIN user_directory AS d ON d.user_id = u.name
                 LEFT OUTER JOIN presence_stream AS p ON p.user_id = u.name
                 WHERE u.is_partner = 0
-                    AND u.is_active = 1
+                    AND u.deactivated = 0
                     %s
 
                 UNION ALL
 
                 SELECT DISTINCT
                     u.name as user_id
-                    , u.is_active
+                    , u.deactivated
                     , u.is_partner
                     , d.display_name
                     , d.avatar_url
@@ -991,7 +991,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 LEFT OUTER JOIN user_directory AS d ON d.user_id = u.name
                 LEFT OUTER JOIN presence_stream AS p ON p.user_id = u.name
                 WHERE u.is_partner = 1
-                    AND u.is_active = 1
+                    AND u.deactivated = 0
                     %s
             """ % (where_clause, where_clause)
             args = [  '%' + search_term + '%' ] * 2 + [ user_id ] + [  '%' + search_term + '%' ] * 2
