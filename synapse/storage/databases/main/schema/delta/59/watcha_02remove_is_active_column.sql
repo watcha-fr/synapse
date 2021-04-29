@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS new_users(
     user_type TEXT DEFAULT NULL,
     deactivated SMALLINT DEFAULT 0 NOT NULL,
     shadow_banned BOOLEAN,
-    is_partner SMALLINT DEFAULT 0 NOT NULL
+    is_partner SMALLINT DEFAULT 0 NOT NULL,
     UNIQUE(name) 
 );
 
