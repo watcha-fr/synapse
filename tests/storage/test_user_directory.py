@@ -182,7 +182,7 @@ class WatchaUserDirectoryStoreTestCase(unittest.TestCase):
             [
                 {
                     "user_id": self.searched_user,
-                    "is_active": 1,
+                    "deactivated": 0,
                     "is_partner": 0,
                     "display_name": None,
                     "avatar_url": None,
@@ -205,7 +205,7 @@ class WatchaUserDirectoryStoreTestCase(unittest.TestCase):
             [
                 {
                     "user_id": self.searched_user,
-                    "is_active": 1,
+                    "deactivated": 0,
                     "is_partner": 0,
                     "display_name": "user",
                     "avatar_url": None,
@@ -236,7 +236,7 @@ class WatchaUserDirectoryStoreTestCase(unittest.TestCase):
             [
                 {
                     "user_id": self.partner_id,
-                    "is_active": 1,
+                    "deactivated": 0,
                     "is_partner": 1,
                     "display_name": None,
                     "avatar_url": None,
