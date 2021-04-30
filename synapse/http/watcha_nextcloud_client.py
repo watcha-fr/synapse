@@ -162,6 +162,27 @@ class NextcloudClient(SimpleHttpClient):
         validate(response, WITHOUT_DATA_SCHEMA)
         self._raise_for_status(response["ocs"]["meta"])
 
+    async def set_group_displayname(self, group_id: str, displayname: str):
+        """Set the displayname of a Nextcloud group
+
+        Args:
+            group_id: id of the Nextcloud group
+            displayname: value of the displayname to set
+
+        Status codes:
+            100: successful
+            101: not supported by backend
+            997: unauthorised
+        """
+        response = await self.put_json(
+            uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/groups/{group_id}",
+            json_body={"key": "displayname", "value": displayname},
+            headers=self._headers,
+        )
+
+        validate(response, WITHOUT_DATA_SCHEMA)
+        self._raise_for_status(response["ocs"]["meta"])
+
     async def delete_group(self, group_id: str):
         """Removes a existing Nextcloud group.
 
