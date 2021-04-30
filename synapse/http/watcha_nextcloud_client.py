@@ -141,11 +141,11 @@ class NextcloudClient(SimpleHttpClient):
         validate(response, WITHOUT_DATA_SCHEMA)
         self._raise_for_status(response["ocs"]["meta"])
 
-    async def add_group(self, group_name: str):
+    async def add_group(self, group_id: str):
         """Adds a new Nextcloud group.
 
         Args:
-            group_name: the name of the Nextcloud group
+            group_id: id of the Nextcloud group
 
         Status codes:
             100: successful
@@ -155,18 +155,18 @@ class NextcloudClient(SimpleHttpClient):
         """
         response = await self.post_json_get_json(
             uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/groups",
-            post_json={"groupid": group_name},
+            post_json={"groupid": group_id},
             headers=self._headers,
         )
 
         validate(response, WITHOUT_DATA_SCHEMA)
         self._raise_for_status(response["ocs"]["meta"])
 
-    async def delete_group(self, group_name: str):
+    async def delete_group(self, group_id: str):
         """Removes a existing Nextcloud group.
 
         Args:
-            group_name: the name of the Nextcloud group
+            group_id: id of the Nextcloud group
 
         Status codes:
             100: successful
@@ -174,19 +174,19 @@ class NextcloudClient(SimpleHttpClient):
             102: failed to delete group
         """
         response = await self.delete_get_json(
-            uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/groups/{group_name}",
+            uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/groups/{group_id}",
             headers=self._headers,
         )
 
         validate(response, WITHOUT_DATA_SCHEMA)
         self._raise_for_status(response["ocs"]["meta"])
 
-    async def add_user_to_group(self, username: str, group_name: str):
+    async def add_user_to_group(self, username: str, group_id: str):
         """Add user to the Nextcloud group.
 
         Args:
-            username: the username of the user to add to the group.
-            group_name: the group name.
+            username: the username of the user to add to the group
+            group_id: id of the Nextcloud group
 
         Status codes:
             100: successful
@@ -198,19 +198,19 @@ class NextcloudClient(SimpleHttpClient):
         """
         response = await self.post_json_get_json(
             uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/users/{username}/groups",
-            post_json={"groupid": group_name},
+            post_json={"groupid": group_id},
             headers=self._headers,
         )
 
         validate(response, WITHOUT_DATA_SCHEMA)
         self._raise_for_status(response["ocs"]["meta"])
 
-    async def remove_user_from_group(self, username: str, group_name: str):
+    async def remove_user_from_group(self, username: str, group_id: str):
         """Removes the specified user from the specified group.
 
         Args:
-            username: the username of the user to remove from the group.
-            group_name: the group name.
+            username: the username of the user to remove from the group
+            group_id: id of the Nextcloud group
 
         Status codes:
             100: successful
@@ -223,19 +223,19 @@ class NextcloudClient(SimpleHttpClient):
         response = await self.delete_get_json(
             uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/users/{username}/groups",
             headers=self._headers,
-            json_body={"groupid": group_name},
+            json_body={"groupid": group_id},
         )
 
         validate(response, WITHOUT_DATA_SCHEMA)
         self._raise_for_status(response["ocs"]["meta"])
 
-    async def share(self, requester: str, path: str, group_name: str):
+    async def share(self, requester: str, path: str, group_id: str):
         """Share an existing file or folder with all permissions for a group.
 
         Args:
             requester: the user who want to create the share
             path: the path of the folder to share
-            group_name: the name of group which will share the folder
+            group_id: id of the Nextcloud group which will share the folder
 
         Payload:
             shareType: the type of the share. This can be one of:
@@ -268,7 +268,7 @@ class NextcloudClient(SimpleHttpClient):
             post_json={
                 "path": path,
                 "shareType": 1,
-                "shareWith": group_name,
+                "shareWith": group_id,
                 "permissions": 31,
                 "requester": requester,
             },

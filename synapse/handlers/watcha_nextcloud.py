@@ -36,12 +36,12 @@ class NextcloudHandler(BaseHandler):
         Args :
             room_id: the id of the room to bind.
         """
-        group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
+        group_id = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
         try:
-            await self.nextcloud_client.delete_group(group_name)
+            await self.nextcloud_client.delete_group(group_id)
         except NEXTCLOUD_CLIENT_ERRORS as error:
             logger.error(
-                f"[watcha] delete nextcloud group {group_name} - failed: {error}"
+                f"[watcha] delete nextcloud group {group_id} - failed: {error}"
             )
 
         await self.store.delete_share(room_id)
@@ -57,20 +57,20 @@ class NextcloudHandler(BaseHandler):
            room_id: the id of the room to bind.
            path: the path of the Nextcloud folder to bind.
         """
-        group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
+        group_id = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
 
         try:
-            await self.nextcloud_client.add_group(group_name)
+            await self.nextcloud_client.add_group(group_id)
         except NEXTCLOUD_CLIENT_ERRORS as error:
             # Do not raise error if Nextcloud group already exist
             if isinstance(error, NextcloudError) and error.code == 102:
                 logger.warn(
-                    f"[watcha] add nextcloud group {group_name} - failed: the group already exists"
+                    f"[watcha] add nextcloud group {group_id} - failed: the group already exists"
                 )
             else:
                 raise SynapseError(
                     500,
-                    f"[watcha] add nextcloud group {group_name} - failed: {error}",
+                    f"[watcha] add nextcloud group {group_id} - failed: {error}",
                     Codes.NEXTCLOUD_CAN_NOT_CREATE_GROUP,
                 )
 
@@ -83,25 +83,25 @@ class NextcloudHandler(BaseHandler):
         Args:
             room_id: the id of the room which the Nextcloud group name is infered from.
         """
-        group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
+        group_id = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
         user_ids = await self.store.get_users_in_room(room_id)
 
         for user_id in user_ids:
             nextcloud_username = await self.store.get_username(user_id)
             try:
                 await self.nextcloud_client.add_user_to_group(
-                    nextcloud_username, group_name
+                    nextcloud_username, group_id
                 )
             except NEXTCLOUD_CLIENT_ERRORS as error:
                 # Do not raise error if some users can not be added to group
                 if isinstance(error, NextcloudError) and (error.code in (103, 105)):
                     logger.error(
-                        f"[watcha] add user {user_id} to group {group_name} - failed: {error}"
+                        f"[watcha] add user {user_id} to group {group_id} - failed: {error}"
                     )
                 else:
                     raise SynapseError(
                         500,
-                        f"[watcha] add members of room {room_id} to group {group_name} - failed: {error}",
+                        f"[watcha] add members of room {room_id} to group {group_id} - failed: {error}",
                         Codes.NEXTCLOUD_CAN_NOT_ADD_MEMBERS_TO_GROUP,
                     )
 
@@ -114,7 +114,7 @@ class NextcloudHandler(BaseHandler):
             room_id: the id of the room to bind.
             path: the path of the Nextcloud folder to bind.
         """
-        group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
+        group_id = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
         nextcloud_username = await self.store.get_username(requester_id)
 
         old_share_id = await self.store.get_share_id(room_id)
@@ -126,7 +126,7 @@ class NextcloudHandler(BaseHandler):
 
         try:
             new_share_id = await self.nextcloud_client.share(
-                nextcloud_username, path, group_name
+                nextcloud_username, path, group_id
             )
         except NEXTCLOUD_CLIENT_ERRORS as error:
             await self.unbind(room_id)
@@ -138,7 +138,7 @@ class NextcloudHandler(BaseHandler):
             )
             raise SynapseError(
                 http_code,
-                f"[watcha] share folder {path} with group {group_name} - failed: {error}",
+                f"[watcha] share folder {path} with group {group_id} - failed: {error}",
                 Codes.NEXTCLOUD_CAN_NOT_SHARE,
             )
 
@@ -154,24 +154,24 @@ class NextcloudHandler(BaseHandler):
             room_id: the id of the room where the membership event was sent
             membership: membership event. Can be 'invite', 'join', 'kick' or 'leave'
         """
-        group_name = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
+        group_id = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
         nextcloud_username = await self.store.get_username(user_id)
 
         if membership in ("invite", "join"):
             try:
                 await self.nextcloud_client.add_user_to_group(
-                    nextcloud_username, group_name
+                    nextcloud_username, group_id
                 )
             except NEXTCLOUD_CLIENT_ERRORS as error:
                 logger.warn(
-                    f"[watcha] add user {user_id} to group {group_name} - failed: {error}"
+                    f"[watcha] add user {user_id} to group {group_id} - failed: {error}"
                 )
         else:
             try:
                 await self.nextcloud_client.remove_user_from_group(
-                    nextcloud_username, group_name
+                    nextcloud_username, group_id
                 )
             except NEXTCLOUD_CLIENT_ERRORS as error:
                 logger.warn(
-                    f"[watcha] remove user {user_id} from group {group_name} - failed: {error}"
+                    f"[watcha] remove user {user_id} from group {group_id} - failed: {error}"
                 )
