@@ -84,7 +84,7 @@ class NextcloudClient(SimpleHttpClient):
             ],
         }
 
-    def _raise_for_status(self, meta: List[Any], errcode: Codes):
+    def _raise_for_status(self, meta: List[Any]):
         if meta["status"] == "failure":
             raise NextcloudError(
                 meta["statuscode"],
