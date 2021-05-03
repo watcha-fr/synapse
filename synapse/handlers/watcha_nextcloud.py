@@ -14,7 +14,8 @@ from ._base import BaseHandler
 logger = logging.getLogger(__name__)
 
 # echo -n watcha | md5sum  | head -c 10
-NEXTCLOUD_GROUP_NAME_PREFIX = "c4d96a06b7_"
+NEXTCLOUD_GROUP_ID_PREFIX = "c4d96a06b7_"
+NEXTCLOUD_GROUP_DISPLAYNAME_PREFIX = "[Salon Watcha]"
 NEXTCLOUD_CLIENT_ERRORS = (
     NextcloudError,
     SchemaError,
@@ -26,6 +27,7 @@ NEXTCLOUD_CLIENT_ERRORS = (
 class NextcloudHandler(BaseHandler):
     def __init__(self, hs: "Homeserver"):
         self.store = hs.get_datastore()
+        self.administration_handler = hs.get_administration_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
@@ -36,7 +38,7 @@ class NextcloudHandler(BaseHandler):
         Args :
             room_id: the id of the room to bind.
         """
-        group_id = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
+        group_id = NEXTCLOUD_GROUP_ID_PREFIX + room_id
         try:
             await self.nextcloud_client.delete_group(group_id)
         except NEXTCLOUD_CLIENT_ERRORS as error:
@@ -57,7 +59,25 @@ class NextcloudHandler(BaseHandler):
            room_id: the id of the room to bind.
            path: the path of the Nextcloud folder to bind.
         """
-        group_id = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
+        await self.create_group(room_id)
+        await self.add_room_members_to_group(room_id)
+        await self.create_share(requester_id, room_id, path)
+
+    async def create_group(self, room_id: str):
+        """Create a Nextcloud group with specific id and displayname.
+        The group id corresponds to association of a pattern and room_id.
+        The group displayname corresponds to association of another pattern and room name.
+
+        Args:
+            room_id: the id of the room
+        """
+        group_id = NEXTCLOUD_GROUP_ID_PREFIX + room_id
+        room_name = await self.administration_handler.get_room_name(room_id)
+        group_displayname = (
+            " ".join((NEXTCLOUD_GROUP_DISPLAYNAME_PREFIX, room_name))
+            if room_name
+            else NEXTCLOUD_GROUP_DISPLAYNAME_PREFIX
+        )
 
         try:
             await self.nextcloud_client.add_group(group_id)
@@ -74,8 +94,14 @@ class NextcloudHandler(BaseHandler):
                     Codes.NEXTCLOUD_CAN_NOT_CREATE_GROUP,
                 )
 
-        await self.add_room_members_to_group(room_id)
-        await self.create_share(requester_id, room_id, path)
+        try:
+            await self.nextcloud_client.set_group_displayname(
+                group_id, group_displayname
+            )
+        except NEXTCLOUD_CLIENT_ERRORS as error:
+            logger.warn(
+                f"[watcha] set displayname for group {group_id} - failed : {error}"
+            )
 
     async def add_room_members_to_group(self, room_id: str):
         """Add all members of a room to a Nextcloud group.
@@ -83,7 +109,7 @@ class NextcloudHandler(BaseHandler):
         Args:
             room_id: the id of the room which the Nextcloud group name is infered from.
         """
-        group_id = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
+        group_id = NEXTCLOUD_GROUP_ID_PREFIX + room_id
         user_ids = await self.store.get_users_in_room(room_id)
 
         for user_id in user_ids:
@@ -114,7 +140,7 @@ class NextcloudHandler(BaseHandler):
             room_id: the id of the room to bind.
             path: the path of the Nextcloud folder to bind.
         """
-        group_id = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
+        group_id = NEXTCLOUD_GROUP_ID_PREFIX + room_id
         nextcloud_username = await self.store.get_username(requester_id)
 
         old_share_id = await self.store.get_share_id(room_id)
@@ -154,7 +180,7 @@ class NextcloudHandler(BaseHandler):
             room_id: the id of the room where the membership event was sent
             membership: membership event. Can be 'invite', 'join', 'kick' or 'leave'
         """
-        group_id = NEXTCLOUD_GROUP_NAME_PREFIX + room_id
+        group_id = NEXTCLOUD_GROUP_ID_PREFIX + room_id
         nextcloud_username = await self.store.get_username(user_id)
 
         if membership in ("invite", "join"):
