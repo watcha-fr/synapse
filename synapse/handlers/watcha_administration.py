@@ -1,5 +1,6 @@
 import logging
 
+from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 from synapse.types import UserID
 
@@ -13,6 +14,19 @@ class AdministrationHandler(BaseHandler):
         super().__init__(hs)
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
+
+    async def get_room_name(self, room_id: str):
+        """Get the name of a room
+
+        Args:
+            room_id: the id of the room
+        """
+        room_state = await self.state_handler.get_current_state(room_id)
+        room_name_event = room_state.get((EventTypes.Name, ""))
+        if not room_name_event:
+            return
+
+        return room_name_event.content.get("name", "")
 
     async def watcha_user_list(self):
         users = await self.store.watcha_user_list()
