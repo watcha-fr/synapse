@@ -66,18 +66,11 @@ class NextcloudHandler(BaseHandler):
     async def create_group(self, room_id: str):
         """Create a Nextcloud group with specific id and displayname.
         The group id corresponds to association of a pattern and room_id.
-        The group displayname corresponds to association of another pattern and room name.
 
         Args:
             room_id: the id of the room
         """
         group_id = NEXTCLOUD_GROUP_ID_PREFIX + room_id
-        room_name = await self.administration_handler.get_room_name(room_id)
-        group_displayname = (
-            " ".join((NEXTCLOUD_GROUP_DISPLAYNAME_PREFIX, room_name))
-            if room_name
-            else NEXTCLOUD_GROUP_DISPLAYNAME_PREFIX
-        )
 
         try:
             await self.nextcloud_client.add_group(group_id)
@@ -93,6 +86,22 @@ class NextcloudHandler(BaseHandler):
                     f"[watcha] add nextcloud group {group_id} - failed: {error}",
                     Codes.NEXTCLOUD_CAN_NOT_CREATE_GROUP,
                 )
+
+        await self.set_group_displayname(room_id)
+
+    async def set_group_displayname(self, room_id: str):
+        """Set displayname corresponds to association of another pattern and room name for the group,
+
+        Args:
+            room_id: the id of the room
+        """
+        group_id = NEXTCLOUD_GROUP_ID_PREFIX + room_id
+        room_name = await self.administration_handler.get_room_name(room_id)
+        group_displayname = (
+            " ".join((NEXTCLOUD_GROUP_DISPLAYNAME_PREFIX, room_name))
+            if room_name
+            else NEXTCLOUD_GROUP_DISPLAYNAME_PREFIX
+        )
 
         try:
             await self.nextcloud_client.set_group_displayname(
