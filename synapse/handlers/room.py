@@ -810,6 +810,12 @@ class RoomCreationHandler(BaseHandler):
             if is_direct:
                 content["is_direct"] = is_direct
 
+            # watcha+
+            reason = config.get("reason", None)
+            if reason:
+                content["reason"] = reason
+            # +watcha
+
             for invitee in invite_list:
                 (
                     _,
