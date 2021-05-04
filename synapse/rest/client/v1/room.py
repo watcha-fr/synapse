@@ -226,7 +226,11 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                 # +watcha
             else:
                 # watcha+
-                if (
+                if event_type == EventTypes.Name and await self.store.get_share_id(
+                    room_id
+                ):
+                    await self.nextcloud_handler.set_group_displayname(room_id)
+                elif (
                     event_type == EventTypes.VectorSetting
                     and "nextcloudShare" in content
                 ):
