@@ -5,9 +5,6 @@ from synapse.rest.client.v1 import login, room
 from synapse.rest import admin
 from tests.unittest import HomeserverTestCase
 
-NEXTCLOUD_GROUP_NAME_PREFIX = "c4d96a06b7_"
-NEXTCLOUD_GROUP_DISPLAYNAME_PREFIX = "[Salon Watcha]"
-
 
 class NextcloudHandlerTestCase(HomeserverTestCase):
     servlets = [
@@ -31,7 +28,9 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
             self.room_id, src=self.creator, targ=self.inviter, tok=self.creator_tok
         )
         self.helper.join(self.room_id, self.inviter, tok=inviter_tok)
-        self.group_id = NEXTCLOUD_GROUP_NAME_PREFIX + self.room_id
+        self.group_id = self.get_success(
+            self.nextcloud_handler.build_group_id(self.room_id)
+        )
 
         self.nextcloud_client.add_group = AsyncMock()
         self.nextcloud_client.delete_group = AsyncMock()
@@ -83,16 +82,22 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.assertEquals(share_id, "share_2")
 
     def test_create_group(self):
-        room_name = "default room"
-        self.hs.get_administration_handler().get_room_name = AsyncMock(
-            return_value=room_name
+        self.helper.send_state(
+            self.room_id,
+            "m.room.name",
+            {"name": "default room"},
+            tok=self.creator_tok,
         )
         self.nextcloud_client.set_group_displayname.reset_mock()
         self.get_success(self.nextcloud_handler.create_group(self.room_id))
 
+        group_displayname = self.get_success(
+            self.nextcloud_handler.build_group_displayname(self.room_id)
+        )
+
         self.nextcloud_client.add_group.assert_called_once_with(self.group_id)
         self.nextcloud_client.set_group_displayname.assert_called_once_with(
-            self.group_id, " ".join((NEXTCLOUD_GROUP_DISPLAYNAME_PREFIX, room_name))
+            self.group_id, group_displayname
         )
 
     def test_create_existing_group(self):
