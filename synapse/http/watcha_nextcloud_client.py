@@ -119,7 +119,7 @@ class NextcloudClient(SimpleHttpClient):
             post_json=payload,
             headers=self._headers,
         )
-        
+
         validate(response, WITH_DATA_SCHEMA)
         self._raise_for_status(response["ocs"]["meta"])
 
