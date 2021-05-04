@@ -16,6 +16,9 @@ logger = logging.getLogger(__name__)
 # echo -n watcha | md5sum  | head -c 10
 NEXTCLOUD_GROUP_ID_PREFIX = "c4d96a06b7_"
 NEXTCLOUD_GROUP_DISPLAYNAME_PREFIX = "[Salon Watcha]"
+NEXTCLOUD_GROUP_ID_LENGHT_LIMIT = (
+    64  # Nextcloud do not allow group id longer than 64 characters
+)
 NEXTCLOUD_CLIENT_ERRORS = (
     NextcloudError,
     SchemaError,
@@ -31,22 +34,6 @@ class NextcloudHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
-
-    async def unbind(self, room_id: str):
-        """Unbind a Nextcloud folder from a room.
-
-        Args :
-            room_id: the id of the room to bind.
-        """
-        group_id = NEXTCLOUD_GROUP_ID_PREFIX + room_id
-        try:
-            await self.nextcloud_client.delete_group(group_id)
-        except NEXTCLOUD_CLIENT_ERRORS as error:
-            logger.error(
-                f"[watcha] delete nextcloud group {group_id} - failed: {error}"
-            )
-
-        await self.store.delete_share(room_id)
 
     async def bind(self, requester_id: str, room_id: str, path: str):
         """Bind a Nextcloud folder with a room in three steps :
@@ -65,12 +52,12 @@ class NextcloudHandler(BaseHandler):
 
     async def create_group(self, room_id: str):
         """Create a Nextcloud group with specific id and displayname.
-        The group id corresponds to association of a pattern and room_id.
 
         Args:
             room_id: the id of the room
         """
-        group_id = NEXTCLOUD_GROUP_ID_PREFIX + room_id
+        group_id = await self.build_group_id(room_id)
+        group_displayname = await self.build_group_displayname(room_id)
 
         try:
             await self.nextcloud_client.add_group(group_id)
@@ -87,22 +74,38 @@ class NextcloudHandler(BaseHandler):
                     Codes.NEXTCLOUD_CAN_NOT_CREATE_GROUP,
                 )
 
-        await self.set_group_displayname(room_id)
+        await self.set_group_displayname(group_id, group_displayname)
 
-    async def set_group_displayname(self, room_id: str):
-        """Set displayname corresponds to association of another pattern and room name for the group,
+    async def build_group_id(self, room_id: str):
+        """Build the Nextcloud group id corresponding to an association of a pattern and room id
 
         Args:
             room_id: the id of the room
         """
         group_id = NEXTCLOUD_GROUP_ID_PREFIX + room_id
+        return group_id[:NEXTCLOUD_GROUP_ID_LENGHT_LIMIT]
+
+    async def build_group_displayname(self, room_id):
+        """Build the Nextcloud group name corresponding to an association of a pattern and room name
+
+        Args:
+            room_id: the id of the room
+        """
         room_name = await self.administration_handler.get_room_name(room_id)
         group_displayname = (
             " ".join((NEXTCLOUD_GROUP_DISPLAYNAME_PREFIX, room_name))
             if room_name
             else NEXTCLOUD_GROUP_DISPLAYNAME_PREFIX
         )
+        return group_displayname
 
+    async def set_group_displayname(self, group_id: str, group_displayname: str):
+        """Set the displayname of a Nextcloud group
+
+        Args:
+            group_id: the id of group
+            group_displayname: the displayname of the group
+        """
         try:
             await self.nextcloud_client.set_group_displayname(
                 group_id, group_displayname
@@ -118,7 +121,7 @@ class NextcloudHandler(BaseHandler):
         Args:
             room_id: the id of the room which the Nextcloud group name is infered from.
         """
-        group_id = NEXTCLOUD_GROUP_ID_PREFIX + room_id
+        group_id = await self.build_group_id(room_id)
         user_ids = await self.store.get_users_in_room(room_id)
 
         for user_id in user_ids:
@@ -149,7 +152,7 @@ class NextcloudHandler(BaseHandler):
             room_id: the id of the room to bind.
             path: the path of the Nextcloud folder to bind.
         """
-        group_id = NEXTCLOUD_GROUP_ID_PREFIX + room_id
+        group_id = await self.build_group_id(room_id)
         nextcloud_username = await self.store.get_username(requester_id)
 
         old_share_id = await self.store.get_share_id(room_id)
@@ -179,6 +182,22 @@ class NextcloudHandler(BaseHandler):
 
         await self.store.register_share(room_id, new_share_id)
 
+    async def unbind(self, room_id: str):
+        """Unbind a Nextcloud folder from a room.
+
+        Args :
+            room_id: the id of the room to bind
+        """
+        group_id = await self.build_group_id(room_id)
+        try:
+            await self.nextcloud_client.delete_group(group_id)
+        except NEXTCLOUD_CLIENT_ERRORS as error:
+            logger.error(
+                f"[watcha] delete nextcloud group {group_id} - failed: {error}"
+            )
+
+        await self.store.delete_share(room_id)
+
     async def update_group(self, user_id: str, room_id: str, membership: str):
         """Update a Nextcloud group by adding or removing users.
         If membership is 'join' or 'invite', the user is add to the Nextcloud group infered from the room.
@@ -189,7 +208,7 @@ class NextcloudHandler(BaseHandler):
             room_id: the id of the room where the membership event was sent
             membership: membership event. Can be 'invite', 'join', 'kick' or 'leave'
         """
-        group_id = NEXTCLOUD_GROUP_ID_PREFIX + room_id
+        group_id = await self.build_group_id(room_id)
         nextcloud_username = await self.store.get_username(user_id)
 
         if membership in ("invite", "join"):

@@ -160,4 +160,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
             {"name": "default room"},
             tok=self.creator_tok,
         )
-        self.nextcloud_handler.set_group_displayname.assert_called_once_with(self.room_id)
+
+        group_id = self.get_success(self.nextcloud_handler.build_group_id(self.room_id))
+        group_displayname = self.get_success(self.nextcloud_handler.build_group_displayname(self.room_id))
+        self.nextcloud_handler.set_group_displayname.assert_called_once_with(group_id, group_displayname)
