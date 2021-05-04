@@ -226,11 +226,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                 # +watcha
             else:
                 # watcha+
-                if event_type == EventTypes.Name and await self.store.get_share_id(
-                    room_id
-                ):
-                    await self.nextcloud_handler.set_group_displayname(room_id)
-                elif (
+                if (
                     event_type == EventTypes.VectorSetting
                     and "nextcloudShare" in content
                 ):
@@ -263,6 +259,18 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     requester, event_dict, txn_id=txn_id
                 )
                 event_id = event.event_id
+                # watcha+
+                if event_type == EventTypes.Name and await self.store.get_share_id(
+                    room_id
+                ):
+                    group_id = await self.nextcloud_handler.build_group_id(room_id)
+                    group_displayname = await self.nextcloud_handler.build_group_displayname(
+                        room_id
+                    )
+                    await self.nextcloud_handler.set_group_displayname(
+                        group_id, group_displayname
+                    )
+                # +watcha
         except ShadowBanError:
             event_id = "$" + random_string(43)
 
