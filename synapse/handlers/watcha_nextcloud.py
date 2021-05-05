@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 
 # echo -n watcha | md5sum  | head -c 10
 NEXTCLOUD_GROUP_ID_PREFIX = "c4d96a06b7_"
-NEXTCLOUD_GROUP_DISPLAYNAME_PREFIX = "[Salon Watcha]"
 NEXTCLOUD_GROUP_ID_LENGHT_LIMIT = (
     64  # Nextcloud do not allow group id longer than 64 characters
 )
@@ -32,6 +31,7 @@ class NextcloudHandler(BaseHandler):
         self.store = hs.get_datastore()
         self.administration_handler = hs.get_administration_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.group_displayname_prefix = hs.config.nextcloud_group_displayname_prefix
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
 
@@ -93,9 +93,9 @@ class NextcloudHandler(BaseHandler):
         """
         room_name = await self.administration_handler.get_room_name(room_id)
         group_displayname = (
-            " ".join((NEXTCLOUD_GROUP_DISPLAYNAME_PREFIX, room_name))
+            " ".join((self.group_displayname_prefix, room_name))
             if room_name
-            else NEXTCLOUD_GROUP_DISPLAYNAME_PREFIX
+            else self.group_displayname_prefix
         )
         return group_displayname
 
