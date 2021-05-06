@@ -20,7 +20,7 @@ class AdministrationHandler(BaseHandler):
 
     async def get_room_name(self, room_id: str):
         """Get the name of a room
-        Inspired by Matrix calculate_room_name function
+        Inspired by https://github.com/matrix-org/synapse/blob/release-v1.33.0/synapse/push/presentable_names.py#L35
 
         Args:
             room_id: the id of the room
