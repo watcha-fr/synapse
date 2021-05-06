@@ -19,7 +19,7 @@ class AdministrationHandler(BaseHandler):
         self.auth_handler = hs.get_auth_handler()
 
     async def calculate_room_name(self, room_id: str) -> str:
-        """Get the name of a room
+        """Get the name of a room if any, or calculate it from members' display names
         Inspired by https://github.com/matrix-org/synapse/blob/release-v1.33.0/synapse/push/presentable_names.py#L35
 
         Args:
