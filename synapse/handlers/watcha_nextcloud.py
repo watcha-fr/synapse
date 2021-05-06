@@ -107,7 +107,7 @@ class NextcloudHandler(BaseHandler):
             )
         except NEXTCLOUD_CLIENT_ERRORS as error:
             logger.warn(
-                f"[watcha] set displayname for group {group_id} - failed : {error}"
+                f"[watcha] set displayname for group {group_id} - failed: {error}"
             )
 
     async def add_room_members_to_group(self, room_id: str):
