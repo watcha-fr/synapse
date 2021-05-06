@@ -151,3 +151,20 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         self.helper.invite(room_id, self.creator, self.inviter, tok=self.creator_tok)
 
         self.nextcloud_handler.update_existing_nextcloud_share_for_user.assert_not_called()
+
+    def test_update_group_displayname_on_event_type_name(self):
+        self.nextcloud_handler.set_group_displayname = AsyncMock()
+        self.helper.send_state(
+            self.room_id,
+            "m.room.name",
+            {"name": "default room"},
+            tok=self.creator_tok,
+        )
+
+        group_id = self.get_success(self.nextcloud_handler.build_group_id(self.room_id))
+        group_displayname = self.get_success(
+            self.nextcloud_handler.build_group_displayname(self.room_id)
+        )
+        self.nextcloud_handler.set_group_displayname.assert_called_once_with(
+            group_id, group_displayname
+        )

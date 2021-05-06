@@ -5,8 +5,6 @@ from synapse.rest.client.v1 import login, room
 from synapse.rest import admin
 from tests.unittest import HomeserverTestCase
 
-NEXTCLOUD_GROUP_NAME_PREFIX = "c4d96a06b7_"
-
 
 class NextcloudHandlerTestCase(HomeserverTestCase):
     servlets = [
@@ -30,12 +28,15 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
             self.room_id, src=self.creator, targ=self.inviter, tok=self.creator_tok
         )
         self.helper.join(self.room_id, self.inviter, tok=inviter_tok)
-        self.group_name = NEXTCLOUD_GROUP_NAME_PREFIX + self.room_id
+        self.group_id = self.get_success(
+            self.nextcloud_handler.build_group_id(self.room_id)
+        )
 
         self.nextcloud_client.add_group = AsyncMock()
         self.nextcloud_client.delete_group = AsyncMock()
         self.nextcloud_client.add_user_to_group = AsyncMock()
         self.nextcloud_client.remove_user_from_group = AsyncMock()
+        self.nextcloud_client.set_group_displayname = AsyncMock()
         self.nextcloud_client.unshare = AsyncMock()
         self.nextcloud_client.share = AsyncMock(return_value="share_1")
 
@@ -50,7 +51,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.get_success(self.nextcloud_handler.unbind(self.room_id))
         share_id = self.get_success(self.store.get_share_id(self.room_id))
 
-        self.nextcloud_client.delete_group.assert_called()
+        self.nextcloud_client.delete_group.assert_called_once_with(self.group_id)
         self.assertIsNone(share_id)
 
     def test_unbind_with_unexisting_group(self):
@@ -63,10 +64,10 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         share_id = self.get_success(self.store.get_share_id(self.room_id))
 
         self.assertIn(
-            f"[watcha] delete nextcloud group {self.group_name} - failed:",
+            f"[watcha] delete nextcloud group {self.group_id} - failed:",
             cm.output[0],
         )
-        self.nextcloud_client.delete_group.assert_called()
+        self.nextcloud_client.delete_group.assert_called_once_with(self.group_id)
         self.assertIsNone(share_id)
 
     def test_update_bind(self):
@@ -77,38 +78,72 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         )
         share_id = self.get_success(self.store.get_share_id(self.room_id))
 
-        self.assertEqual(old_share_id, "share_1")
-        self.nextcloud_client.add_group.assert_called_once()
-        self.nextcloud_client.share.assert_called_once()
-        self.assertEquals(self.nextcloud_client.add_user_to_group.call_count, 2)
-        self.nextcloud_client.unshare.assert_called()
+        self.assertEquals(old_share_id, "share_1")
         self.assertEquals(share_id, "share_2")
 
-    def test_update_bind_with_existing_group(self):
+    def test_create_group(self):
+        self.helper.send_state(
+            self.room_id,
+            "m.room.name",
+            {"name": "default room"},
+            tok=self.creator_tok,
+        )
+        self.nextcloud_client.set_group_displayname.reset_mock()
+        self.get_success(self.nextcloud_handler.create_group(self.room_id))
+
+        group_displayname = self.get_success(
+            self.nextcloud_handler.build_group_displayname(self.room_id)
+        )
+
+        self.nextcloud_client.add_group.assert_called_once_with(self.group_id)
+        self.nextcloud_client.set_group_displayname.assert_called_once_with(
+            self.group_id, group_displayname
+        )
+
+    def test_create_existing_group(self):
         self.nextcloud_client.add_group = AsyncMock(
             side_effect=NextcloudError(code=102, msg="")
         )
 
         with self.assertLogs("synapse.handlers.watcha_nextcloud", level="WARN") as cm:
-            self.get_success(
-                self.nextcloud_handler.bind(self.creator, self.room_id, "/new_folder")
-            )
+            self.get_success(self.nextcloud_handler.create_group(self.room_id))
 
         self.assertIn(
-            f"[watcha] add nextcloud group {self.group_name} - failed: the group already exists",
+            f"[watcha] add nextcloud group {self.group_id} - failed: the group already exists",
             cm.output[0],
         )
 
-    def test_update_bind_with_invalid_input_data(self):
+    def test_create_group_with_invalid_input_data(self):
         self.nextcloud_client.add_group = AsyncMock(
             side_effect=NextcloudError(code=101, msg="")
         )
         self.get_failure(
-            self.nextcloud_handler.bind(self.creator, self.room_id, "/new_folder"),
+            self.nextcloud_handler.create_group(self.room_id),
             SynapseError,
         )
 
-    def test_add_user_to_group_without_account(self):
+    def test_create_group_with_set_displayname_exception(self):
+        room_name = "default room"
+        self.hs.get_administration_handler().calculate_room_name = AsyncMock(
+            return_value=room_name
+        )
+        self.nextcloud_client.set_group_displayname = AsyncMock(
+            side_effect=NextcloudError(code=101, msg="")
+        )
+        with self.assertLogs("synapse.handlers.watcha_nextcloud", level="WARN") as cm:
+            self.get_success(self.nextcloud_handler.create_group(self.room_id))
+
+        self.assertIn(
+            f"[watcha] set displayname for group {self.group_id} - failed",
+            cm.output[0],
+        )
+
+    def test_add_room_members_to_group(self):
+        self.get_success(self.nextcloud_handler.add_room_members_to_group(self.room_id))
+
+        self.assertEquals(self.nextcloud_client.add_user_to_group.call_count, 2)
+
+    def test_add_room_members_to_group_without_account(self):
         self.nextcloud_client.add_user_to_group = AsyncMock(
             side_effect=NextcloudError(code=103, msg="")
         )
@@ -119,13 +154,23 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
             )
 
         self.assertIn(
-            f"[watcha] add user {self.creator} to group {self.group_name} - failed",
+            f"[watcha] add user {self.creator} to group {self.group_id} - failed",
             cm.output[0],
         )
         self.assertIn(
-            f"[watcha] add user {self.inviter} to group {self.group_name} - failed",
+            f"[watcha] add user {self.inviter} to group {self.group_id} - failed",
             cm.output[1],
         )
+
+    def test_create_share(self):
+        self.get_success(
+            self.nextcloud_handler.create_share(
+                self.creator, self.room_id, "/new_folder"
+            )
+        )
+
+        self.nextcloud_client.unshare.assert_called_once()
+        self.nextcloud_client.share.assert_called_once()
 
     def test_create_share_with_unexisting_folder(self):
         old_share_id = self.get_success(self.store.get_share_id(self.room_id))
@@ -168,7 +213,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
             )
 
         self.assertEquals(error.value.code, 500)
-        self.nextcloud_handler.unbind.assert_called_once()
+        self.nextcloud_handler.unbind.assert_called_once_with(self.room_id)
         self.assertIn(f"[watcha] unshare {old_share_id} - failed", cm.output[0])
 
     def test_add_user_to_unexisting_group(self):
@@ -234,7 +279,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
                 )
             )
         self.assertIn(
-            f"[watcha] add user {second_inviter} to group {self.group_name} - failed",
+            f"[watcha] add user {second_inviter} to group {self.group_id} - failed",
             cm.output[0],
         )
 
@@ -251,6 +296,6 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
                 )
             )
         self.assertIn(
-            f"[watcha] remove user {second_inviter} from group {self.group_name} - failed",
+            f"[watcha] remove user {second_inviter} from group {self.group_id} - failed",
             cm.output[0],
         )
