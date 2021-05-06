@@ -15,9 +15,8 @@ logger = logging.getLogger(__name__)
 
 # echo -n watcha | md5sum  | head -c 10
 NEXTCLOUD_GROUP_ID_PREFIX = "c4d96a06b7_"
-NEXTCLOUD_GROUP_ID_LENGHT_LIMIT = (
-    64  # Nextcloud do not allow group id longer than 64 characters
-)
+# Nextcloud does not allow group id longer than 64 characters
+NEXTCLOUD_GROUP_ID_LENGHT_LIMIT = 64 
 NEXTCLOUD_CLIENT_ERRORS = (
     NextcloudError,
     SchemaError,
