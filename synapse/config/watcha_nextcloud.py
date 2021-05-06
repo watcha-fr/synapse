@@ -20,7 +20,7 @@ class NextcloudConfig(Config):
         self.service_account_name = None
         self.keycloak_service_account_password = None
         self.nextcloud_service_account_password = None
-        self.nextcloud_group_displayname_prefix = None
+        self.nextcloud_group_displayname_prefix = "[Watcha room]"
 
     def read_config(self, config, **kwargs):
         self.nextcloud_enabled = False
