@@ -90,7 +90,7 @@ class NextcloudHandler(BaseHandler):
         Args:
             room_id: the id of the room
         """
-        room_name = await self.administration_handler.get_room_name(room_id)
+        room_name = await self.administration_handler.calculate_room_name(room_id)
         group_displayname = self.group_displayname_prefix + room_name
         return group_displayname
 

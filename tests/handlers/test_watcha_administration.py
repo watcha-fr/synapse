@@ -29,14 +29,14 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
         )
 
         room_name = self.get_success(
-            self.administration_handler.get_room_name(self.room_id)
+            self.administration_handler.calculate_room_name(self.room_id)
         )
 
         self.assertEquals(room_name, expected_room_name)
 
     def test_get_empty_room_name_with_one_member(self):
         room_name = self.get_success(
-            self.administration_handler.get_room_name(self.room_id)
+            self.administration_handler.calculate_room_name(self.room_id)
         )
 
         self.assertEquals(room_name, "creator")
@@ -44,7 +44,7 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
     def test_get_empty_room_name_with_two_members(self):
         self.helper.invite(self.room_id, self.creator, self.second_user, tok=self.creator_tok)
         room_name = self.get_success(
-            self.administration_handler.get_room_name(self.room_id)
+            self.administration_handler.calculate_room_name(self.room_id)
         )
 
         self.assertEquals(room_name, "creator and second_user")
@@ -54,7 +54,7 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
         self.helper.invite(self.room_id, self.creator, self.second_user, tok=self.creator_tok)
         self.helper.invite(self.room_id, self.creator, third_user, tok=self.creator_tok)
         room_name = self.get_success(
-            self.administration_handler.get_room_name(self.room_id)
+            self.administration_handler.calculate_room_name(self.room_id)
         )
 
         self.assertEquals(room_name, "creator and 2 others")
@@ -62,7 +62,7 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
     def test_get_empty_room_name_with_empty_room(self):
         self.helper.leave(self.room_id, self.creator, tok=self.creator_tok)
         room_name = self.get_success(
-            self.administration_handler.get_room_name(self.room_id)
+            self.administration_handler.calculate_room_name(self.room_id)
         )
 
         self.assertEquals(room_name, "nobody")
