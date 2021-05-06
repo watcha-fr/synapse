@@ -80,5 +80,5 @@ class NextcloudConfig(Config):
 
           #nextcloud_service_account_password: "examplepassword"
 
-          #group_displayname_prefix: "[Watcha room]
+          #group_displayname_prefix: "[Watcha room]"
         """
