@@ -92,11 +92,7 @@ class NextcloudHandler(BaseHandler):
             room_id: the id of the room
         """
         room_name = await self.administration_handler.get_room_name(room_id)
-        group_displayname = (
-            " ".join((self.group_displayname_prefix, room_name))
-            if room_name
-            else self.group_displayname_prefix
-        )
+        group_displayname = self.group_displayname_prefix + room_name
         return group_displayname
 
     async def set_group_displayname(self, group_id: str, group_displayname: str):
