@@ -210,8 +210,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     content=content,
                 )
                 # watcha+
-                share_id = await self.store.get_share_id(room_id)
-                if share_id and membership in [
+                if await self.store.get_share_id(room_id) and membership in [
                     "invite",
                     "join",
                     "kick",
@@ -231,8 +230,6 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     and "nextcloudShare" in content
                 ):
                     nextcloud_url = content["nextcloudShare"]
-                    requester_id = requester.user.to_string()
-
                     if not nextcloud_url:
                         await self.nextcloud_handler.unbind(room_id)
                     else:
@@ -249,7 +246,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                         nextcloud_folder_path = url_query["dir"][0]
 
                         await self.nextcloud_handler.bind(
-                            requester_id, room_id, nextcloud_folder_path
+                            requester.user.to_string(), room_id, nextcloud_folder_path
                         )
                 # +watcha
                 (
@@ -259,6 +256,18 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     requester, event_dict, txn_id=txn_id
                 )
                 event_id = event.event_id
+                # watcha+
+                if event_type == EventTypes.Name and await self.store.get_share_id(
+                    room_id
+                ):
+                    group_id = await self.nextcloud_handler.build_group_id(room_id)
+                    group_displayname = (
+                        await self.nextcloud_handler.build_group_displayname(room_id)
+                    )
+                    await self.nextcloud_handler.set_group_displayname(
+                        group_id, group_displayname
+                    )
+                # +watcha
         except ShadowBanError:
             event_id = "$" + random_string(43)
 
@@ -374,8 +383,7 @@ class JoinRoomAliasServlet(TransactionRestServlet):
         )
 
         # watcha+
-        share_id = await self.store.get_share_id(room_id)
-        if share_id:
+        if await self.store.get_share_id(room_id):
             await self.nextcloud_handler.update_group(
                 requester.user.to_string(), room_id, "join"
             )
@@ -899,8 +907,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             pass
 
         # watcha+
-        share_id = await self.store.get_share_id(room_id)
-        if share_id and membership_action in [
+        if await self.store.get_share_id(room_id) and membership_action in [
             "invite",
             "join",
             "kick",

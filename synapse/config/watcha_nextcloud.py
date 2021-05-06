@@ -20,6 +20,7 @@ class NextcloudConfig(Config):
         self.service_account_name = None
         self.keycloak_service_account_password = None
         self.nextcloud_service_account_password = None
+        self.nextcloud_group_displayname_prefix = "[Watcha room]"
 
     def read_config(self, config, **kwargs):
         self.nextcloud_enabled = False
@@ -59,6 +60,7 @@ class NextcloudConfig(Config):
         self.nextcloud_service_account_password = nextcloud_config[
             "nextcloud_service_account_password"
         ]
+        self.nextcloud_group_displayname_prefix = nextcloud_config.get("group_displayname_prefix", "[Watcha room]")
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
@@ -77,4 +79,6 @@ class NextcloudConfig(Config):
           #keycloak_service_account_password: "examplepassword"
 
           #nextcloud_service_account_password: "examplepassword"
+
+          #group_displayname_prefix: "[Watcha room]"
         """
