@@ -226,7 +226,7 @@ class NextcloudClient(SimpleHttpClient):
         validate(response, WITHOUT_DATA_SCHEMA)
         self._raise_for_status(response["ocs"]["meta"])
 
-    async def remove_user_from_group(self, username: str, group_id: str):
+    async def remove_user_from_group(self, username: str, group_id: str) -> None:
         """Removes the specified user from the specified group.
 
         Args:
