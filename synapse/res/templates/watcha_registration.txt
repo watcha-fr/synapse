@@ -1,0 +1,37 @@
+Bonjour,
+
+{{ host_name }} vous a invité(e) à rejoindre l'espace de travail sécurisé Watcha.
+
+
+
+Connectez-vous depuis votre navigateur, en vous rendant sur la plateforme :
+
+      {{ login_url }}
+
+
+
+Connectez-vous depuis votre mobile :
+
+      Télécharger l'application Android sur Google Play :
+      
+            https://play.google.com/store/apps/details?id=im.watcha.app
+
+      Télécharger l'application iOS sur l'App Store :
+      
+            https://itunes.apple.com/us/app/watcha/id1383732254
+
+
+
+Paramètres de connexion :
+
+      Email :
+
+            {{ email }}
+
+      Mot de passe provisoire :
+
+            {{ password }}
+
+      Espace de travail :
+
+            {{ server }}

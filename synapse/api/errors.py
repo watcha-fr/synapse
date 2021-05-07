@@ -75,6 +75,12 @@ class Codes:
     INVALID_SIGNATURE = "M_INVALID_SIGNATURE"
     USER_DEACTIVATED = "M_USER_DEACTIVATED"
     BAD_ALIAS = "M_BAD_ALIAS"
+    # watcha+
+    NEXTCLOUD_CAN_NOT_ADD_MEMBERS_TO_GROUP = "W_NEXTCLOUD_CAN_NOT_ADD_MEMBERS_TO_GROUP"
+    NEXTCLOUD_CAN_NOT_CREATE_GROUP = "W_NEXTCLOUD_CAN_NOT_CREATE_GROUP"
+    NEXTCLOUD_CAN_NOT_SHARE = "W_NEXTCLOUD_CAN_NOT_SHARE"
+
+    # +watcha
 
 
 class CodeMessageException(RuntimeError):
@@ -142,6 +148,25 @@ class SynapseError(CodeMessageException):
 
     def error_dict(self):
         return cs_error(self.msg, self.errcode)
+
+
+# watcha+
+class NextcloudError(CodeMessageException):
+    """A base exception type for Nextcloud errors which have an error code and error
+    message (corresponding to status code and status message from Nextcloud API documentation).
+    """
+
+    def __init__(self, code: int, msg: str):
+        """Constructs a Nextcloud error.
+
+        Args:
+            code: The integer error code (corresponding to status code in response body)
+            msg: The human-readable error message.
+        """
+        super().__init__(code, msg)
+
+
+# +watcha
 
 
 class ProxiedRequestError(SynapseError):

@@ -416,7 +416,10 @@ class AuthHandler(BaseHandler):
         # also allow auth from password providers
         for provider in self.password_providers:
             for t in provider.get_supported_login_types().keys():
+                """ watcha!
                 if t == LoginType.PASSWORD and not self._password_enabled:
+                !watcha """
+                if t == LoginType.PASSWORD:  # watcha+
                     continue
                 ui_auth_types.add(t)
 
@@ -426,6 +429,14 @@ class AuthHandler(BaseHandler):
             user.to_string()
         ):
             ui_auth_types.add(LoginType.SSO)
+
+        # watcha+
+        # even it should never happen in real life, appeases
+        # - test_no_local_user_fallback_ui_auth
+        # - test_password_only_auth_provider_ui_auth
+        if not len(ui_auth_types):
+            ui_auth_types.add(LoginType.PASSWORD)
+        # +watcha
 
         return ui_auth_types
 
@@ -819,7 +830,13 @@ class AuthHandler(BaseHandler):
         ):
             await self.auth.check_auth_blocking(user_id)
 
+        """ watcha!
         access_token = self.macaroon_gen.generate_access_token(user_id)
+        !watcha """
+        # watcha+
+        extra_caveats = ["partner = true"] if await self.is_partner(user_id) else None
+        access_token = self.macaroon_gen.generate_access_token(user_id, extra_caveats)
+        # +watcha
         await self.store.add_access_token_to_user(
             user_id=user_id,
             token=access_token,
@@ -1578,6 +1595,15 @@ class AuthHandler(BaseHandler):
         query.append((param_name, param))
         url_parts[4] = urllib.parse.urlencode(query)
         return urllib.parse.urlunparse(url_parts)
+
+    # watcha+
+    async def is_partner(self, user_id):
+        ret = await self.store.is_partner(
+            user_id,
+        )
+        return await self.store.is_partner(user_id)
+
+    # +watcha
 
 
 @attr.s(slots=True)

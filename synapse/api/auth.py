@@ -164,6 +164,7 @@ class Auth:
         self,
         request: SynapseRequest,
         allow_guest: bool = False,
+        allow_partner: bool = True,  # watcha+
         rights: str = "access",
         allow_expired: bool = False,
     ) -> Requester:
@@ -217,6 +218,7 @@ class Auth:
             token_id = user_info.token_id
             is_guest = user_info.is_guest
             shadow_banned = user_info.shadow_banned
+            is_partner = user_info.is_partner  # watcha+
 
             # Deny the request if the user account has expired.
             if self._account_validity_enabled and not allow_expired:
@@ -245,6 +247,15 @@ class Auth:
                     errcode=Codes.GUEST_ACCESS_FORBIDDEN,
                 )
 
+            # watcha+
+            if is_partner and not allow_partner:
+                raise AuthError(
+                    403,
+                    "Partner access not allowed",
+                    errcode=Codes.GUEST_ACCESS_FORBIDDEN,
+                )
+            # +watcha
+
             requester = create_requester(
                 user_info.user_id,
                 token_id,
@@ -253,6 +264,7 @@ class Auth:
                 device_id,
                 app_service=app_service,
                 authenticated_entity=user_info.token_owner,
+                is_partner=is_partner, # watcha+
             )
 
             request.requester = requester

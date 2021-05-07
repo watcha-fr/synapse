@@ -38,7 +38,10 @@ DELAY_BEFORE_MAIL_MS = 10 * 60 * 1000
 THROTTLE_START_MS = 10 * 60 * 1000
 THROTTLE_MAX_MS = 24 * 60 * 60 * 1000  # 24h
 # THROTTLE_MULTIPLIER = 6              # 10 mins, 1 hour, 6 hours, 24 hours
+""" watcha!
 THROTTLE_MULTIPLIER = 144  # 10 mins, 24 hours - i.e. jump straight to 1 day
+!watcha """
+THROTTLE_MULTIPLIER = 24  # 10 mins, 4 hours, 96 hours (reset to 24h) # watcha+
 
 # If no event triggers a notification for this long after the previous,
 # the throttle is released.
