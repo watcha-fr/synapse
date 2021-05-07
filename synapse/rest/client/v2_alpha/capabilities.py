@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -42,10 +41,10 @@ class CapabilitiesRestServlet(RestServlet):
         self.store = hs.get_datastore()  # watcha+
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        """watcha!
+        """ watcha!
         await self.auth.get_user_by_req(request, allow_guest=True)
         change_password = self.auth_handler.can_change_password()
-        !watcha"""
+        !watcha """
         # watcha+
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         user = await self.store.get_user_by_id(requester.user.to_string())

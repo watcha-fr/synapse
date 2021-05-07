@@ -1,4 +1,4 @@
-from mock import AsyncMock
+from unittest.mock import AsyncMock
 
 from synapse.api.errors import SynapseError, NextcloudError
 from synapse.rest.client.v1 import login, room

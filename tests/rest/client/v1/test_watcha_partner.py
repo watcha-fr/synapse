@@ -2,7 +2,7 @@ import json
 import os
 import pkg_resources
 
-from mock import AsyncMock
+from unittest.mock import AsyncMock
 
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room

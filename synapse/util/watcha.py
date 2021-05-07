@@ -1,12 +1,7 @@
 import os
 import sys
 import unicodedata
-
-# secrets is available since python 3.6
-if sys.version_info[0:2] >= (3, 6):
-    import secrets as crypto
-else:
-    import random as crypto
+import secrets as crypto
 
 import pkg_resources
 

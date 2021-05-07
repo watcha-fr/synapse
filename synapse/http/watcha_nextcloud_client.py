@@ -1,4 +1,5 @@
 import logging
+import secrets
 from base64 import b64encode
 from jsonschema import validate
 from typing import Any, List
@@ -68,7 +69,6 @@ class NextcloudClient(SimpleHttpClient):
         super().__init__(hs)
 
         self.nextcloud_url = hs.config.nextcloud_url
-        self.secrets = hs.get_secrets()
         self.service_account_name = hs.config.service_account_name
         self.service_account_password = hs.config.nextcloud_service_account_password
         self._headers = self._get_headers()
@@ -105,7 +105,7 @@ class NextcloudClient(SimpleHttpClient):
             103 - unknown error occurred whilst adding the user
         """
         # A password is needed to create NC user, but it will not be used by KC login process.
-        password = self.secrets.token_hex()
+        password = secrets.token_hex()
         payload = {
             "userid": username,
             "password": password,

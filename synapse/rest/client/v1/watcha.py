@@ -11,7 +11,7 @@ from synapse.api.errors import (
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.push.mailer import Mailer
-from synapse.rest.admin._base import assert_requester_is_admin
+from synapse.rest.admin._base import assert_requester_is_admin, assert_user_is_admin
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.util.watcha import Secrets
 
@@ -122,7 +122,8 @@ class WatchaRegisterRestServlet(RestServlet):
             )
 
     async def on_POST(self, request):
-        await assert_requester_is_admin(self.auth, request)
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
         params = parse_json_object_from_request(request)
 
         displayname = params.get("displayname", "").strip()
@@ -173,12 +174,9 @@ class WatchaRegisterRestServlet(RestServlet):
             await self.nextcloud_client.delete_user(keycloak_user_id)
             raise
 
-        sender = await self.auth.get_user_by_req(request)
-        sender_id = sender.user.to_string()
-
         await self.mailer.send_watcha_registration_email(
             email_address=email,
-            sender_id=sender_id,
+            sender_id=requester.user.to_string(),
             password=password,
         )
 

@@ -1,5 +1,5 @@
 import json
-from mock import AsyncMock
+from unittest.mock import AsyncMock
 
 from synapse.api.errors import SynapseError
 from synapse.rest import admin

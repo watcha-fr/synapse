@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018-2019 New Vector Ltd
@@ -17,6 +16,9 @@
 # limitations under the License.
 
 """Contains constants from the specification."""
+
+# the max size of a (canonical-json-encoded) event
+MAX_PDU_SIZE = 65536
 
 # the "depth" field on events is limited to 2**63 - 1
 MAX_DEPTH = 2 ** 63 - 1
@@ -59,6 +61,8 @@ class JoinRules:
     KNOCK = "knock"
     INVITE = "invite"
     PRIVATE = "private"
+    # As defined for MSC3083.
+    MSC3083_RESTRICTED = "restricted"
 
 
 class LoginType:
@@ -69,6 +73,11 @@ class LoginType:
     TERMS = "m.login.terms"
     SSO = "m.login.sso"
     DUMMY = "m.login.dummy"
+
+
+# This is used in the `type` parameter for /register when called by
+# an appservice to register a new user.
+APP_SERVICE_REGISTRATION_TYPE = "m.login.application_service"
 
 
 class EventTypes:

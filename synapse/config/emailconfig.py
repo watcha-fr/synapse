@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -329,7 +328,7 @@ class EmailConfig(Config):
         )
         # +watcha
 
-        if self.account_validity.renew_by_email_enabled:
+        if self.account_validity_renew_by_email_enabled:
             expiry_template_html = email_config.get(
                 "expiry_template_html", "notice_expiry.html"
             )
