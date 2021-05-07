@@ -28,6 +28,8 @@ from synapse.util import stringutils
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
+from synapse.logging.utils import build_log_message  # watcha+
+
 logger = logging.getLogger(__name__)
 
 
@@ -224,16 +226,30 @@ class AccountValidityHandler:
 
         if len(emails) > 1:
             raise SynapseError(
-                403, "This user has multiple email addresses attached to his account."
+                403,
+                build_log_message(
+                    log_vars={
+                        "user_id": user_id,
+                        "email_addresses": emails,
+                        "reason": "this user has multiple email addresses attached to his account.",
+                    }
+                ),
             )
         if not emails:
             raise SynapseError(
-                403, "This user has no email address attached to his account"
+                403,
+                build_log_message(
+                    {
+                        "user_id": user_id,
+                        "reason": "this user has no email address attached to his account",
+                    }
+                ),
             )
 
         email = emails[0]
 
         return email
+
     # +watcha
 
     async def _get_email_addresses_for_user(self, user_id: str) -> List[str]:

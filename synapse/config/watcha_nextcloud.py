@@ -3,6 +3,8 @@ from urllib.parse import urljoin
 
 from ._base import Config, ConfigError
 
+from synapse.logging.utils import build_log_message
+
 
 class NextcloudConfig(Config):
 
@@ -37,7 +39,11 @@ class NextcloudConfig(Config):
         match = re.match("(https?://.+?)/realms/([^/]+)", issuer)
         if match is None:
             raise ConfigError(
-                "nextcloud requires oidc_config.issuer to be of the form https://example/realms/xxx"
+                build_log_message(
+                    log_vars={
+                        "reason": "nextcloud requires oidc_config.issuer to be of the form https://example/realms/xxx"
+                    }
+                )
             )
         self.keycloak_url = match.group(1)
         self.realm_name = match.group(2)
@@ -47,7 +53,11 @@ class NextcloudConfig(Config):
             client_base_url = config.get("email", {}).get("client_base_url")
             if client_base_url is None:
                 raise ConfigError(
-                    "nextcloud requires nextcloud_url or email.client_base_url to be set"
+                    build_log_message(
+                        log_vars={
+                            "reason": "nextcloud requires nextcloud_url or email.client_base_url to be set"
+                        }
+                    )
                 )
             nextcloud_url = urljoin(client_base_url, "nextcloud")
         self.nextcloud_url = nextcloud_url
@@ -60,7 +70,9 @@ class NextcloudConfig(Config):
         self.nextcloud_service_account_password = nextcloud_config[
             "nextcloud_service_account_password"
         ]
-        self.nextcloud_group_displayname_prefix = nextcloud_config.get("group_displayname_prefix", "[Watcha room]")
+        self.nextcloud_group_displayname_prefix = nextcloud_config.get(
+            "group_displayname_prefix", "[Watcha room]"
+        )
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\

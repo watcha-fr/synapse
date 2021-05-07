@@ -6,6 +6,7 @@ import subprocess
 from collections import defaultdict
 from datetime import datetime
 
+from synapse.logging.utils import build_log_message
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
 
@@ -272,19 +273,19 @@ class AdministrationStore(SQLBaseStore):
                 check=True,
             )
         except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
-            logger.warn("[watcha] collect disk usage - failed: %s", e)
+            logger.warn(build_log_message(log_vars={"error": e}))
             return
 
         stdout = completed_process.stdout
         try:
             stdout = stdout.decode()
         except AttributeError as e:
-            logger.warn("[watcha] parse disk usage statistics - failed: %s", e)
+            logger.warn(build_log_message(log_vars={"error": e}))
             return
 
         tokens = stdout.split("\t")
         if len(tokens) == 1:
-            logger.warn("[watcha] parse disk usage statistics - failed")
+            logger.warn(build_log_message(log_vars={"error": e}))
             return
 
         disk_usage = tokens[0]

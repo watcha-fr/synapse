@@ -4,6 +4,7 @@ from jsonschema.exceptions import SchemaError, ValidationError
 
 from synapse.api.errors import HttpResponseException, NextcloudError
 from synapse.config.emailconfig import ThreepidBehaviour
+from synapse.logging.utils import build_log_message
 from synapse.push.mailer import Mailer
 from synapse.util.watcha import Secrets
 
@@ -55,7 +56,11 @@ class PartnerHandler(BaseHandler):
             SchemaError,
         ) as error:
             if isinstance(error, NextcloudError) and error.code == 102:
-                logger.warn(f"[watcha] add user {keycloak_user_id} - failed: {error}")
+                logger.warn(
+                    build_log_message(
+                        log_vars={"user_id": keycloak_user_id, "error": error}
+                    )
+                )
             else:
                 await self.keycloak_client.delete_user(keycloak_user_id)
                 raise
@@ -67,7 +72,7 @@ class PartnerHandler(BaseHandler):
             make_partner=True,
         )
 
-        logger.info("[watcha] create new partner - success")
+        logger.info(build_log_message(failed_action=False))
 
         await self.mailer.send_watcha_registration_email(
             email_address=invitee_email,

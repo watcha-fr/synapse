@@ -8,6 +8,7 @@ from synapse.api.errors import (
     NextcloudError,
     SynapseError,
 )
+from synapse.logging.utils import build_log_message
 
 from ._base import BaseHandler
 
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 # echo -n watcha | md5sum  | head -c 10
 NEXTCLOUD_GROUP_ID_PREFIX = "c4d96a06b7_"
 # Nextcloud does not allow group id longer than 64 characters
-NEXTCLOUD_GROUP_ID_LENGHT_LIMIT = 64 
+NEXTCLOUD_GROUP_ID_LENGHT_LIMIT = 64
 NEXTCLOUD_CLIENT_ERRORS = (
     NextcloudError,
     SchemaError,
@@ -64,12 +65,22 @@ class NextcloudHandler(BaseHandler):
             # Do not raise error if Nextcloud group already exist
             if isinstance(error, NextcloudError) and error.code == 102:
                 logger.warn(
-                    f"[watcha] add nextcloud group {group_id} - failed: the group already exists"
+                    build_log_message(
+                        log_vars={
+                            "group_id": group_id,
+                            "reason": "the group already exists",
+                        }
+                    )
                 )
             else:
                 raise SynapseError(
                     500,
-                    f"[watcha] add nextcloud group {group_id} - failed: {error}",
+                    build_log_message(
+                        log_vars={
+                            "group_id": group_id,
+                            "error": error,
+                        }
+                    ),
                     Codes.NEXTCLOUD_CAN_NOT_CREATE_GROUP,
                 )
 
@@ -107,7 +118,7 @@ class NextcloudHandler(BaseHandler):
             )
         except NEXTCLOUD_CLIENT_ERRORS as error:
             logger.warn(
-                f"[watcha] set displayname for group {group_id} - failed: {error}"
+                build_log_message(log_vars={"group_id": group_id, "error": error})
             )
 
     async def add_room_members_to_group(self, room_id: str):
@@ -129,12 +140,24 @@ class NextcloudHandler(BaseHandler):
                 # Do not raise error if some users can not be added to group
                 if isinstance(error, NextcloudError) and (error.code in (103, 105)):
                     logger.error(
-                        f"[watcha] add user {user_id} to group {group_id} - failed: {error}"
+                        build_log_message(
+                            log_vars={
+                                "user_id": user_id,
+                                "group_id": group_id,
+                                "error": error,
+                            }
+                        )
                     )
                 else:
                     raise SynapseError(
                         500,
-                        f"[watcha] add members of room {room_id} to group {group_id} - failed: {error}",
+                        build_log_message(
+                            log_vars={
+                                "room_id": room_id,
+                                "group_id": group_id,
+                                "error": error,
+                            }
+                        ),
                         Codes.NEXTCLOUD_CAN_NOT_ADD_MEMBERS_TO_GROUP,
                     )
 
@@ -155,7 +178,11 @@ class NextcloudHandler(BaseHandler):
             try:
                 await self.nextcloud_client.unshare(nextcloud_username, old_share_id)
             except NEXTCLOUD_CLIENT_ERRORS as error:
-                logger.error(f"[watcha] unshare {old_share_id} - failed: {error}")
+                logger.error(
+                    build_log_message(
+                        log_vars={"old_share_id": old_share_id, "error": error}
+                    )
+                )
 
         try:
             new_share_id = await self.nextcloud_client.share(
@@ -171,7 +198,9 @@ class NextcloudHandler(BaseHandler):
             )
             raise SynapseError(
                 http_code,
-                f"[watcha] share folder {path} with group {group_id} - failed: {error}",
+                build_log_message(
+                    log_vars={"path": path, "group_id": group_id, "error": error}
+                ),
                 Codes.NEXTCLOUD_CAN_NOT_SHARE,
             )
 
@@ -188,7 +217,7 @@ class NextcloudHandler(BaseHandler):
             await self.nextcloud_client.delete_group(group_id)
         except NEXTCLOUD_CLIENT_ERRORS as error:
             logger.error(
-                f"[watcha] delete nextcloud group {group_id} - failed: {error}"
+                build_log_message(log_vars={"group_id": group_id, "error": error})
             )
 
         await self.store.delete_share(room_id)
@@ -213,7 +242,13 @@ class NextcloudHandler(BaseHandler):
                 )
             except NEXTCLOUD_CLIENT_ERRORS as error:
                 logger.warn(
-                    f"[watcha] add user {user_id} to group {group_id} - failed: {error}"
+                    build_log_message(
+                        log_vars={
+                            "user_id": user_id,
+                            "group_id": group_id,
+                            "error": error,
+                        }
+                    )
                 )
         else:
             try:
@@ -222,5 +257,11 @@ class NextcloudHandler(BaseHandler):
                 )
             except NEXTCLOUD_CLIENT_ERRORS as error:
                 logger.warn(
-                    f"[watcha] remove user {user_id} from group {group_id} - failed: {error}"
+                    build_log_message(
+                        log_vars={
+                            "user_id": user_id,
+                            "group_id": group_id,
+                            "error": error,
+                        }
+                    )
                 )

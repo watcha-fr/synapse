@@ -48,6 +48,8 @@ from synapse.util.stringutils import random_string
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
+from synapse.logging.utils import build_log_message  # watcha+
+
 logger = logging.getLogger(__name__)
 
 
@@ -451,7 +453,7 @@ class SsoHandler:
             # Otherwise, generate a new user.
             if not user_id:
                 attributes = await self._call_attribute_mapper(sso_to_matrix_id_mapper)
-    
+
                 if attributes.localpart is None:
                     # the mapper doesn't return a username. bail out with a redirect to
                     # the username picker.
@@ -621,9 +623,12 @@ class SsoHandler:
         for email in attributes.emails:
             if await self._store.get_user_id_by_threepid("email", email):
                 raise MappingException(
-                    "[watcha] register user with email {} failed : email address already exists".format(
-                        email
-                    ),
+                    build_log_message(
+                        log_vars={
+                            "email": email,
+                            "reason": "email address already exists",
+                        }
+                    )
                 )
         # +watcha
 

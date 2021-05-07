@@ -47,6 +47,7 @@ from pathlib import Path
 
 import pkg_resources
 
+from synapse.logging.utils import build_log_message
 from synapse.types import get_localpart_from_id
 
 # +watcha
@@ -138,8 +139,11 @@ class Mailer:
         b64_image_cache = self.__dict__.setdefault("_watcha_image_cache", {})
         b64_image = b64_image_cache.get(image_name)
         if b64_image is not None:
+            log_vars = {}
             logger.debug(
-                "[watcha] load base64 image from cache %s" % {"image_name": image_name}
+                build_log_message(
+                    failed_action=False, log_vars={"image_name": image_name}
+                )
             )
             return b64_image
         path = Path(
@@ -148,7 +152,9 @@ class Mailer:
         data = path.read_bytes()
         b64_image = b64encode(data).decode()
         b64_image_cache[image_name] = b64_image
-        logger.debug("[watcha] load image from disk %s" % {"image_name": image_name})
+        logger.debug(
+            build_log_message(failed_action=False, log_vars={"image_name": image_name})
+        )
         return b64_image
 
     async def send_watcha_registration_email(

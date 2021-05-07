@@ -3,6 +3,7 @@ from typing import Dict
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import SynapseError
+from synapse.logging.utils import build_log_message
 from synapse.push.presentable_names import descriptor_from_member_events
 from synapse.types import StateMap, UserID
 
@@ -82,7 +83,16 @@ class AdministrationHandler(BaseHandler):
         user_role = await self.get_user_role(user_id)
 
         if user_role == role:
-            raise SynapseError(400, "This user has already the %s role" % role)
+            raise SynapseError(
+                400,
+                build_log_message(
+                    log_vars={
+                        "user_id": user_id,
+                        "role": role,
+                        "reason": "this user has already the corresponding role",
+                    }
+                ),
+            )
 
         await self.store.watcha_update_user_role(user_id, role)
 
@@ -98,7 +108,15 @@ class AdministrationHandler(BaseHandler):
         is_admin = await self.auth.is_server_admin(UserID.from_string(user_id))
 
         if is_partner and is_admin:
-            raise SynapseError(400, "A user can't be admin and partner too.")
+            raise SynapseError(
+                400,
+                build_log_message(
+                    log_vars={
+                        "user_id": user_id,
+                        "reason": "this user is both a partner and an admin",
+                    }
+                ),
+            )
         elif is_partner:
             role = "partner"
         elif is_admin:

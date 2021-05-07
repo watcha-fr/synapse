@@ -59,6 +59,8 @@ from synapse.util.stringutils import parse_and_validate_server_name, random_stri
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
+from synapse.logging.utils import build_log_message  # watcha+
+
 logger = logging.getLogger(__name__)
 
 
@@ -239,7 +241,10 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                         if "dir" not in url_query:
                             raise SynapseError(
                                 400,
-                                "[watcha] binding Nextcloud folder with room - failed: wrong folder path",
+                                build_log_message(
+                                    action="bind Nextcloud folder with room",
+                                    log_vars={"reason": "no folder path is set in url"},
+                                ),
                             )
 
                         nextcloud_folder_path = url_query["dir"][0]
@@ -832,7 +837,13 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             Membership.JOIN,
             Membership.LEAVE,
         }:
-            raise AuthError(403, "Partners can only join and leave rooms")
+            raise AuthError(
+                403,
+                build_log_message(
+                    action="invite or ban in room",
+                    log_vars={"reason": "partners can only join and leave rooms"},
+                ),
+            )
         # +watcha
 
         try:
