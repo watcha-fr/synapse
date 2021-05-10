@@ -1,11 +1,12 @@
 import os
-
-import pkg_resources
 from unittest.mock import AsyncMock
 
+import pkg_resources
+
 from synapse.rest import admin
-from synapse.rest.client.v1 import watcha, login, room
+from synapse.rest.client.v1 import login, room, watcha
 from synapse.types import UserID
+
 from tests import unittest
 from tests.utils import mock_getRawHeaders
 
@@ -129,7 +130,12 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST",
             self.url,
-            {"email": "user1@example.com", "admin": False, "password": "", "displayname": "user1"},
+            {
+                "email": "user1@example.com",
+                "admin": False,
+                "password": "",
+                "displayname": "user1",
+            },
             self.owner_tok,
         )
         user_id = UserID.from_string(channel.json_body["user_id"])
@@ -138,5 +144,7 @@ class RegisterTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(displayname, "user1")
         self.assertTrue(self.keycloak_client.add_user.called)
-        self.nextcloud_client.add_user.assert_called_with(nextcloud_username, displayname)
+        self.nextcloud_client.add_user.assert_called_with(
+            nextcloud_username, displayname
+        )
         self.assertEqual(channel.code, 200)

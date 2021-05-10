@@ -41,7 +41,7 @@ DEFAULT_SUBJECTS = {
     "invite_from_person_to_room": "[%(app)s] %(person)s has invited you to join the %(room)s room on %(app)s...",
     "password_reset": "[%(server_name)s] Password reset",
     "email_validation": "[%(server_name)s] Validate your email",
-    "watcha_registration": "[%(app)s] Invitation to the Secure Workplace", # watcha+
+    "watcha_registration": "[%(app)s] Invitation to the Secure Workplace",  # watcha+
 }
 
 
@@ -57,7 +57,7 @@ class EmailSubjectConfig:
     invite_from_person_to_room = attr.ib(type=str)
     password_reset = attr.ib(type=str)
     email_validation = attr.ib(type=str)
-    watcha_registration = attr.ib(type=str) # watcha+
+    watcha_registration = attr.ib(type=str)  # watcha+
 
 
 class EmailConfig(Config):
@@ -83,9 +83,9 @@ class EmailConfig(Config):
         if "app_name" in email_config:
             self.email_app_name = email_config["app_name"]
         else:
-            """ watcha !
+            """watcha !
             self.email_app_name = "Matrix"
-            !watcha """
+            !watcha"""
             self.email_app_name = "Watcha"
 
         # TODO: Rename notif_from to something more generic, or have a separate

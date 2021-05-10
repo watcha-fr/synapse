@@ -1,9 +1,9 @@
 import re
 from urllib.parse import urljoin
 
-from ._base import Config, ConfigError
-
 from synapse.logging.utils import build_log_message
+
+from ._base import Config, ConfigError
 
 
 class NextcloudConfig(Config):

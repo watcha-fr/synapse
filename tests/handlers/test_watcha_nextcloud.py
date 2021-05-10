@@ -1,8 +1,9 @@
 from unittest.mock import AsyncMock
 
-from synapse.api.errors import SynapseError, NextcloudError
-from synapse.rest.client.v1 import login, room
+from synapse.api.errors import NextcloudError, SynapseError
 from synapse.rest import admin
+from synapse.rest.client.v1 import login, room
+
 from tests.unittest import HomeserverTestCase
 
 
@@ -118,7 +119,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.nextcloud_client.set_group_displayname = AsyncMock(
             side_effect=NextcloudError(code=101, msg="")
         )
-        
+
         self.get_success(self.nextcloud_handler.create_group(self.room_id))
 
     def test_add_room_members_to_group(self):
@@ -131,9 +132,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
             side_effect=NextcloudError(code=103, msg="")
         )
 
-        self.get_success(
-            self.nextcloud_handler.add_room_members_to_group(self.room_id)
-        )
+        self.get_success(self.nextcloud_handler.add_room_members_to_group(self.room_id))
 
     def test_create_share(self):
         self.get_success(
@@ -242,9 +241,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         second_inviter = "@second_inviter:test"
 
         self.get_success(
-            self.nextcloud_handler.update_group(
-                second_inviter, self.room_id, "invite"
-            )
+            self.nextcloud_handler.update_group(second_inviter, self.room_id, "invite")
         )
 
     def test_update_existing_group_on_leave_membership_with_exception(self):
@@ -254,7 +251,5 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         second_inviter = "@second_inviter:test"
 
         self.get_success(
-            self.nextcloud_handler.update_group(
-                second_inviter, self.room_id, "leave"
-            )
+            self.nextcloud_handler.update_group(second_inviter, self.room_id, "leave")
         )

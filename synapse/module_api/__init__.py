@@ -84,7 +84,8 @@ class ModuleApi:
     """ watcha!
     def get_user_by_req(self, req, allow_guest=False):
     !watcha """
-    def get_user_by_req(self, req, allow_guest=False, allow_partner=False): # watcha+
+
+    def get_user_by_req(self, req, allow_guest=False, allow_partner=False):  # watcha+
         """Check the access_token provided for a request
 
         Args:
@@ -103,7 +104,7 @@ class ModuleApi:
         """ watcha!
         return self._auth.get_user_by_req(req, allow_guest)
         !watcha """
-        return self._auth.get_user_by_req(req, allow_guest, allow_partner) # watcha+
+        return self._auth.get_user_by_req(req, allow_guest, allow_partner)  # watcha+
 
     def get_qualified_user_id(self, username):
         """Qualify a user id, if necessary

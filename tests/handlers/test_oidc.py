@@ -80,9 +80,9 @@ class TestMappingProvider:
         return userinfo["sub"]
 
     async def map_user_attributes(self, userinfo, token):
-        """ watcha!
+        """watcha!
         return {"localpart": userinfo["username"], "display_name": None}
-        !watcha """
+        !watcha"""
         # watcha+
         email = userinfo.get("email")
         is_admin = userinfo.get("is_admin")  # type: Optional[bool]
@@ -1000,7 +1000,12 @@ class OidcHandlerTestCase(HomeserverTestCase):
             store.register_user(user_id=user7.to_string(), password_hash=None)
         )
         self.get_success(
-            auth_handler.add_threepid(user7.to_string(), "email", "test_user@test.com", self.hs.get_clock().time_msec())
+            auth_handler.add_threepid(
+                user7.to_string(),
+                "email",
+                "test_user@test.com",
+                self.hs.get_clock().time_msec(),
+            )
         )
         userinfo = {
             "sub": "test_user_8",
@@ -1009,9 +1014,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         }
         self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_not_called()
-        self.assertRenderedError(
-            "mapping_error"
-        )
+        self.assertRenderedError("mapping_error")
 
         # +watcha
 

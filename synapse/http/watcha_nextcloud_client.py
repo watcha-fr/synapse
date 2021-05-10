@@ -1,8 +1,9 @@
 import logging
 import secrets
 from base64 import b64encode
-from jsonschema import validate
 from typing import Any, List
+
+from jsonschema import validate
 
 from synapse.api.errors import Codes, NextcloudError
 from synapse.http.client import SimpleHttpClient

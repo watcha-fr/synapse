@@ -78,7 +78,9 @@ class ClientDirectoryServer(RestServlet):
         """ watcha!
         requester = await self.auth.get_user_by_req(request)
         !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
+        # watcha+
+        requester = await self.auth.get_user_by_req(request, allow_partner=False)
+        # +watcha
 
         await self.directory_handler.create_association(
             requester, room_alias, room_id, servers
@@ -106,8 +108,10 @@ class ClientDirectoryServer(RestServlet):
         """ watcha!
         requester = await self.auth.get_user_by_req(request)
         !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
- 
+        # watcha+
+        requester = await self.auth.get_user_by_req(request, allow_partner=False)
+        # +watcha
+
         user = requester.user
 
         room_alias = RoomAlias.from_string(room_alias)
@@ -138,10 +142,12 @@ class ClientDirectoryListServer(RestServlet):
         return 200, {"visibility": "public" if room["is_public"] else "private"}
 
     async def on_PUT(self, request, room_id):
-        """ watcha!
+        """watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
+        !watcha"""
+        # watcha+
+        requester = await self.auth.get_user_by_req(request, allow_partner=False)
+        # +watcha
 
         content = parse_json_object_from_request(request)
         visibility = content.get("visibility", "public")
@@ -153,10 +159,12 @@ class ClientDirectoryListServer(RestServlet):
         return 200, {}
 
     async def on_DELETE(self, request, room_id):
-        """ watcha!
+        """watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
+        !watcha"""
+        # watcha+
+        requester = await self.auth.get_user_by_req(request, allow_partner=False)
+        # +watcha
 
         await self.directory_handler.edit_published_room_list(
             requester, room_id, "private"
@@ -185,10 +193,12 @@ class ClientAppserviceDirectoryListServer(RestServlet):
         return self._edit(request, network_id, room_id, "private")
 
     async def _edit(self, request, network_id, room_id, visibility):
-        """ watcha!
+        """watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
-        requester = await self.auth.get_user_by_req(request, allow_partner=False) # watcha+
+        !watcha"""
+        # watcha+
+        requester = await self.auth.get_user_by_req(request, allow_partner=False)
+        # +watcha
 
         if not requester.app_service:
             raise AuthError(

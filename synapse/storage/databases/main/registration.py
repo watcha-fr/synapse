@@ -58,7 +58,7 @@ class TokenLookupResult:
     user_id = attr.ib(type=str)
     is_guest = attr.ib(type=bool, default=False)
     shadow_banned = attr.ib(type=bool, default=False)
-    is_partner = attr.ib(type=bool, default=False) # watcha+
+    is_partner = attr.ib(type=bool, default=False)  # watcha+
     token_id = attr.ib(type=Optional[int], default=None)
     device_id = attr.ib(type=Optional[str], default=None)
     valid_until_ms = attr.ib(type=Optional[int], default=None)
@@ -128,7 +128,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 "password_hash",
                 "is_guest",
                 "admin",
-                "is_partner", # watcha+
+                "is_partner",  # watcha+
                 "consent_version",
                 "consent_server_notice_sent",
                 "appservice_id",
@@ -436,7 +436,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         await self.db_pool.runInteraction("set_shadow_banned", set_shadow_banned_txn)
 
     def _query_for_auth(self, txn, token: str) -> Optional[TokenLookupResult]:
-        ''' watcha!
+        '''watcha!
         sql = """
             SELECT users.name as user_id,
                 users.is_guest,
@@ -548,7 +548,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         user_id: str,
         nextcloud_username: str = None,
     ) -> None:
-    # +watcha
+        # +watcha
         """Record a mapping from an external user id to a mxid
 
         Args:
@@ -563,10 +563,11 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 "auth_provider": auth_provider,
                 "external_id": external_id,
                 "user_id": user_id,
-                "nextcloud_username": nextcloud_username, # watcha+
+                "nextcloud_username": nextcloud_username,  # watcha+
             },
             desc="record_user_external_id",
         )
+
     # +watcha
 
     async def get_user_by_external_id(
@@ -1372,7 +1373,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         password_hash: Optional[str] = None,
         was_guest: bool = False,
         make_guest: bool = False,
-        make_partner: bool = False, # watcha+
+        make_partner: bool = False,  # watcha+
         appservice_id: Optional[str] = None,
         create_profile_with_displayname: Optional[str] = None,
         admin: bool = False,
@@ -1407,7 +1408,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             password_hash,
             was_guest,
             make_guest,
-            make_partner, # watcha+
+            make_partner,  # watcha+
             appservice_id,
             create_profile_with_displayname,
             admin,
@@ -1422,7 +1423,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         password_hash: Optional[str],
         was_guest: bool,
         make_guest: bool,
-        make_partner, # watcha+
+        make_partner,  # watcha+
         appservice_id: Optional[str],
         create_profile_with_displayname: Optional[str],
         admin: bool,
@@ -1469,7 +1470,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                         "password_hash": password_hash,
                         "creation_ts": now,
                         "is_guest": 1 if make_guest else 0,
-                        "is_partner": 1 if make_partner else 0, # watcha+
+                        "is_partner": 1 if make_partner else 0,  # watcha+
                         "appservice_id": appservice_id,
                         "admin": 1 if admin else 0,
                         "user_type": user_type,
@@ -1810,6 +1811,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         return bool(is_partner)
 
     # +watcha
+
 
 def find_max_generated_user_id_localpart(cur: Cursor) -> int:
     """

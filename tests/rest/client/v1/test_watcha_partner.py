@@ -1,11 +1,12 @@
 import json
 import os
-import pkg_resources
-
 from unittest.mock import AsyncMock
+
+import pkg_resources
 
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
+
 from tests import unittest
 from tests.utils import mock_getRawHeaders
 

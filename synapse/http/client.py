@@ -834,7 +834,9 @@ class SimpleHttpClient:
         if headers:
             actual_headers.update(headers)
 
-        optional_params = {"data": encode_canonical_json(json_body)} if json_body else {}
+        optional_params = (
+            {"data": encode_canonical_json(json_body)} if json_body else {}
+        )
 
         response = await self.request(
             "DELETE", uri, headers=Headers(actual_headers), **optional_params

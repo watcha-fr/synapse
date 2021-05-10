@@ -226,7 +226,7 @@ class RoomTestCase(_ShadowBannedBase):
             ],
         )
 
-    test_invite_3pid.skip = "Disabled for Watcha after OP553." # watcha+
+    test_invite_3pid.skip = "Disabled for Watcha after OP553."  # watcha+
 
 
 # To avoid the tests timing out don't add a delay to "annoy the requester".

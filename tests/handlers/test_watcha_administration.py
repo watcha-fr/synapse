@@ -1,5 +1,6 @@
 import synapse.rest.admin
 from synapse.rest.client.v1 import login, room
+
 from tests import unittest
 
 
@@ -40,18 +41,22 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEquals(room_name, "creator")
-    
+
     def test_get_empty_room_name_with_two_members(self):
-        self.helper.invite(self.room_id, self.creator, self.second_user, tok=self.creator_tok)
+        self.helper.invite(
+            self.room_id, self.creator, self.second_user, tok=self.creator_tok
+        )
         room_name = self.get_success(
             self.administration_handler.calculate_room_name(self.room_id)
         )
 
         self.assertEquals(room_name, "creator and second_user")
-    
+
     def test_get_empty_room_name_with_many_members(self):
         third_user = self.register_user("third_user", "pass")
-        self.helper.invite(self.room_id, self.creator, self.second_user, tok=self.creator_tok)
+        self.helper.invite(
+            self.room_id, self.creator, self.second_user, tok=self.creator_tok
+        )
         self.helper.invite(self.room_id, self.creator, third_user, tok=self.creator_tok)
         room_name = self.get_success(
             self.administration_handler.calculate_room_name(self.room_id)
