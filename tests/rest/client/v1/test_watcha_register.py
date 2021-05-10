@@ -111,10 +111,6 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         self.nextcloud_client.add_user.assert_not_called()
 
         self.assertEqual(channel.code, 400)
-        self.assertEqual(
-            channel.result["body"],
-            b'{"errcode":"M_UNKNOWN","error":"Email address cannot be empty"}',
-        )
 
     def test_register_user_with_same_email_adress(self):
         channel = self.make_request(
@@ -128,10 +124,6 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         self.nextcloud_client.add_user.assert_not_called()
 
         self.assertEqual(channel.code, 400)
-        self.assertEqual(
-            channel.result["body"],
-            b'{"errcode":"M_UNKNOWN","error":"A user with this email address already exists. Cannot create a new one."}',
-        )
 
     def test_register_user_with_displayname(self):
         channel = self.make_request(

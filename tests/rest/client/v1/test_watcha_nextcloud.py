@@ -97,10 +97,6 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         self.assertFalse(self.nextcloud_handler.bind.called)
         self.assertRaises(SynapseError)
         self.assertEquals(400, channel.code)
-        self.assertEquals(
-            "[watcha] binding Nextcloud folder with room - failed: wrong folder path",
-            json.loads(channel.result["body"])["error"],
-        )
 
     def test_update_nextcloud_share_on_invite_and_join_event(self):
         self.helper.invite(

@@ -63,7 +63,6 @@ class WatchaUpdateUserRoleRestServlet(RestServlet):
 
         users = await self.administration_handler.get_users()
         if target_user_id not in [user["name"] for user in users]:
-            log_vars = {}
             raise SynapseError(
                 400,
                 build_log_message(

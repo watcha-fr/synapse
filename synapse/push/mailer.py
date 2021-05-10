@@ -139,7 +139,6 @@ class Mailer:
         b64_image_cache = self.__dict__.setdefault("_watcha_image_cache", {})
         b64_image = b64_image_cache.get(image_name)
         if b64_image is not None:
-            log_vars = {}
             logger.debug(
                 build_log_message(
                     failed_action=False, log_vars={"image_name": image_name}
@@ -158,7 +157,10 @@ class Mailer:
         return b64_image
 
     async def send_watcha_registration_email(
-        self, email_address: str, sender_id: str, password: str,
+        self,
+        email_address: str,
+        sender_id: str,
+        password: str,
     ) -> None:
         """Send an email with temporary password and connexion link to Watcha.
 
@@ -203,7 +205,9 @@ class Mailer:
         }
 
         await self.send_email(
-            email_address, subject, template_vars,
+            email_address,
+            subject,
+            template_vars,
         )
 
     # +watcha

@@ -87,9 +87,9 @@ class RoomCreateRestServlet(TransactionRestServlet):
         return self.txns.fetch_or_execute_request(request, self.on_POST, request)
 
     async def on_POST(self, request):
-        """ watcha!
+        """watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
+        !watcha"""
         # watcha+
         requester = await self.auth.get_user_by_req(request, allow_partner=False)
         # +watcha
@@ -416,9 +416,9 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         server = parse_string(request, "server", default=None)
 
         try:
-            """ watcha!
+            """watcha!
             await self.auth.get_user_by_req(request, allow_guest=True)
-            !watcha """
+            !watcha"""
             # watcha+
             await self.auth.get_user_by_req(
                 request, allow_guest=True, allow_partner=False
@@ -472,9 +472,9 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         return 200, data
 
     async def on_POST(self, request):
-        """ watcha!
+        """watcha!
         await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha """
+        !watcha"""
         # watcha+
         await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=False)
         # +watcha

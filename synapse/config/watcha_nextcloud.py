@@ -41,7 +41,7 @@ class NextcloudConfig(Config):
             raise ConfigError(
                 build_log_message(
                     log_vars={
-                        "reason": "nextcloud requires oidc_config.issuer to be of the form https://example/realms/xxx"
+                        "reason": "Nextcloud requires oidc_config.issuer to be of the form https://example/realms/xxx"
                     }
                 )
             )
@@ -55,7 +55,7 @@ class NextcloudConfig(Config):
                 raise ConfigError(
                     build_log_message(
                         log_vars={
-                            "reason": "nextcloud requires nextcloud_url or email.client_base_url to be set"
+                            "reason": "Nextcloud requires nextcloud_url or email.client_base_url to be set"
                         }
                     )
                 )
