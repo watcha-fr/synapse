@@ -179,17 +179,12 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             self.auth.add_threepid(self.owner, "msisdn", "0612345678", self.time)
         )
 
-        with self.assertLogs("synapse.rest.client.v1.profile", level="ERROR") as cm:
-            channel = self.make_request(
-                "GET", "/profile/%s" % (quote(self.owner, safe=""))
-            )
+        channel = self.make_request(
+            "GET", "/profile/%s" % (quote(self.owner, safe=""))
+        )
 
         self.assertEqual(channel.code, 200)
         self.assertRaises(SynapseError)
-        self.assertIn(
-            "ERROR:synapse.rest.client.v1.profile:Email is not defined for this user.",
-            cm.output[0],
-        )
 
     def test_get_only_one_email_threepids(self):
 
@@ -203,17 +198,13 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        with self.assertLogs("synapse.rest.client.v1.profile", level="ERROR") as cm:
-            channel = self.make_request(
-                "GET", "/profile/%s" % (quote(self.owner, safe=""))
-            )
+        channel = self.make_request(
+            "GET", "/profile/%s" % (quote(self.owner, safe=""))
+        )
 
         self.assertEqual(channel.code, 200)
         self.assertRaises(SynapseError)
-        self.assertIn(
-            "ERROR:synapse.rest.client.v1.profile:Email is not defined for this user.",
-            cm.output[0],
-        )
+
     # +watcha
 
 

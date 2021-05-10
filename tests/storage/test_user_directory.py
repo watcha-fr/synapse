@@ -128,17 +128,9 @@ class WatchaUserDirectoryStoreTestCase(HomeserverTestCase):
         )
 
     def test_search_user_dir_with_user_id(self):
-        with self.assertLogs(
-            "synapse.storage.databases.main.user_directory", level="INFO"
-        ) as cm:
-            sqlResult = self.get_success(
-                self.store.search_user_dir(self.user_id, self.searched_user, 1)
-            )
-            self.assertIn(
-                "INFO:synapse.storage.databases.main.user_directory:Searching with search term: %s"
-                % repr(self.searched_user),
-                "".join(cm.output),
-            )
+        sqlResult = self.get_success(
+            self.store.search_user_dir(self.user_id, self.searched_user, 1)
+        )
 
         self.assertFalse(sqlResult["limited"])
         self.assertEquals(

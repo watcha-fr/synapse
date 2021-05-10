@@ -1010,8 +1010,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_not_called()
         self.assertRenderedError(
-            "mapping_error",
-            "[watcha] register user with email test_user@test.com failed : email address already exists",
+            "mapping_error"
         )
 
         # +watcha
