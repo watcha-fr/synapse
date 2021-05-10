@@ -90,15 +90,12 @@ def build_log_message(
         log_vars:  collection of variables to log
     """
 
-    def _get_action_from_caller_function(caller_function_index: int = 2):
-        """Get human readable action name from caller function
-
-        Args:
-            caller_function_index: index of caller function in the stack trace (by default it's the grand parent function)
-        """
+    def _get_action_from_caller_function():
+        """Get human readable action name from caller function"""
         FUNCTION_NAME_INDEX = 3
+        CALLER_FUNCTION_INDEX = 2  # correspond to grand mother function
 
-        function_name = stack()[caller_function_index][FUNCTION_NAME_INDEX]
+        function_name = stack()[CALLER_FUNCTION_INDEX][FUNCTION_NAME_INDEX]
         action = " ".join(function_name.split("_")).strip()
         return action
 
