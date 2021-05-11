@@ -77,7 +77,6 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
         self.room_id = self.helper.create_room_as(self.owner, tok=self.owner_tok)
 
         self.keycloak_client = self.nextcloud_handler.keycloak_client
-        self.nextcloud_client = self.nextcloud_handler.nextcloud_client
 
         response = AsyncMock()
         response.headers.getRawHeaders = mock_getRawHeaders(
@@ -89,7 +88,6 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
         )
 
         self.keycloak_client.add_user = AsyncMock(return_value=response)
-        self.nextcloud_client.add_user = AsyncMock()
 
         self.invite_uri = "/rooms/{}/invite".format(self.room_id)
 
@@ -102,7 +100,6 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertTrue(self.keycloak_client.add_user.called)
-        self.assertTrue(self.nextcloud_client.add_user.called)
         self.assertTrue(self.store.add_partner_invitation.called)
 
         self.assertEqual(len(self.email_attempts), 1)
@@ -123,7 +120,6 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
         )
 
         self.keycloak_client.add_user.assert_not_called()
-        self.nextcloud_client.add_user.assert_not_called()
         self.store.add_partner_invitation.assert_called_once()
 
         self.assertEqual(len(self.email_attempts), 0)
@@ -144,7 +140,6 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
         )
 
         self.keycloak_client.add_user.assert_not_called()
-        self.nextcloud_client.add_user.assert_not_called()
         self.store.add_partner_invitation.assert_not_called()
 
         self.assertEqual(len(self.email_attempts), 0)
@@ -169,7 +164,6 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertTrue(self.keycloak_client.add_user.called)
-        self.assertTrue(self.nextcloud_client.add_user.called)
         self.assertTrue(self.store.add_partner_invitation.called)
 
         self.assertEqual(len(self.email_attempts), 1)
@@ -193,7 +187,6 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
         )
 
         self.keycloak_client.add_user.assert_not_called()
-        self.nextcloud_client.add_user.assert_not_called()
         self.store.add_partner_invitation.assert_called_once()
 
         self.assertEqual(len(self.email_attempts), 0)
@@ -217,7 +210,6 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
         )
 
         self.keycloak_client.add_user.assert_not_called()
-        self.nextcloud_client.add_user.assert_not_called()
         self.store.add_partner_invitation.assert_not_called()
 
         self.assertEqual(len(self.email_attempts), 0)
