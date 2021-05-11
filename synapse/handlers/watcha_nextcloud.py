@@ -158,7 +158,7 @@ class NextcloudHandler(BaseHandler):
                 logger.error(f"[watcha] unshare {old_share_id} - failed: {error}")
 
         try:
-            new_share_id = await self.nextcloud_client.share(
+            new_share_id = await self.nextcloud_client.create_internal_share(
                 nextcloud_username, path, group_id
             )
         except NEXTCLOUD_CLIENT_ERRORS as error:
