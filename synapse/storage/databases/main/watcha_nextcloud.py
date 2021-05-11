@@ -6,39 +6,48 @@ class NextcloudStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs: "Homeserver"):
         super().__init__(database, db_conn, hs)
 
-    async def get_share_id(self, room_id: str):
-        """Get Nextcloud share id of a room.
+    async def get_share_ids(self, room_id: str):
+        """Get the internal share id of a room.
 
         Args:
             room_id: id of the room
+
+        Returns:
+            a list of all share ids of the room
         """
-        return await self.db_pool.simple_select_one_onecol(
+        return await self.db_pool.simple_select_list(
             table="watcha_nextcloud_shares",
-            keyvalues={"room_id": room_id},
-            retcol="share_id",
+            keyvalues={
+                "room_id": room_id,
+            },
+            retcols={"share_id"},
             allow_none=True,
-            desc="get_share_id",
+            desc="get_share_ids",
         )
 
-    async def register_share(self, room_id: str, share_id: str):
-        """Register a share between a room and a Nextcloud folder
+    async def register_share(
+        self, room_id: str, share_id: str, public_link: str = None
+    ):
+        """Register a public link or an internal share between a room and a Nextcloud folder
 
         Args:
             room_id: id of the room
             share_id: id of the Nextcloud share
+            public_link: url of the public link
         """
         await self.db_pool.simple_upsert(
             table="watcha_nextcloud_shares",
-            keyvalues={"room_id": room_id},
+            keyvalues={"room_id": room_id, "share_id": share_id},
             values={
                 "room_id": room_id,
                 "share_id": share_id,
+                "public_link": public_link,
             },
-            desc="bind",
+            desc="register_share",
         )
 
-    async def delete_share(self, room_id: str):
-        """Delete an existing share of a room
+    async def delete_all_shares(self, room_id: str):
+        """Delete all existing shares of a room
 
         Args:
             room_id: id of the room where the share is associated
@@ -46,7 +55,7 @@ class NextcloudStore(SQLBaseStore):
         await self.db_pool.simple_delete(
             table="watcha_nextcloud_shares",
             keyvalues={"room_id": room_id},
-            desc="unbind",
+            desc="delete_all_shares",
         )
 
     async def get_username(self, user_id: str):
