@@ -47,7 +47,7 @@ from pathlib import Path
 
 import pkg_resources
 
-from synapse.logging.utils import build_log_message
+from synapse.logging.utils import build_log_message, LoggedActionStatus
 from synapse.types import get_localpart_from_id
 
 # +watcha
@@ -141,7 +141,7 @@ class Mailer:
         if b64_image is not None:
             logger.debug(
                 build_log_message(
-                    failed_action=False, log_vars={"image_name": image_name}
+                    status=LoggedActionStatus.SUCCESS.value, log_vars={"image_name": image_name}
                 )
             )
             return b64_image
@@ -152,7 +152,7 @@ class Mailer:
         b64_image = b64encode(data).decode()
         b64_image_cache[image_name] = b64_image
         logger.debug(
-            build_log_message(failed_action=False, log_vars={"image_name": image_name})
+            build_log_message(status=LoggedActionStatus.SUCCESS.value, log_vars={"image_name": image_name})
         )
         return b64_image
 

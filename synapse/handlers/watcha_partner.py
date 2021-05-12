@@ -4,7 +4,7 @@ from jsonschema.exceptions import SchemaError, ValidationError
 
 from synapse.api.errors import HttpResponseException, NextcloudError
 from synapse.config.emailconfig import ThreepidBehaviour
-from synapse.logging.utils import build_log_message
+from synapse.logging.utils import build_log_message, LoggedActionStatus
 from synapse.push.mailer import Mailer
 from synapse.util.watcha import Secrets
 
@@ -72,7 +72,7 @@ class PartnerHandler(BaseHandler):
             make_partner=True,
         )
 
-        logger.info(build_log_message(failed_action=False))
+        logger.info(build_log_message(status=LoggedActionStatus.SUCCESS.value))
 
         await self.mailer.send_watcha_registration_email(
             email_address=invitee_email,
