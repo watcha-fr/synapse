@@ -82,7 +82,7 @@ class WatchaUpdateUserRoleRestServlet(RestServlet):
                 ),
             )
 
-        result = await self.administration_handler.watcha_update_user_role(
+        result = await self.administration_handler.update_user_role(
             target_user_id, role
         )
         return 200, {"new_role": result}

@@ -79,7 +79,13 @@ class AdministrationHandler(BaseHandler):
 
         return result
 
-    async def watcha_update_user_role(self, user_id, role):
+    async def update_user_role(self, user_id, role):
+        """Update the user role
+
+        Args:
+            user_id: the id of the user
+            role: role to be assigned to the user. It can be 'administrator', 'collaborator' or 'patner'
+        """
         current_role = await self.get_user_role(user_id)
 
         if current_role == role:
@@ -94,7 +100,7 @@ class AdministrationHandler(BaseHandler):
                 ),
             )
 
-        await self.store.watcha_update_user_role(user_id, role)
+        await self.store.update_user_role(user_id, role)
 
         return role
 

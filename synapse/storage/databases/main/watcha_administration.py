@@ -452,7 +452,7 @@ class AdministrationStore(SQLBaseStore):
             desc=_caller_name(),
         )
 
-    async def watcha_update_user_role(self, user_id, role):
+    async def update_user_role(self, user_id, role):
         if role == "collaborator":
             return await self._update_user(user_id, admin=0, is_partner=0)
         elif role == "administrator":
