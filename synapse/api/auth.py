@@ -255,11 +255,11 @@ class Auth:
                     403,
                     build_log_message(
                         log_vars={
-                            "userid": userid,
-                            "reason": "partner access are not allowed",
+                            "user_id": user_info.user_id,
+                            "is_partner": is_guest,
+                            "allow_partner": allow_partner,
                         }
                     ),
-                    errcode=Codes.GUEST_ACCESS_FORBIDDEN,
                 )
             # +watcha
 

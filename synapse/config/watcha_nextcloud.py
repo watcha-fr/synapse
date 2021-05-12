@@ -36,12 +36,15 @@ class NextcloudConfig(Config):
             return
 
         issuer = oidc_config.get("issuer", "")
-        match = re.match("(https?://.+?)/realms/([^/]+)", issuer)
+        expected_pattern = "(https?://.+?)/realms/([^/]+)"
+        match = re.match(expected_pattern, issuer)
         if match is None:
             raise ConfigError(
                 build_log_message(
+                    action="check if 'issuer' attribute correspond to the expected pattern"
                     log_vars={
-                        "reason": "Nextcloud requires oidc_config.issuer to be of the form https://example/realms/xxx"
+                        "issuer": issuer,
+                        "expected_pattern": expected_pattern,
                     }
                 )
             )
@@ -54,8 +57,9 @@ class NextcloudConfig(Config):
             if client_base_url is None:
                 raise ConfigError(
                     build_log_message(
+                        action="check if 'client_base_url' attribute is set",
                         log_vars={
-                            "reason": "Nextcloud requires nextcloud_url or email.client_base_url to be set"
+                            "client_base_url": client_base_url
                         }
                     )
                 )

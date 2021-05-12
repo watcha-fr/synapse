@@ -627,10 +627,10 @@ class SsoHandler:
             if await self._store.get_user_id_by_threepid("email", email):
                 raise MappingException(
                     build_log_message(
+                        action="check if email address is available",
                         log_vars={
                             "email": email,
-                            "reason": "email address already exists",
-                        }
+                        },
                     )
                 )
         # +watcha

@@ -1360,10 +1360,10 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             except Exception as e:
                 raise ConfigError(
                     build_log_message(
+                        action="get Nextcloud username template",
                         log_vars={
-                            "reason": "invalid jinja template for oidc_config.user_mapping_provider.config.nextcloud_username_template",
                             "error": e,
-                        }
+                        },
                     )
                 )
         # +watcha
@@ -1433,10 +1433,10 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         if not isinstance(is_admin, bool) and is_admin is not None:
             raise MappingException(
                 build_log_message(
+                    action="get 'is_admin' attribute",
                     log_vars={
                         "is_admin": is_admin,
-                        "reason": "is_admin is not a boolean",
-                    }
+                    },
                 )
             )
 

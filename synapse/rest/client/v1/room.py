@@ -242,8 +242,8 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                             raise SynapseError(
                                 400,
                                 build_log_message(
-                                    action="bind Nextcloud folder with room",
-                                    log_vars={"reason": "no folder path is set in url"},
+                                    action="check if 'dir' parameter url is set ",
+                                    log_vars={"url": nextcloud_url},
                                 ),
                             )
 
@@ -840,8 +840,12 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             raise AuthError(
                 403,
                 build_log_message(
-                    action="invite or ban in room",
-                    log_vars={"reason": "partners can only join and leave rooms"},
+                    action="check membership action",
+                    log_vars={
+                        "user_id": requester.user.to_string(),
+                        "is_partner": is_partner,
+                        "membership": membership_action,
+                    },
                 ),
             )
         # +watcha

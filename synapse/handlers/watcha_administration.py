@@ -80,16 +80,16 @@ class AdministrationHandler(BaseHandler):
         return result
 
     async def watcha_update_user_role(self, user_id, role):
-        user_role = await self.get_user_role(user_id)
+        current_role = await self.get_user_role(user_id)
 
-        if user_role == role:
+        if current_role == role:
             raise SynapseError(
                 400,
                 build_log_message(
                     log_vars={
                         "user_id": user_id,
-                        "role": role,
-                        "reason": "this user has already the corresponding role",
+                        "current_role": current_role,
+                        "desired_role": role,
                     }
                 ),
             )
@@ -111,9 +111,11 @@ class AdministrationHandler(BaseHandler):
             raise SynapseError(
                 400,
                 build_log_message(
+                    action="check if the user has only one role"
                     log_vars={
                         "user_id": user_id,
-                        "reason": "this user is both a partner and an admin",
+                        "is_admin": is_admin,
+                        "is_partner": is_partner,
                     }
                 ),
             )

@@ -66,9 +66,9 @@ class NextcloudHandler(BaseHandler):
             if isinstance(error, NextcloudError) and error.code == 102:
                 logger.warn(
                     build_log_message(
+                        action="check if group_id is available",
                         log_vars={
                             "group_id": group_id,
-                            "reason": "the group already exists",
                         }
                     )
                 )

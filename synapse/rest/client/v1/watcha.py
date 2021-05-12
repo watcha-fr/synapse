@@ -66,20 +66,19 @@ class WatchaUpdateUserRoleRestServlet(RestServlet):
             raise SynapseError(
                 400,
                 build_log_message(
-                    action="update user role",
-                    log_vars={
-                        "reason": "targeted user is not registered in this homeserver"
-                    },
+                    action="check if user is registered",
+                    log_vars={"user_id": target_user_id},
                 ),
             )
 
         role = params["role"]
-        if role not in ["partner", "collaborator", "admin"]:
+        handled_role = ("partner", "collaborator", "admin")
+        if role not in handled_role:
             raise SynapseError(
                 400,
                 build_log_message(
-                    action="update user role",
-                    log_vars={"role": role, "reason": "this role is not supported"},
+                    action="check if role is handled",
+                    log_vars={"role": role, "handled_role": handled_role},
                 ),
             )
 
@@ -145,8 +144,8 @@ class WatchaRegisterRestServlet(RestServlet):
             raise SynapseError(
                 400,
                 build_log_message(
-                    action="register user",
-                    log_vars={"reason": "email address cannot be empty"},
+                    action="check if email address is set",
+                    log_vars={"email": email},
                 ),
             )
 
@@ -154,10 +153,9 @@ class WatchaRegisterRestServlet(RestServlet):
             raise SynapseError(
                 400,
                 build_log_message(
-                    action="register user",
+                    action="check if email is available",
                     log_vars={
                         "email": email,
-                        "reason": "this email address is already set for a user",
                     },
                 ),
             )

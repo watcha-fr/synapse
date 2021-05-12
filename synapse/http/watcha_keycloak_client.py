@@ -85,10 +85,10 @@ class KeycloakClient(SimpleHttpClient):
             if e.code == 409:
                 logger.info(
                     build_log_message(
+                        action="check if email address is available",
                         log_vars={
                             "email": email,
-                            "reason": "user with thid email already exists on Keycloak server",
-                        }
+                        },
                     )
                 )
             else:

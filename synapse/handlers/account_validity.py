@@ -224,24 +224,26 @@ class AccountValidityHandler:
 
         emails = await self._get_email_addresses_for_user(user_id)
 
-        if len(emails) > 1:
-            raise SynapseError(
-                403,
-                build_log_message(
-                    log_vars={
-                        "user_id": user_id,
-                        "email_addresses": emails,
-                        "reason": "this user has multiple email addresses attached to his account.",
-                    }
-                ),
-            )
         if not emails:
             raise SynapseError(
                 403,
                 build_log_message(
-                    {
+                    action="check if email address is set for user",
+                    log_vars={
                         "user_id": user_id,
-                        "reason": "this user has no email address attached to his account",
+                        "emails": emails,
+                    }
+                ),
+            )
+
+        if len(emails) > 1:
+            raise SynapseError(
+                403,
+                build_log_message(
+                    action="check if only one email address is assigned to the user",
+                    log_vars={
+                        "user_id": user_id,
+                        "email_addresses": emails,
                     }
                 ),
             )
