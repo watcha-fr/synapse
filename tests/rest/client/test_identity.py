@@ -32,7 +32,7 @@ class IdentityTestCase(unittest.HomeserverTestCase):
 
         config = self.default_config()
         config["enable_3pid_lookup"] = False
-        config["public_baseurl"] = "https://localhsot:8008" # watcha+
+        config["public_baseurl"] = "https://localhsot:8008"  # watcha+
         self.hs = self.setup_test_homeserver(config=config)
 
         return self.hs

@@ -16,7 +16,7 @@ from unittest.mock import Mock
 import pymacaroons
 
 from synapse.api.errors import AuthError, ResourceLimitError
-from synapse.rest import admin # watcha+
+from synapse.rest import admin  # watcha+
 
 from tests import unittest
 from tests.test_utils import make_awaitable
@@ -61,6 +61,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         )
         macaroon = pymacaroons.Macaroon.deserialize(access_token)
         self.assertIn("partner = true", macaroon.inspect())
+
     # +watcha
 
     def test_macaroon_caveats(self):

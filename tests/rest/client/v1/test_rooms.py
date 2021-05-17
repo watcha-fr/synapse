@@ -1188,7 +1188,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         # watcha+
         self.helper.invite(
             self.room_id, self.creator, self.second_user_id, tok=self.creator_tok
-        )  
+        )
         # +watcha
         self.helper.join(self.room_id, user=self.second_user_id, tok=self.second_tok)
 
@@ -1207,7 +1207,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         # watcha+
         self.helper.invite(
             self.room_id, self.creator, self.second_user_id, tok=self.creator_tok
-        )  
+        )
         # +watcha
         self.helper.join(self.room_id, user=self.second_user_id, tok=self.second_tok)
 
@@ -1226,7 +1226,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         # watcha+
         self.helper.invite(
             self.room_id, self.creator, self.second_user_id, tok=self.creator_tok
-        )  
+        )
         # +watcha
         self.helper.join(self.room_id, user=self.second_user_id, tok=self.second_tok)
 

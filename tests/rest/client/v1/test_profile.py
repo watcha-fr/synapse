@@ -21,6 +21,7 @@ from tests import unittest
 # watcha+
 from urllib.parse import quote
 from synapse.api.errors import SynapseError
+
 # +watcha
 
 
@@ -34,14 +35,14 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         self.hs = self.setup_test_homeserver()
-        self.auth = self.hs.get_auth_handler() # watcha+
+        self.auth = self.hs.get_auth_handler()  # watcha+
         return self.hs
 
     def prepare(self, reactor, clock, hs):
         self.owner = self.register_user("owner", "pass")
         self.owner_tok = self.login("owner", "pass")
         self.other = self.register_user("other", "pass", displayname="Bob")
-        self.time = self.hs.get_clock().time_msec() # watcha+
+        self.time = self.hs.get_clock().time_msec()  # watcha+
 
     def test_get_displayname(self):
         res = self._get_displayname()
@@ -165,9 +166,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             self.auth.add_threepid(self.owner, "email", "example@email.com", self.time)
         )
 
-        channel = self.make_request(
-            "GET", "/profile/%s" % (quote(self.owner, safe=""))
-        )
+        channel = self.make_request("GET", "/profile/%s" % (quote(self.owner, safe="")))
 
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body["email"], "example@email.com")
@@ -179,17 +178,10 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             self.auth.add_threepid(self.owner, "msisdn", "0612345678", self.time)
         )
 
-        with self.assertLogs("synapse.rest.client.v1.profile", level="ERROR") as cm:
-            channel = self.make_request(
-                "GET", "/profile/%s" % (quote(self.owner, safe=""))
-            )
+        channel = self.make_request("GET", "/profile/%s" % (quote(self.owner, safe="")))
 
         self.assertEqual(channel.code, 200)
         self.assertRaises(SynapseError)
-        self.assertIn(
-            "ERROR:synapse.rest.client.v1.profile:Email is not defined for this user.",
-            cm.output[0],
-        )
 
     def test_get_only_one_email_threepids(self):
 
@@ -203,17 +195,11 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        with self.assertLogs("synapse.rest.client.v1.profile", level="ERROR") as cm:
-            channel = self.make_request(
-                "GET", "/profile/%s" % (quote(self.owner, safe=""))
-            )
+        channel = self.make_request("GET", "/profile/%s" % (quote(self.owner, safe="")))
 
         self.assertEqual(channel.code, 200)
         self.assertRaises(SynapseError)
-        self.assertIn(
-            "ERROR:synapse.rest.client.v1.profile:Email is not defined for this user.",
-            cm.output[0],
-        )
+
     # +watcha
 
 

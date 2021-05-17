@@ -1,4 +1,4 @@
-from unittest.mock import patch, mock_open
+from unittest.mock import mock_open, patch
 
 from synapse.types import UserID
 
@@ -9,6 +9,7 @@ WATCHA_RELEASE=1.0
 INSTALL_DATE=2020-03-16T18:32:18
 UPGRADE_DATE=2020-06-16T22:43:29
 """
+
 
 class AdministrationTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
@@ -103,7 +104,7 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
 
         for element in expected_values:
             self.get_success(
-                self.store.watcha_update_user_role(user_id, element["role"])
+                self.store.update_user_role(user_id, element["role"])
             )
             is_partner = self.get_success(self.store.is_partner(user_id))
             is_admin = self.get_success(
@@ -114,7 +115,9 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
 
     @patch("builtins.open", new_callable=mock_open, read_data=SETUP_PROPERTIES)
     def test_get_install_information_from_file(self, mock_file):
-        install_information = self.get_success(self.store._get_install_information_from_file())
+        install_information = self.get_success(
+            self.store._get_install_information_from_file()
+        )
         self.assertEqual("1.0", install_information["watcha_release"])
         self.assertEqual("2020-03-16T18:32:18", install_information["install_date"])
         self.assertEqual("2020-06-16T22:43:29", install_information["upgrade_date"])

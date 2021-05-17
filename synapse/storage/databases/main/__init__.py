@@ -74,8 +74,9 @@ from .user_erasure_store import UserErasureStore
 
 # watcha+
 from .watcha_administration import AdministrationStore
-from .watcha_partner import PartnerStore
 from .watcha_nextcloud import NextcloudStore
+from .watcha_partner import PartnerStore
+
 # +watcha
 
 logger = logging.getLogger(__name__)

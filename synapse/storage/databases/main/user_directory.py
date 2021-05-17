@@ -520,8 +520,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         return user_ids
 
     async def get_all_rooms(self):
-        """Get all room_ids we've ever known about, in ascending order of "size"
-        """
+        """Get all room_ids we've ever known about, in ascending order of "size" """
 
         def get_all_rooms_txn(txn):
             sql = """
@@ -532,10 +531,8 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             txn.execute(sql)
             return txn.fetchall()
 
-
     async def get_all_local_users(self):
-        """Get all local users
-        """
+        """Get all local users"""
 
         def get_all_local_users_txn(txn):
 
@@ -547,6 +544,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             return txn.fetchall()
 
         return self.runInteraction("get_all_local_users", get_all_local_users_txn)
+
     # +watcha
 
     async def add_users_who_share_private_room(
@@ -903,7 +901,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 + (limit + 1,)
             )
         elif isinstance(self.database_engine, Sqlite3Engine):
-            ''' watcha!
+            '''watcha!
             search_query = _parse_query_sqlite(search_term)
 
             # If enabled, this config option will rank local users higher than those on
@@ -936,7 +934,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 "order_statements": " ".join(additional_ordering_statements),
             }
             args = join_args + (search_query,) + ordering_arguments + (limit + 1,)
-            !watcha '''
+            !watcha'''
             # watcha+
             # TODO: change for PostgreSql
 
@@ -992,8 +990,15 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 WHERE u.is_partner = 1
                     AND u.deactivated = 0
                     %s
-            """ % (where_clause, where_clause)
-            args = [  '%' + search_term + '%' ] * 2 + [ user_id ] + [  '%' + search_term + '%' ] * 2
+            """ % (
+                where_clause,
+                where_clause,
+            )
+            args = (
+                ["%" + search_term + "%"] * 2
+                + [user_id]
+                + ["%" + search_term + "%"] * 2
+            )
             logger.debug(sql)
             # +watcha
         else:

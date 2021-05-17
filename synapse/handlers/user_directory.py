@@ -80,7 +80,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                             "display_name": <display_name>,
                             "avatar_url": <avatar_url>
                             # watcha+
-                            "is_partner": 1 or 0 
+                            "is_partner": 1 or 0
                             "presence": "invited", "offline" or "online"
                             # +watcha
                         }

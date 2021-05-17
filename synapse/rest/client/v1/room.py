@@ -59,6 +59,8 @@ from synapse.util.stringutils import parse_and_validate_server_name, random_stri
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
+from synapse.logging.utils import build_log_message  # watcha+
+
 logger = logging.getLogger(__name__)
 
 
@@ -85,9 +87,9 @@ class RoomCreateRestServlet(TransactionRestServlet):
         return self.txns.fetch_or_execute_request(request, self.on_POST, request)
 
     async def on_POST(self, request):
-        """ watcha!
+        """watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
+        !watcha"""
         # watcha+
         requester = await self.auth.get_user_by_req(request, allow_partner=False)
         # +watcha
@@ -239,7 +241,10 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                         if "dir" not in url_query:
                             raise SynapseError(
                                 400,
-                                "[watcha] binding Nextcloud folder with room - failed: wrong folder path",
+                                build_log_message(
+                                    action="get `nextcloud_folder_path` from `im.vector.web.settings` event",
+                                    log_vars={"nextcloud_url": nextcloud_url},
+                                ),
                             )
 
                         nextcloud_folder_path = url_query["dir"][0]
@@ -411,9 +416,9 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         server = parse_string(request, "server", default=None)
 
         try:
-            """ watcha!
+            """watcha!
             await self.auth.get_user_by_req(request, allow_guest=True)
-            !watcha """
+            !watcha"""
             # watcha+
             await self.auth.get_user_by_req(
                 request, allow_guest=True, allow_partner=False
@@ -467,9 +472,9 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         return 200, data
 
     async def on_POST(self, request):
-        """ watcha!
+        """watcha!
         await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha """
+        !watcha"""
         # watcha+
         await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=False)
         # +watcha
@@ -832,7 +837,17 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             Membership.JOIN,
             Membership.LEAVE,
         }:
-            raise AuthError(403, "Partners can only join and leave rooms")
+            raise AuthError(
+                403,
+                build_log_message(
+                    action="change member membership",
+                    log_vars={
+                        "requester.user_id": requester.user.to_string(),
+                        "requester.is_partner": requester.is_partner,
+                        "membership_action": membership_action,
+                    },
+                ),
+            )
         # +watcha
 
         try:

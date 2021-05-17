@@ -169,4 +169,5 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 200)
         self.assertFalse(capabilities["m.change_password"]["enabled"])
+
     # +watcha

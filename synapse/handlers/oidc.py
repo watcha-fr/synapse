@@ -49,6 +49,8 @@ from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
+from synapse.logging.utils import build_log_message  # watcha+
+
 logger = logging.getLogger(__name__)
 
 # we want the cookie to be returned to us even when the request is the POSTed
@@ -1320,7 +1322,7 @@ class JinjaOidcMappingConfig:
     display_name_template = attr.ib(type=Optional[Template])
     email_template = attr.ib(type=Optional[Template])
     extra_attributes = attr.ib(type=Dict[str, Template])
-    nextcloud_username_template = attr.ib(type=Optional[Template]) # watcha+
+    nextcloud_username_template = attr.ib(type=Optional[Template])  # watcha+
 
 
 class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
@@ -1349,17 +1351,9 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         email_template = parse_template_config("email_template")
 
         # watcha+
-        nextcloud_username_template = None  # type: Optional[Template]
-        if "nextcloud_username_template" in config:
-            try:
-                nextcloud_username_template = env.from_string(
-                    config["nextcloud_username_template"]
-                )
-            except Exception as e:
-                raise ConfigError(
-                    "invalid jinja template for oidc_config.user_mapping_provider.config.nextcloud_username_template: %r"
-                    % (e,)
-                )
+        nextcloud_username_template = parse_template_config(
+            "nextcloud_username_template"
+        )
         # +watcha
 
         extra_attributes = {}  # type Dict[str, Template]
@@ -1425,7 +1419,13 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         # watcha+
         is_admin = userinfo.get("is_admin")  # type: Optional[bool]
         if not isinstance(is_admin, bool) and is_admin is not None:
-            raise MappingException("is_admin '{}' is not a boolean".format(is_admin))
+            raise MappingException(
+                build_log_message(
+                    log_vars={
+                        "is_admin": is_admin,
+                    },
+                )
+            )
 
         locale = userinfo.get("locale")  # type: Optional[str]
 

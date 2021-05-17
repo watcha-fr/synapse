@@ -1,6 +1,8 @@
 import re
 from urllib.parse import urljoin
 
+from synapse.logging.utils import build_log_message
+
 from ._base import Config, ConfigError
 
 
@@ -20,7 +22,7 @@ class NextcloudConfig(Config):
         self.service_account_name = None
         self.keycloak_service_account_password = None
         self.nextcloud_service_account_password = None
-        self.nextcloud_group_displayname_prefix = "[Watcha room]"
+        self.nextcloud_group_displayname_prefix = "[Salon Watcha]"
 
     def read_config(self, config, **kwargs):
         self.nextcloud_enabled = False
@@ -37,7 +39,12 @@ class NextcloudConfig(Config):
         match = re.match("(https?://.+?)/realms/([^/]+)", issuer)
         if match is None:
             raise ConfigError(
-                "nextcloud requires oidc_config.issuer to be of the form https://example/realms/xxx"
+                build_log_message(
+                    action="extract `keycloak_url` and `realm_name` from issuer config",
+                    log_vars={
+                        "issuer": issuer,
+                    },
+                )
             )
         self.keycloak_url = match.group(1)
         self.realm_name = match.group(2)
@@ -47,7 +54,10 @@ class NextcloudConfig(Config):
             client_base_url = config.get("email", {}).get("client_base_url")
             if client_base_url is None:
                 raise ConfigError(
-                    "nextcloud requires nextcloud_url or email.client_base_url to be set"
+                    build_log_message(
+                        action="get `client_base_url` from config",
+                        log_vars={"client_base_url": client_base_url},
+                    )
                 )
             nextcloud_url = urljoin(client_base_url, "nextcloud")
         self.nextcloud_url = nextcloud_url
@@ -60,7 +70,9 @@ class NextcloudConfig(Config):
         self.nextcloud_service_account_password = nextcloud_config[
             "nextcloud_service_account_password"
         ]
-        self.nextcloud_group_displayname_prefix = nextcloud_config.get("group_displayname_prefix", "[Watcha room]")
+        self.nextcloud_group_displayname_prefix = nextcloud_config.get(
+            "group_displayname_prefix", "[Salon Watcha]"
+        )
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
@@ -80,5 +92,5 @@ class NextcloudConfig(Config):
 
           #nextcloud_service_account_password: "examplepassword"
 
-          #group_displayname_prefix: "[Watcha room]"
+          #group_displayname_prefix: "[Salon Watcha]"
         """
