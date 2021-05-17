@@ -242,8 +242,8 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                             raise SynapseError(
                                 400,
                                 build_log_message(
-                                    action="check if 'dir' parameter url is set ",
-                                    log_vars={"url": nextcloud_url},
+                                    action="get `nextcloud_folder_path` from `im.vector.web.settings` event",
+                                    log_vars={"nextcloud_url": nextcloud_url},
                                 ),
                             )
 
@@ -840,11 +840,11 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             raise AuthError(
                 403,
                 build_log_message(
-                    action="check membership action",
+                    action="change member membership",
                     log_vars={
-                        "user_id": requester.user.to_string(),
-                        "is_partner": is_partner,
-                        "membership": membership_action,
+                        "requester.user_id": requester.user.to_string(),
+                        "requester.is_partner": requester.is_partner,
+                        "membership_action": membership_action,
                     },
                 ),
             )

@@ -1351,21 +1351,9 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         email_template = parse_template_config("email_template")
 
         # watcha+
-        nextcloud_username_template = None  # type: Optional[Template]
-        if "nextcloud_username_template" in config:
-            try:
-                nextcloud_username_template = env.from_string(
-                    config["nextcloud_username_template"]
-                )
-            except Exception as e:
-                raise ConfigError(
-                    build_log_message(
-                        action="get Nextcloud username template",
-                        log_vars={
-                            "error": e,
-                        },
-                    )
-                )
+        nextcloud_username_template = parse_template_config(
+            "nextcloud_username_template"
+        )
         # +watcha
 
         extra_attributes = {}  # type Dict[str, Template]
@@ -1433,7 +1421,6 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         if not isinstance(is_admin, bool) and is_admin is not None:
             raise MappingException(
                 build_log_message(
-                    action="get 'is_admin' attribute",
                     log_vars={
                         "is_admin": is_admin,
                     },

@@ -79,28 +79,28 @@ class AdministrationHandler(BaseHandler):
 
         return result
 
-    async def update_user_role(self, user_id, role):
+    async def update_user_role(self, user_id, target_role):
         """Update the user role
 
         Args:
             user_id: the id of the user
-            role: role to be assigned to the user. It can be 'administrator', 'collaborator' or 'patner'
+            target_role: role to be assigned to the user. It can be 'administrator', 'collaborator' or 'partner'
         """
         current_role = await self.get_user_role(user_id)
 
-        if current_role == role:
+        if current_role == target_role:
             raise SynapseError(
                 400,
                 build_log_message(
                     log_vars={
                         "user_id": user_id,
                         "current_role": current_role,
-                        "desired_role": role,
+                        "target_role": target_role,
                     }
                 ),
             )
 
-        await self.store.update_user_role(user_id, role)
+        await self.store.update_user_role(user_id, target_role)
 
         return role
 
@@ -117,7 +117,6 @@ class AdministrationHandler(BaseHandler):
             raise SynapseError(
                 400,
                 build_log_message(
-                    action="check if the user has only one role",
                     log_vars={
                         "user_id": user_id,
                         "is_admin": is_admin,

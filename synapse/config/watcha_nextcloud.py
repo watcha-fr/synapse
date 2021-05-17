@@ -36,16 +36,14 @@ class NextcloudConfig(Config):
             return
 
         issuer = oidc_config.get("issuer", "")
-        expected_pattern = "(https?://.+?)/realms/([^/]+)"
-        match = re.match(expected_pattern, issuer)
+        match = re.match("(https?://.+?)/realms/([^/]+)", issuer)
         if match is None:
             raise ConfigError(
                 build_log_message(
-                    action="check if 'issuer' attribute correspond to the expected pattern",
+                    action="extract `keycloak_url` and `realm_name` from issuer config",
                     log_vars={
                         "issuer": issuer,
-                        "expected_pattern": expected_pattern,
-                    }
+                    },
                 )
             )
         self.keycloak_url = match.group(1)
@@ -57,10 +55,8 @@ class NextcloudConfig(Config):
             if client_base_url is None:
                 raise ConfigError(
                     build_log_message(
-                        action="check if 'client_base_url' attribute is set",
-                        log_vars={
-                            "client_base_url": client_base_url
-                        }
+                        action="get `client_base_url` from config",
+                        log_vars={"client_base_url": client_base_url},
                     )
                 )
             nextcloud_url = urljoin(client_base_url, "nextcloud")

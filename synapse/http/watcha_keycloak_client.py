@@ -81,12 +81,12 @@ class KeycloakClient(SimpleHttpClient):
                 headers=await self._get_header(),
                 post_json=user,
             )
-        except HttpResponseException as e:
-            if e.code == 409:
+        except HttpResponseException as error:
+            if error.code == 409:
                 logger.info(
                     build_log_message(
-                        action="check if email address is available",
                         log_vars={
+                            "user": user,
                             "email": email,
                         },
                     )

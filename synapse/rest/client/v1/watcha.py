@@ -62,12 +62,12 @@ class WatchaUpdateUserRoleRestServlet(RestServlet):
         params = parse_json_object_from_request(request)
 
         users = await self.administration_handler.get_users()
-        if target_user_id not in [user["name"] for user in users]:
+        if target_user_id not in (user["name"] for user in users):
             raise SynapseError(
                 400,
                 build_log_message(
                     action="check if user is registered",
-                    log_vars={"user_id": target_user_id},
+                    log_vars={"target_user_id": target_user_id},
                 ),
             )
 
@@ -145,7 +145,7 @@ class WatchaRegisterRestServlet(RestServlet):
                 400,
                 build_log_message(
                     action="check if email address is set",
-                    log_vars={"email": email},
+                    log_vars={"params": params},
                 ),
             )
 
@@ -180,7 +180,7 @@ class WatchaRegisterRestServlet(RestServlet):
                 logger.warn(
                     build_log_message(
                         action="register user",
-                        log_vars={"keycloak_uid": keycloak_user_id, "error": error},
+                        log_vars={"keycloak_user_id": keycloak_user_id, "error": error},
                     )
                 )
             else:

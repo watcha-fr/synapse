@@ -624,11 +624,12 @@ class SsoHandler:
             raise MappingException("localpart is invalid: %s" % (attributes.localpart,))
         # watcha+
         for email in attributes.emails:
-            if await self._store.get_user_id_by_threepid("email", email):
+            user_id = await self._store.get_user_id_by_threepid("email", email)
+            if user_id:
                 raise MappingException(
                     build_log_message(
-                        action="check if email address is available",
                         log_vars={
+                            "user_id": user_id,
                             "email": email,
                         },
                     )

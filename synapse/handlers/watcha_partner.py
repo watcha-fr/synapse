@@ -58,7 +58,7 @@ class PartnerHandler(BaseHandler):
             if isinstance(error, NextcloudError) and error.code == 102:
                 logger.warn(
                     build_log_message(
-                        log_vars={"user_id": keycloak_user_id, "error": error}
+                        log_vars={"keycloak_user_id": keycloak_user_id, "error": error}
                     )
                 )
             else:
