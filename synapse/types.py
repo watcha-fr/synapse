@@ -95,7 +95,7 @@ class Requester:
     device_id = attr.ib(type=Optional[str])
     app_service = attr.ib(type=Optional["ApplicationService"])
     authenticated_entity = attr.ib(type=str)
-    is_partner = attr.ib(type=bool) # watcha+
+    is_partner = attr.ib(type=bool)  # watcha+
 
     def serialize(self):
         """Converts self to a type that can be serialized as JSON, and then

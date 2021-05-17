@@ -80,7 +80,7 @@ class RoomCreationHandler(BaseHandler):
         # watcha+
         self.store = hs.get_datastore()
         self.administration_handler = hs.get_administration_handler()
-        self.partner_handler = hs.get_partner_handler()  
+        self.partner_handler = hs.get_partner_handler()
         # +watcha
 
         # Room state based off defined presets
@@ -829,7 +829,7 @@ class RoomCreationHandler(BaseHandler):
                 )
 
         for invite_3pid in invite_3pid_list:
-            """ watcha!
+            """watcha!
             id_server = invite_3pid["id_server"]
             id_access_token = invite_3pid.get("id_access_token")  # optional
             address = invite_3pid["address"]
@@ -846,7 +846,7 @@ class RoomCreationHandler(BaseHandler):
                 txn_id=None,
                 id_access_token=id_access_token,
             )
-            !watcha """
+            !watcha"""
             # watcha+
             invitee_email = invite_3pid["address"].strip()
             invitee_id = await self.store.get_user_id_by_threepid(

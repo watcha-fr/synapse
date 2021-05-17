@@ -5,8 +5,8 @@ from jsonschema.exceptions import SchemaError, ValidationError
 from synapse.api.errors import (
     AuthError,
     HttpResponseException,
-    SynapseError,
     NextcloudError,
+    SynapseError,
 )
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.servlet import RestServlet, parse_json_object_from_request

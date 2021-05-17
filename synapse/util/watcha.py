@@ -1,7 +1,7 @@
 import os
+import secrets as crypto
 import sys
 import unicodedata
-import secrets as crypto
 
 import pkg_resources
 
