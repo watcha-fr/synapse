@@ -47,7 +47,7 @@ from pathlib import Path
 
 import pkg_resources
 
-from synapse.logging.utils import build_log_message, LoggedActionStatus
+from synapse.logging.utils import build_log_message, ActionStatus
 from synapse.types import get_localpart_from_id
 
 # +watcha
@@ -142,7 +142,7 @@ class Mailer:
             logger.debug(
                 build_log_message(
                     action="load base64 image from cache",
-                    status=LoggedActionStatus.SUCCESS.value,
+                    status=ActionStatus.SUCCESS,
                     log_vars={"image_name": image_name},
                 )
             )
@@ -156,7 +156,7 @@ class Mailer:
         logger.debug(
             build_log_message(
                 action="load image from disk",
-                status=LoggedActionStatus.SUCCESS.value,
+                status=ActionStatus.SUCCESS,
                 log_vars={"image_name": image_name},
             )
         )

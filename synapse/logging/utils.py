@@ -79,8 +79,8 @@ def log_function(f):
     return wrapped
 
 
-class LoggedActionStatus(Enum):
-    """Enum to define the status of the action that is logged"""
+class ActionStatus(Enum):
+    """Enum to define the status of a logged action"""
 
     FAILED = "failed"
     SUCCESS = "success"
@@ -89,7 +89,7 @@ class LoggedActionStatus(Enum):
 # watcha+
 def build_log_message(
     action: str = None,
-    status: LoggedActionStatus = LoggedActionStatus.FAILED.value,
+    status: ActionStatus = ActionStatus.FAILED,
     log_vars: Dict = None,
 ):
     """Build log message to correspond with Watcha format : "[prefix] <action to log> - <status of action> - <collection of variables to logs>"
@@ -109,13 +109,11 @@ def build_log_message(
         action = " ".join(function_name.split("_")).strip()
         return action
 
-    if not action:
+    if action is None:
         action = _get_action_from_caller_function()
 
-    standard_log_message = f"[watcha] {action} - {status}"
-    return (
-        standard_log_message if not log_vars else f"{standard_log_message} {log_vars}"
-    )
+    message = f"[watcha] {action} - {status.value}"
+    return message if log_vars is None else f"{message} {log_vars}"
 
 
 # +watcha
