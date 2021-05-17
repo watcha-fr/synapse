@@ -41,7 +41,7 @@ class NextcloudConfig(Config):
         if match is None:
             raise ConfigError(
                 build_log_message(
-                    action="check if 'issuer' attribute correspond to the expected pattern"
+                    action="check if 'issuer' attribute correspond to the expected pattern",
                     log_vars={
                         "issuer": issuer,
                         "expected_pattern": expected_pattern,

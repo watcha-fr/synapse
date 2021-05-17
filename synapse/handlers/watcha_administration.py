@@ -117,7 +117,7 @@ class AdministrationHandler(BaseHandler):
             raise SynapseError(
                 400,
                 build_log_message(
-                    action="check if the user has only one role"
+                    action="check if the user has only one role",
                     log_vars={
                         "user_id": user_id,
                         "is_admin": is_admin,
