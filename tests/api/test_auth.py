@@ -257,7 +257,9 @@ class AuthTestCase(unittest.HomeserverTestCase):
         USER_ID = "@percy:matrix.org"
         self.store.add_access_token_to_user = simple_async_mock(None)
         self.store.get_device = simple_async_mock(None)
-        self.hs.get_auth_handler().is_partner = simple_async_mock(return_value=False) # watcha+
+        # watcha+
+        self.hs.get_auth_handler().is_partner = simple_async_mock(return_value=False)
+        # +watcha
 
         token = self.get_success(
             self.hs.get_auth_handler().get_access_token_for_user_id(

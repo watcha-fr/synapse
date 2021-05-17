@@ -1,7 +1,8 @@
 import json
 
 from synapse.rest import admin
-from synapse.rest.client.v1 import watcha, login, room
+from synapse.rest.client.v1 import login, room, watcha
+
 from tests import unittest
 
 

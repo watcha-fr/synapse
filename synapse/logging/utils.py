@@ -17,6 +17,13 @@ import logging
 from functools import wraps
 from inspect import getcallargs
 
+# watcha+
+from enum import Enum
+from typing import Dict
+from inspect import stack
+
+# +watcha
+
 _TIME_FUNC_ID = 0
 
 
@@ -70,3 +77,43 @@ def log_function(f):
 
     wrapped.__name__ = func_name
     return wrapped
+
+
+class ActionStatus(Enum):
+    """Enum to define the status of a logged action"""
+
+    FAILED = "failed"
+    SUCCESS = "success"
+
+
+# watcha+
+def build_log_message(
+    action: str = None,
+    status: ActionStatus = ActionStatus.FAILED,
+    log_vars: Dict = None,
+):
+    """Build log message to correspond with Watcha format : "[prefix] <action to log> - <status of action> - <collection of variables to logs>"
+
+    Args:
+        action: action to log, if it not specified, correspond to caller function name
+        status: status of the logged action
+        log_vars:  collection of variables to log
+    """
+
+    def _get_action_from_caller_function():
+        """Get human readable action name from caller function"""
+        FUNCTION_NAME_INDEX = 3
+        CALLER_FUNCTION_INDEX = 2  # correspond to grand mother function
+
+        function_name = stack()[CALLER_FUNCTION_INDEX][FUNCTION_NAME_INDEX]
+        action = " ".join(function_name.split("_")).strip()
+        return action
+
+    if action is None:
+        action = _get_action_from_caller_function()
+
+    message = f"[watcha] {action} - {status.value}"
+    return message if log_vars is None else f"{message} {log_vars}"
+
+
+# +watcha

@@ -47,6 +47,7 @@ from pathlib import Path
 
 import pkg_resources
 
+from synapse.logging.utils import build_log_message, ActionStatus
 from synapse.types import get_localpart_from_id
 
 # +watcha
@@ -139,7 +140,11 @@ class Mailer:
         b64_image = b64_image_cache.get(image_name)
         if b64_image is not None:
             logger.debug(
-                "[watcha] load base64 image from cache %s" % {"image_name": image_name}
+                build_log_message(
+                    action="load base64 image from cache",
+                    status=ActionStatus.SUCCESS,
+                    log_vars={"image_name": image_name},
+                )
             )
             return b64_image
         path = Path(
@@ -148,11 +153,20 @@ class Mailer:
         data = path.read_bytes()
         b64_image = b64encode(data).decode()
         b64_image_cache[image_name] = b64_image
-        logger.debug("[watcha] load image from disk %s" % {"image_name": image_name})
+        logger.debug(
+            build_log_message(
+                action="load image from disk",
+                status=ActionStatus.SUCCESS,
+                log_vars={"image_name": image_name},
+            )
+        )
         return b64_image
 
     async def send_watcha_registration_email(
-        self, email_address: str, sender_id: str, password: str,
+        self,
+        email_address: str,
+        sender_id: str,
+        password: str,
     ) -> None:
         """Send an email with temporary password and connexion link to Watcha.
 
@@ -197,7 +211,9 @@ class Mailer:
         }
 
         await self.send_email(
-            email_address, subject, template_vars,
+            email_address,
+            subject,
+            template_vars,
         )
 
     # +watcha

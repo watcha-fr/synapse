@@ -3,6 +3,7 @@ from typing import Dict
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import SynapseError
+from synapse.logging.utils import build_log_message
 from synapse.push.presentable_names import descriptor_from_member_events
 from synapse.types import StateMap, UserID
 
@@ -78,13 +79,28 @@ class AdministrationHandler(BaseHandler):
 
         return result
 
-    async def watcha_update_user_role(self, user_id, role):
-        user_role = await self.get_user_role(user_id)
+    async def update_user_role(self, user_id, target_role):
+        """Update the user role
 
-        if user_role == role:
-            raise SynapseError(400, "This user has already the %s role" % role)
+        Args:
+            user_id: the id of the user
+            target_role: role to be assigned to the user. It can be 'administrator', 'collaborator' or 'partner'
+        """
+        current_role = await self.get_user_role(user_id)
 
-        await self.store.watcha_update_user_role(user_id, role)
+        if current_role == target_role:
+            raise SynapseError(
+                400,
+                build_log_message(
+                    log_vars={
+                        "user_id": user_id,
+                        "current_role": current_role,
+                        "target_role": target_role,
+                    }
+                ),
+            )
+
+        await self.store.update_user_role(user_id, target_role)
 
         return role
 
@@ -98,7 +114,16 @@ class AdministrationHandler(BaseHandler):
         is_admin = await self.auth.is_server_admin(UserID.from_string(user_id))
 
         if is_partner and is_admin:
-            raise SynapseError(400, "A user can't be admin and partner too.")
+            raise SynapseError(
+                400,
+                build_log_message(
+                    log_vars={
+                        "user_id": user_id,
+                        "is_admin": is_admin,
+                        "is_partner": is_partner,
+                    }
+                ),
+            )
         elif is_partner:
             role = "partner"
         elif is_admin:

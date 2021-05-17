@@ -644,9 +644,14 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
 
     # watcha+
-    test_initial_share_all_users.skip = "Disabled for watcha because of user directory modification for partners"
-    test_private_room.skip = "Disabled for watcha because of user directory modification for partners"
+    test_initial_share_all_users.skip = (
+        "Disabled for watcha because of user directory modification for partners"
+    )
+    test_private_room.skip = (
+        "Disabled for watcha because of user directory modification for partners"
+    )
     # +watcha
+
 
 class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
     user_id = "@test:test"

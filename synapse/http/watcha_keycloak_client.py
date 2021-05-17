@@ -5,6 +5,7 @@ from jsonschema import validate
 
 from synapse.api.errors import HttpResponseException
 from synapse.http.client import SimpleHttpClient
+from synapse.logging.utils import build_log_message
 
 logger = logging.getLogger(__name__)
 
@@ -80,11 +81,14 @@ class KeycloakClient(SimpleHttpClient):
                 headers=await self._get_header(),
                 post_json=user,
             )
-        except HttpResponseException as e:
-            if e.code == 409:
+        except HttpResponseException as error:
+            if error.code == 409:
                 logger.info(
-                    "User with email {} already exists on Keycloak server.".format(
-                        email
+                    build_log_message(
+                        log_vars={
+                            "user": user,
+                            "email": email,
+                        },
                     )
                 )
             else:

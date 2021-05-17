@@ -26,7 +26,7 @@ from tests.utils import mock_getRawHeaders
 
 from .. import unittest
 
-from ..utils import setup_test_homeserver # watcha+ op251
+from ..utils import setup_test_homeserver  # watcha+
 
 
 class RegistrationTestCase(unittest.HomeserverTestCase):

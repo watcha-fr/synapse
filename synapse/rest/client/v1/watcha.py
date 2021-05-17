@@ -5,11 +5,12 @@ from jsonschema.exceptions import SchemaError, ValidationError
 from synapse.api.errors import (
     AuthError,
     HttpResponseException,
-    SynapseError,
     NextcloudError,
+    SynapseError,
 )
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.logging.utils import build_log_message
 from synapse.push.mailer import Mailer
 from synapse.rest.admin._base import assert_requester_is_admin, assert_user_is_admin
 from synapse.rest.client.v2_alpha._base import client_patterns
@@ -61,16 +62,27 @@ class WatchaUpdateUserRoleRestServlet(RestServlet):
         params = parse_json_object_from_request(request)
 
         users = await self.administration_handler.get_users()
-        if target_user_id not in [user["name"] for user in users]:
+        if target_user_id not in (user["name"] for user in users):
             raise SynapseError(
-                400, "The target user is not registered in this homeserver."
+                400,
+                build_log_message(
+                    action="check if user is registered",
+                    log_vars={"target_user_id": target_user_id},
+                ),
             )
 
         role = params["role"]
-        if role not in ["partner", "collaborator", "admin"]:
-            raise SynapseError(400, "%s is not a defined role." % role)
+        handled_role = ("partner", "collaborator", "admin")
+        if role not in handled_role:
+            raise SynapseError(
+                400,
+                build_log_message(
+                    action="check if role is handled",
+                    log_vars={"role": role, "handled_role": handled_role},
+                ),
+            )
 
-        result = await self.administration_handler.watcha_update_user_role(
+        result = await self.administration_handler.update_user_role(
             target_user_id, role
         )
         return 200, {"new_role": result}
@@ -131,13 +143,21 @@ class WatchaRegisterRestServlet(RestServlet):
         if not email:
             raise SynapseError(
                 400,
-                "Email address cannot be empty",
+                build_log_message(
+                    action="check if email address is set",
+                    log_vars={"params": params},
+                ),
             )
 
         if await self.store.get_user_id_by_threepid("email", email):
             raise SynapseError(
                 400,
-                "A user with this email address already exists. Cannot create a new one.",
+                build_log_message(
+                    action="check if email is available",
+                    log_vars={
+                        "email": email,
+                    },
+                ),
             )
 
         password = params.get("password") or self.secrets.passphrase()
@@ -157,7 +177,12 @@ class WatchaRegisterRestServlet(RestServlet):
             SchemaError,
         ) as error:
             if isinstance(error, NextcloudError) and error.code == 102:
-                logger.warn(f"[watcha] add user {keycloak_user_id} - failed: {error}")
+                logger.warn(
+                    build_log_message(
+                        action="register user",
+                        log_vars={"keycloak_user_id": keycloak_user_id, "error": error},
+                    )
+                )
             else:
                 await self.keycloak_client.delete_user(keycloak_user_id)
                 raise

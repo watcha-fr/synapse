@@ -43,6 +43,8 @@ from synapse.util.metrics import Measure
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
+from synapse.logging.utils import build_log_message  # watcha+
+
 logger = logging.getLogger(__name__)
 
 
@@ -251,8 +253,13 @@ class Auth:
             if is_partner and not allow_partner:
                 raise AuthError(
                     403,
-                    "Partner access not allowed",
-                    errcode=Codes.GUEST_ACCESS_FORBIDDEN,
+                    build_log_message(
+                        log_vars={
+                            "user_id": user_info.user_id,
+                            "is_partner": is_guest,
+                            "allow_partner": allow_partner,
+                        }
+                    ),
                 )
             # +watcha
 
@@ -264,7 +271,7 @@ class Auth:
                 device_id,
                 app_service=app_service,
                 authenticated_entity=user_info.token_owner,
-                is_partner=is_partner, # watcha+
+                is_partner=is_partner,  # watcha+
             )
 
             request.requester = requester

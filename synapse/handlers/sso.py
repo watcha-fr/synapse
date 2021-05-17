@@ -48,6 +48,8 @@ from synapse.util.stringutils import random_string
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
+from synapse.logging.utils import build_log_message  # watcha+
+
 logger = logging.getLogger(__name__)
 
 
@@ -436,22 +438,25 @@ class SsoHandler:
                 user_id = await grandfather_existing_users()
                 if user_id:
                     # Future logins should also match this user ID.
-                    """ watcha!
+                    """watcha!
                     await self._store.record_user_external_id(
                         auth_provider_id, remote_user_id, user_id
                     )
-                    !watcha """
+                    !watcha"""
                     # watcha+
                     attributes = await sso_to_matrix_id_mapper(0)
                     await self._store.record_user_external_id(
-                        auth_provider_id, remote_user_id, user_id, attributes.nextcloud_username
+                        auth_provider_id,
+                        remote_user_id,
+                        user_id,
+                        attributes.nextcloud_username,
                     )
                     # +watcha
 
             # Otherwise, generate a new user.
             if not user_id:
                 attributes = await self._call_attribute_mapper(sso_to_matrix_id_mapper)
-    
+
                 if attributes.localpart is None:
                     # the mapper doesn't return a username. bail out with a redirect to
                     # the username picker.
@@ -619,11 +624,15 @@ class SsoHandler:
             raise MappingException("localpart is invalid: %s" % (attributes.localpart,))
         # watcha+
         for email in attributes.emails:
-            if await self._store.get_user_id_by_threepid("email", email):
+            user_id = await self._store.get_user_id_by_threepid("email", email)
+            if user_id:
                 raise MappingException(
-                    "[watcha] register user with email {} failed : email address already exists".format(
-                        email
-                    ),
+                    build_log_message(
+                        log_vars={
+                            "user_id": user_id,
+                            "email": email,
+                        },
+                    )
                 )
         # +watcha
 
