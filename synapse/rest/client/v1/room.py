@@ -59,6 +59,8 @@ from synapse.util.stringutils import parse_and_validate_server_name, random_stri
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
+from synapse.logging.utils import build_log_message  # watcha+
+
 logger = logging.getLogger(__name__)
 
 
@@ -85,7 +87,12 @@ class RoomCreateRestServlet(TransactionRestServlet):
         return self.txns.fetch_or_execute_request(request, self.on_POST, request)
 
     async def on_POST(self, request):
+        """watcha!
         requester = await self.auth.get_user_by_req(request)
+        !watcha"""
+        # watcha+
+        requester = await self.auth.get_user_by_req(request, allow_partner=False)
+        # +watcha
 
         info, _ = await self._room_creation_handler.create_room(
             requester, self.get_room_config(request)
@@ -106,6 +113,10 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         self.room_member_handler = hs.get_room_member_handler()
         self.message_handler = hs.get_message_handler()
         self.auth = hs.get_auth()
+        # watcha+
+        self.store = hs.get_datastore()
+        self.nextcloud_handler = hs.get_nextcloud_handler()
+        # +watcha
 
     def register(self, http_server):
         # /room/$roomid/state/$eventtype
@@ -199,7 +210,49 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     action=membership,
                     content=content,
                 )
+                # watcha+
+                if await self.store.get_share_id(room_id) and membership in [
+                    "invite",
+                    "join",
+                    "kick",
+                    "leave",
+                ]:
+                    user = (
+                        requester.user.to_string()
+                        if membership in ["join", "leave"]
+                        else state_key
+                    )
+                    await self.nextcloud_handler.update_group(user, room_id, membership)
+                # +watcha
             else:
+                # watcha+
+                if (
+                    event_type == EventTypes.VectorSetting
+                    and "nextcloudShare" in content
+                ):
+                    nextcloud_url = content["nextcloudShare"]
+                    if not nextcloud_url:
+                        await self.nextcloud_handler.unbind(room_id)
+                    else:
+                        url_query = urlparse.parse_qs(
+                            urlparse.urlparse(nextcloud_url).query
+                        )
+
+                        if "dir" not in url_query:
+                            raise SynapseError(
+                                400,
+                                build_log_message(
+                                    action="get `nextcloud_folder_path` from `im.vector.web.settings` event",
+                                    log_vars={"nextcloud_url": nextcloud_url},
+                                ),
+                            )
+
+                        nextcloud_folder_path = url_query["dir"][0]
+
+                        await self.nextcloud_handler.bind(
+                            requester.user.to_string(), room_id, nextcloud_folder_path
+                        )
+                # +watcha
                 (
                     event,
                     _,
@@ -207,6 +260,18 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     requester, event_dict, txn_id=txn_id
                 )
                 event_id = event.event_id
+                # watcha+
+                if event_type == EventTypes.Name and await self.store.get_share_id(
+                    room_id
+                ):
+                    group_id = await self.nextcloud_handler.build_group_id(room_id)
+                    group_displayname = (
+                        await self.nextcloud_handler.build_group_displayname(room_id)
+                    )
+                    await self.nextcloud_handler.set_group_displayname(
+                        group_id, group_displayname
+                    )
+                # +watcha
         except ShadowBanError:
             event_id = "$" + random_string(43)
 
@@ -272,6 +337,10 @@ class JoinRoomAliasServlet(TransactionRestServlet):
         super().__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
+        # watcha+
+        self.store = hs.get_datastore()
+        self.nextcloud_handler = hs.get_nextcloud_handler()
+        # +watcha
 
     def register(self, http_server):
         # /join/$room_identifier[/$txn_id]
@@ -317,6 +386,13 @@ class JoinRoomAliasServlet(TransactionRestServlet):
             third_party_signed=content.get("third_party_signed", None),
         )
 
+        # watcha+
+        if await self.store.get_share_id(room_id):
+            await self.nextcloud_handler.update_group(
+                requester.user.to_string(), room_id, "join"
+            )
+        # +watcha
+
         return 200, {"room_id": room_id}
 
     def on_PUT(self, request, room_identifier, txn_id):
@@ -340,7 +416,14 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         server = parse_string(request, "server", default=None)
 
         try:
+            """watcha!
             await self.auth.get_user_by_req(request, allow_guest=True)
+            !watcha"""
+            # watcha+
+            await self.auth.get_user_by_req(
+                request, allow_guest=True, allow_partner=False
+            )
+            # +watcha
         except InvalidClientCredentialsError as e:
             # Option to allow servers to require auth when accessing
             # /publicRooms via CS API. This is especially helpful in private
@@ -389,7 +472,12 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         return 200, data
 
     async def on_POST(self, request):
+        """watcha!
         await self.auth.get_user_by_req(request, allow_guest=True)
+        !watcha"""
+        # watcha+
+        await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=False)
+        # +watcha
 
         server = parse_string(request, "server", default=None)
         content = parse_json_object_from_request(request)
@@ -579,6 +667,7 @@ class RoomStateRestServlet(RestServlet):
             room_id=room_id,
             user_id=requester.user.to_string(),
             is_guest=requester.is_guest,
+            is_partner=requester.is_partner,  # watcha+
         )
         return 200, events
 
@@ -719,6 +808,12 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         super().__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
+        # watcha+
+        self.store = hs.get_datastore()
+        self.administration_handler = hs.get_administration_handler()
+        self.nextcloud_handler = hs.get_nextcloud_handler()
+        self.partner_handler = hs.get_partner_handler()
+        # +watcha
 
     def register(self, http_server):
         # /rooms/$roomid/[invite|join|leave]
@@ -737,6 +832,24 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         }:
             raise AuthError(403, "Guest access not allowed")
 
+        # watcha+
+        if requester.is_partner and membership_action not in {
+            Membership.JOIN,
+            Membership.LEAVE,
+        }:
+            raise AuthError(
+                403,
+                build_log_message(
+                    action="change member membership",
+                    log_vars={
+                        "requester.user_id": requester.user.to_string(),
+                        "requester.is_partner": requester.is_partner,
+                        "membership_action": membership_action,
+                    },
+                ),
+            )
+        # +watcha
+
         try:
             content = parse_json_object_from_request(request)
         except Exception:
@@ -744,6 +857,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             # cheekily send invalid bodies.
             content = {}
 
+        """ watcha!
         if membership_action == "invite" and self._has_3pid_invite_keys(content):
             try:
                 await self.room_member_handler.do_3pid_invite(
@@ -760,6 +874,28 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 # Pretend the request succeeded.
                 pass
             return 200, {}
+        !watcha """
+        # watcha+
+        if membership_action == "invite" and self._has_3pid_invite_keys(content):
+            invitee_email = content["address"].strip()
+            invitee_id = await self.store.get_user_id_by_threepid(
+                "email", invitee_email
+            )
+
+            if not invitee_id:
+                invitee_id = await self.partner_handler.register_partner(
+                    sender_id=requester.user.to_string(),
+                    invitee_email=invitee_email,
+                )
+
+            if await self.administration_handler.get_user_role(invitee_id) == "partner":
+                await self.store.add_partner_invitation(
+                    partner_id=invitee_id,
+                    sender_id=requester.user.to_string(),
+                )
+
+            content["user_id"] = invitee_id
+        # +watcha
 
         target = requester.user
         if membership_action in ["invite", "ban", "unban", "kick"]:
@@ -783,6 +919,21 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         except ShadowBanError:
             # Pretend the request succeeded.
             pass
+
+        # watcha+
+        if await self.store.get_share_id(room_id) and membership_action in [
+            "invite",
+            "join",
+            "kick",
+            "leave",
+        ]:
+            user = (
+                requester.user.to_string()
+                if membership_action in ["join", "leave"]
+                else content["user_id"]
+            )
+            await self.nextcloud_handler.update_group(user, room_id, membership_action)
+        # +watcha
 
         return_value = {}
 

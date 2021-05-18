@@ -43,6 +43,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
         user_type,
         address,
         shadow_banned,
+        make_partner,  # watcha+
     ):
         """
         Args:

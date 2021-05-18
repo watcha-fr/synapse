@@ -42,6 +42,19 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
         self.user1 = self.register_user("a_user", "pass")
 
+    # watcha+
+    def test_token_is_a_partner_macaroon(self):
+        partner_id = self.register_user("partner", "pass", is_partner=True)
+        access_token = self.get_success(
+            self.auth_handler.get_access_token_for_user_id(
+                partner_id, device_id=None, valid_until_ms=None
+            )
+        )
+        macaroon = pymacaroons.Macaroon.deserialize(access_token)
+        self.assertIn("partner = true", macaroon.inspect())
+
+    # +watcha
+
     def test_macaroon_caveats(self):
         token = self.macaroon_generator.generate_guest_access_token("a_user")
         macaroon = pymacaroons.Macaroon.deserialize(token)
