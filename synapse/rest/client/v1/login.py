@@ -14,7 +14,6 @@
 
 import logging
 import re
-from sys import is_finalizing
 from typing import TYPE_CHECKING, Awaitable, Callable, Dict, Optional
 
 from synapse.api.errors import Codes, LoginError, SynapseError

@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
-from sys import is_finalizing
 import time
 import urllib.parse
 from typing import Any, Dict, List, Optional, Union
@@ -46,6 +44,7 @@ try:
 except ImportError:
     HAS_JWT = False
 
+from json import loads # watcha+
 
 # synapse server name: used to populate public_baseurl in some tests
 SYNAPSE_SERVER_PUBLIC_HOSTNAME = "synapse"
@@ -388,7 +387,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(b"POST", LOGIN_URL, params)
         
         self.assertEqual(channel.code, 200)
-        self.assertTrue(json.loads(channel.result["body"])["is_partner"])
+        self.assertTrue(loads(channel.result["body"])["is_partner"])
 
     # +watcha
 
