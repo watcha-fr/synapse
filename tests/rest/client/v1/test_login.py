@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+from sys import is_finalizing
 import time
 import urllib.parse
 from typing import Any, Dict, List, Optional, Union
@@ -374,6 +376,21 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(b"POST", "/logout/all", access_token=access_token)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
+    # watcha+
+    def test_login_as_partner(self):
+        self.register_user("partner", "pass", is_partner=True)
+
+        params = {
+            "type": "m.login.password",
+            "identifier": {"type": "m.id.user", "user": "partner"},
+            "password": "pass",
+        }
+        channel = self.make_request(b"POST", LOGIN_URL, params)
+        
+        self.assertEqual(channel.code, 200)
+        self.assertTrue(json.loads(channel.result["body"])["is_partner"])
+
+    # +watcha
 
 @skip_unless(has_saml2 and HAS_OIDC, "Requires SAML2 and OIDC")
 class MultiSSOTestCase(unittest.HomeserverTestCase):

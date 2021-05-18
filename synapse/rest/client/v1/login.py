@@ -14,6 +14,7 @@
 
 import logging
 import re
+from sys import is_finalizing
 from typing import TYPE_CHECKING, Awaitable, Callable, Dict, Optional
 
 from synapse.api.errors import Codes, LoginError, SynapseError
@@ -285,6 +286,12 @@ class LoginRestServlet(RestServlet):
             "home_server": self.hs.hostname,
             "device_id": device_id,
         }
+
+        # watcha+
+        is_partner = await self.auth_handler.is_partner(user_id)
+        if is_partner:
+            result["is_partner"] = is_partner
+        # +watcha
 
         if callback is not None:
             await callback(result)
