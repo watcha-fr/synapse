@@ -286,6 +286,12 @@ class LoginRestServlet(RestServlet):
             "device_id": device_id,
         }
 
+        # watcha+
+        is_partner = await self.auth_handler.is_partner(user_id)
+        if is_partner:
+            result["is_partner"] = is_partner
+        # +watcha
+
         if callback is not None:
             await callback(result)
 
