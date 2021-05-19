@@ -835,15 +835,7 @@ class AuthHandler(BaseHandler):
         ):
             await self.auth.check_auth_blocking(user_id)
 
-        """ watcha!
         access_token = self.generate_access_token(target_user_id_obj)
-        !watcha """
-        # watcha+
-        if await self.is_partner(user_id):
-            access_token = self.macaroon_gen.generate_partner_access_token(user_id)
-        else:
-            access_token = self.generate_access_token(target_user_id_obj)
-        # +watcha
         await self.store.add_access_token_to_user(
             user_id=user_id,
             token=access_token,
@@ -1641,19 +1633,6 @@ class MacaroonGenerator:
         )
         macaroon.add_first_party_caveat("guest = true")
         return macaroon.serialize()
-    
-    # watcha+
-    def generate_partner_access_token(self, user_id: str) -> str:
-        macaroon = self._generate_base_macaroon(user_id)
-        macaroon.add_first_party_caveat("type = access")
-        # Include a nonce, to make sure that each login gets a different
-        # access token.
-        macaroon.add_first_party_caveat(
-            "nonce = %s" % (stringutils.random_string_with_symbols(16),)
-        )
-        macaroon.add_first_party_caveat("partner = true")
-        return macaroon.serialize()
-    # +watcha
 
     def generate_short_term_login_token(
         self,
