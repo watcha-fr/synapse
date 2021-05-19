@@ -48,29 +48,15 @@ class PartnerHandler(BaseHandler):
         keycloak_user_id = location.split("/")[-1]
 
         try:
-            await self.nextcloud_client.add_user(keycloak_user_id)
-        except (
-            NextcloudError,
-            HttpResponseException,
-            ValidationError,
-            SchemaError,
-        ) as error:
-            if isinstance(error, NextcloudError) and error.code == 102:
-                logger.warn(
-                    build_log_message(
-                        log_vars={"keycloak_user_id": keycloak_user_id, "error": error}
-                    )
-                )
-            else:
-                await self.keycloak_client.delete_user(keycloak_user_id)
-                raise
-
-        invitee_id = await self.registration_handler.register_user(
-            localpart=keycloak_user_id,
-            default_display_name=invitee_email,
-            bind_emails=[invitee_email],
-            make_partner=True,
-        )
+            invitee_id = await self.registration_handler.register_user(
+                localpart=keycloak_user_id,
+                default_display_name=invitee_email,
+                bind_emails=[invitee_email],
+                make_partner=True,
+            )
+        except SynapseError:
+            await self.keycloak_client.delete_user(keycloak_user_id)
+            raise
 
         logger.info(build_log_message(status=ActionStatus.SUCCESS))
 

@@ -60,6 +60,28 @@ WITH_DATA_SCHEMA = {
     "required": ["ocs"],
 }
 
+WITH_URL_SCHEMA = {
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "description": "Nextcloud API schema which data is expected",
+    "definitions": {"meta": META_SCHEMA},
+    "type": "object",
+    "properties": {
+        "ocs": {
+            "type": "object",
+            "properties": {
+                "meta": {"$ref": "#/definitions/meta"},
+                "data": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "url": {"url": "string"}},
+                    "required": ["id", "url"],
+                },
+            },
+            "required": ["meta", "data"],
+        },
+    },
+    "required": ["ocs"],
+}
+
 
 class NextcloudClient(SimpleHttpClient):
     """Interface for talking with Nextcloud APIs
@@ -94,16 +116,11 @@ class NextcloudClient(SimpleHttpClient):
 
     async def add_user(self, username: str, displayname: str = None):
         """Create a new user.
+        https://docs.nextcloud.com/server/19/admin_manual/configuration_user/instruction_set_for_users.html#add-a-new-user
 
         Args:
             username: the username of the user to create.
             displayname: displayname of the user. Defaults to user keycloak id.
-
-        Status codes:
-            100 - successful
-            101 - invalid input data
-            102 - username already exists
-            103 - unknown error occurred whilst adding the user
         """
         # A password is needed to create NC user, but it will not be used by KC login process.
         password = secrets.token_hex()
@@ -126,13 +143,10 @@ class NextcloudClient(SimpleHttpClient):
 
     async def delete_user(self, username: str):
         """Delete an existing user.
+        https://docs.nextcloud.com/server/19/admin_manual/configuration_user/instruction_set_for_users.html#delete-a-user
 
         Args:
             username: The username of the user to delete.
-
-        Status codes:
-            100 - successful
-            101 - failure
         """
         response = await self.delete_get_json(
             uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/users/{username}",
@@ -144,15 +158,10 @@ class NextcloudClient(SimpleHttpClient):
 
     async def add_group(self, group_id: str):
         """Adds a new Nextcloud group.
+        https://docs.nextcloud.com/server/19/admin_manual/configuration_user/instruction_set_for_groups.html#create-a-group
 
         Args:
             group_id: id of the Nextcloud group
-
-        Status codes:
-            100: successful
-            101: invalid input data
-            102: group already exists
-            103: failed to add the group
         """
         response = await self.post_json_get_json(
             uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/groups",
@@ -165,6 +174,7 @@ class NextcloudClient(SimpleHttpClient):
 
     async def set_group_displayname(self, group_id: str, displayname: str):
         """Set the displayname of a Nextcloud group
+        This function is not set in the Nextcloud API documentation
 
         Args:
             group_id: id of the Nextcloud group
@@ -186,14 +196,10 @@ class NextcloudClient(SimpleHttpClient):
 
     async def delete_group(self, group_id: str):
         """Removes a existing Nextcloud group.
+        https://docs.nextcloud.com/server/19/admin_manual/configuration_user/instruction_set_for_groups.html#delete-a-group
 
         Args:
             group_id: id of the Nextcloud group
-
-        Status codes:
-            100: successful
-            101: group does not exist
-            102: failed to delete group
         """
         response = await self.delete_get_json(
             uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/groups/{group_id}",
@@ -205,18 +211,11 @@ class NextcloudClient(SimpleHttpClient):
 
     async def add_user_to_group(self, username: str, group_id: str):
         """Add user to the Nextcloud group.
+        https://docs.nextcloud.com/server/19/admin_manual/configuration_user/instruction_set_for_users.html#add-user-to-group
 
         Args:
             username: the username of the user to add to the group
             group_id: id of the Nextcloud group
-
-        Status codes:
-            100: successful
-            101: no group specified
-            102: group does not exist
-            103: user does not exist
-            104: insufficient privileges
-            105: failed to add user to group
         """
         response = await self.post_json_get_json(
             uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/users/{username}/groups",
@@ -229,18 +228,11 @@ class NextcloudClient(SimpleHttpClient):
 
     async def remove_user_from_group(self, username: str, group_id: str) -> None:
         """Removes the specified user from the specified group.
+        https://docs.nextcloud.com/server/19/admin_manual/configuration_user/instruction_set_for_users.html#remove-user-from-group
 
         Args:
             username: the username of the user to remove from the group
             group_id: id of the Nextcloud group
-
-        Status codes:
-            100: successful
-            101: no group specified
-            102: group does not exist
-            103: user does not exist
-            104: insufficient privileges
-            105: failed to remove user from group
         """
         response = await self.delete_get_json(
             uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/users/{username}/groups",
@@ -251,35 +243,16 @@ class NextcloudClient(SimpleHttpClient):
         validate(response, WITHOUT_DATA_SCHEMA)
         self._raise_for_status(response["ocs"]["meta"])
 
-    async def share(self, requester: str, path: str, group_id: str):
-        """Share an existing file or folder with all permissions for a group.
+    async def create_internal_share(
+        self, requester: str, path: str, group_id: str = None, is_public: bool = False
+    ):
+        """Create a Nextcloud internal share between the requester and the specified group with all permissions
+        https://docs.nextcloud.com/server/20/developer_manual/client_apis/OCS/ocs-share-api.html#create-a-new-share
 
         Args:
             requester: the user who want to create the share
             path: the path of the folder to share
             group_id: id of the Nextcloud group which will share the folder
-
-        Payload:
-            shareType: the type of the share. This can be one of:
-                0 = user
-                1 = group
-                3 = public link
-                6 = federated cloud share
-
-            permissions: the permissions to set on the share.
-                1 = read (default for public link shares);
-                2 = update;
-                4 = create;
-                8 = delete;
-                15 = read/write;
-                16 = share;
-                31 = All permissions.
-
-        Status codes:
-            100: successful
-            400: Unknown share type
-            403: Public upload was disabled by the admin
-            404: File or folder couldn’t be shared
 
         Returns:
             the id of Nextcloud share
@@ -301,16 +274,41 @@ class NextcloudClient(SimpleHttpClient):
 
         return response["ocs"]["data"]["id"]
 
+    async def create_public_link_share(self, requester: str, path: str):
+        """Create a Nextcloud public link for share folder with partners
+        https://docs.nextcloud.com/server/20/developer_manual/client_apis/OCS/ocs-share-api.html#create-a-new-share
+
+        Args:
+            requester: the user who want to create the share
+            path: the path of the folder to share
+
+        Returns:
+            the id of Nextcloud share and the url of the public link
+        """
+        response = await self.post_json_get_json(
+            uri=f"{self.nextcloud_url}/ocs/v2.php/apps/watcha_integrator/api/v1/shares",
+            headers=self._headers,
+            post_json={
+                "path": path,
+                "shareType": 3,
+                "permissions": 1,
+                "requester": requester,
+                "publicUpload": False,
+            },
+        )
+
+        validate(response, WITH_URL_SCHEMA)
+        self._raise_for_status(response["ocs"]["meta"])
+
+        return response["ocs"]["data"]["id"], response["ocs"]["data"]["url"]
+
     async def unshare(self, requester: str, share_id: str):
         """Remove a given Nextcloud share
+        https://docs.nextcloud.com/server/20/developer_manual/client_apis/OCS/ocs-share-api.html#delete-share
 
         Args:
             requester: the user who want to remove the share
             share_id: the share's unique id.
-
-        Status codes:
-            100: successful
-            404: Share couldn’t be deleted.
         """
         response = await self.delete_get_json(
             uri=f"{self.nextcloud_url}/ocs/v2.php/apps/watcha_integrator/api/v1/shares/{share_id}",

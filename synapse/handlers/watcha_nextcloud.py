@@ -180,7 +180,7 @@ class NextcloudHandler(BaseHandler):
                 )
 
         try:
-            new_share_id = await self.nextcloud_client.share(
+            new_share_id = await self.nextcloud_client.create_internal_share(
                 nextcloud_username, path, group_id
             )
         except NEXTCLOUD_CLIENT_ERRORS as error:
