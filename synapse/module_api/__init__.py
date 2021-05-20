@@ -85,7 +85,7 @@ class ModuleApi:
     def get_user_by_req(self, req, allow_guest=False):
     !watcha """
 
-    def get_user_by_req(self, req, allow_guest=False, allow_partner=False):  # watcha+
+    def get_user_by_req(self, req, allow_guest=False, allow_partner=True):  # watcha+
         """Check the access_token provided for a request
 
         Args:
