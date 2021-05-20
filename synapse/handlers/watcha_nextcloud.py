@@ -164,7 +164,7 @@ class NextcloudHandler(BaseHandler):
         group_id = await self.build_group_id(room_id)
         nextcloud_username = await self.store.get_username(requester_id)
 
-        old_share_id = await self.store.get_share_id(room_id)
+        old_share_id = await self.store.get_internal_share_id(room_id)
         if old_share_id:
             try:
                 await self.nextcloud_client.unshare(nextcloud_username, old_share_id)
@@ -204,7 +204,7 @@ class NextcloudHandler(BaseHandler):
                 Codes.NEXTCLOUD_CAN_NOT_SHARE,
             )
 
-        await self.store.register_share(room_id, new_share_id)
+        await self.store.register_internal_share(room_id, new_share_id)
 
     async def unbind(self, room_id: str):
         """Unbind a Nextcloud folder from a room.
@@ -220,7 +220,7 @@ class NextcloudHandler(BaseHandler):
                 build_log_message(log_vars={"group_id": group_id, "error": error})
             )
 
-        await self.store.delete_share(room_id)
+        await self.store.delete_all_shares(room_id)
 
     async def update_group(self, user_id: str, room_id: str, membership: str):
         """Update a Nextcloud group by adding or removing users.

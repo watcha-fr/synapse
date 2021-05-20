@@ -50,7 +50,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
 
     def test_unbind(self):
         self.get_success(self.nextcloud_handler.unbind(self.room_id))
-        share_id = self.get_success(self.store.get_share_id(self.room_id))
+        share_id = self.get_success(self.store.get_internal_share_id(self.room_id))
 
         self.nextcloud_client.delete_group.assert_called_once_with(self.group_id)
         self.assertIsNone(share_id)
@@ -60,18 +60,18 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
             side_effect=NextcloudError(code=101, msg="")
         )
         self.get_success(self.nextcloud_handler.unbind(self.room_id))
-        share_id = self.get_success(self.store.get_share_id(self.room_id))
+        share_id = self.get_success(self.store.get_internal_share_id(self.room_id))
 
         self.nextcloud_client.delete_group.assert_called_once_with(self.group_id)
         self.assertIsNone(share_id)
 
     def test_update_bind(self):
-        old_share_id = self.get_success(self.store.get_share_id(self.room_id))
+        old_share_id = self.get_success(self.store.get_internal_share_id(self.room_id))
         self.nextcloud_client.create_internal_share = AsyncMock(return_value="share_2")
         self.get_success(
             self.nextcloud_handler.bind(self.creator, self.room_id, "/new_folder")
         )
-        share_id = self.get_success(self.store.get_share_id(self.room_id))
+        share_id = self.get_success(self.store.get_internal_share_id(self.room_id))
 
         self.assertEquals(old_share_id, "share_1")
         self.assertEquals(share_id, "share_2")
@@ -145,7 +145,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.nextcloud_client.create_internal_share.assert_called_once()
 
     def test_create_share_with_unexisting_folder(self):
-        old_share_id = self.get_success(self.store.get_share_id(self.room_id))
+        old_share_id = self.get_success(self.store.get_internal_share_id(self.room_id))
         self.nextcloud_client.create_internal_share = AsyncMock(
             side_effect=NextcloudError(code=404, msg="")
         )
@@ -165,7 +165,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.nextcloud_handler.unbind.assert_called_once()
 
     def test_create_share_with_other_exceptions(self):
-        old_share_id = self.get_success(self.store.get_share_id(self.room_id))
+        old_share_id = self.get_success(self.store.get_internal_share_id(self.room_id))
         self.nextcloud_client.create_internal_share = AsyncMock(
             side_effect=NextcloudError(code=400, msg="")
         )

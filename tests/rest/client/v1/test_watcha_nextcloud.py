@@ -28,7 +28,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         self.inviter = self.register_user("inviter", "pass")
         self.inviter_tok = self.login("inviter", "pass")
         self.room_id = self.helper.create_room_as(self.creator, tok=self.creator_tok)
-        self.get_success(self.store.register_share(self.room_id, 1))
+        self.get_success(self.store.register_internal_share(self.room_id, 1))
 
         self.nextcloud_handler.bind = AsyncMock()
         self.nextcloud_handler.unbind = AsyncMock()

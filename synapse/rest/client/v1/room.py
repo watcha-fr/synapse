@@ -211,7 +211,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     content=content,
                 )
                 # watcha+
-                if await self.store.get_share_id(room_id) and membership in [
+                if await self.store.get_internal_share_id(room_id) and membership in [
                     "invite",
                     "join",
                     "kick",
@@ -261,7 +261,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                 )
                 event_id = event.event_id
                 # watcha+
-                if event_type == EventTypes.Name and await self.store.get_share_id(
+                if event_type == EventTypes.Name and await self.store.get_internal_share_id(
                     room_id
                 ):
                     group_id = await self.nextcloud_handler.build_group_id(room_id)
@@ -387,7 +387,7 @@ class JoinRoomAliasServlet(TransactionRestServlet):
         )
 
         # watcha+
-        if await self.store.get_share_id(room_id):
+        if await self.store.get_internal_share_id(room_id):
             await self.nextcloud_handler.update_group(
                 requester.user.to_string(), room_id, "join"
             )
@@ -921,7 +921,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             pass
 
         # watcha+
-        if await self.store.get_share_id(room_id) and membership_action in [
+        if await self.store.get_internal_share_id(room_id) and membership_action in [
             "invite",
             "join",
             "kick",
