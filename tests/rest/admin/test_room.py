@@ -617,6 +617,8 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
+        self.store = hs.get_datastore()  # watcha+
+
     def test_list_rooms(self):
         """Test that we can list rooms"""
         # Create 3 test rooms
@@ -1240,6 +1242,22 @@ class RoomTestCase(unittest.HomeserverTestCase):
             ["@admin:test", "@bar:test", "@foobar:test"], channel.json_body["members"]
         )
         self.assertEqual(channel.json_body["total"], 3)
+
+    # watcha+
+    def test_partner_is_in_room(self):
+        room_id = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+
+        partner = self.register_user("partner", "pass", is_partner=True)
+        partner_tok = self.login("partner", "pass")
+
+        self.helper.invite(room_id, self.admin_user, partner, tok=self.admin_user_tok)
+        self.helper.join(room_id, partner, tok=partner_tok)
+
+        partner_members = self.get_success(self.store.get_partners_in_room(room_id))
+        print(partner_members)
+        self.assertIn(partner, partner_members)
+
+    # +watcha
 
     def test_room_state(self):
         """Test that room state can be requested correctly"""

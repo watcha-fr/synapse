@@ -190,6 +190,46 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         txn.execute(sql, (room_id, Membership.JOIN))
         return [r[0] for r in txn]
 
+    # watcha+
+    @cached(max_entries=100000, iterable=True)
+    async def get_partners_in_room(self, room_id: str) -> List[str]:
+        return await self.db_pool.runInteraction(
+            "get_partners_in_room", self.get_partners_in_room_txn, room_id
+        )
+
+    def get_partners_in_room_txn(self, txn, room_id: str) -> List[str]:
+        if self._current_state_events_membership_up_to_date:
+            sql = """
+                SELECT cse.state_key 
+                FROM current_state_events AS cse
+                INNER JOIN users 
+                    ON users.name = cse.state_key
+                WHERE cse.type = 'm.room.member' 
+                    AND cse.room_id = ? 
+                    AND cse.membership = ?
+                    AND users.is_partner = 1
+            """
+        else:
+            sql = """
+                SELECT cse.state_key 
+                FROM room_memberships as rm
+                INNER JOIN current_state_events as cse
+                    ON rm.event_id = cse.event_id
+                    AND rm.room_id = cse.room_id
+                    AND rm.user_id = cse.state_key
+                INNER JOIN users
+                    ON users.name = rm.user_id
+                WHERE cse.type = 'm.room.member' 
+                    AND cse.room_id = ? 
+                    AND rm.membership = ?
+                    AND users.is_partner = 1
+            """
+
+        txn.execute(sql, (room_id, Membership.JOIN))
+        return [r[0] for r in txn]
+
+    # +watcha
+
     @cached(max_entries=100000, iterable=True)
     async def get_users_in_room_with_profiles(
         self, room_id: str
