@@ -1,6 +1,7 @@
 import logging
 
 from jsonschema.exceptions import SchemaError, ValidationError
+from typing import List
 
 from synapse.api.errors import (
     Codes,
@@ -36,19 +37,27 @@ class NextcloudHandler(BaseHandler):
         self.nextcloud_client = hs.get_nextcloud_client()
 
     async def bind(self, requester_id: str, room_id: str, path: str):
-        """Bind a Nextcloud folder with a room in three steps :
+        """Bind a Nextcloud folder with a room in four steps :
             1 - create a new Nextcloud group
-            2 - add all room members in the new group
-            3 - create a share on folder for the new group
+            2 - add internal room members in the new group
+            3 - create a internal share on folder for the new group
+            4 - create a public link share for partners in the room
 
         Args :
            requester_id: the mxid of the requester.
            room_id: the id of the room to bind.
            path: the path of the Nextcloud folder to bind.
         """
+        members = await self.store.get_users_in_room(room_id)
+        partner_members = await self.store.get_partners_in_room(room_id)
+        internal_members = [member for member in members if member not in partner_members]
+
         await self.create_group(room_id)
-        await self.add_room_members_to_group(room_id)
-        await self.create_share(requester_id, room_id, path)
+        await self.add_internal_members_to_group(room_id, internal_members)
+        await self.create_internal_share(requester_id, room_id, path)
+
+        if partner_members:
+            await self.create_public_link_share(requester_id, room_id, path)
 
     async def create_group(self, room_id: str):
         """Create a Nextcloud group with specific id and displayname.
@@ -117,17 +126,17 @@ class NextcloudHandler(BaseHandler):
                 )
             )
 
-    async def add_room_members_to_group(self, room_id: str):
-        """Add all members of a room to a Nextcloud group.
+    async def add_internal_members_to_group(self, room_id: str, internal_members: List[str]):
+        """Add internal room members to a Nextcloud group.
 
         Args:
-            room_id: the id of the room which the Nextcloud group name is infered from.
+            room_id: the id of the room which the Nextcloud group name is infered from
+            internal_members: a list of all non partner members in the room
         """
         group_id = await self.build_group_id(room_id)
-        user_ids = await self.store.get_users_in_room(room_id)
 
-        for user_id in user_ids:
-            nextcloud_username = await self.store.get_username(user_id)
+        for member in internal_members:
+            nextcloud_username = await self.store.get_username(member)
             try:
                 await self.nextcloud_client.add_user_to_group(
                     nextcloud_username, group_id
@@ -135,7 +144,7 @@ class NextcloudHandler(BaseHandler):
             except NEXTCLOUD_CLIENT_ERRORS as error:
                 log_message = build_log_message(
                     log_vars={
-                        "user_id": user_id,
+                        "user_id": member,
                         "nextcloud_username": nextcloud_username,
                         "group_id": group_id,
                         "room_id": room_id,
@@ -152,9 +161,9 @@ class NextcloudHandler(BaseHandler):
                         Codes.NEXTCLOUD_CAN_NOT_ADD_MEMBERS_TO_GROUP,
                     )
 
-    async def create_share(self, requester_id: str, room_id: str, path: str):
-        """Create a new share on folder for a specific Nextcloud group.
-        Before that, delete old existing share for this group if it exist.
+    async def create_internal_share(self, requester_id: str, room_id: str, path: str):
+        """Create a internal share on folder for a specific Nextcloud group.
+        Before that, delete old existing internal share for this group if it exist.
 
         Args:
             requester_id: the mxid of the requester.
@@ -205,6 +214,58 @@ class NextcloudHandler(BaseHandler):
             )
 
         await self.store.register_internal_share(room_id, new_share_id)
+
+    async def create_public_link_share(self, requester_id: str, room_id: str, path: str):
+        """Create a public link share on folder for partners in room.
+        Before that, delete old existing public link share if it exist.
+
+        Args:
+            requester_id: the mxid of the requester.
+            room_id: the id of the room to bind.
+            path: the path of the Nextcloud folder to bind.
+        """
+        nextcloud_username = await self.store.get_username(requester_id)
+
+        old_share_id = await self.store.get_public_link_share_id(room_id)
+        if old_share_id:
+            try:
+                await self.nextcloud_client.unshare(nextcloud_username, old_share_id)
+            except NEXTCLOUD_CLIENT_ERRORS as error:
+                logger.error(
+                    build_log_message(
+                        log_vars={
+                            "nextcloud_username": nextcloud_username,
+                            "old_share_id": old_share_id,
+                            "error": error,
+                        }
+                    )
+                )
+
+        try:
+            new_share_id, public_link_url = await self.nextcloud_client.create_public_link_share(
+                nextcloud_username, path,
+            )
+        except NEXTCLOUD_CLIENT_ERRORS as error:
+            await self.unbind(room_id)
+            # raise 404 error if folder to share do not exist
+            http_code = (
+                error.code
+                if isinstance(error, NextcloudError) and error.code == 404
+                else 500
+            )
+            raise SynapseError(
+                http_code,
+                build_log_message(
+                    log_vars={
+                        "nextcloud_username": nextcloud_username,
+                        "path": path,
+                        "error": error,
+                    }
+                ),
+                Codes.NEXTCLOUD_CAN_NOT_SHARE,
+            )
+
+        await self.store.register_public_link_share(room_id, new_share_id)
 
     async def unbind(self, room_id: str):
         """Unbind a Nextcloud folder from a room.

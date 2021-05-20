@@ -22,13 +22,15 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
 
         self.creator = self.register_user("creator", "pass", admin=True)
         self.creator_tok = self.login("creator", "pass")
-        self.inviter = self.register_user("inviter", "pass")
-        inviter_tok = self.login("inviter", "pass")
+        self.collaborator = self.register_user("collaborator", "pass")
+        collaborator_tok = self.login("collaborator", "pass")
+        self.partner = self.register_user("partner", "pass", is_partner=True)
+        self.partner_tok = self.login("partner", "pass")
         self.room_id = self.helper.create_room_as(self.creator, tok=self.creator_tok)
         self.helper.invite(
-            self.room_id, src=self.creator, targ=self.inviter, tok=self.creator_tok
+            self.room_id, src=self.creator, targ=self.collaborator, tok=self.creator_tok
         )
-        self.helper.join(self.room_id, self.inviter, tok=inviter_tok)
+        self.helper.join(self.room_id, self.collaborator, tok=collaborator_tok)
         self.group_id = self.get_success(
             self.nextcloud_handler.build_group_id(self.room_id)
         )
@@ -39,14 +41,27 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.nextcloud_client.remove_user_from_group = AsyncMock()
         self.nextcloud_client.set_group_displayname = AsyncMock()
         self.nextcloud_client.unshare = AsyncMock()
-        self.nextcloud_client.create_internal_share = AsyncMock(return_value="share_1")
+        self.nextcloud_client.create_internal_share = AsyncMock(
+            return_value="internal_share_1"
+        )
+        self.nextcloud_client.create_public_link_share = AsyncMock(
+            return_value=("public_link_share_1", "https://example.com/12345")
+        )
 
+    def _bind(self):
         self.get_success(
             self.nextcloud_handler.bind(self.creator, self.room_id, "/folder")
         )
         self.nextcloud_client.add_group.reset_mock()
         self.nextcloud_client.add_user_to_group.reset_mock()
         self.nextcloud_client.create_internal_share.reset_mock()
+        self.nextcloud_client.create_public_link_share.reset_mock()
+
+    def _add_partner_to_room(self):
+        self.helper.invite(
+            self.room_id, src=self.creator, targ=self.partner, tok=self.creator_tok
+        )
+        self.helper.join(self.room_id, self.partner, tok=self.partner_tok)
 
     def test_unbind(self):
         self.get_success(self.nextcloud_handler.unbind(self.room_id))
@@ -65,16 +80,27 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.nextcloud_client.delete_group.assert_called_once_with(self.group_id)
         self.assertIsNone(share_id)
 
-    def test_update_bind(self):
-        old_share_id = self.get_success(self.store.get_internal_share_id(self.room_id))
-        self.nextcloud_client.create_internal_share = AsyncMock(return_value="share_2")
-        self.get_success(
-            self.nextcloud_handler.bind(self.creator, self.room_id, "/new_folder")
+    def test_bind(self):
+        self._bind()
+        internal_share_id = self.get_success(
+            self.store.get_internal_share_id(self.room_id)
         )
-        share_id = self.get_success(self.store.get_internal_share_id(self.room_id))
 
-        self.assertEquals(old_share_id, "share_1")
-        self.assertEquals(share_id, "share_2")
+        self.assertEquals(internal_share_id, "internal_share_1")
+
+    def test_bind_with_partner_in_room(self):
+        self._add_partner_to_room()
+        self._bind()
+
+        internal_share_id = self.get_success(
+            self.store.get_internal_share_id(self.room_id)
+        )
+        public_link_share_id = self.get_success(
+            self.store.get_public_link_share_id(self.room_id)
+        )
+
+        self.assertEqual("internal_share_1", internal_share_id)
+        self.assertEqual("public_link_share_1", public_link_share_id)
 
     def test_create_group(self):
         self.helper.send_state(
@@ -122,29 +148,42 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
 
         self.get_success(self.nextcloud_handler.create_group(self.room_id))
 
-    def test_add_room_members_to_group(self):
-        self.get_success(self.nextcloud_handler.add_room_members_to_group(self.room_id))
+    def test_add_internal_members_to_group(self):
+        internal_members = ["partner1", "partner2"]
+        self.get_success(self.nextcloud_handler.add_internal_members_to_group(self.room_id, internal_members))
 
-        self.assertEquals(self.nextcloud_client.add_user_to_group.call_count, 2)
+        self.assertEquals(self.nextcloud_client.add_user_to_group.call_count, len(internal_members))
 
-    def test_add_room_members_to_group_without_account(self):
+    def test_add_internal_members_to_group_without_account(self):
+        internal_members = ["partner1"]
         self.nextcloud_client.add_user_to_group = AsyncMock(
             side_effect=NextcloudError(code=103, msg="")
         )
 
-        self.get_success(self.nextcloud_handler.add_room_members_to_group(self.room_id))
+        self.get_success(self.nextcloud_handler.add_internal_members_to_group(self.room_id, internal_members))
 
-    def test_create_share(self):
+    def test_add_internal_members_to_unexisting_group(self):
+        internal_members = ["partner1"]
+        self.nextcloud_client.add_user_to_group = AsyncMock(
+            side_effect=NextcloudError(code=102, msg="")
+        )
+
+        self.get_failure(
+            self.nextcloud_handler.add_internal_members_to_group(self.room_id, internal_members),
+            SynapseError,
+        )
+
+    def test_create_internal_share(self):
         self.get_success(
-            self.nextcloud_handler.create_share(
+            self.nextcloud_handler.create_internal_share(
                 self.creator, self.room_id, "/new_folder"
             )
         )
 
-        self.nextcloud_client.unshare.assert_called_once()
+        self.nextcloud_client.unshare.assert_not_called()
         self.nextcloud_client.create_internal_share.assert_called_once()
 
-    def test_create_share_with_unexisting_folder(self):
+    def test_create_internal_share_with_unexisting_folder(self):
         old_share_id = self.get_success(self.store.get_internal_share_id(self.room_id))
         self.nextcloud_client.create_internal_share = AsyncMock(
             side_effect=NextcloudError(code=404, msg="")
@@ -155,7 +194,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.nextcloud_handler.unbind = AsyncMock()
 
         error = self.get_failure(
-            self.nextcloud_handler.create_share(
+            self.nextcloud_handler.create_internal_share(
                 self.creator, self.room_id, "/new_folder"
             ),
             SynapseError,
@@ -164,7 +203,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.assertEquals(error.value.code, 404)
         self.nextcloud_handler.unbind.assert_called_once()
 
-    def test_create_share_with_other_exceptions(self):
+    def test_create_internal_share_with_other_exceptions(self):
         old_share_id = self.get_success(self.store.get_internal_share_id(self.room_id))
         self.nextcloud_client.create_internal_share = AsyncMock(
             side_effect=NextcloudError(code=400, msg="")
@@ -175,7 +214,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.nextcloud_handler.unbind = AsyncMock()
 
         error = self.get_failure(
-            self.nextcloud_handler.create_share(
+            self.nextcloud_handler.create_internal_share(
                 self.creator, self.room_id, "/new_folder"
             ),
             SynapseError,
@@ -184,20 +223,10 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.assertEquals(error.value.code, 500)
         self.nextcloud_handler.unbind.assert_called_once_with(self.room_id)
 
-    def test_add_user_to_unexisting_group(self):
-        self.nextcloud_client.add_user_to_group = AsyncMock(
-            side_effect=NextcloudError(code=102, msg="")
-        )
-
-        self.get_failure(
-            self.nextcloud_handler.add_room_members_to_group(self.room_id),
-            SynapseError,
-        )
-
     def test_update_existing_group_on_invite_membership(self):
         self.get_success(
             self.nextcloud_handler.update_group(
-                "@second_inviter:test", self.room_id, "invite"
+                "@second_collaborator:test", self.room_id, "invite"
             )
         )
 
@@ -207,7 +236,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
     def test_update_existing_group_on_join_membership(self):
         self.get_success(
             self.nextcloud_handler.update_group(
-                "@second_inviter:test", self.room_id, "join"
+                "@second_collaborator:test", self.room_id, "join"
             )
         )
 
@@ -217,7 +246,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
     def test_update_existing_group_on_leave_membership(self):
         self.get_success(
             self.nextcloud_handler.update_group(
-                "@second_inviter:test", self.room_id, "leave"
+                "@second_collaborator:test", self.room_id, "leave"
             )
         )
 
@@ -227,7 +256,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
     def test_update_existing_group_on_kick_membership(self):
         self.get_success(
             self.nextcloud_handler.update_group(
-                "@second_inviter:test", self.room_id, "kick"
+                "@second_collaborator:test", self.room_id, "kick"
             )
         )
 
@@ -238,18 +267,22 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.nextcloud_client.add_user_to_group = AsyncMock(
             side_effect=NextcloudError(code=103, msg="")
         )
-        second_inviter = "@second_inviter:test"
+        second_collaborator = "@second_collaborator:test"
 
         self.get_success(
-            self.nextcloud_handler.update_group(second_inviter, self.room_id, "invite")
+            self.nextcloud_handler.update_group(
+                second_collaborator, self.room_id, "invite"
+            )
         )
 
     def test_update_existing_group_on_leave_membership_with_exception(self):
         self.nextcloud_client.remove_user_from_group = AsyncMock(
             side_effect=NextcloudError(code=103, msg="")
         )
-        second_inviter = "@second_inviter:test"
+        second_collaborator = "@second_collaborator:test"
 
         self.get_success(
-            self.nextcloud_handler.update_group(second_inviter, self.room_id, "leave")
+            self.nextcloud_handler.update_group(
+                second_collaborator, self.room_id, "leave"
+            )
         )
