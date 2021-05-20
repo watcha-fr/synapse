@@ -63,23 +63,6 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         )
         self.helper.join(self.room_id, self.partner, tok=self.partner_tok)
 
-    def test_unbind(self):
-        self.get_success(self.nextcloud_handler.unbind(self.room_id))
-        share_id = self.get_success(self.store.get_internal_share_id(self.room_id))
-
-        self.nextcloud_client.delete_group.assert_called_once_with(self.group_id)
-        self.assertIsNone(share_id)
-
-    def test_unbind_with_unexisting_group(self):
-        self.nextcloud_client.delete_group = AsyncMock(
-            side_effect=NextcloudError(code=101, msg="")
-        )
-        self.get_success(self.nextcloud_handler.unbind(self.room_id))
-        share_id = self.get_success(self.store.get_internal_share_id(self.room_id))
-
-        self.nextcloud_client.delete_group.assert_called_once_with(self.group_id)
-        self.assertIsNone(share_id)
-
     def test_bind(self):
         self._bind()
         internal_share_id = self.get_success(
@@ -92,14 +75,10 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self._add_partner_to_room()
         self._bind()
 
-        internal_share_id = self.get_success(
-            self.store.get_internal_share_id(self.room_id)
-        )
         public_link_share_id = self.get_success(
             self.store.get_public_link_share_id(self.room_id)
         )
 
-        self.assertEqual("internal_share_1", internal_share_id)
         self.assertEqual("public_link_share_1", public_link_share_id)
 
     def test_create_group(self):
@@ -222,6 +201,35 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
 
         self.assertEquals(error.value.code, 500)
         self.nextcloud_handler.unbind.assert_called_once_with(self.room_id)
+
+    def test_unbind(self):
+        self._bind()
+        self.get_success(self.nextcloud_handler.unbind(self.room_id))
+
+        internal_share_id = self.get_success(self.store.get_internal_share_id(self.room_id))
+
+        self.nextcloud_client.delete_group.assert_called_once_with(self.group_id)
+        self.assertIsNone(internal_share_id)
+
+    def test_unbind_with_partner_in_room(self):
+        self._add_partner_to_room()
+        self._bind()
+        self.get_success(self.nextcloud_handler.unbind(self.room_id))
+
+        public_link_share_id = self.get_success(self.store.get_public_link_share_id(self.room_id))
+
+        self.nextcloud_client.delete_group.assert_called_once_with(self.group_id)
+        self.assertIsNone(public_link_share_id)
+
+    def test_unbind_with_unexisting_group(self):
+        self.nextcloud_client.delete_group = AsyncMock(
+            side_effect=NextcloudError(code=101, msg="")
+        )
+        self.get_success(self.nextcloud_handler.unbind(self.room_id))
+        share_id = self.get_success(self.store.get_internal_share_id(self.room_id))
+
+        self.nextcloud_client.delete_group.assert_called_once_with(self.group_id)
+        self.assertIsNone(share_id)
 
     def test_update_existing_group_on_invite_membership(self):
         self.get_success(
