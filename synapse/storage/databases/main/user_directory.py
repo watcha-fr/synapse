@@ -811,10 +811,6 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                             "user_id": <user_id>,
                             "display_name": <display_name>,
                             "avatar_url": <avatar_url>
-                            # watcha+
-                            "is_partner": 1 or 0
-                            "presence": "invited", "offline" or "online"
-                            # +watcha
                         }
                     ]
                 }
@@ -934,70 +930,53 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             args = join_args + (search_query,) + ordering_arguments + (limit + 1,)
             !watcha'''
             # watcha+
-            # TODO: change for PostgreSql
-
-            logger.info("Searching with search term: %s" % repr(search_term))
-            where_clause = """ AND (display_name LIKE ? OR t.address LIKE ? )"""
-
             sql = """
                 SELECT
-                    u.name as user_id
-                    , u.deactivated
-                    , u.is_partner
-                    , d.display_name
-                    , d.avatar_url
-                    , p.state as presence
-                    , t.address as email
-                FROM users AS u
-                LEFT OUTER JOIN
-                    (SELECT
-                        t.user_id
-                        , t.address
-                    FROM user_threepids AS t
-                    WHERE t.medium = 'email') AS t
-                    ON t.user_id = u.name
-                LEFT OUTER JOIN user_directory AS d ON d.user_id = u.name
-                LEFT OUTER JOIN presence_stream AS p ON p.user_id = u.name
-                WHERE u.is_partner = 0
-                    AND u.deactivated = 0
-                    %s
-
-                UNION ALL
-
-                SELECT DISTINCT
-                    u.name as user_id
-                    , u.deactivated
-                    , u.is_partner
-                    , d.display_name
-                    , d.avatar_url
-                    , coalesce(p.state, "invited") as presence
-                    , t.address as email
-                FROM users AS u
-                INNER JOIN partners_invitations AS pib
-                    ON pib.user_id = u.name AND pib.invited_by = ?
-                LEFT OUTER JOIN
-                    (SELECT
-                        t.user_id
-                        , t.medium
-                        , t.address
-                    FROM user_threepids AS t
-                    WHERE t.medium = 'email') AS t
-                    ON t.user_id = u.name
-                LEFT OUTER JOIN user_directory AS d ON d.user_id = u.name
-                LEFT OUTER JOIN presence_stream AS p ON p.user_id = u.name
-                WHERE u.is_partner = 1
-                    AND u.deactivated = 0
-                    %s
-            """ % (
-                where_clause,
-                where_clause,
-            )
-            args = (
-                ["%" + search_term + "%"] * 2
-                + [user_id]
-                + ["%" + search_term + "%"] * 2
-            )
-            logger.debug(sql)
+                    ud.user_id,
+                    ud.display_name,
+                    ud.avatar_url,
+                    tpid.address AS email
+                FROM
+                    user_directory AS ud
+                    LEFT OUTER JOIN
+                        (
+                            SELECT
+                                user_id,
+                                address
+                            FROM
+                                user_threepids
+                            WHERE
+                                medium = 'email'
+                        )
+                        AS tpid
+                        ON ud.user_id = tpid.user_id
+                    LEFT OUTER JOIN
+                        (
+                            SELECT
+                                name,
+                                is_partner
+                            FROM
+                                users
+                        )
+                        as users
+                        ON ud.user_id = users.name
+                    LEFT OUTER JOIN
+                        partners_invitations AS pi
+                        ON ud.user_id = pi.user_id
+                WHERE
+                    (
+                        display_name LIKE ?
+                        OR address LIKE ?
+                    )
+                    AND
+                    (
+                        is_partner = 0
+                        OR invited_by = ?
+                    )
+                LIMIT ?
+            """
+            search_term = f"%{search_term}%"
+            args = (search_term, search_term, user_id, limit + 1)
             # +watcha
         else:
             # This should be unreachable.
