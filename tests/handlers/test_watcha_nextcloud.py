@@ -162,8 +162,18 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.nextcloud_client.unshare.assert_not_called()
         self.nextcloud_client.create_internal_share.assert_called_once()
 
+    def test_overwrite_existing_internal_share(self):
+        self._bind()
+        self.get_success(
+            self.nextcloud_handler.create_internal_share(
+                self.creator, self.room_id, "/new_folder"
+            )
+        )
+
+        self.nextcloud_client.unshare.assert_called_once()
+        self.nextcloud_client.create_internal_share.assert_called_once()
+
     def test_create_internal_share_with_unexisting_folder(self):
-        old_share_id = self.get_success(self.store.get_internal_share_id(self.room_id))
         self.nextcloud_client.create_internal_share = AsyncMock(
             side_effect=NextcloudError(code=404, msg="")
         )
@@ -183,7 +193,6 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.nextcloud_handler.unbind.assert_called_once()
 
     def test_create_internal_share_with_other_exceptions(self):
-        old_share_id = self.get_success(self.store.get_internal_share_id(self.room_id))
         self.nextcloud_client.create_internal_share = AsyncMock(
             side_effect=NextcloudError(code=400, msg="")
         )
@@ -201,6 +210,66 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
 
         self.assertEquals(error.value.code, 500)
         self.nextcloud_handler.unbind.assert_called_once_with(self.room_id)
+
+    def test_create_public_link_share(self):
+        self.get_success(
+            self.nextcloud_handler.create_public_link_share(
+                self.creator, self.room_id, "/new_folder"
+            )
+        )
+
+        self.nextcloud_client.unshare.assert_not_called()
+        self.nextcloud_client.create_public_link_share.assert_called_once()
+
+    def test_overwrite_existing_public_link_share(self):
+        self._add_partner_to_room()
+        self._bind()
+        self.get_success(
+            self.nextcloud_handler.create_public_link_share(
+                self.creator, self.room_id, "/new_folder"
+            )
+        )
+
+        self.nextcloud_client.unshare.assert_called_once()
+        self.nextcloud_client.create_public_link_share.assert_called_once()
+
+    def test_create_public_link_share_with_unexisting_folder(self):
+        self.nextcloud_client.create_public_link_share = AsyncMock(
+            side_effect=NextcloudError(code=404, msg="")
+        )
+        self.nextcloud_client.unshare = AsyncMock(
+            side_effect=NextcloudError(code=404, msg="")
+        )
+        self.nextcloud_handler.unbind = AsyncMock()
+
+        error = self.get_failure(
+            self.nextcloud_handler.create_public_link_share(
+                self.creator, self.room_id, "/new_folder"
+            ),
+            SynapseError,
+        )
+
+        self.assertEquals(error.value.code, 404)
+        self.nextcloud_handler.unbind.assert_not_called()
+
+    def test_create_public_link_share_with_other_exceptions(self):
+        self.nextcloud_client.create_public_link_share = AsyncMock(
+            side_effect=NextcloudError(code=400, msg="")
+        )
+        self.nextcloud_client.unshare = AsyncMock(
+            side_effect=NextcloudError(code=404, msg="")
+        )
+        self.nextcloud_handler.unbind = AsyncMock()
+
+        error = self.get_failure(
+            self.nextcloud_handler.create_public_link_share(
+                self.creator, self.room_id, "/new_folder"
+            ),
+            SynapseError,
+        )
+
+        self.assertEquals(error.value.code, 500)
+        self.nextcloud_handler.unbind.assert_not_called()
 
     def test_unbind(self):
         self._bind()

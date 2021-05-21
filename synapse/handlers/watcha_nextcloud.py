@@ -50,7 +50,9 @@ class NextcloudHandler(BaseHandler):
         """
         members = await self.store.get_users_in_room(room_id)
         partner_members = await self.store.get_partners_in_room(room_id)
-        internal_members = [member for member in members if member not in partner_members]
+        internal_members = [
+            member for member in members if member not in partner_members
+        ]
 
         await self.create_group(room_id)
         await self.add_internal_members_to_group(room_id, internal_members)
@@ -126,7 +128,9 @@ class NextcloudHandler(BaseHandler):
                 )
             )
 
-    async def add_internal_members_to_group(self, room_id: str, internal_members: List[str]):
+    async def add_internal_members_to_group(
+        self, room_id: str, internal_members: List[str]
+    ):
         """Add internal room members to a Nextcloud group.
 
         Args:
@@ -215,7 +219,9 @@ class NextcloudHandler(BaseHandler):
 
         await self.store.register_internal_share(room_id, new_share_id)
 
-    async def create_public_link_share(self, requester_id: str, room_id: str, path: str):
+    async def create_public_link_share(
+        self, requester_id: str, room_id: str, path: str
+    ):
         """Create a public link share on folder for partners in room.
         Before that, delete old existing public link share if it exist.
 
@@ -242,11 +248,14 @@ class NextcloudHandler(BaseHandler):
                 )
 
         try:
-            new_share_id, public_link_url = await self.nextcloud_client.create_public_link_share(
-                nextcloud_username, path,
+            (
+                new_share_id,
+                public_link_url,
+            ) = await self.nextcloud_client.create_public_link_share(
+                nextcloud_username,
+                path,
             )
         except NEXTCLOUD_CLIENT_ERRORS as error:
-            await self.unbind(room_id)
             # raise 404 error if folder to share do not exist
             http_code = (
                 error.code
