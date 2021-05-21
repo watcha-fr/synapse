@@ -19,9 +19,10 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
-        self.nextcloud_handler = hs.get_nextcloud_handler()
-        self.keycloak_client = self.nextcloud_handler.keycloak_client
-        self.nextcloud_client = self.nextcloud_handler.nextcloud_client
+        self.nextcloud_bind_handler = hs.get_nextcloud_bind_handler()
+        self.nextcloud_group_handler = hs.get_nextcloud_group_handler()
+        self.keycloak_client = hs.get_keycloak_client()
+        self.nextcloud_client = hs.get_nextcloud_client()
 
         self.creator = self.register_user("creator", "pass")
         self.creator_tok = self.login("creator", "pass")
@@ -30,8 +31,8 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         self.room_id = self.helper.create_room_as(self.creator, tok=self.creator_tok)
         self.get_success(self.store.register_internal_share(self.room_id, 1))
 
-        self.nextcloud_handler.bind = AsyncMock()
-        self.nextcloud_handler.unbind = AsyncMock()
+        self.nextcloud_bind_handler.bind = AsyncMock()
+        self.nextcloud_bind_handler.unbind = AsyncMock()
         self.nextcloud_directory_url = (
             "https://test/nextcloud/apps/files/?dir=/directory"
         )
@@ -57,7 +58,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
             {"nextcloudShare": self.nextcloud_directory_url}
         )
 
-        self.assertTrue(self.nextcloud_handler.bind.called)
+        self.assertTrue(self.nextcloud_bind_handler.bind.called)
         self.assertEquals(200, channel.code)
 
     def test_delete_existing_room_nextcloud_mapping(self):
@@ -66,8 +67,8 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         )
         channel = self.send_room_nextcloud_mapping_event({"nextcloudShare": ""})
 
-        self.assertTrue(self.nextcloud_handler.bind.called)
-        self.assertTrue(self.nextcloud_handler.unbind.called)
+        self.assertTrue(self.nextcloud_bind_handler.bind.called)
+        self.assertTrue(self.nextcloud_bind_handler.unbind.called)
         self.assertEquals(200, channel.code)
 
     def test_update_existing_room_nextcloud_mapping(self):
@@ -78,7 +79,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
             {"nextcloudShare": "https://test/nextcloud/apps/files/?dir=/directory2"}
         )
 
-        self.assertTrue(self.nextcloud_handler.bind.called)
+        self.assertTrue(self.nextcloud_bind_handler.bind.called)
         self.assertEquals(200, channel.code)
 
     def test_create_new_room_nextcloud_mapping_without_nextcloudShare_attribute(self):
@@ -86,7 +87,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
             {"nextcloud": self.nextcloud_directory_url}
         )
 
-        self.assertFalse(self.nextcloud_handler.bind.called)
+        self.assertFalse(self.nextcloud_bind_handler.bind.called)
         self.assertEquals(200, channel.code)
 
     def test_create_new_room_nextcloud_mapping_with_wrong_url(self):
@@ -94,7 +95,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
             {"nextcloudShare": "https://test/nextcloud/apps/files/?file=brandbook.pdf"}
         )
 
-        self.assertFalse(self.nextcloud_handler.bind.called)
+        self.assertFalse(self.nextcloud_bind_handler.bind.called)
         self.assertRaises(SynapseError)
         self.assertEquals(400, channel.code)
 
@@ -141,15 +142,8 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         self.nextcloud_client.remove_user_from_group.assert_called_once()
         self.assertEqual(200, channel.code)
 
-    def test_update_nextcloud_share_with_an_unmapped_room(self):
-        self.nextcloud_handler.update_existing_nextcloud_share_for_user = AsyncMock()
-        room_id = self.helper.create_room_as(self.creator, tok=self.creator_tok)
-        self.helper.invite(room_id, self.creator, self.inviter, tok=self.creator_tok)
-
-        self.nextcloud_handler.update_existing_nextcloud_share_for_user.assert_not_called()
-
     def test_update_group_displayname_on_event_type_name(self):
-        self.nextcloud_handler.set_group_displayname = AsyncMock()
+        self.nextcloud_group_handler.set_group_display_name = AsyncMock()
         self.helper.send_state(
             self.room_id,
             "m.room.name",
@@ -157,10 +151,11 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
             tok=self.creator_tok,
         )
 
-        group_id = self.get_success(self.nextcloud_handler.build_group_id(self.room_id))
-        group_displayname = self.get_success(
-            self.nextcloud_handler.build_group_displayname(self.room_id)
+        group_id = self.get_success(self.nextcloud_group_handler.build_group_id(self.room_id))
+        group_display_name = self.get_success(
+            self.nextcloud_group_handler.build_group_display_name(self.room_id)
         )
-        self.nextcloud_handler.set_group_displayname.assert_called_once_with(
-            group_id, group_displayname
+
+        self.nextcloud_group_handler.set_group_display_name.assert_called_once_with(
+            group_id, group_display_name
         )

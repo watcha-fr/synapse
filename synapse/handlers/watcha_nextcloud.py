@@ -1,7 +1,7 @@
 import logging
 
 from jsonschema.exceptions import SchemaError, ValidationError
-from typing import List
+from typing import List, TYPE_CHECKING
 
 from synapse.api.errors import (
     Codes,
@@ -11,14 +11,15 @@ from synapse.api.errors import (
 )
 from synapse.logging.utils import build_log_message
 
-from ._base import BaseHandler
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 # echo -n watcha | md5sum  | head -c 10
 NEXTCLOUD_GROUP_ID_PREFIX = "c4d96a06b7_"
 # Nextcloud does not allow group id longer than 64 characters
-NEXTCLOUD_GROUP_ID_LENGHT_LIMIT = 64
+NEXTCLOUD_GROUP_ID_LENGHT_LIMIT: int = 64
 NEXTCLOUD_CLIENT_ERRORS = (
     NextcloudError,
     SchemaError,
@@ -27,14 +28,12 @@ NEXTCLOUD_CLIENT_ERRORS = (
 )
 
 
-class NextcloudHandler(BaseHandler):
-    def __init__(self, hs: "Homeserver"):
-        self.store = hs.get_datastore()
-        self.administration_handler = hs.get_administration_handler()
-        self.event_creation_handler = hs.get_event_creation_handler()
-        self.group_displayname_prefix = hs.config.nextcloud_group_displayname_prefix
-        self.keycloak_client = hs.get_keycloak_client()
+class NextcloudBindHandler:
+    def __init__(self, hs: "HomeServer"):
         self.nextcloud_client = hs.get_nextcloud_client()
+        self.nextcloud_group_handler = hs.get_nextcloud_group_handler()
+        self.nextcloud_share_handler = hs.get_nextcloud_share_handler()
+        self.store = hs.get_datastore()
 
     async def bind(self, requester_id: str, room_id: str, path: str):
         """Bind a Nextcloud folder with a room in four steps :
@@ -54,21 +53,51 @@ class NextcloudHandler(BaseHandler):
             member for member in members if member not in partner_members
         ]
 
-        await self.create_group(room_id)
-        await self.add_internal_members_to_group(room_id, internal_members)
-        await self.create_internal_share(requester_id, room_id, path)
+        await self.nextcloud_group_handler.create_group(room_id)
+        await self.nextcloud_group_handler.add_internal_members_to_group(
+            room_id, internal_members
+        )
+        await self.nextcloud_share_handler.create_internal_share(
+            requester_id, room_id, path
+        )
 
         if partner_members:
-            await self.create_public_link_share(requester_id, room_id, path)
+            await self.nextcloud_share_handler.create_public_link_share(
+                requester_id, room_id, path
+            )
+
+    async def unbind(self, room_id: str):
+        """Unbind a Nextcloud folder from a room.
+
+        Args :
+            room_id: the id of the room to bind
+        """
+        group_id = await self.nextcloud_group_handler.build_group_id(room_id)
+        try:
+            await self.nextcloud_client.delete_group(group_id)
+        except NEXTCLOUD_CLIENT_ERRORS as error:
+            logger.error(
+                build_log_message(log_vars={"group_id": group_id, "error": error})
+            )
+
+        await self.store.delete_all_shares(room_id)
+
+
+class NextcloudGroupHandler:
+    def __init__(self, hs: "HomeServer"):
+        self.administration_handler = hs.get_administration_handler()
+        self.group_display_name_prefix = hs.config.nextcloud_group_display_name_prefix
+        self.nextcloud_client = hs.get_nextcloud_client()
+        self.store = hs.get_datastore()
 
     async def create_group(self, room_id: str):
-        """Create a Nextcloud group with specific id and displayname.
+        """Create a Nextcloud group with specific id and display name.
 
         Args:
             room_id: the id of the room
         """
         group_id = await self.build_group_id(room_id)
-        group_displayname = await self.build_group_displayname(room_id)
+        group_display_name = await self.build_group_display_name(room_id)
 
         try:
             await self.nextcloud_client.add_group(group_id)
@@ -78,7 +107,7 @@ class NextcloudHandler(BaseHandler):
                 log_vars={"group_id": group_id, "error": error}
             )
             if isinstance(error, NextcloudError) and error.code == 102:
-                logger.warn(log_message)
+                logger.warning(log_message)
             else:
                 raise SynapseError(
                     500,
@@ -86,9 +115,10 @@ class NextcloudHandler(BaseHandler):
                     Codes.NEXTCLOUD_CAN_NOT_CREATE_GROUP,
                 )
 
-        await self.set_group_displayname(group_id, group_displayname)
+        await self.set_group_display_name(group_id, group_display_name)
 
-    async def build_group_id(self, room_id: str):
+    @staticmethod
+    async def build_group_id(room_id: str):
         """Build the Nextcloud group id corresponding to an association of a pattern and room id
 
         Args:
@@ -97,32 +127,32 @@ class NextcloudHandler(BaseHandler):
         group_id = NEXTCLOUD_GROUP_ID_PREFIX + room_id
         return group_id[:NEXTCLOUD_GROUP_ID_LENGHT_LIMIT]
 
-    async def build_group_displayname(self, room_id):
+    async def build_group_display_name(self, room_id):
         """Build the Nextcloud group name corresponding to an association of a pattern and room name
 
         Args:
             room_id: the id of the room
         """
         room_name = await self.administration_handler.calculate_room_name(room_id)
-        return f"{self.group_displayname_prefix} {room_name}"
+        return f"{self.group_display_name_prefix} {room_name}"
 
-    async def set_group_displayname(self, group_id: str, group_displayname: str):
-        """Set the displayname of a Nextcloud group
+    async def set_group_display_name(self, group_id: str, group_display_name: str):
+        """Set the display name of a Nextcloud group
 
         Args:
             group_id: the id of group
-            group_displayname: the displayname of the group
+            group_display_name: the display name of the group
         """
         try:
-            await self.nextcloud_client.set_group_displayname(
-                group_id, group_displayname
+            await self.nextcloud_client.set_group_display_name(
+                group_id, group_display_name
             )
         except NEXTCLOUD_CLIENT_ERRORS as error:
-            logger.warn(
+            logger.warning(
                 build_log_message(
                     log_vars={
                         "group_id": group_id,
-                        "group_displayname": group_displayname,
+                        "group_display_name": group_display_name,
                         "error": error,
                     }
                 )
@@ -165,6 +195,51 @@ class NextcloudHandler(BaseHandler):
                         Codes.NEXTCLOUD_CAN_NOT_ADD_MEMBERS_TO_GROUP,
                     )
 
+    async def update_group(self, user_id: str, room_id: str, membership: str):
+        """Update a Nextcloud group by adding or removing users.
+        If membership is 'join' or 'invite', the user is add to the Nextcloud group inferred from the room.
+        Else, the users is removed from the group.
+
+        Args:
+            user_id: mxid of the user concerned by the membership event
+            room_id: the id of the room where the membership event was sent
+            membership: membership event. Can be 'invite', 'join', 'kick' or 'leave'
+        """
+        group_id = await self.build_group_id(room_id)
+        nextcloud_username = await self.store.get_username(user_id)
+
+        log_vars = {
+            "user_id": user_id,
+            "room_id": room_id,
+            "membership": membership,
+            "nextcloud_username": nextcloud_username,
+            "group_id": group_id,
+        }
+        if membership in ("invite", "join"):
+            try:
+                await self.nextcloud_client.add_user_to_group(
+                    nextcloud_username, group_id
+                )
+            except NEXTCLOUD_CLIENT_ERRORS as error:
+                log_vars["error"] = error
+                logger.warning(build_log_message(log_vars=log_vars))
+        else:
+            try:
+                await self.nextcloud_client.remove_user_from_group(
+                    nextcloud_username, group_id
+                )
+            except NEXTCLOUD_CLIENT_ERRORS as error:
+                log_vars["error"] = error
+                logger.warning(build_log_message(log_vars=log_vars))
+
+
+class NextcloudShareHandler:
+    def __init__(self, hs: "HomeServer"):
+        self.hs = hs
+        self.nextcloud_client = hs.get_nextcloud_client()
+        self.nextcloud_group_handler = hs.get_nextcloud_group_handler()
+        self.store = hs.get_datastore()
+
     async def create_internal_share(self, requester_id: str, room_id: str, path: str):
         """Create a internal share on folder for a specific Nextcloud group.
         Before that, delete old existing internal share for this group if it exist.
@@ -174,7 +249,7 @@ class NextcloudHandler(BaseHandler):
             room_id: the id of the room to bind.
             path: the path of the Nextcloud folder to bind.
         """
-        group_id = await self.build_group_id(room_id)
+        group_id = await self.nextcloud_group_handler.build_group_id(room_id)
         nextcloud_username = await self.store.get_username(requester_id)
 
         old_share_id = await self.store.get_internal_share_id(room_id)
@@ -197,7 +272,7 @@ class NextcloudHandler(BaseHandler):
                 nextcloud_username, path, group_id
             )
         except NEXTCLOUD_CLIENT_ERRORS as error:
-            await self.unbind(room_id)
+            await self.hs.get_nextcloud_bind_handler().unbind(room_id)
             # raise 404 error if folder to share do not exist
             http_code = (
                 error.code
@@ -275,56 +350,3 @@ class NextcloudHandler(BaseHandler):
             )
 
         await self.store.register_public_link_share(room_id, new_share_id)
-
-    async def unbind(self, room_id: str):
-        """Unbind a Nextcloud folder from a room.
-
-        Args :
-            room_id: the id of the room to bind
-        """
-        group_id = await self.build_group_id(room_id)
-        try:
-            await self.nextcloud_client.delete_group(group_id)
-        except NEXTCLOUD_CLIENT_ERRORS as error:
-            logger.error(
-                build_log_message(log_vars={"group_id": group_id, "error": error})
-            )
-
-        await self.store.delete_all_shares(room_id)
-
-    async def update_group(self, user_id: str, room_id: str, membership: str):
-        """Update a Nextcloud group by adding or removing users.
-        If membership is 'join' or 'invite', the user is add to the Nextcloud group infered from the room.
-        Else, the users is removed from the group.
-
-        Args:
-            user_id: mxid of the user concerned by the membership event
-            room_id: the id of the room where the membership event was sent
-            membership: membership event. Can be 'invite', 'join', 'kick' or 'leave'
-        """
-        group_id = await self.build_group_id(room_id)
-        nextcloud_username = await self.store.get_username(user_id)
-
-        log_vars = {
-            "user_id": user_id,
-            "room_id": room_id,
-            "membership": membership,
-            "nextcloud_username": nextcloud_username,
-            "group_id": group_id,
-        }
-        if membership in ("invite", "join"):
-            try:
-                await self.nextcloud_client.add_user_to_group(
-                    nextcloud_username, group_id
-                )
-            except NEXTCLOUD_CLIENT_ERRORS as error:
-                log_vars["error"] = error
-                logger.warn(build_log_message(log_vars=log_vars))
-        else:
-            try:
-                await self.nextcloud_client.remove_user_from_group(
-                    nextcloud_username, group_id
-                )
-            except NEXTCLOUD_CLIENT_ERRORS as error:
-                log_vars["error"] = error
-                logger.warn(build_log_message(log_vars=log_vars))

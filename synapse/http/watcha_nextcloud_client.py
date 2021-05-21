@@ -172,13 +172,13 @@ class NextcloudClient(SimpleHttpClient):
         validate(response, WITHOUT_DATA_SCHEMA)
         self._raise_for_status(response["ocs"]["meta"])
 
-    async def set_group_displayname(self, group_id: str, displayname: str):
+    async def set_group_display_name(self, group_id: str, display_name: str):
         """Set the displayname of a Nextcloud group
         This function is not set in the Nextcloud API documentation
 
         Args:
             group_id: id of the Nextcloud group
-            displayname: value of the displayname to set
+            display_name: value of the display name to set
 
         Status codes:
             100: successful
@@ -187,7 +187,7 @@ class NextcloudClient(SimpleHttpClient):
         """
         response = await self.put_json(
             uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/groups/{group_id}",
-            json_body={"key": "displayname", "value": displayname},
+            json_body={"key": "displayname", "value": display_name},
             headers=self._headers,
         )
 

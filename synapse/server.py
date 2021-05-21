@@ -143,9 +143,14 @@ from synapse.util.stringutils import random_string
 # watcha+
 from synapse.handlers.watcha_administration import AdministrationHandler
 from synapse.handlers.watcha_partner import PartnerHandler
-from synapse.handlers.watcha_nextcloud import NextcloudHandler
+from synapse.handlers.watcha_nextcloud import (
+    NextcloudBindHandler,
+    NextcloudGroupHandler,
+    NextcloudShareHandler,
+)
 from synapse.http.watcha_keycloak_client import KeycloakClient
 from synapse.http.watcha_nextcloud_client import NextcloudClient
+
 # +watcha
 
 logger = logging.getLogger(__name__)
@@ -799,7 +804,7 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_keycloak_client(self) -> KeycloakClient:
         return KeycloakClient(self)
-    
+
     @cache_in_self
     def get_nextcloud_client(self) -> NextcloudClient:
         return NextcloudClient(self)
@@ -814,7 +819,15 @@ class HomeServer(metaclass=abc.ABCMeta):
         return PartnerHandler(self)
 
     @cache_in_self
-    def get_nextcloud_handler(self) -> NextcloudHandler:
-        return NextcloudHandler(self)
+    def get_nextcloud_bind_handler(self) -> NextcloudBindHandler:
+        return NextcloudBindHandler(self)
+
+    @cache_in_self
+    def get_nextcloud_group_handler(self) -> NextcloudGroupHandler:
+        return NextcloudGroupHandler(self)
+
+    @cache_in_self
+    def get_nextcloud_share_handler(self) -> NextcloudShareHandler:
+        return NextcloudShareHandler(self)
 
     # +watcha

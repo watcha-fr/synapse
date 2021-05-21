@@ -52,7 +52,6 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
         self.time = hs.get_clock().time_msec()
 
         self.auth = hs.get_auth_handler()
-        self.nextcloud_handler = hs.get_nextcloud_handler()
 
         self.owner = self.register_user("owner", "pass")
         self.owner_tok = self.login("owner", "pass")
@@ -77,7 +76,7 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
 
         self.room_id = self.helper.create_room_as(self.owner, tok=self.owner_tok)
 
-        self.keycloak_client = self.nextcloud_handler.keycloak_client
+        self.keycloak_client = hs.get_keycloak_client()
 
         response = AsyncMock()
         response.headers.getRawHeaders = mock_getRawHeaders(
