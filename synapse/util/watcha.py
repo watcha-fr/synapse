@@ -1,24 +1,22 @@
-import os
-import secrets as crypto
-import sys
+from math import ceil, log2
+import secrets
+import string
 import unicodedata
-
-import pkg_resources
 
 
 class Secrets:
-    def __init__(self, word_list_filename):
-        self.word_list_filename = word_list_filename
+    # https://fr.wikipedia.org/wiki/Ascii85#Version_ZeroMQ_(Z85)
+    alphabet = string.ascii_letters + string.digits + ".-:+=^!/*?&<>()[]{}@%$#"
+    min_entropy = 128
 
-    def _get_words(self):
-        word_list_dir = pkg_resources.resource_filename(
-            "synapse", "res/watcha_word_lists"
-        )
-        word_list_path = os.path.join(word_list_dir, self.word_list_filename)
-        with open(word_list_path) as f:
-            return [word.strip() for word in f]
+    def __init__(self, alphabet: str = None, min_entropy: int = None):
+        if alphabet is not None:
+            self.alphabet = unicodedata.normalize("NFKC", alphabet)
 
-    def passphrase(self, nwords=4):
-        words = self._get_words()
-        passphrase = " ".join(crypto.choice(words) for i in range(nwords))
-        return unicodedata.normalize("NFKC", passphrase)
+        if min_entropy is not None:
+            self.min_entropy = min_entropy
+
+    def gen_password(self) -> str:
+        alphabet_length = len(self.alphabet)
+        password_length = ceil(self.min_entropy / log2(alphabet_length))
+        return "".join(secrets.choice(self.alphabet) for i in range(password_length))
