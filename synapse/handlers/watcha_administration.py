@@ -102,7 +102,7 @@ class AdministrationHandler(BaseHandler):
 
         await self.store.update_user_role(user_id, target_role)
 
-        return role
+        return target_role
 
     async def get_user_role(self, user_id):
         """Retrieve user role [administrator|collaborator|partner]
