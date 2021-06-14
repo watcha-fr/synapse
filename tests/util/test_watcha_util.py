@@ -1,10 +1,11 @@
 import synapse.rest.admin
 from synapse.rest.client.v1 import login, room
+from synapse.util.watcha import calculate_room_name
 
 from tests import unittest
 
 
-class AdministrationTestCase(unittest.HomeserverTestCase):
+class UtilTestCase(unittest.HomeserverTestCase):
 
     servlets = [
         synapse.rest.admin.register_servlets,
@@ -13,6 +14,7 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
+        self.hs = hs
         self.administration_handler = hs.get_administration_handler()
 
         self.creator = self.register_user("creator", "pass")
@@ -29,9 +31,7 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
             tok=self.creator_tok,
         )
 
-        room_name = self.get_success(
-            self.administration_handler.calculate_room_name(self.room_id)
-        )
+        room_name = self.get_success(calculate_room_name(self.hs, self.room_id))
 
         self.assertEquals(room_name, expected_room_name)
 
@@ -43,16 +43,12 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
             tok=self.creator_tok,
         )
 
-        room_name = self.get_success(
-            self.administration_handler.calculate_room_name(self.room_id)
-        )
+        room_name = self.get_success(calculate_room_name(self.hs, self.room_id))
 
         self.assertEquals(room_name, "creator")
 
     def test_get_unspecified_room_name_with_one_member(self):
-        room_name = self.get_success(
-            self.administration_handler.calculate_room_name(self.room_id)
-        )
+        room_name = self.get_success(calculate_room_name(self.hs, self.room_id))
 
         self.assertEquals(room_name, "creator")
 
@@ -60,9 +56,7 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
         self.helper.invite(
             self.room_id, self.creator, self.second_user, tok=self.creator_tok
         )
-        room_name = self.get_success(
-            self.administration_handler.calculate_room_name(self.room_id)
-        )
+        room_name = self.get_success(calculate_room_name(self.hs, self.room_id))
 
         self.assertEquals(room_name, "creator and second_user")
 
@@ -72,16 +66,12 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
             self.room_id, self.creator, self.second_user, tok=self.creator_tok
         )
         self.helper.invite(self.room_id, self.creator, third_user, tok=self.creator_tok)
-        room_name = self.get_success(
-            self.administration_handler.calculate_room_name(self.room_id)
-        )
+        room_name = self.get_success(calculate_room_name(self.hs, self.room_id))
 
         self.assertEquals(room_name, "creator and 2 others")
 
     def test_get_unspecified_room_name_with_empty_room(self):
         self.helper.leave(self.room_id, self.creator, tok=self.creator_tok)
-        room_name = self.get_success(
-            self.administration_handler.calculate_room_name(self.room_id)
-        )
+        room_name = self.get_success(calculate_room_name(self.hs, self.room_id))
 
         self.assertEquals(room_name, "nobody")
