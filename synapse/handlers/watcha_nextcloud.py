@@ -9,6 +9,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.logging.utils import build_log_message
+from synapse.util.watcha import calculate_room_name
 
 from ._base import BaseHandler
 
@@ -28,6 +29,7 @@ NEXTCLOUD_CLIENT_ERRORS = (
 
 class NextcloudHandler(BaseHandler):
     def __init__(self, hs: "Homeserver"):
+        self.hs = hs
         self.store = hs.get_datastore()
         self.administration_handler = hs.get_administration_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -92,7 +94,7 @@ class NextcloudHandler(BaseHandler):
         Args:
             room_id: the id of the room
         """
-        room_name = await self.administration_handler.calculate_room_name(room_id)
+        room_name = await calculate_room_name(self.hs, room_id)
         return f"{self.group_displayname_prefix} {room_name}"
 
     async def set_group_displayname(self, group_id: str, group_displayname: str):
