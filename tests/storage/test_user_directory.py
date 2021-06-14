@@ -72,156 +72,133 @@ class UserDirectoryStoreTestCase(HomeserverTestCase):
         )
 
     # watcha+
-    test_search_user_dir.skip = (
-        "Disabled for watcha because of user directory modification for partners"
-    )
-    test_search_user_dir_all_users.skip = (
-        "Disabled for watcha because of user directory modification for partners"
-    )
-    test_search_user_dir_stop_words.skip = (
-        "Disabled for watcha because of user directory modification for partners"
-    )
-
-    def test_search_user_dir_for_watcha(self):
-        # This only tests that it's not crashing :) after our motifs.
-        # There should be more tests !
-        r = self.get_success(self.store.search_user_dir(ALICE, "bob", 10))
-        self.assertFalse(r["limited"])
-        self.assertEqual(0, len(r["results"]))
-
+    skip_reason = "[watcha] reason: user directory modifications for partners & 3pids"
+    test_search_user_dir.skip = skip_reason
+    test_search_user_dir_all_users.skip = skip_reason
+    test_search_user_dir_stop_words.skip = skip_reason
     # +watcha
 
 
 # watcha+
+USER = "@user:test"
+USER_X = "@user_x:test"
+USER_Y = "@user_y:test"
+PARTNER = "@partner:test"
+
+
 class WatchaUserDirectoryStoreTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
+        self.registration_handler = self.hs.get_registration_handler()
         self.store = hs.get_datastore()
-        self.user_id = "@user:test"
-        self.searched_user = "@searched_user:test"
-        self.partner_id = "@partner:test"
         self.time = int(hs.get_clock().time_msec())
 
-        # Register a user who want to see other user on the user_directory :
         self.get_success(
-            self.store.register_user(
-                self.user_id, password_hash=None, create_profile_with_displayname=None
+            self.registration_handler.register_user(
+                localpart="user_x",
+                default_display_name="user_x",
+                bind_emails=["user_x@example.com"],
             )
         )
 
-        # Register an active user who @user:test want to see :
         self.get_success(
-            self.store.register_user(
-                self.searched_user,
-                password_hash=None,
-                create_profile_with_displayname=None,
+            self.registration_handler.register_user(
+                localpart="user_y",
+                default_display_name="user_y",
+                bind_emails=["user_y@example.com"],
             )
         )
 
-        # Register an active external partner :
         self.get_success(
-            self.store.register_user(
-                self.partner_id,
-                password_hash=None,
+            self.registration_handler.register_user(
+                localpart="partner",
+                default_display_name="partner",
+                bind_emails=["partner@external.com"],
                 make_partner=True,
-                create_profile_with_displayname=None,
             )
         )
 
-    def test_search_user_dir_with_user_id(self):
-        sqlResult = self.get_success(
-            self.store.search_user_dir(self.user_id, self.searched_user, 1)
-        )
+        self.get_success(self.store.add_partner_invitation(PARTNER, USER))
 
-        self.assertFalse(sqlResult["limited"])
-        self.assertEquals(
-            sqlResult["results"],
-            [],
-        )
-
-    def test_search_user_dir_with_email(self):
+        self.get_success(self.store.update_profile_in_user_dir(USER_X, "user_x", None))
+        self.get_success(self.store.update_profile_in_user_dir(USER_Y, "user_y", None))
         self.get_success(
-            self.store.user_add_threepid(
-                self.searched_user, "email", "example@example.com", self.time, self.time
-            )
-        )
-        sqlResult = self.get_success(
-            self.store.search_user_dir(self.user_id, "example@example.com", 1)
+            self.store.update_profile_in_user_dir(PARTNER, "partner", None)
         )
 
+    @override_config({"user_directory": {"search_all_users": True}})
+    def test_search_user_dir_by_user_id(self):
+        r = self.get_success(self.store.search_user_dir(USER, USER_X, 10))
+        self.assertFalse(r["limited"])
+        self.assertEqual(0, len(r["results"]))
+
+    @override_config({"user_directory": {"search_all_users": True}})
+    def test_search_user_dir_by_displayname(self):
+        r = self.get_success(self.store.search_user_dir(USER, "user", 10))
+        self.assertFalse(r["limited"])
+        self.assertEqual(2, len(r["results"]))
         self.assertEquals(
-            sqlResult["results"],
-            [
-                {
-                    "user_id": self.searched_user,
-                    "deactivated": 0,
-                    "is_partner": 0,
-                    "display_name": None,
-                    "avatar_url": None,
-                    "presence": None,
-                    "email": "example@example.com",
-                }
-            ],
-        )
-
-    def test_search_user_dir_with_displayname(self):
-        self.get_success(
-            self.store.update_profile_in_user_dir(self.searched_user, "user", None)
-        )
-        sqlResult = self.get_success(
-            self.store.search_user_dir(self.user_id, "user", 1)
+            r["results"][0],
+            {
+                "user_id": USER_X,
+                "display_name": "user_x",
+                "avatar_url": None,
+                "email": "user_x@example.com",
+            },
         )
         self.assertEquals(
-            sqlResult["results"],
-            [
-                {
-                    "user_id": self.searched_user,
-                    "deactivated": 0,
-                    "is_partner": 0,
-                    "display_name": "user",
-                    "avatar_url": None,
-                    "presence": None,
-                    "email": None,
-                }
-            ],
+            r["results"][1],
+            {
+                "user_id": USER_Y,
+                "display_name": "user_y",
+                "avatar_url": None,
+                "email": "user_y@example.com",
+            },
         )
 
+    @override_config({"user_directory": {"search_all_users": True}})
+    def test_search_user_dir_by_email(self):
+        r = self.get_success(self.store.search_user_dir(USER, "@example.com", 10))
+        self.assertFalse(r["limited"])
+        self.assertEqual(2, len(r["results"]))
+        self.assertEquals(
+            r["results"][0],
+            {
+                "user_id": USER_X,
+                "display_name": "user_x",
+                "avatar_url": None,
+                "email": "user_x@example.com",
+            },
+        )
+        self.assertEquals(
+            r["results"][1],
+            {
+                "user_id": USER_Y,
+                "display_name": "user_y",
+                "avatar_url": None,
+                "email": "user_y@example.com",
+            },
+        )
+
+    @override_config({"user_directory": {"search_all_users": True}})
     def test_search_user_dir_with_user_invite_partner(self):
-        # User invite partner :
-        self.get_success(
-            self.store.add_partner_invitation(self.partner_id, self.user_id)
-        )
-        self.get_success(
-            self.store.user_add_threepid(
-                self.partner_id, "email", "partner@example.com", self.time, self.time
-            )
-        )
-
-        sqlResult = self.get_success(
-            self.store.search_user_dir(self.user_id, "partner@example.com", 1)
-        )
-
+        r = self.get_success(self.store.search_user_dir(USER, "partner", 10))
+        self.assertFalse(r["limited"])
+        self.assertEqual(1, len(r["results"]))
         self.assertEquals(
-            sqlResult["results"],
-            [
-                {
-                    "user_id": self.partner_id,
-                    "deactivated": 0,
-                    "is_partner": 1,
-                    "display_name": None,
-                    "avatar_url": None,
-                    "presence": "invited",
-                    "email": "partner@example.com",
-                }
-            ],
+            r["results"][0],
+            {
+                "user_id": PARTNER,
+                "display_name": "partner",
+                "avatar_url": None,
+                "email": "partner@external.com",
+            },
         )
 
+    @override_config({"user_directory": {"search_all_users": True}})
     def test_search_user_dir_with_user_dont_invite_partner(self):
-        # User doesn't invite partner but want to see it on the user directory :
-
-        sqlResult = self.get_success(
-            self.store.search_user_dir(self.user_id, self.partner_id, 1)
-        )
-        self.assertEquals(sqlResult["results"], [])
+        r = self.get_success(self.store.search_user_dir(USER_X, "partner", 10))
+        self.assertFalse(r["limited"])
+        self.assertEqual(0, len(r["results"]))
 
 
 # +watcha

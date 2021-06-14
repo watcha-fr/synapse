@@ -20,7 +20,7 @@ class PartnerHandler(BaseHandler):
         self.registration_handler = hs.get_registration_handler()
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
-        self.secrets = Secrets(hs.config.word_list_path)
+        self.secrets = Secrets()
 
         if hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self.mailer = Mailer(
@@ -40,7 +40,7 @@ class PartnerHandler(BaseHandler):
         Returns:
             invitee_id: the mxid of the new partner
         """
-        password = self.secrets.passphrase()
+        password = self.secrets.gen_password()
         password_hash = await self.auth_handler.hash(password)
         response = await self.keycloak_client.add_user(password_hash, invitee_email)
 

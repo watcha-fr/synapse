@@ -142,8 +142,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             batch_size (int): Maximum number of state events to process
                 per cycle.
         """
-        state = self.hs.get_state_handler()
-
         # If we don't have progress filed, delete everything.
         if not progress:
             await self.delete_all_from_user_dir()
@@ -197,7 +195,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                     room_id
                 )
 
-                users_with_profile = await state.get_current_users_in_room(room_id)
+                users_with_profile = await self.get_users_in_room_with_profiles(room_id)
                 user_ids = set(users_with_profile)
 
                 # Update each user in the user directory.
@@ -470,83 +468,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             "update_profile_in_user_dir", _update_profile_in_user_dir_txn
         )
 
-    # watcha+
-    def remove_from_user_dir(self, user_id):
-        def _remove_from_user_dir_txn(txn):
-            self._simple_delete_txn(
-                txn, table="user_directory", keyvalues={"user_id": user_id}
-            )
-            self._simple_delete_txn(
-                txn, table="user_directory_search", keyvalues={"user_id": user_id}
-            )
-            self._simple_delete_txn(
-                txn, table="users_in_public_rooms", keyvalues={"user_id": user_id}
-            )
-            self._simple_delete_txn(
-                txn,
-                table="users_who_share_private_rooms",
-                keyvalues={"user_id": user_id},
-            )
-            self._simple_delete_txn(
-                txn,
-                table="users_who_share_private_rooms",
-                keyvalues={"other_user_id": user_id},
-            )
-            txn.call_after(self.get_user_in_directory.invalidate, (user_id,))
-
-        return self.runInteraction("remove_from_user_dir", _remove_from_user_dir_txn)
-
-    async def get_users_in_dir_due_to_room(self, room_id):
-        """Get all user_ids that are in the room directory because they're
-        in the given room_id
-        """
-        user_ids_share_pub = await self.db_pool.simple_select_onecol(
-            table="users_in_public_rooms",
-            keyvalues={"room_id": room_id},
-            retcol="user_id",
-            desc="get_users_in_dir_due_to_room",
-        )
-
-        user_ids_share_priv = await self.db_pool.simple_select_onecol(
-            table="users_who_share_private_rooms",
-            keyvalues={"room_id": room_id},
-            retcol="other_user_id",
-            desc="get_users_in_dir_due_to_room",
-        )
-
-        user_ids = set(user_ids_share_pub)
-        user_ids.update(user_ids_share_priv)
-
-        return user_ids
-
-    async def get_all_rooms(self):
-        """Get all room_ids we've ever known about, in ascending order of "size" """
-
-        def get_all_rooms_txn(txn):
-            sql = """
-                SELECT room_id FROM current_state_events
-                GROUP BY room_id
-                ORDER BY count(*) ASC
-            """
-            txn.execute(sql)
-            return txn.fetchall()
-
-    async def get_all_local_users(self):
-        """Get all local users"""
-
-        def get_all_local_users_txn(txn):
-
-            sql = """
-                SELECT name FROM users
-            """
-
-            txn.execute(sql)
-            return txn.fetchall()
-
-        return self.runInteraction("get_all_local_users", get_all_local_users_txn)
-
-    # +watcha
-
     async def add_users_who_share_private_room(
         self, room_id: str, user_id_tuples: Iterable[Tuple[str, str]]
     ) -> None:
@@ -813,10 +734,6 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                             "user_id": <user_id>,
                             "display_name": <display_name>,
                             "avatar_url": <avatar_url>
-                            # watcha+
-                            "is_partner": 1 or 0
-                            "presence": "invited", "offline" or "online"
-                            # +watcha
                         }
                     ]
                 }
@@ -936,70 +853,53 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             args = join_args + (search_query,) + ordering_arguments + (limit + 1,)
             !watcha'''
             # watcha+
-            # TODO: change for PostgreSql
-
-            logger.info("Searching with search term: %s" % repr(search_term))
-            where_clause = """ AND (display_name LIKE ? OR t.address LIKE ? )"""
-
             sql = """
                 SELECT
-                    u.name as user_id
-                    , u.deactivated
-                    , u.is_partner
-                    , d.display_name
-                    , d.avatar_url
-                    , p.state as presence
-                    , t.address as email
-                FROM users AS u
-                LEFT OUTER JOIN
-                    (SELECT
-                        t.user_id
-                        , t.address
-                    FROM user_threepids AS t
-                    WHERE t.medium = 'email') AS t
-                    ON t.user_id = u.name
-                LEFT OUTER JOIN user_directory AS d ON d.user_id = u.name
-                LEFT OUTER JOIN presence_stream AS p ON p.user_id = u.name
-                WHERE u.is_partner = 0
-                    AND u.deactivated = 0
-                    %s
-
-                UNION ALL
-
-                SELECT DISTINCT
-                    u.name as user_id
-                    , u.deactivated
-                    , u.is_partner
-                    , d.display_name
-                    , d.avatar_url
-                    , coalesce(p.state, "invited") as presence
-                    , t.address as email
-                FROM users AS u
-                INNER JOIN partners_invitations AS pib
-                    ON pib.user_id = u.name AND pib.invited_by = ?
-                LEFT OUTER JOIN
-                    (SELECT
-                        t.user_id
-                        , t.medium
-                        , t.address
-                    FROM user_threepids AS t
-                    WHERE t.medium = 'email') AS t
-                    ON t.user_id = u.name
-                LEFT OUTER JOIN user_directory AS d ON d.user_id = u.name
-                LEFT OUTER JOIN presence_stream AS p ON p.user_id = u.name
-                WHERE u.is_partner = 1
-                    AND u.deactivated = 0
-                    %s
-            """ % (
-                where_clause,
-                where_clause,
-            )
-            args = (
-                ["%" + search_term + "%"] * 2
-                + [user_id]
-                + ["%" + search_term + "%"] * 2
-            )
-            logger.debug(sql)
+                    ud.user_id,
+                    ud.display_name,
+                    ud.avatar_url,
+                    tpid.address AS email
+                FROM
+                    user_directory AS ud
+                    LEFT OUTER JOIN
+                        (
+                            SELECT
+                                user_id,
+                                address
+                            FROM
+                                user_threepids
+                            WHERE
+                                medium = 'email'
+                        )
+                        AS tpid
+                        ON ud.user_id = tpid.user_id
+                    LEFT OUTER JOIN
+                        (
+                            SELECT
+                                name,
+                                is_partner
+                            FROM
+                                users
+                        )
+                        as users
+                        ON ud.user_id = users.name
+                    LEFT OUTER JOIN
+                        partners_invitations AS pi
+                        ON ud.user_id = pi.user_id
+                WHERE
+                    (
+                        display_name LIKE ?
+                        OR address LIKE ?
+                    )
+                    AND
+                    (
+                        is_partner = 0
+                        OR invited_by = ?
+                    )
+                LIMIT ?
+            """
+            search_term = f"%{search_term}%"
+            args = (search_term, search_term, user_id, limit + 1)
             # +watcha
         else:
             # This should be unreachable.
