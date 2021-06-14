@@ -38,7 +38,10 @@ class AdministrationHandler(BaseHandler):
             name_event = await self.store.get_event(
                 room_state_ids[(EventTypes.Name, "")]
             )
-            return name_event.content["name"]
+            room_name = name_event.content["name"]
+
+            if room_name:
+                return room_name
 
         all_members = []
         room_state_bytype_ids = _state_as_two_level_dict(room_state_ids)
