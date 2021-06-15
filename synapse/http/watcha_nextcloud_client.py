@@ -291,9 +291,9 @@ class NextcloudClient(SimpleHttpClient):
             post_json={
                 "path": path,
                 "shareType": 3,
-                "permissions": 1,
+                "permissions": 15,
                 "requester": requester,
-                "publicUpload": False,
+                "publicUpload": True,
             },
         )
 
