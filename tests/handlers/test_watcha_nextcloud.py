@@ -164,11 +164,7 @@ class NextcloudGroupHandlerTestCase(HomeserverTestCase):
         )
 
     def test_create_group_with_set_displayname_exception(self):
-        room_name = "default room"
-        self.hs.get_administration_handler().calculate_room_name = AsyncMock(
-            return_value=room_name
-        )
-        self.nextcloud_client.set_group_display_name = AsyncMock(
+        self.nextcloud_client.set_group_displayname = AsyncMock(
             side_effect=NextcloudError(code=101, msg="")
         )
 

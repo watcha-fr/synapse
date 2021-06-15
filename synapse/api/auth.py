@@ -256,7 +256,7 @@ class Auth:
                     build_log_message(
                         log_vars={
                             "user_id": user_info.user_id,
-                            "is_partner": is_guest,
+                            "is_partner": is_partner,
                             "allow_partner": allow_partner,
                         }
                     ),

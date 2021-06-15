@@ -10,6 +10,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.logging.utils import build_log_message
+from synapse.util.watcha import calculate_room_name
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -85,6 +86,7 @@ class NextcloudBindHandler:
 
 class NextcloudGroupHandler:
     def __init__(self, hs: "HomeServer"):
+        self.hs = hs
         self.administration_handler = hs.get_administration_handler()
         self.group_display_name_prefix = hs.config.nextcloud_group_display_name_prefix
         self.nextcloud_client = hs.get_nextcloud_client()
@@ -133,7 +135,7 @@ class NextcloudGroupHandler:
         Args:
             room_id: the id of the room
         """
-        room_name = await self.administration_handler.calculate_room_name(room_id)
+        room_name = await calculate_room_name(self.hs, room_id)
         return f"{self.group_display_name_prefix} {room_name}"
 
     async def set_group_display_name(self, group_id: str, group_display_name: str):
