@@ -1,7 +1,9 @@
 CREATE TABLE IF NOT EXISTS new_watcha_nextcloud_shares (
     room_id TEXT NOT NULL PRIMARY KEY,
     internal_share_id INTEGER,
-    public_link_share_id INTEGER
+    public_link_share_id INTEGER,
+    requester_id INTEGER,
+    folder_path TEXT
 );
 
 INSERT INTO new_watcha_nextcloud_shares(
