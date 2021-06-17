@@ -212,18 +212,18 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     content=content,
                 )
                 # watcha+
-                if await self.store.get_internal_share_id(room_id) and membership in [
-                    "invite",
-                    "join",
-                    "kick",
-                    "leave",
-                ]:
+                if await self.store.get_internal_share_id(room_id) and membership in (
+                    Membership.INVITE,
+                    Membership.JOIN,
+                    Membership.LEAVE,
+                    Membership.BAN,
+                ):
                     user = (
                         requester.user.to_string()
-                        if membership in ["join", "leave"]
+                        if membership in (Membership.JOIN, Membership.LEAVE)
                         else state_key
                     )
-                    await self.nextcloud_group_handler.update_group(
+                    await self.nextcloud_bind_handler.update_bind(
                         user, room_id, membership
                     )
                 # +watcha
@@ -347,7 +347,7 @@ class JoinRoomAliasServlet(TransactionRestServlet):
         self.auth = hs.get_auth()
         # watcha+
         self.store = hs.get_datastore()
-        self.nextcloud_group_handler = hs.get_nextcloud_group_handler()
+        self.nextcloud_bind_handler = hs.get_nextcloud_bind_handler()
         # +watcha
 
     def register(self, http_server):
@@ -396,8 +396,8 @@ class JoinRoomAliasServlet(TransactionRestServlet):
 
         # watcha+
         if await self.store.get_internal_share_id(room_id):
-            await self.nextcloud_group_handler.update_group(
-                requester.user.to_string(), room_id, "join"
+            await self.nextcloud_bind_handler.update_bind(
+                requester.user.to_string(), room_id, Membership.JOIN
             )
         # +watcha
 
@@ -819,7 +819,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         # watcha+
         self.store = hs.get_datastore()
         self.administration_handler = hs.get_administration_handler()
-        self.nextcloud_group_handler = hs.get_nextcloud_group_handler()
+        self.nextcloud_bind_handler = hs.get_nextcloud_bind_handler()
         self.partner_handler = hs.get_partner_handler()
         # +watcha
 
@@ -940,7 +940,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 if membership_action in ["join", "leave"]
                 else content["user_id"]
             )
-            await self.nextcloud_group_handler.update_group(
+            await self.nextcloud_bind_handler.update_bind(
                 user, room_id, membership_action
             )
         # +watcha

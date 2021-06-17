@@ -3,6 +3,7 @@ import logging
 from jsonschema.exceptions import SchemaError, ValidationError
 from typing import List, TYPE_CHECKING
 
+from synapse.api.constants import Membership
 from synapse.api.errors import (
     Codes,
     HttpResponseException,
@@ -31,6 +32,7 @@ NEXTCLOUD_CLIENT_ERRORS = (
 
 class NextcloudBindHandler:
     def __init__(self, hs: "HomeServer"):
+        self.auth_handler = hs.get_auth_handler()
         self.nextcloud_client = hs.get_nextcloud_client()
         self.nextcloud_group_handler = hs.get_nextcloud_group_handler()
         self.nextcloud_share_handler = hs.get_nextcloud_share_handler()
@@ -82,6 +84,24 @@ class NextcloudBindHandler:
             )
 
         await self.store.delete_all_shares(room_id)
+
+    async def update_bind(self, user_id: str, room_id: str, membership: str):
+        """Update a Nextcloud bind.
+        Create or delete public share link in case of the user is a partner, else update the Nextcloud group associated to the room.
+
+        Args:
+            user_id: mxid of the user concerned by the membership event
+            room_id: the id of the room where the membership event was sent
+            membership: membership event. Can be 'invite', 'join', 'kick' or 'leave'
+        """
+        if await self.auth_handler.is_partner(user_id):
+            await self.nextcloud_share_handler.handle_public_link_share_on_membership(
+                room_id, membership
+            )
+        else:
+            await self.nextcloud_group_handler.update_group(
+                user_id, room_id, membership
+            )
 
 
 class NextcloudGroupHandler:
@@ -205,7 +225,7 @@ class NextcloudGroupHandler:
         Args:
             user_id: mxid of the user concerned by the membership event
             room_id: the id of the room where the membership event was sent
-            membership: membership event. Can be 'invite', 'join', 'kick' or 'leave'
+            membership: membership event. Can be 'invite', 'join', 'ban' or 'leave'
         """
         group_id = await self.build_group_id(room_id)
         nextcloud_username = await self.store.get_username(user_id)
@@ -217,7 +237,7 @@ class NextcloudGroupHandler:
             "nextcloud_username": nextcloud_username,
             "group_id": group_id,
         }
-        if membership in ("invite", "join"):
+        if membership in (Membership.INVITE, Membership.JOIN):
             try:
                 await self.nextcloud_client.add_user_to_group(
                     nextcloud_username, group_id
@@ -294,7 +314,9 @@ class NextcloudShareHandler:
                 Codes.NEXTCLOUD_CAN_NOT_SHARE,
             )
 
-        await self.store.register_internal_share(room_id, new_share_id)
+        await self.store.register_internal_share(
+            room_id, new_share_id, requester_id, path
+        )
 
     async def create_public_link_share(
         self, requester_id: str, room_id: str, path: str
@@ -352,3 +374,41 @@ class NextcloudShareHandler:
             )
 
         await self.store.register_public_link_share(room_id, new_share_id)
+
+    async def handle_public_link_share_on_membership(
+        self, room_id: str, membership: str
+    ):
+        """Handle public link share on partner membership according to three use cases :
+            if it's the first partner to join room : create a new public link share
+            if it's the last partner to leave room : delete the public link share
+            if it's not the last partner to leave room : delete the public link share and create a new one
+
+        Args :
+            room_id: the id of the room where the membership event was sent
+            membership: membership event. Can be 'invite', 'join', 'ban' or 'leave'
+        """
+        partner_members = await self.store.get_partners_in_room(room_id)
+        requester_id = await self.store.get_sharing_requester_id(room_id)
+        path = await self.store.get_folder_path(room_id)
+
+        if (membership == Membership.JOIN and len(partner_members) == 1) or (
+            membership in (Membership.LEAVE, Membership.BAN)
+            and len(partner_members) > 0
+        ):
+            await self.create_public_link_share(requester_id, room_id, path)
+
+        elif membership in (Membership.LEAVE, Membership.BAN) and not partner_members:
+            nextcloud_username = await self.store.get_username(requester_id)
+            old_share_id = await self.store.get_public_link_share_id(room_id)
+            try:
+                await self.nextcloud_client.unshare(nextcloud_username, old_share_id)
+            except NEXTCLOUD_CLIENT_ERRORS as error:
+                logger.error(
+                    build_log_message(
+                        log_vars={
+                            "nextcloud_username": nextcloud_username,
+                            "old_share_id": old_share_id,
+                            "error": error,
+                        }
+                    )
+                )

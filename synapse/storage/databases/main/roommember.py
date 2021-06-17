@@ -191,7 +191,6 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         return [r[0] for r in txn]
 
     # watcha+
-    @cached(max_entries=100000, iterable=True)
     async def get_partners_in_room(self, room_id: str) -> List[str]:
         return await self.db_pool.runInteraction(
             "get_partners_in_room", self.get_partners_in_room_txn, room_id

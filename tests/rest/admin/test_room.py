@@ -1254,7 +1254,6 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.helper.join(room_id, partner, tok=partner_tok)
 
         partner_members = self.get_success(self.store.get_partners_in_room(room_id))
-        print(partner_members)
         self.assertIn(partner, partner_members)
 
     # +watcha
