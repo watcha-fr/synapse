@@ -67,8 +67,10 @@ class NextcloudBindHandlerTestCase(HomeserverTestCase):
         self.assertEquals(internal_share_id, "internal_share_1")
 
     def test_overwrite_bind(self):
-        self.get_success(self.nextcloud_bind_handler.bind(self.creator, self.room_id, "/new_folder"))
-        
+        self.get_success(
+            self.nextcloud_bind_handler.bind(self.creator, self.room_id, "/new_folder")
+        )
+
         self.assertEqual(self.nextcloud_client.unshare.call_count, 2)
         self.nextcloud_client.create_internal_share.assert_called_once()
 
@@ -80,7 +82,7 @@ class NextcloudBindHandlerTestCase(HomeserverTestCase):
         self.assertEqual("public_link_share_1", public_link_share_id)
 
     def test_unbind(self):
-        self.get_success(self.nextcloud_bind_handler.unbind(self.room_id))
+        self.get_success(self.nextcloud_bind_handler.unbind(self.creator, self.room_id))
 
         internal_share_id = self.get_success(
             self.store.get_internal_share_id(self.room_id)
@@ -90,7 +92,7 @@ class NextcloudBindHandlerTestCase(HomeserverTestCase):
         self.assertIsNone(internal_share_id)
 
     def test_unbind_with_partner_in_room(self):
-        self.get_success(self.nextcloud_bind_handler.unbind(self.room_id))
+        self.get_success(self.nextcloud_bind_handler.unbind(self.creator, self.room_id))
 
         public_link_share_id = self.get_success(
             self.store.get_public_link_share_id(self.room_id)
@@ -103,7 +105,7 @@ class NextcloudBindHandlerTestCase(HomeserverTestCase):
         self.nextcloud_client.delete_group = AsyncMock(
             side_effect=NextcloudError(code=101, msg="")
         )
-        self.get_success(self.nextcloud_bind_handler.unbind(self.room_id))
+        self.get_success(self.nextcloud_bind_handler.unbind(self.creator, self.room_id))
         share_id = self.get_success(self.store.get_internal_share_id(self.room_id))
 
         self.nextcloud_client.delete_group.assert_called_once_with(self.group_id)
@@ -374,7 +376,9 @@ class NextcloudInternalShareHandlerTestCase(HomeserverTestCase):
         )
 
         self.assertEquals(error.value.code, 500)
-        self.nextcloud_bind_handler.unbind.assert_called_once_with(self.room_id)
+        self.nextcloud_bind_handler.unbind.assert_called_once_with(
+            self.creator, self.room_id
+        )
 
 
 class NextcloudPublicShareHandlerTestCase(HomeserverTestCase):

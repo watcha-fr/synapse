@@ -108,25 +108,3 @@ class NextcloudStorageTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertIsNone(public_link_share_id)
-
-    def test_delete_all_shares(self):
-        self.get_success(
-            self.store.register_internal_share(
-                self.room_id,
-                self.internal_share_id,
-                self.requester_id,
-                self.folder_path,
-            )
-        )
-        self.get_success(self.store.get_public_link_share_id(self.room_id))
-
-        self.get_success(self.store.delete_all_shares(self.room_id))
-        internal_share_id = self.get_success(
-            self.store.get_internal_share_id(self.room_id)
-        )
-        public_link_share_id = self.get_success(
-            self.store.get_public_link_share_id(self.room_id)
-        )
-
-        self.assertIsNone(internal_share_id)
-        self.assertIsNone(public_link_share_id)

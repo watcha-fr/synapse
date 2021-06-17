@@ -147,18 +147,6 @@ class NextcloudStore(SQLBaseStore):
             desc="delete_public_link_share",
         )
 
-    async def delete_all_shares(self, room_id: str):
-        """Delete all existing shares of a room
-
-        Args:
-            room_id: id of the room where shares are associated
-        """
-        await self.db_pool.simple_delete(
-            table="watcha_nextcloud_shares",
-            keyvalues={"room_id": room_id},
-            desc="delete_all_shares",
-        )
-
     async def get_username(self, user_id: str):
         """Look up a Nextcloud username by their user_id
 

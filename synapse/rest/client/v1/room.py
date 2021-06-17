@@ -234,8 +234,10 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     and "nextcloudShare" in content
                 ):
                     nextcloud_url = content["nextcloudShare"]
+                    requester_id = requester.user.to_string()
+
                     if not nextcloud_url:
-                        await self.nextcloud_bind_handler.unbind(room_id)
+                        await self.nextcloud_bind_handler.unbind(requester_id, room_id)
                     else:
                         url_query = urlparse.parse_qs(
                             urlparse.urlparse(nextcloud_url).query
@@ -253,7 +255,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                         nextcloud_folder_path = url_query["dir"][0]
 
                         await self.nextcloud_bind_handler.bind(
-                            requester.user.to_string(), room_id, nextcloud_folder_path
+                            requester_id, room_id, nextcloud_folder_path
                         )
                 # +watcha
                 (
