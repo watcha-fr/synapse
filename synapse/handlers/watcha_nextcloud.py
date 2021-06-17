@@ -60,6 +60,10 @@ class NextcloudBindHandler:
         await self.nextcloud_group_handler.add_internal_members_to_group(
             room_id, internal_members
         )
+
+        await self.nextcloud_share_handler.delete_internal_share(
+            requester_id, room_id
+        )
         await self.nextcloud_share_handler.create_internal_share(
             requester_id, room_id, path
         )
@@ -274,21 +278,6 @@ class NextcloudShareHandler:
         group_id = await self.nextcloud_group_handler.build_group_id(room_id)
         nextcloud_username = await self.store.get_username(requester_id)
 
-        old_share_id = await self.store.get_internal_share_id(room_id)
-        if old_share_id:
-            try:
-                await self.nextcloud_client.unshare(nextcloud_username, old_share_id)
-            except NEXTCLOUD_CLIENT_ERRORS as error:
-                logger.error(
-                    build_log_message(
-                        log_vars={
-                            "nextcloud_username": nextcloud_username,
-                            "old_share_id": old_share_id,
-                            "error": error,
-                        }
-                    )
-                )
-
         try:
             new_share_id = await self.nextcloud_client.create_internal_share(
                 nextcloud_username, path, group_id
@@ -317,6 +306,32 @@ class NextcloudShareHandler:
         await self.store.register_internal_share(
             room_id, new_share_id, requester_id, path
         )
+
+    async def delete_internal_share(self, requester_id: str, room_id: str):
+        """Delete, if it exist, internal share of a room
+
+        Args:
+            requester_id: the mxid of the requester.
+            room_id: the id of the room.
+        """
+        old_share_id = await self.store.get_internal_share_id(room_id)
+
+        if old_share_id:
+            nextcloud_username = await self.store.get_username(requester_id)
+            try:
+                await self.nextcloud_client.unshare(nextcloud_username, old_share_id)
+            except NEXTCLOUD_CLIENT_ERRORS as error:
+                logger.error(
+                    build_log_message(
+                        log_vars={
+                            "nextcloud_username": nextcloud_username,
+                            "old_share_id": old_share_id,
+                            "error": error,
+                        }
+                    )
+                )
+
+            await self.store.delete_internal_share(room_id)
 
     async def create_public_link_share(
         self, requester_id: str, room_id: str, path: str

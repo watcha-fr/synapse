@@ -48,6 +48,7 @@ class NextcloudBindHandlerTestCase(HomeserverTestCase):
         self.nextcloud_client.create_public_link_share = AsyncMock(
             return_value=("public_link_share_1", "https://example.com/12345")
         )
+        self.nextcloud_client.unshare = AsyncMock()
 
         self.get_success(
             self.nextcloud_bind_handler.bind(self.creator, self.room_id, "/folder")
@@ -56,6 +57,7 @@ class NextcloudBindHandlerTestCase(HomeserverTestCase):
         self.nextcloud_client.add_user_to_group.reset_mock()
         self.nextcloud_client.create_internal_share.reset_mock()
         self.nextcloud_client.create_public_link_share.reset_mock()
+        self.nextcloud_client.unshare.reset_mock()
 
     def test_bind(self):
         internal_share_id = self.get_success(
@@ -63,6 +65,12 @@ class NextcloudBindHandlerTestCase(HomeserverTestCase):
         )
 
         self.assertEquals(internal_share_id, "internal_share_1")
+
+    def test_overwrite_bind(self):
+        self.get_success(self.nextcloud_bind_handler.bind(self.creator, self.room_id, "/new_folder"))
+        
+        self.assertEqual(self.nextcloud_client.unshare.call_count, 2)
+        self.nextcloud_client.create_internal_share.assert_called_once()
 
     def test_bind_with_partner_in_room(self):
         public_link_share_id = self.get_success(
@@ -328,22 +336,6 @@ class NextcloudInternalShareHandlerTestCase(HomeserverTestCase):
             )
         )
 
-        self.nextcloud_client.unshare.assert_not_called()
-        self.nextcloud_client.create_internal_share.assert_called_once()
-
-    def test_overwrite_existing_internal_share(self):
-        self.get_success(
-            self.nextcloud_bind_handler.bind(self.creator, self.room_id, "/folder")
-        )
-        self.nextcloud_client.create_internal_share.reset_mock()
-
-        self.get_success(
-            self.nextcloud_share_handler.create_internal_share(
-                self.creator, self.room_id, "/new_folder"
-            )
-        )
-
-        self.nextcloud_client.unshare.assert_called_once()
         self.nextcloud_client.create_internal_share.assert_called_once()
 
     def test_create_internal_share_with_unexisting_folder(self):
