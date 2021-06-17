@@ -426,23 +426,6 @@ class NextcloudPublicShareHandlerTestCase(HomeserverTestCase):
         self.nextcloud_client.unshare.assert_not_called()
         self.nextcloud_client.create_public_link_share.assert_called_once()
 
-    def test_overwrite_existing_public_link_share(self):
-        self.get_success(
-            self.nextcloud_share_handler.create_public_link_share(
-                self.creator, self.room_id, "/folder"
-            )
-        )
-        self.nextcloud_client.create_public_link_share.reset_mock()
-
-        self.get_success(
-            self.nextcloud_share_handler.create_public_link_share(
-                self.creator, self.room_id, "/new_folder"
-            )
-        )
-
-        self.nextcloud_client.unshare.assert_called_once()
-        self.nextcloud_client.create_public_link_share.assert_called_once()
-
     def test_create_public_link_share_with_unexisting_folder(self):
         self.nextcloud_client.create_public_link_share = AsyncMock(
             side_effect=NextcloudError(code=404, msg="")

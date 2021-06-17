@@ -61,14 +61,15 @@ class NextcloudBindHandler:
             room_id, internal_members
         )
 
-        await self.nextcloud_share_handler.delete_internal_share(
-            requester_id, room_id
-        )
+        await self.nextcloud_share_handler.delete_internal_share(requester_id, room_id)
         await self.nextcloud_share_handler.create_internal_share(
             requester_id, room_id, path
         )
 
         if partner_members:
+            await self.nextcloud_share_handler.delete_public_link_share(
+                requester_id, room_id
+            )
             await self.nextcloud_share_handler.create_public_link_share(
                 requester_id, room_id, path
             )
@@ -346,21 +347,6 @@ class NextcloudShareHandler:
         """
         nextcloud_username = await self.store.get_username(requester_id)
 
-        old_share_id = await self.store.get_public_link_share_id(room_id)
-        if old_share_id:
-            try:
-                await self.nextcloud_client.unshare(nextcloud_username, old_share_id)
-            except NEXTCLOUD_CLIENT_ERRORS as error:
-                logger.error(
-                    build_log_message(
-                        log_vars={
-                            "nextcloud_username": nextcloud_username,
-                            "old_share_id": old_share_id,
-                            "error": error,
-                        }
-                    )
-                )
-
         try:
             (
                 new_share_id,
@@ -390,6 +376,32 @@ class NextcloudShareHandler:
 
         await self.store.register_public_link_share(room_id, new_share_id)
 
+    async def delete_public_link_share(self, requester_id: str, room_id: str):
+        """Delete, if it exist, public link share of a room
+
+        Args:
+            requester_id: the mxid of the requester.
+            room_id: the id of the room.
+        """
+        old_share_id = await self.store.get_public_link_share_id(room_id)
+
+        if old_share_id:
+            nextcloud_username = await self.store.get_username(requester_id)
+            try:
+                await self.nextcloud_client.unshare(nextcloud_username, old_share_id)
+            except NEXTCLOUD_CLIENT_ERRORS as error:
+                logger.error(
+                    build_log_message(
+                        log_vars={
+                            "nextcloud_username": nextcloud_username,
+                            "old_share_id": old_share_id,
+                            "error": error,
+                        }
+                    )
+                )
+
+            await self.store.delete_public_link_share(room_id)
+
     async def handle_public_link_share_on_membership(
         self, room_id: str, membership: str
     ):
@@ -406,24 +418,11 @@ class NextcloudShareHandler:
         requester_id = await self.store.get_sharing_requester_id(room_id)
         path = await self.store.get_folder_path(room_id)
 
-        if (membership == Membership.JOIN and len(partner_members) == 1) or (
-            membership in (Membership.LEAVE, Membership.BAN)
-            and len(partner_members) > 0
-        ):
+        if membership == Membership.JOIN and len(partner_members) == 1:
             await self.create_public_link_share(requester_id, room_id, path)
 
-        elif membership in (Membership.LEAVE, Membership.BAN) and not partner_members:
-            nextcloud_username = await self.store.get_username(requester_id)
-            old_share_id = await self.store.get_public_link_share_id(room_id)
-            try:
-                await self.nextcloud_client.unshare(nextcloud_username, old_share_id)
-            except NEXTCLOUD_CLIENT_ERRORS as error:
-                logger.error(
-                    build_log_message(
-                        log_vars={
-                            "nextcloud_username": nextcloud_username,
-                            "old_share_id": old_share_id,
-                            "error": error,
-                        }
-                    )
-                )
+        elif membership in (Membership.LEAVE, Membership.BAN):
+            await self.delete_public_link_share(requester_id, room_id)
+
+            if len(partner_members) > 0:
+                await self.create_public_link_share(requester_id, room_id, path)
