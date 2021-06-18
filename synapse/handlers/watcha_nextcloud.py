@@ -11,6 +11,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.logging.utils import build_log_message
+from synapse.types import Requester
 from synapse.util.watcha import calculate_room_name
 
 if TYPE_CHECKING:
@@ -33,12 +34,13 @@ NEXTCLOUD_CLIENT_ERRORS = (
 class NextcloudBindHandler:
     def __init__(self, hs: "HomeServer"):
         self.auth_handler = hs.get_auth_handler()
+        self.event_creation_handler = hs.get_event_creation_handler()
         self.nextcloud_client = hs.get_nextcloud_client()
         self.nextcloud_group_handler = hs.get_nextcloud_group_handler()
         self.nextcloud_share_handler = hs.get_nextcloud_share_handler()
         self.store = hs.get_datastore()
 
-    async def bind(self, requester_id: str, room_id: str, path: str):
+    async def bind(self, requester: Requester, room_id: str, path: str):
         """Bind a Nextcloud folder with a room in four steps :
             1 - create a new Nextcloud group
             2 - add internal room members in the new group
@@ -46,10 +48,14 @@ class NextcloudBindHandler:
             4 - create a public link share for partners in the room
 
         Args :
-           requester_id: the mxid of the requester.
+           requester: user requesting the bind.
            room_id: the id of the room to bind.
            path: the path of the Nextcloud folder to bind.
+
+        Returns:
+            url of the public link share
         """
+        requester_id = requester.user.to_string()
         members = await self.store.get_users_in_room(room_id)
         partner_members = await self.store.get_partners_in_room(room_id)
         internal_members = [
@@ -66,13 +72,18 @@ class NextcloudBindHandler:
             requester_id, room_id, path
         )
 
+        public_link_url = ""
         if partner_members:
             await self.nextcloud_share_handler.delete_public_link_share(
                 requester_id, room_id
             )
-            await self.nextcloud_share_handler.create_public_link_share(
-                requester_id, room_id, path
+            public_link_url = (
+                await self.nextcloud_share_handler.create_public_link_share(
+                    requester_id, room_id, path
+                )
             )
+
+        return public_link_url
 
     async def unbind(self, requester_id: str, room_id: str):
         """Unbind a Nextcloud folder from a room.
@@ -90,7 +101,9 @@ class NextcloudBindHandler:
             )
 
         await self.nextcloud_share_handler.delete_internal_share(requester_id, room_id)
-        await self.nextcloud_share_handler.delete_public_link_share(requester_id, room_id)
+        await self.nextcloud_share_handler.delete_public_link_share(
+            requester_id, room_id
+        )
 
     async def update_bind(self, user_id: str, room_id: str, membership: str):
         """Update a Nextcloud bind.
@@ -346,6 +359,9 @@ class NextcloudShareHandler:
             requester_id: the mxid of the requester.
             room_id: the id of the room to bind.
             path: the path of the Nextcloud folder to bind.
+
+        Returns:
+            url of the public link share
         """
         nextcloud_username = await self.store.get_username(requester_id)
 
@@ -377,6 +393,8 @@ class NextcloudShareHandler:
             )
 
         await self.store.register_public_link_share(room_id, new_share_id)
+
+        return public_link_url
 
     async def delete_public_link_share(self, requester_id: str, room_id: str):
         """Delete, if it exist, public link share of a room
@@ -417,14 +435,14 @@ class NextcloudShareHandler:
             membership: membership event. Can be 'invite', 'join', 'ban' or 'leave'
         """
         partner_members = await self.store.get_partners_in_room(room_id)
-        requester_id = await self.store.get_sharing_requester_id(room_id)
+        sharing_requester_id = await self.store.get_sharing_requester_id(room_id)
         path = await self.store.get_folder_path(room_id)
 
         if membership == Membership.JOIN and len(partner_members) == 1:
-            await self.create_public_link_share(requester_id, room_id, path)
+            await self.create_public_link_share(sharing_requester_id, room_id, path)
 
         elif membership in (Membership.LEAVE, Membership.BAN):
-            await self.delete_public_link_share(requester_id, room_id)
+            await self.delete_public_link_share(sharing_requester_id, room_id)
 
             if len(partner_members) > 0:
-                await self.create_public_link_share(requester_id, room_id, path)
+                await self.create_public_link_share(sharing_requester_id, room_id, path)

@@ -33,7 +33,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
             self.store.register_internal_share(self.room_id, 1, self.creator, "/folder")
         )
 
-        self.nextcloud_bind_handler.bind = AsyncMock()
+        self.nextcloud_bind_handler.bind = AsyncMock(return_value="https://test/nextcloud/1234")
         self.nextcloud_bind_handler.unbind = AsyncMock()
         self.nextcloud_directory_url = (
             "https://test/nextcloud/apps/files/?dir=/directory"
@@ -45,7 +45,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         self.nextcloud_client.add_user_to_group = AsyncMock()
         self.nextcloud_client.remove_user_from_group = AsyncMock()
 
-    def send_room_nextcloud_mapping_event(self, request_content):
+    def _send_room_nextcloud_mapping_event(self, request_content):
         channel = self.make_request(
             "PUT",
             f"/rooms/{self.room_id}/state/im.vector.web.settings",
@@ -55,8 +55,8 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
 
         return channel
 
-    def test_create_new_room_nextcloud_mapping(self):
-        channel = self.send_room_nextcloud_mapping_event(
+    def test_create_room_nextcloud_mapping(self):
+        channel = self._send_room_nextcloud_mapping_event(
             {"nextcloudShare": self.nextcloud_directory_url}
         )
 
@@ -64,20 +64,20 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code)
 
     def test_delete_existing_room_nextcloud_mapping(self):
-        self.send_room_nextcloud_mapping_event(
+        self._send_room_nextcloud_mapping_event(
             {"nextcloudShare": self.nextcloud_directory_url}
         )
-        channel = self.send_room_nextcloud_mapping_event({"nextcloudShare": ""})
+        channel = self._send_room_nextcloud_mapping_event({"nextcloudShare": ""})
 
         self.assertTrue(self.nextcloud_bind_handler.bind.called)
         self.assertTrue(self.nextcloud_bind_handler.unbind.called)
         self.assertEquals(200, channel.code)
 
     def test_update_existing_room_nextcloud_mapping(self):
-        self.send_room_nextcloud_mapping_event(
+        self._send_room_nextcloud_mapping_event(
             {"nextcloudShare": self.nextcloud_directory_url}
         )
-        channel = self.send_room_nextcloud_mapping_event(
+        channel = self._send_room_nextcloud_mapping_event(
             {"nextcloudShare": "https://test/nextcloud/apps/files/?dir=/directory2"}
         )
 
@@ -85,7 +85,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code)
 
     def test_create_new_room_nextcloud_mapping_without_nextcloudShare_attribute(self):
-        channel = self.send_room_nextcloud_mapping_event(
+        channel = self._send_room_nextcloud_mapping_event(
             {"nextcloud": self.nextcloud_directory_url}
         )
 
@@ -93,7 +93,7 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code)
 
     def test_create_new_room_nextcloud_mapping_with_wrong_url(self):
-        channel = self.send_room_nextcloud_mapping_event(
+        channel = self._send_room_nextcloud_mapping_event(
             {"nextcloudShare": "https://test/nextcloud/apps/files/?file=brandbook.pdf"}
         )
 

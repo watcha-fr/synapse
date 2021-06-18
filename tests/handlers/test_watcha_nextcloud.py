@@ -4,6 +4,7 @@ from synapse.api.constants import Membership
 from synapse.api.errors import NextcloudError, SynapseError
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
+from synapse.types import create_requester
 
 from tests.unittest import HomeserverTestCase
 
@@ -25,6 +26,7 @@ class NextcloudBindHandlerTestCase(HomeserverTestCase):
 
         self.creator = self.register_user("creator", "pass", admin=True)
         self.creator_tok = self.login("creator", "pass")
+        self.requester = create_requester(self.creator)
         self.partner = self.register_user("partner", "pass", is_partner=True)
         self.partner_tok = self.login("partner", "pass")
         self.collaborator = self.register_user("collaborator", "pass")
@@ -51,7 +53,7 @@ class NextcloudBindHandlerTestCase(HomeserverTestCase):
         self.nextcloud_client.unshare = AsyncMock()
 
         self.get_success(
-            self.nextcloud_bind_handler.bind(self.creator, self.room_id, "/folder")
+            self.nextcloud_bind_handler.bind(self.requester, self.room_id, "/folder")
         )
         self.nextcloud_client.add_group.reset_mock()
         self.nextcloud_client.add_user_to_group.reset_mock()
@@ -68,7 +70,7 @@ class NextcloudBindHandlerTestCase(HomeserverTestCase):
 
     def test_overwrite_bind(self):
         self.get_success(
-            self.nextcloud_bind_handler.bind(self.creator, self.room_id, "/new_folder")
+            self.nextcloud_bind_handler.bind(self.requester, self.room_id, "/new_folder")
         )
 
         self.assertEqual(self.nextcloud_client.unshare.call_count, 2)

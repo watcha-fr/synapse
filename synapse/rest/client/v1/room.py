@@ -238,6 +238,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 
                     if not nextcloud_url:
                         await self.nextcloud_bind_handler.unbind(requester_id, room_id)
+                        content.pop("nextcloudPublicLinkShareUrl", None)
                     else:
                         url_query = urlparse.parse_qs(
                             urlparse.urlparse(nextcloud_url).query
@@ -254,9 +255,12 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 
                         nextcloud_folder_path = url_query["dir"][0]
 
-                        await self.nextcloud_bind_handler.bind(
-                            requester_id, room_id, nextcloud_folder_path
+                        public_link_url = await self.nextcloud_bind_handler.bind(
+                            requester, room_id, nextcloud_folder_path
                         )
+
+                        if public_link_url:
+                            content["nextcloudPublicLinkShareUrl"] = public_link_url
                 # +watcha
                 (
                     event,
