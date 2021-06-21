@@ -16,10 +16,13 @@ logger = logging.getLogger(__name__)
 class PartnerHandler(BaseHandler):
     def __init__(self, hs):
         super().__init__(hs)
+        self.hs = hs
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
+        self.user_directory_handler = hs.get_user_directory_handler()
+        self.store = hs.get_datastore()
         self.secrets = Secrets()
 
         if hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
@@ -73,6 +76,12 @@ class PartnerHandler(BaseHandler):
         )
 
         logger.info(build_log_message(status=ActionStatus.SUCCESS))
+
+        if self.hs.config.user_directory_search_all_users:
+            profile = await self.store.get_profileinfo(keycloak_user_id)
+            await self.user_directory_handler.handle_local_profile_change(
+                invitee_id, profile
+            )
 
         await self.mailer.send_watcha_registration_email(
             email_address=invitee_email,
