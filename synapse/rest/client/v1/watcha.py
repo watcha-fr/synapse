@@ -116,6 +116,7 @@ class WatchaRegisterRestServlet(RestServlet):
 
     def __init__(self, hs):
         super().__init__()
+        self.hs = hs
         self.config = hs.config
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
@@ -123,6 +124,7 @@ class WatchaRegisterRestServlet(RestServlet):
         self.store = hs.get_datastore()
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
+        self.user_directory_handler = hs.get_user_directory_handler()
         self.secrets = Secrets()
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
@@ -198,6 +200,12 @@ class WatchaRegisterRestServlet(RestServlet):
             await self.keycloak_client.delete_user(keycloak_user_id)
             await self.nextcloud_client.delete_user(keycloak_user_id)
             raise
+
+        if self.hs.config.user_directory_search_all_users:
+            profile = await self.store.get_profileinfo(keycloak_user_id)
+            await self.user_directory_handler.handle_local_profile_change(
+                user_id, profile
+            )
 
         await self.mailer.send_watcha_registration_email(
             email_address=email,
