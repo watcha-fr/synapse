@@ -854,7 +854,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             !watcha'''
             # watcha+
             sql = """
-                SELECT
+                SELECT DISTINCT
                     ud.user_id,
                     ud.display_name,
                     ud.avatar_url,
