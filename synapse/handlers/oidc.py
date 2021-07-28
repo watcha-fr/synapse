@@ -1225,7 +1225,7 @@ UserAttributeDict = TypedDict(
     {"localpart": Optional[str], "display_name": Optional[str], "emails": List[str]},
 )
 !watcha """
-# watcha+ op524
+# watcha+
 UserAttributeDict = TypedDict(
     "UserAttributeDict",
     {
@@ -1233,7 +1233,6 @@ UserAttributeDict = TypedDict(
         "display_name": Optional[str],
         "emails": List[str],
         "is_admin": Optional[bool],
-        "locale": Optional[str],
         "nextcloud_username": Optional[str],
     },
 )
@@ -1427,8 +1426,6 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
                 )
             )
 
-        locale = userinfo.get("locale")  # type: Optional[str]
-
         nextcloud_username = None  # type: Optional[str]
         if self._config.nextcloud_username_template is not None:
             nextcloud_username = self._config.nextcloud_username_template.render(
@@ -1440,7 +1437,6 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             display_name=display_name,
             emails=emails,
             is_admin=is_admin,
-            locale=locale,
             nextcloud_username=nextcloud_username,
         )
         # +watcha
