@@ -120,8 +120,8 @@ CONDITIONAL_REQUIREMENTS = {
     # Required to use experimental `caches.track_memory_usage` config option.
     "cache_memory": ["pympler"],
     # watcha+
-    "shared-secret-authenticator": [
-        "shared-secret-authenticator @ git+https://github.com/devture/matrix-synapse-shared-secret-auth@1.0.2#egg=shared-secret-authenticator"
+    "shared_secret_auth": [
+        "shared-secret-authenticator @ git+https://github.com/watcha-fr/matrix-synapse-shared-secret-auth@1.0.2#egg=shared-secret-authenticator"
     ],
     # +watcha
 }
