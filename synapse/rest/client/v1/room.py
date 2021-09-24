@@ -211,18 +211,11 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     content=content,
                 )
                 # watcha+
-                if await self.store.get_share_id(room_id) and membership in [
-                    "invite",
-                    "join",
-                    "kick",
-                    "leave",
-                ]:
-                    user = (
-                        requester.user.to_string()
-                        if membership in ["join", "leave"]
-                        else state_key
+                memberships = ("join", "leave", "ban")
+                if membership in memberships and await self.store.get_share_id(room_id):
+                    await self.nextcloud_handler.update_group(
+                        state_key, room_id, membership
                     )
-                    await self.nextcloud_handler.update_group(user, room_id, membership)
                 # +watcha
             else:
                 # watcha+

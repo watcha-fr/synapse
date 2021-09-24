@@ -226,37 +226,31 @@ class NextcloudHandler(BaseHandler):
 
     async def update_group(self, user_id: str, room_id: str, membership: str):
         """Update a Nextcloud group by adding or removing users.
-        If membership is 'join' or 'invite', the user is add to the Nextcloud group infered from the room.
-        Else, the users is removed from the group.
 
         Args:
-            user_id: mxid of the user concerned by the membership event
-            room_id: the id of the room where the membership event was sent
-            membership: membership event. Can be 'invite', 'join', 'kick' or 'leave'
+            user_id: The mxid whose membership has been updated
+            room_id: The id of the room where the membership event was sent
+            membership: The type of membership event
         """
-        group_id = await self.build_group_id(room_id)
         nextcloud_username = await self.store.get_username(user_id)
+        group_id = await self.build_group_id(room_id)
 
-        log_vars = {
-            "user_id": user_id,
-            "room_id": room_id,
-            "membership": membership,
-            "nextcloud_username": nextcloud_username,
-            "group_id": group_id,
-        }
-        if membership in ("invite", "join"):
-            try:
+        try:
+            if membership == "join":
                 await self.nextcloud_client.add_user_to_group(
                     nextcloud_username, group_id
                 )
-            except NEXTCLOUD_CLIENT_ERRORS as error:
-                log_vars["error"] = error
-                logger.warn(build_log_message(log_vars=log_vars))
-        else:
-            try:
+            else:
                 await self.nextcloud_client.remove_user_from_group(
                     nextcloud_username, group_id
                 )
-            except NEXTCLOUD_CLIENT_ERRORS as error:
-                log_vars["error"] = error
-                logger.warn(build_log_message(log_vars=log_vars))
+        except NEXTCLOUD_CLIENT_ERRORS as error:
+            log_vars = {
+                "user_id": user_id,
+                "room_id": room_id,
+                "membership": membership,
+                "nextcloud_username": nextcloud_username,
+                "group_id": group_id,
+                "error": error,
+            }
+            logger.warn(build_log_message(log_vars=log_vars))
