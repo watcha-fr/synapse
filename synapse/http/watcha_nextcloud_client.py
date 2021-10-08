@@ -66,6 +66,8 @@ class NextcloudClient(SimpleHttpClient):
     https://docs.nextcloud.com/server/latest/developer_manual/client_apis/index.html
     """
 
+    NEXTCLOUD_APP_NAME = "watcha"
+
     def __init__(self, hs: "Homeserver"):
         super().__init__(hs)
 
@@ -73,10 +75,14 @@ class NextcloudClient(SimpleHttpClient):
         self.service_account_name = hs.config.service_account_name
         self.service_account_password = hs.config.nextcloud_service_account_password
         self._headers = self._get_headers()
+        self._headers_for_ocs_api = self._get_headers_for_ocs_api()
+
+    @property
+    def base_url(self):
+        return f"{self.nextcloud_url}/apps/{self.NEXTCLOUD_APP_NAME}"
 
     def _get_headers(self):
         return {
-            "OCS-APIRequest": ["true"],
             "Authorization": [
                 "Basic "
                 + b64encode(
@@ -84,6 +90,9 @@ class NextcloudClient(SimpleHttpClient):
                 ).decode()
             ],
         }
+
+    def _get_headers_for_ocs_api(self):
+        return {"OCS-APIRequest": ["true"], **self._get_headers()}
 
     def _raise_for_status(self, meta: List[Any]):
         if meta["status"] == "failure":
@@ -118,7 +127,7 @@ class NextcloudClient(SimpleHttpClient):
         response = await self.post_json_get_json(
             uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/users",
             post_json=payload,
-            headers=self._headers,
+            headers=self._headers_for_ocs_api,
         )
 
         validate(response, WITH_DATA_SCHEMA)
@@ -136,7 +145,7 @@ class NextcloudClient(SimpleHttpClient):
         """
         response = await self.delete_get_json(
             uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/users/{username}",
-            headers=self._headers,
+            headers=self._headers_for_ocs_api,
         )
 
         validate(response, WITHOUT_DATA_SCHEMA)
@@ -157,7 +166,7 @@ class NextcloudClient(SimpleHttpClient):
         response = await self.post_json_get_json(
             uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/groups",
             post_json={"groupid": group_id},
-            headers=self._headers,
+            headers=self._headers_for_ocs_api,
         )
 
         validate(response, WITHOUT_DATA_SCHEMA)
@@ -178,7 +187,7 @@ class NextcloudClient(SimpleHttpClient):
         response = await self.put_json(
             uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/groups/{group_id}",
             json_body={"key": "displayname", "value": displayname},
-            headers=self._headers,
+            headers=self._headers_for_ocs_api,
         )
 
         validate(response, WITHOUT_DATA_SCHEMA)
@@ -197,7 +206,7 @@ class NextcloudClient(SimpleHttpClient):
         """
         response = await self.delete_get_json(
             uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/groups/{group_id}",
-            headers=self._headers,
+            headers=self._headers_for_ocs_api,
         )
 
         validate(response, WITHOUT_DATA_SCHEMA)
@@ -221,7 +230,7 @@ class NextcloudClient(SimpleHttpClient):
         response = await self.post_json_get_json(
             uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/users/{username}/groups",
             post_json={"groupid": group_id},
-            headers=self._headers,
+            headers=self._headers_for_ocs_api,
         )
 
         validate(response, WITHOUT_DATA_SCHEMA)
@@ -244,7 +253,7 @@ class NextcloudClient(SimpleHttpClient):
         """
         response = await self.delete_get_json(
             uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/users/{username}/groups",
-            headers=self._headers,
+            headers=self._headers_for_ocs_api,
             json_body={"groupid": group_id},
         )
 
@@ -286,7 +295,7 @@ class NextcloudClient(SimpleHttpClient):
         """
         response = await self.post_json_get_json(
             uri=f"{self.nextcloud_url}/ocs/v2.php/apps/watcha_integrator/api/v1/shares",
-            headers=self._headers,
+            headers=self._headers_for_ocs_api,
             post_json={
                 "path": path,
                 "shareType": 1,
@@ -314,9 +323,180 @@ class NextcloudClient(SimpleHttpClient):
         """
         response = await self.delete_get_json(
             uri=f"{self.nextcloud_url}/ocs/v2.php/apps/watcha_integrator/api/v1/shares/{share_id}",
-            headers=self._headers,
+            headers=self._headers_for_ocs_api,
             json_body={"requester": requester},
         )
 
         validate(response, WITHOUT_DATA_SCHEMA)
         self._raise_for_status(response["ocs"]["meta"])
+
+    # calendar operations
+    # ===================
+
+    async def get_users_own_calendars(self, user_id: str):
+        """List all calendars owned by a specific user.
+
+        Args:
+            user_id: the ID of the concerned Nextcloud user
+        """
+
+        return await self.get_json(
+            uri=f"{self.base_url}/users/{user_id}/calendars",
+            headers=self._headers,
+        )
+
+    async def get_calendar(self, user_id: str, calendar_id: int):
+        """Get properties for a specific calendar from the perspective of a specific user.
+
+        Args:
+            user_id: the ID of the concerned Nextcloud user
+            calendar_id: the ID of the concerned calendar
+        """
+
+        return await self.get_json(
+            uri=f"{self.base_url}/users/{user_id}/calendars/{calendar_id}",
+            headers=self._headers,
+        )
+
+    async def reorder_calendars(self, user_id: str, calendar_id: int):
+        """Move up a calendar at the top of the list for a specific user.
+
+        Args:
+            user_id: the ID of the Nextcloud user for whom to reorder calendars
+            calendar_id: the ID of the calendar to put at the top of the list
+        """
+
+        return await self.put_json(
+            uri=f"{self.base_url}/users/{user_id}/calendars/{calendar_id}/top",
+            headers=self._headers,
+            json_body={},
+        )
+
+    async def create_and_share_calendar(
+        self, room_id: str, displayname: str, user_ids: List[str]
+    ):
+        """Create and share a calendar with members of a specific room.
+
+        Args:
+            room_id: the ID of the concerned room
+            displayname: the displayname to use for the group and the calendar
+            user_ids: the IDs of Nextcloud users to share with
+        """
+
+        return await self.post_json_get_json(
+            uri=f"{self.base_url}/calendars",
+            headers=self._headers,
+            post_json={
+                "mxRoomId": room_id,
+                "displayName": displayname,
+                "userIds": user_ids,
+            },
+        )
+
+    async def share_calendar(
+        self,
+        user_id: str,
+        calendar_id: int,
+        room_id: str,
+        displayname: str,
+        user_ids: List[str],
+    ):
+        """Share a personal user calendar with members of a specific room.
+
+        Args:
+            user_id: the ID of the Nextcloud calendar owner
+            calendar_id: the ID of the calendar to share
+            room_id: the ID of the concerned room
+            displayname: the displayname to use for the group and the calendar
+            user_ids: the IDs of Nextcloud users to share with
+        """
+
+        return await self.put_json(
+            uri=f"{self.base_url}/users/{user_id}/calendars/{calendar_id}",
+            headers=self._headers,
+            json_body={
+                "mxRoomId": room_id,
+                "displayName": displayname,
+                "userIds": user_ids,
+            },
+        )
+
+    async def unshare_calendar(
+        self, calendar_ids: List[int], room_id: str, delete_group: bool
+    ):
+        """Cancel sharing a calendar with a specific room.
+
+        Args:
+            calendar_id: the ID of the calendar not to be shared anymore
+            room_id: the ID of the concerned room
+        """
+
+        return await self.delete_get_json(
+            uri=f"{self.base_url}/calendars",
+            headers=self._headers,
+            json_body={
+                "calendarIds": calendar_ids,
+                "mxRoomId": room_id,
+                "deleteGroup": delete_group,
+            },
+        )
+
+    async def add_user_access_to_calendars(
+        self, user_id: str, room_id: str, calendar_ids: List[int], displayname: str
+    ):
+        """Allow one user to access specific calendars in the context of a room.
+
+        Args:
+            user_id: the ID of the concerned Nextcloud user
+            room_id: the ID of the concerned room
+            calendar_ids: the calendar IDs to be accessible to
+            displayname: the displayname to use for the calendar
+        """
+
+        return await self.post_json_get_json(
+            uri=f"{self.base_url}/users",
+            headers=self._headers,
+            post_json={
+                "userId": user_id,
+                "mxRoomId": room_id,
+                "calendarIds": calendar_ids,
+                "displayName": displayname,
+            },
+        )
+
+    async def remove_user_access_to_calendars(self, user_id: str, room_id: str):
+        """Revoke a user's access to a calendar in the context of a room.
+
+        Args:
+            user_id: the ID of the concerned Nextcloud user
+            room_id: the ID of the concerned room
+        """
+
+        return await self.delete_get_json(
+            uri=f"{self.base_url}/users/{user_id}",
+            headers=self._headers,
+            json_body={
+                "mxRoomId": room_id,
+            },
+        )
+
+    async def rename_calendars(
+        self, calendar_ids: List[int], room_id: str, displayname: str
+    ):
+        """Rename calendars for each members of a specific room.
+
+        Args:
+            calendar_ids: the calendar IDs to rename
+            room_id: the ID of the concerned room
+            displayname: the displayname to use for the group and the calendar
+        """
+
+        return await self.put_json(
+            uri=f"{self.base_url}/calendars/displayname",
+            headers=self._headers,
+            json_body={
+                "calendarIds": calendar_ids,
+                "mxRoomId": room_id,
+                "displayName": displayname,
+            },
+        )

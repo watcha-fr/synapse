@@ -113,10 +113,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         self.room_member_handler = hs.get_room_member_handler()
         self.message_handler = hs.get_message_handler()
         self.auth = hs.get_auth()
-        # watcha+
-        self.store = hs.get_datastore()
-        self.nextcloud_handler = hs.get_nextcloud_handler()
-        # +watcha
+        self.nextcloud_handler = hs.get_nextcloud_handler() # watcha+
 
     def register(self, http_server):
         # /room/$roomid/state/$eventtype
@@ -211,11 +208,14 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     content=content,
                 )
                 # watcha+
-                memberships = ("join", "leave", "ban")
-                if membership in memberships and await self.store.get_share_id(room_id):
-                    await self.nextcloud_handler.update_group(
-                        state_key, room_id, membership
-                    )
+            elif event_type == EventTypes.Name:
+                event_id = await self.nextcloud_handler.handle_room_name_event(
+                    requester, event_dict, txn_id=txn_id
+                )
+            elif event_type == EventTypes.NextcloudCalendar:
+                event_id = await self.nextcloud_handler.update_calendar_share(
+                    requester, event_dict, txn_id=txn_id
+                )
                 # +watcha
             else:
                 # watcha+
@@ -223,28 +223,8 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     event_type == EventTypes.VectorSetting
                     and "nextcloudShare" in content
                 ):
-                    nextcloud_url = content["nextcloudShare"]
-                    if not nextcloud_url:
-                        await self.nextcloud_handler.unbind(room_id)
-                    else:
-                        url_query = urlparse.parse_qs(
-                            urlparse.urlparse(nextcloud_url).query
-                        )
-
-                        if "dir" not in url_query:
-                            raise SynapseError(
-                                400,
-                                build_log_message(
-                                    action="get `nextcloud_folder_path` from `im.vector.web.settings` event",
-                                    log_vars={"nextcloud_url": nextcloud_url},
-                                ),
-                            )
-
-                        nextcloud_folder_path = url_query["dir"][0]
-
-                        await self.nextcloud_handler.bind(
-                            requester.user.to_string(), room_id, nextcloud_folder_path
-                        )
+                    user_id = requester.user.to_string()
+                    await self.nextcloud_handler.update_share(room_id, user_id, content)
                 # +watcha
                 (
                     event,
@@ -253,18 +233,6 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     requester, event_dict, txn_id=txn_id
                 )
                 event_id = event.event_id
-                # watcha+
-                if event_type == EventTypes.Name and await self.store.get_share_id(
-                    room_id
-                ):
-                    group_id = await self.nextcloud_handler.build_group_id(room_id)
-                    group_displayname = (
-                        await self.nextcloud_handler.build_group_displayname(room_id)
-                    )
-                    await self.nextcloud_handler.set_group_displayname(
-                        group_id, group_displayname
-                    )
-                # +watcha
         except ShadowBanError:
             event_id = "$" + random_string(43)
 
@@ -330,10 +298,6 @@ class JoinRoomAliasServlet(TransactionRestServlet):
         super().__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
-        # watcha+
-        self.store = hs.get_datastore()
-        self.nextcloud_handler = hs.get_nextcloud_handler()
-        # +watcha
 
     def register(self, http_server):
         # /join/$room_identifier[/$txn_id]
@@ -378,13 +342,6 @@ class JoinRoomAliasServlet(TransactionRestServlet):
             content=content,
             third_party_signed=content.get("third_party_signed", None),
         )
-
-        # watcha+
-        if await self.store.get_share_id(room_id):
-            await self.nextcloud_handler.update_group(
-                requester.user.to_string(), room_id, "join"
-            )
-        # +watcha
 
         return 200, {"room_id": room_id}
 
@@ -804,7 +761,6 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         # watcha+
         self.store = hs.get_datastore()
         self.administration_handler = hs.get_administration_handler()
-        self.nextcloud_handler = hs.get_nextcloud_handler()
         self.partner_handler = hs.get_partner_handler()
         # +watcha
 
@@ -912,21 +868,6 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         except ShadowBanError:
             # Pretend the request succeeded.
             pass
-
-        # watcha+
-        if await self.store.get_share_id(room_id) and membership_action in [
-            "invite",
-            "join",
-            "kick",
-            "leave",
-        ]:
-            user = (
-                requester.user.to_string()
-                if membership_action in ["join", "leave"]
-                else content["user_id"]
-            )
-            await self.nextcloud_handler.update_group(user, room_id, membership_action)
-        # +watcha
 
         return_value = {}
 
