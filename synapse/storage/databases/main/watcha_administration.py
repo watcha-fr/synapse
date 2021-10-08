@@ -27,7 +27,7 @@ def _caller_name():
 class AdministrationStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
-
+        self.hs = hs
         self.clock = hs.get_clock()
 
     async def _get_new_rooms(self):
@@ -267,7 +267,7 @@ class AdministrationStore(SQLBaseStore):
 
         try:
             completed_process = subprocess.run(
-                ["du", "-bsh", "/var/lib/matrix-synapse/media"],
+                ["du", "-bsh", self.hs.config.media_store_path],
                 stdout=subprocess.PIPE,
                 timeout=3,
                 check=True,
