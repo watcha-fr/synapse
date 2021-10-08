@@ -98,48 +98,18 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         self.assertRaises(SynapseError)
         self.assertEquals(400, channel.code)
 
-    def test_update_nextcloud_share_on_invite_and_join_event(self):
+    def test_update_nextcloud_share_on_invite_join(self):
         self.helper.invite(
             self.room_id, self.creator, self.inviter, tok=self.creator_tok
         )
-        channel = self.make_request(
-            "POST",
-            f"/_matrix/client/r0/rooms/{self.room_id}/join",
-            access_token=self.inviter_tok,
-        )
+        self.helper.join(self.room_id, self.inviter, tok=self.inviter_tok)
+        self.nextcloud_client.add_user_to_group.assert_called_once()
 
-        self.assertEquals(self.nextcloud_client.add_user_to_group.call_count, 2)
-        self.assertEqual(200, channel.code)
-
-    def test_update_nextcloud_share_on_leave_event(self):
-        self.helper.invite(
-            self.room_id, self.creator, self.inviter, tok=self.creator_tok
-        )
-        channel = self.make_request(
-            "POST",
-            f"/_matrix/client/r0/rooms/{self.room_id}/leave",
-            access_token=self.inviter_tok,
-        )
-
+    def test_update_nextcloud_share_on_join_leave(self):
+        self.helper.join(self.room_id, self.inviter, tok=self.inviter_tok)
+        self.helper.leave(self.room_id, self.inviter, tok=self.inviter_tok)
         self.nextcloud_client.add_user_to_group.assert_called_once()
         self.nextcloud_client.remove_user_from_group.assert_called_once()
-        self.assertEqual(200, channel.code)
-
-    def test_update_nextcloud_share_on_kick_event(self):
-        self.helper.invite(
-            self.room_id, self.creator, self.inviter, tok=self.creator_tok
-        )
-        self.helper.join(self.room_id, user=self.inviter, tok=self.inviter_tok)
-        channel = self.make_request(
-            "POST",
-            f"/_matrix/client/r0/rooms/{self.room_id}/kick",
-            content={"user_id": self.inviter},
-            access_token=self.inviter_tok,
-        )
-
-        self.assertEquals(self.nextcloud_client.add_user_to_group.call_count, 2)
-        self.nextcloud_client.remove_user_from_group.assert_called_once()
-        self.assertEqual(200, channel.code)
 
     def test_update_nextcloud_share_with_an_unmapped_room(self):
         self.nextcloud_handler.update_existing_nextcloud_share_for_user = AsyncMock()

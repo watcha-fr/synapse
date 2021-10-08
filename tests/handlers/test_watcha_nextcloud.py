@@ -193,16 +193,6 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
             SynapseError,
         )
 
-    def test_update_existing_group_on_invite_membership(self):
-        self.get_success(
-            self.nextcloud_handler.update_group(
-                "@second_inviter:test", self.room_id, "invite"
-            )
-        )
-
-        self.nextcloud_client.add_user_to_group.assert_called_once()
-        self.nextcloud_client.remove_user_from_group.assert_not_called()
-
     def test_update_existing_group_on_join_membership(self):
         self.get_success(
             self.nextcloud_handler.update_group(
@@ -233,14 +223,14 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.nextcloud_client.remove_user_from_group.assert_called_once()
         self.nextcloud_client.add_user_to_group.assert_not_called()
 
-    def test_update_existing_group_on_invite_membership_with_exception(self):
+    def test_update_existing_group_on_join_membership_with_exception(self):
         self.nextcloud_client.add_user_to_group = AsyncMock(
             side_effect=NextcloudError(code=103, msg="")
         )
         second_inviter = "@second_inviter:test"
 
         self.get_success(
-            self.nextcloud_handler.update_group(second_inviter, self.room_id, "invite")
+            self.nextcloud_handler.update_group(second_inviter, self.room_id, "join")
         )
 
     def test_update_existing_group_on_leave_membership_with_exception(self):
