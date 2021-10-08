@@ -74,6 +74,7 @@ from synapse.storage.prepare_database import UpgradeDatabaseException
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.module_loader import load_module
 from synapse.util.versionstring import get_version_string
+from synapse.rest.watcha import WatchaRestResource  # watcha+
 
 logger = logging.getLogger("synapse.app.homeserver")
 
@@ -190,6 +191,7 @@ class SynapseHomeServer(HomeServer):
                     "/.well-known/matrix/client": WellKnownResource(self),
                     "/_synapse/admin": AdminRestResource(self),
                     **build_synapse_client_resource_tree(self),
+                    "/_watcha": WatchaRestResource(self),  #  watcha+
                 }
             )
 

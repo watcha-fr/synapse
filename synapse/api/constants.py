@@ -106,7 +106,6 @@ class EventTypes:
     ServerACL = "m.room.server_acl"
     Pinned = "m.room.pinned_events"
 
-    VectorSetting = "im.vector.web.settings"  # watcha+
     Retention = "m.room.retention"
 
     Dummy = "org.matrix.dummy_event"
@@ -115,6 +114,9 @@ class EventTypes:
     SpaceParent = "m.space.parent"
     MSC1772_SPACE_CHILD = "org.matrix.msc1772.space.child"
     MSC1772_SPACE_PARENT = "org.matrix.msc1772.space.parent"
+
+    VectorSetting = "im.vector.web.settings"  # watcha+
+    NextcloudCalendar = "watcha.room.nextcloud_calendar"  # watcha+
 
 
 class ToDeviceEventTypes:

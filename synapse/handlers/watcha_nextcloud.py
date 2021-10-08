@@ -1,21 +1,26 @@
 import logging
+from typing import Iterable, List, Optional, Set
+from urllib import parse as urlparse
 
 from jsonschema.exceptions import SchemaError, ValidationError
 
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
     Codes,
     HttpResponseException,
     NextcloudError,
     SynapseError,
 )
+from synapse.events import EventBase
 from synapse.logging.utils import build_log_message
+from synapse.types import Requester
 from synapse.util.watcha import calculate_room_name
 
 from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
-# echo -n watcha | md5sum  | head -c 10
+# echo -n watcha | md5sum | head -c 10
 NEXTCLOUD_GROUP_ID_PREFIX = "c4d96a06b7_"
 # Nextcloud does not allow group id longer than 64 characters
 NEXTCLOUD_GROUP_ID_LENGHT_LIMIT = 64
@@ -30,12 +35,72 @@ NEXTCLOUD_CLIENT_ERRORS = (
 class NextcloudHandler(BaseHandler):
     def __init__(self, hs: "Homeserver"):
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
         self.administration_handler = hs.get_administration_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
-        self.group_displayname_prefix = hs.config.nextcloud_group_displayname_prefix
+        self.state_handler = hs.get_state_handler()
+        self.store = hs.get_datastore()
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
+        self.group_displayname_prefix = hs.config.nextcloud_group_displayname_prefix
+
+    async def handle_room_member_event(
+        self, requester: Requester, room_id: str, user_id: str, membership: str
+    ):
+        if await self.store.get_share_id(room_id):
+            await self.update_group(user_id, room_id, membership)
+
+        events = await self._get_calendar_events(room_id)
+        if events:
+            await self.update_calendar_access(
+                requester, room_id, user_id, membership, events
+            )
+
+    async def handle_room_name_event(
+        self, requester: Requester, event_dict: dict, txn_id: Optional[str] = None
+    ):
+        event, _ = await self.event_creation_handler.create_and_send_nonmember_event(
+            requester, event_dict, txn_id=txn_id
+        )
+
+        room_id = event_dict["room_id"]
+        displayname = await self.build_group_displayname(room_id)
+
+        if await self.store.get_share_id(room_id):
+            group_id = await self.build_group_id(room_id)
+            await self.set_group_displayname(group_id, displayname)
+
+        calendar_ids = await self._get_calendar_ids(room_id)
+        if calendar_ids:
+            await self.nextcloud_client.rename_calendars(
+                calendar_ids, room_id, displayname
+            )
+
+        return event.event_id
+
+    # file sharing
+    # ============
+
+    async def update_share(self, room_id: str, user_id: str, event_content: dict):
+        await self.auth.check_user_in_room(room_id, user_id)
+
+        nextcloud_url = event_content["nextcloudShare"]
+
+        if nextcloud_url:
+            url_query = urlparse.parse_qs(urlparse.urlparse(nextcloud_url).query)
+            if "dir" not in url_query:
+                raise SynapseError(
+                    400,
+                    build_log_message(
+                        action="get `nextcloud_folder_path` from `im.vector.web.settings` event",
+                        log_vars={"nextcloud_url": nextcloud_url},
+                    ),
+                )
+            nextcloud_folder_path = url_query["dir"][0]
+            await self.bind(user_id, room_id, nextcloud_folder_path)
+
+        else:
+            await self.unbind(room_id)
 
     async def bind(self, requester_id: str, room_id: str, path: str):
         """Bind a Nextcloud folder with a room in three steps :
@@ -236,7 +301,7 @@ class NextcloudHandler(BaseHandler):
         group_id = await self.build_group_id(room_id)
 
         try:
-            if membership == "join":
+            if membership == Membership.JOIN:
                 await self.nextcloud_client.add_user_to_group(
                     nextcloud_username, group_id
                 )
@@ -254,3 +319,236 @@ class NextcloudHandler(BaseHandler):
                 "error": error,
             }
             logger.warn(build_log_message(log_vars=log_vars))
+
+    # calendar sharing
+    # ================
+
+    async def list_users_own_calendars(self, user_id: str):
+        nextcloud_username = await self.store.get_username(user_id)
+        calendars = await self.nextcloud_client.get_users_own_calendars(
+            nextcloud_username
+        )
+        aggregated_calendars = {key: list() for key in CalendarComponentTypes.ALL}
+        for calendar in calendars:
+            components = calendar["components"]
+            key = CalendarComponentTypes.serialize(components)
+            aggregated_calendars[key].append(
+                {
+                    "id": calendar["id"],
+                    "displayname": calendar["displayname"],
+                }
+            )
+        return aggregated_calendars
+
+    async def get_calendar(self, user_id: str, calendar_id: str):
+        nextcloud_username = await self.store.get_username(user_id)
+        return await self.nextcloud_client.get_calendar(nextcloud_username, calendar_id)
+
+    async def reorder_calendars(self, user_id: str, calendar_id: str):
+        nextcloud_username = await self.store.get_username(user_id)
+        return await self.nextcloud_client.reorder_calendars(
+            nextcloud_username, calendar_id
+        )
+
+    async def update_calendar_share(
+        self, requester: Requester, event_dict: dict, txn_id: Optional[str] = None
+    ):
+        user_id = event_dict["sender"]
+        room_id = event_dict["room_id"]
+        content = event_dict["content"]
+
+        await self.auth.check_user_in_room(room_id, user_id)
+
+        if not content:
+            state_key = event_dict["state_key"]
+            calendar_event = await self.state_handler.get_current_state(
+                room_id, EventTypes.NextcloudCalendar, state_key
+            )
+            if calendar_event is None or not calendar_event["content"]:
+                raise SynapseError(
+                    400,
+                    f"[Watcha] No such iCalendar component shared with this room",
+                    Codes.BAD_STATE,
+                )
+            calendar_ids = [calendar_event.content["id"]]
+            # FIXME: infer delete_group also from share_state
+            delete_group = len(await self._get_calendar_events(room_id)) == 1
+            await self.nextcloud_client.unshare_calendar(
+                calendar_ids, room_id, delete_group
+            )
+            event_dict["content"] = {}
+
+        elif content.get("id") is None:
+            fake_calendar = {
+                "components": [
+                    CalendarComponentTypes.VEVENT,
+                    CalendarComponentTypes.VTODO,
+                ]
+            }
+            await self._validate_calendar(room_id, fake_calendar)
+            displayname = await self.build_group_displayname(room_id)
+            user_ids = await self.store.get_users_in_room(room_id)
+            nextcloud_usernames = [
+                await self.store.get_username(user_id) for user_id in user_ids
+            ]
+            calendar = await self.nextcloud_client.create_and_share_calendar(
+                room_id, displayname, nextcloud_usernames
+            )
+            event_dict["content"] = self._make_calendar_event_content(calendar)
+            event_dict["state_key"] = CalendarComponentTypes.VEVENT_VTODO
+
+        else:
+            nextcloud_username = await self.store.get_username(user_id)
+            calendar_id = content["id"]
+            calendar = await self.nextcloud_client.get_calendar(
+                nextcloud_username, calendar_id
+            )
+            await self._validate_calendar(room_id, calendar)
+            components = calendar["components"]
+            event_dict["state_key"] = CalendarComponentTypes.serialize(components)
+            displayname = await self.build_group_displayname(room_id)
+            user_ids = await self.store.get_users_in_room(room_id)
+            nextcloud_usernames = [
+                await self.store.get_username(user_id) for user_id in user_ids
+            ]
+            calendar = await self.nextcloud_client.share_calendar(
+                nextcloud_username,
+                calendar_id,
+                room_id,
+                displayname,
+                nextcloud_usernames,
+            )
+            event_dict["content"] = self._make_calendar_event_content(calendar)
+
+        event, _ = await self.event_creation_handler.create_and_send_nonmember_event(
+            requester, event_dict, txn_id=txn_id
+        )
+        return event.event_id
+
+    async def update_calendar_access(
+        self,
+        requester: Requester,
+        room_id: str,
+        user_id: str,
+        membership: str,
+        calendar_events: List[EventBase],
+    ):
+        if membership == Membership.JOIN:
+            nextcloud_username = await self.store.get_username(user_id)
+            calendar_ids = [event["content"]["id"] for event in calendar_events]
+            displayname = await self.build_group_displayname(room_id)
+            await self.nextcloud_client.add_user_access_to_calendars(
+                nextcloud_username, room_id, calendar_ids, displayname
+            )
+            return
+
+        own_calendar_ids = []
+
+        for event in calendar_events:
+            if self._is_own_calendar(user_id, event):
+                own_calendar_ids.append(event["content"]["id"])
+                event_dict = {
+                    "type": EventTypes.NextcloudCalendar,
+                    "content": {},
+                    "room_id": room_id,
+                    "sender": user_id,
+                    "state_key": event["state_key"],
+                }
+                await self.event_creation_handler.create_and_send_nonmember_event(
+                    requester, event_dict
+                )
+
+        # FIXME: infer delete_group also from share_state
+        delete_group = all(
+            self._is_own_calendar(user_id, event) for event in calendar_events
+        )
+
+        if own_calendar_ids:
+            await self.nextcloud_client.unshare_calendar(
+                own_calendar_ids, room_id, delete_group
+            )
+
+        if not delete_group:
+            nextcloud_username = await self.store.get_username(user_id)
+            await self.nextcloud_client.remove_user_access_to_calendars(
+                nextcloud_username, room_id
+            )
+
+    def _is_own_calendar(self, user_id: str, calendar_event: EventBase):
+        return (
+            calendar_event["sender"] == user_id
+            and calendar_event["content"]["is_personal"] == True
+        )
+
+    async def _validate_calendar(self, room_id: str, calendar: dict):
+        components = CalendarComponentTypes.from_calendar(calendar)
+        state_keys = [
+            event["state_key"] for event in await self._get_calendar_events(room_id)
+        ]
+        current_components = CalendarComponentTypes.deserialize_from_state_keys(
+            state_keys
+        )
+        if not components.isdisjoint(current_components):
+            raise SynapseError(
+                400,
+                f"[Watcha] Some of the iCalendar components are already shared with this room",
+                Codes.BAD_STATE,
+            )
+
+    async def _get_calendar_events(self, room_id: str) -> List[EventBase]:
+        calendar_events = []
+        room_state = await self.state_handler.get_current_state(room_id)
+        for state_key in CalendarComponentTypes.ALL:
+            event = room_state.get((EventTypes.NextcloudCalendar, state_key))
+            if event is not None and event["content"]:
+                calendar_events.append(event)
+        return calendar_events
+
+    async def _get_calendar_ids(self, room_id: str) -> List[int]:
+        calendar_ids = []
+        for event in await self._get_calendar_events(room_id):
+            calendar_ids.append(event["content"]["id"])
+        return calendar_ids
+
+    def _make_calendar_event_content(self, calendar: dict) -> dict:
+        return {
+            "id": calendar["id"],
+            "is_personal": calendar["is_personal"],
+        }
+
+
+class CalendarComponentTypes:
+    VEVENT_VTODO = "VEVENT_VTODO"
+    VEVENT = "VEVENT"
+    VTODO = "VTODO"
+    ALL = (VEVENT_VTODO, VEVENT, VTODO)
+
+    @classmethod
+    def serialize(cls, components: List[str]) -> str:
+        key = set(components)
+        if key == {cls.VEVENT, cls.VTODO}:
+            return cls.VEVENT_VTODO
+        if key == {cls.VEVENT}:
+            return cls.VEVENT
+        if key == {cls.VTODO}:
+            return cls.VTODO
+
+    @classmethod
+    def deserialize(cls, components: str) -> Set[str]:
+        types = {
+            cls.VEVENT_VTODO: {cls.VEVENT, cls.VTODO},
+            cls.VEVENT: {cls.VEVENT},
+            cls.VTODO: {cls.VTODO},
+        }
+        return types.get(components)
+
+    @classmethod
+    def deserialize_from_state_keys(cls, state_keys: List[str]) -> Set[str]:
+        component_set = set()
+        for key in state_keys:
+            component_set.update(cls.deserialize(key))
+        return component_set
+
+    @classmethod
+    def from_calendar(cls, calendar: dict) -> Set[str]:
+        return set(calendar["components"])
