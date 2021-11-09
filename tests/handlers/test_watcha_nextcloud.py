@@ -3,7 +3,6 @@ from unittest.mock import AsyncMock
 from synapse.api.errors import NextcloudError, SynapseError
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
-from synapse.util.watcha import calculate_room_name
 
 from tests.unittest import HomeserverTestCase
 
@@ -113,8 +112,6 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         )
 
     def test_create_group_with_set_displayname_exception(self):
-        room_name = "default room"
-        calculate_room_name = AsyncMock(return_value=room_name)
         self.nextcloud_client.set_group_displayname = AsyncMock(
             side_effect=NextcloudError(code=101, msg="")
         )
