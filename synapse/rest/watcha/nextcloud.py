@@ -84,7 +84,7 @@ class ReorderCalendarsRestServlet(RestServlet):
     async def on_PUT(
         self, request: SynapseRequest, calendar_id: str
     ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request, allow_partner=False)
+        requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
         response = await self.nextcloud_handler.reorder_calendars(user_id, calendar_id)
         return 200, {}
