@@ -100,7 +100,7 @@ class NextcloudHandler(BaseHandler):
             await self.bind(user_id, room_id, nextcloud_folder_path)
 
         else:
-            await self.unbind(room_id)
+            await self.unbind(user_id, room_id)
 
     async def bind(self, requester_id: str, room_id: str, path: str):
         """Bind a Nextcloud folder with a room in three steps :
@@ -252,7 +252,7 @@ class NextcloudHandler(BaseHandler):
                 nextcloud_username, path, group_id
             )
         except NEXTCLOUD_CLIENT_ERRORS as error:
-            await self.unbind(room_id)
+            await self.unbind(requester_id, room_id)
             # raise 404 error if folder to share do not exist
             http_code = (
                 error.code
@@ -274,12 +274,29 @@ class NextcloudHandler(BaseHandler):
 
         await self.store.register_share(room_id, new_share_id)
 
-    async def unbind(self, room_id: str):
+    async def unbind(self, requester_id: str, room_id: str):
         """Unbind a Nextcloud folder from a room.
 
         Args :
+            requester_id: the mxid of the requester.
             room_id: the id of the room to bind
         """
+        nextcloud_username = await self.store.get_username(requester_id)
+        share_id = await self.store.get_share_id(room_id)
+        if share_id:
+            try:
+                await self.nextcloud_client.unshare(nextcloud_username, share_id)
+            except NEXTCLOUD_CLIENT_ERRORS as error:
+                logger.error(
+                    build_log_message(
+                        log_vars={
+                            "nextcloud_username": nextcloud_username,
+                            "share_id": share_id,
+                            "error": error,
+                        }
+                    )
+                )
+
         group_id = await self.build_group_id(room_id)
         try:
             await self.nextcloud_client.delete_group(group_id)
