@@ -45,7 +45,7 @@ class KeycloakClient(SimpleHttpClient):
 
         self.server_url = hs.config.keycloak_url
         self.realm_name = hs.config.realm_name
-        self.service_account_name = hs.config.service_account_name
+        self.service_account_name = hs.config.keycloak_service_account_name
         self.service_account_password = hs.config.keycloak_service_account_password
 
     async def add_user(self, password_hash, email, is_admin=False):

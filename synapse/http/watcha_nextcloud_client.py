@@ -72,7 +72,7 @@ class NextcloudClient(SimpleHttpClient):
         super().__init__(hs)
 
         self.nextcloud_url = hs.config.nextcloud_url
-        self.service_account_name = hs.config.service_account_name
+        self.service_account_name = hs.config.nextcloud_service_account_name
         self.service_account_password = hs.config.nextcloud_service_account_password
         self._headers = self._get_headers()
         self._headers_for_ocs_api = self._get_headers_for_ocs_api()
