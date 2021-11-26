@@ -294,7 +294,7 @@ class NextcloudClient(SimpleHttpClient):
             the id of Nextcloud share
         """
         response = await self.post_json_get_json(
-            uri=f"{self.nextcloud_url}/ocs/v2.php/apps/watcha_integrator/api/v1/shares",
+            uri=f"{self.base_url}/documents",
             headers=self._headers_for_ocs_api,
             post_json={
                 "path": path,
@@ -322,7 +322,7 @@ class NextcloudClient(SimpleHttpClient):
             404: Share couldn’t be deleted.
         """
         response = await self.delete_get_json(
-            uri=f"{self.nextcloud_url}/ocs/v2.php/apps/watcha_integrator/api/v1/shares/{share_id}",
+            uri=f"{self.base_url}/documents/{share_id}",
             headers=self._headers_for_ocs_api,
             json_body={"requester": requester},
         )
