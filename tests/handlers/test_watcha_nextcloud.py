@@ -49,7 +49,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.nextcloud_client.share.reset_mock()
 
     def test_unbind(self):
-        self.get_success(self.nextcloud_handler.unbind(self.room_id))
+        self.get_success(self.nextcloud_handler.unbind(self.creator, self.room_id))
         share_id = self.get_success(self.store.get_share_id(self.room_id))
 
         self.nextcloud_client.delete_group.assert_called_once_with(self.group_id)
@@ -59,7 +59,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.nextcloud_client.delete_group = AsyncMock(
             side_effect=NextcloudError(code=101, msg="")
         )
-        self.get_success(self.nextcloud_handler.unbind(self.room_id))
+        self.get_success(self.nextcloud_handler.unbind(self.creator, self.room_id))
         share_id = self.get_success(self.store.get_share_id(self.room_id))
 
         self.nextcloud_client.delete_group.assert_called_once_with(self.group_id)
@@ -178,7 +178,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         )
 
         self.assertEquals(error.value.code, 500)
-        self.nextcloud_handler.unbind.assert_called_once_with(self.room_id)
+        self.nextcloud_handler.unbind.assert_called_once_with(self.creator, self.room_id)
 
     def test_add_user_to_unexisting_group(self):
         self.nextcloud_client.add_user_to_group = AsyncMock(
