@@ -9,7 +9,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.logging.utils import build_log_message
-from synapse.util.watcha import calculate_room_name
+from synapse.push.presentable_names import calculate_room_name
 
 from ._base import BaseHandler
 
@@ -33,6 +33,7 @@ class NextcloudHandler(BaseHandler):
         self.store = hs.get_datastore()
         self.administration_handler = hs.get_administration_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.state_handler = hs.get_state_handler()
         self.group_displayname_prefix = hs.config.nextcloud_group_displayname_prefix
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
@@ -94,7 +95,8 @@ class NextcloudHandler(BaseHandler):
         Args:
             room_id: the id of the room
         """
-        room_name = await calculate_room_name(self.hs, room_id)
+        room_state_ids = await self.state_handler.get_current_state_ids(room_id)
+        room_name = await calculate_room_name(self.store, room_state_ids, None)
         return f"{self.group_displayname_prefix} {room_name}"
 
     async def set_group_displayname(self, group_id: str, group_displayname: str):
