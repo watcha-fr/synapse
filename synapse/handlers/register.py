@@ -401,11 +401,31 @@ class RegistrationHandler(BaseHandler):
                     # create room expects the localpart of the room alias
                     config["room_alias_name"] = room_alias.localpart
 
+                    """ watcha!
                     info, _ = await room_creation_handler.create_room(
                         fake_requester,
                         config=config,
                         ratelimit=False,
                     )
+                    !watcha """
+
+                    # watcha+
+                    try:
+                        info, _ = await room_creation_handler.create_room(
+                            fake_requester,
+                            config=config,
+                            ratelimit=False,
+                        )
+                    except SynapseError as e:
+                        # The room already exists
+                        (
+                            room,
+                            remote_room_hosts,
+                        ) = await room_member_handler.lookup_room_alias(room_alias)
+                        room_id = room.to_string()
+                        info = {"room_id": room_id}
+                        requires_join = True
+                    # +watcha
 
                     # If the room does not require an invite, but another user
                     # created it, then ensure the first user joins it.
@@ -521,6 +541,7 @@ class RegistrationHandler(BaseHandler):
         if self.hs.config.registration.autocreate_auto_join_rooms and is_real_user:
             count = await self.store.count_real_users()
             should_auto_create_rooms = count == 1
+            should_auto_create_rooms = count >= 1  # watcha+
 
         if should_auto_create_rooms:
             await self._create_and_join_rooms(user_id)
