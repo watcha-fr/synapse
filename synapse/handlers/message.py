@@ -88,7 +88,11 @@ class MessageHandler:
             )
 
     async def get_room_data(
-        self, user_id: str, room_id: str, event_type: str, state_key: str,
+        self,
+        user_id: str,
+        room_id: str,
+        event_type: str,
+        state_key: str,
     ) -> dict:
         """ Get data from a room.
 
