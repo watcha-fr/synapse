@@ -652,6 +652,11 @@ class OidcHandlerTestCase(HomeserverTestCase):
         userinfo = {
             "sub": "test_user",
             "username": "test_user",
+            # watcha+
+            "email": "test_user@test.com",
+            "is_admin": True,
+            "is_partner": False,
+            # +watcha
         }
         # The token doesn't matter with the default user mapping provider.
         token = {}
@@ -666,6 +671,11 @@ class OidcHandlerTestCase(HomeserverTestCase):
         userinfo = {
             "sub": 1234,
             "username": "test_user_2",
+            # watcha+
+            "email": "test_user_2@test.com",
+            "is_admin": False,
+            "is_partner": True,
+            # +watcha
         }
         mxid = self.get_success(
             self.handler._map_userinfo_to_user(

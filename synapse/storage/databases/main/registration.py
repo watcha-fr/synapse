@@ -28,6 +28,8 @@ from synapse.storage.util.sequence import build_sequence_generator
 from synapse.types import UserID
 from synapse.util.caches.descriptors import cached
 
+import logging # watcha+
+
 THIRTY_MINUTES_IN_MS = 30 * 60 * 1000
 
 logger = logging.getLogger(__name__)
@@ -69,6 +71,7 @@ class RegistrationWorkerStore(SQLBaseStore):
                 "password_hash",
                 "is_guest",
                 "admin",
+                "is_partner", # watcha+
                 "consent_version",
                 "consent_server_notice_sent",
                 "appservice_id",
@@ -328,6 +331,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         await self.db_pool.runInteraction("set_server_admin", set_server_admin_txn)
 
     def _query_for_auth(self, txn, token):
+        """ watcha!
         sql = (
             "SELECT users.name, users.is_guest, users.shadow_banned, access_tokens.id as token_id,"
             " access_tokens.device_id, access_tokens.valid_until_ms"
@@ -335,6 +339,16 @@ class RegistrationWorkerStore(SQLBaseStore):
             " INNER JOIN access_tokens on users.name = access_tokens.user_id"
             " WHERE token = ?"
         )
+        !watcha """
+        # watcha+
+        sql = (
+            "SELECT users.name, users.is_guest, users.shadow_banned, users.is_partner, access_tokens.id as token_id,"
+            " access_tokens.device_id, access_tokens.valid_until_ms"
+            " FROM users"
+            " INNER JOIN access_tokens on users.name = access_tokens.user_id"
+            " WHERE token = ?"
+        )
+        # +watcha
 
         txn.execute(sql, (token,))
         rows = self.db_pool.cursor_to_dict(txn)
@@ -1094,6 +1108,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
         password_hash: Optional[str] = None,
         was_guest: bool = False,
         make_guest: bool = False,
+        make_partner: bool = False, # watcha+
         appservice_id: Optional[str] = None,
         create_profile_with_displayname: Optional[str] = None,
         admin: bool = False,
@@ -1128,6 +1143,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             password_hash,
             was_guest,
             make_guest,
+            make_partner, # watcha+
             appservice_id,
             create_profile_with_displayname,
             admin,
@@ -1142,6 +1158,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
         password_hash,
         was_guest,
         make_guest,
+        make_partner, # watcha+
         appservice_id,
         create_profile_with_displayname,
         admin,
@@ -1188,6 +1205,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
                         "password_hash": password_hash,
                         "creation_ts": now,
                         "is_guest": 1 if make_guest else 0,
+                        "is_partner": 1 if make_partner else 0, # watcha+
                         "appservice_id": appservice_id,
                         "admin": 1 if admin else 0,
                         "user_type": user_type,
@@ -1576,6 +1594,27 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
         )
         txn.call_after(self.is_guest.invalidate, (user_id,))
 
+    # watcha+ op318
+    async def is_user_partner(self, user_id):
+
+        is_partner = await self.db_pool.simple_select_one_onecol(
+            "users",
+            keyvalues={"name": user_id},
+            retcol="is_partner",
+            desc="isUserPartner",
+        )
+        return is_partner
+
+    async def is_user_admin(self, user_id):
+
+        is_admin = await self.db_pool.simple_select_one_onecol(
+            "users",
+            keyvalues={"name": user_id},
+            retcol="admin",
+            desc="isUserAdmin",
+        )
+        return is_admin
+    # +watcha
 
 def find_max_generated_user_id_localpart(cur: Cursor) -> int:
     """

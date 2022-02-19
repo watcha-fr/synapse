@@ -1529,3 +1529,70 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             self.is_room_blocked,
             (room_id,),
         )
+
+    # watcha+
+    async def get_nextcloud_directory_path_from_roomID(self, room_id):
+        """ Get Nextcloud directory path which is mapped with room_id.
+        """
+
+        return await self.db_pool.simple_select_one_onecol(
+            table="room_mapping_with_NC",
+            keyvalues={"room_id": room_id},
+            retcol="directory_path",
+            allow_none=True,
+            desc="get_nextcloud_directory_path_from_roomID",
+        )
+ 
+    async def get_roomID_from_nextcloud_directory_path(self, directory_path):
+        """ Get the room_id mapped with Nextcloud directory path.
+        """
+
+        return await self.db_pool.simple_select_one_onecol(
+            table="room_mapping_with_NC",
+            keyvalues={"directory_path": directory_path},
+            retcol="room_id",
+            allow_none=True,
+            desc="get_roomID_from_nextcloud_directory_path",
+        )
+
+    async def get_room_creator(self, room_id):
+        """ Get a list of administrators of the room.
+        """
+
+        def get_room_creator_txn(txn):
+            sql = """
+                SELECT
+                    creator
+                FROM rooms
+                WHERE rooms.room_id = ?;
+                """
+            txn.execute(sql, (room_id,))
+            return txn.fetchone()
+
+        first_room_admin = await self.db_pool.runInteraction(
+            "get_room_creator", get_room_creator_txn
+        )
+
+        return first_room_admin[0]
+
+    async def set_room_mapping_with_nextcloud_directory(self, room_id, directory_path):
+        """ Set mapping between Watcha room and Nextcloud directory.
+        """
+
+        await self.db_pool.simple_upsert(
+            table="room_mapping_with_NC",
+            keyvalues={"room_id": room_id},
+            values={"room_id": room_id, "directory_path": directory_path,},
+            desc="set_room_mapping_with_nextcloud_directory",
+        )
+
+    async def deleted_room_mapping_with_nextcloud_directory(self, room_id):
+        """ Delete mapping between Watcha room and Nextcloud directory for room_id.
+        """
+
+        await self.db_pool.simple_delete(
+            table="room_mapping_with_NC",
+            keyvalues={"room_id": room_id},
+            desc="deleted_room_mapping_with_nextcloud_directory",
+        )
+    # +watcha        
