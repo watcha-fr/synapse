@@ -23,6 +23,7 @@ import math
 import random
 import string
 from collections import OrderedDict
+from pathlib import Path # watcha+ op488
 from typing import TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Tuple
 
 from synapse.api.constants import (
@@ -674,7 +675,12 @@ class RoomCreationHandler(BaseHandler):
                 % (user_id,),
             )
 
+        invite_3pid_list = config.get("invite_3pid", [])
+
+        """ watcha!
         visibility = config.get("visibility", None)
+        !watcha """
+        visibility = "private" # watcha+
         is_public = visibility == "public"
 
         room_id = await self._generate_room_id(
@@ -780,6 +786,7 @@ class RoomCreationHandler(BaseHandler):
             )
 
         for invite_3pid in invite_3pid_list:
+            """ watcha!
             id_server = invite_3pid["id_server"]
             id_access_token = invite_3pid.get("id_access_token")  # optional
             address = invite_3pid["address"]
@@ -796,6 +803,35 @@ class RoomCreationHandler(BaseHandler):
                 txn_id=None,
                 id_access_token=id_access_token,
             )
+            !watcha """
+            # watcha+
+            logger.info("invitation on creation: inviter id=%s, device_id=%s",
+                requester.user, requester.device_id)
+
+            invite_3pid["user_id"] = await self.hs.get_handlers().invite_external_handler.invite(
+                room_id=room_id,
+                inviter=requester.user,
+                inviter_device_id=str(requester.device_id),
+                invitee=invite_3pid["address"]
+            )
+
+            logger.info("invitee email=%s has been invited as %s at the creation of the room with id=%s",
+                        invite_3pid["address"], invite_3pid["user_id"], room_id)
+
+            content = {}
+            is_direct = config.get("is_direct", None)
+            if is_direct:
+                content["is_direct"] = is_direct
+
+            await self.room_member_handler.update_membership(
+                requester,
+                UserID.from_string(invite_3pid["user_id"]),
+                room_id,
+                "invite",
+                ratelimit=False,
+                content=content,
+            )
+            # +watcha
 
         result = {"room_id": room_id}
 
@@ -878,6 +914,7 @@ class RoomCreationHandler(BaseHandler):
                 etype=EventTypes.PowerLevels, content=pl_content
             )
         else:
+            """ watcha!
             power_level_content = {
                 "users": {creator_id: 100},
                 "users_default": 0,
@@ -898,6 +935,29 @@ class RoomCreationHandler(BaseHandler):
                 "redact": 50,
                 "invite": 50,
             }  # type: JsonDict
+            !watcha """
+            # watcha+
+            power_level_content = {
+                "users": {creator_id: 100},
+                "users_default": 0,
+                "events": {
+                    EventTypes.Name: 50,
+                    EventTypes.PowerLevels: 100,
+                    EventTypes.RoomHistoryVisibility: 50,
+                    EventTypes.CanonicalAlias: 50,
+                    EventTypes.RoomAvatar: 50,
+                    EventTypes.Tombstone: 100,
+                    EventTypes.ServerACL: 100,
+                    EventTypes.RoomEncryption: 100,
+                },
+                "events_default": 0,
+                "state_default": 50,
+                "ban": 50,
+                "kick": 50,
+                "redact": 50,
+                "invite": 50,
+            }
+            # +watcha
 
             if config["original_invitees_have_ops"]:
                 for invitee in invite_list:
@@ -1344,3 +1404,76 @@ class RoomShutdownHandler:
             "local_aliases": aliases_for_room,
             "new_room_id": new_room_id,
         }
+
+# watcha+
+class WatchaRoomHandler(BaseHandler):
+    def __init__(self, hs):
+        self.store = hs.get_datastore()
+        self.event_creation_handler = hs.get_event_creation_handler()
+
+    async def get_room_list_to_send_NC_notification(
+        self, directory, limit_of_notification_propagation
+    ):
+        rooms = []
+
+        if not directory:
+            raise SynapseError(400, "The directory path is empty")
+
+        directories = [
+            str(directory)
+            for directory in Path(directory).parents
+            if limit_of_notification_propagation in str(directory)
+            and str(directory) != limit_of_notification_propagation
+        ]
+        directories.append(directory)
+
+        for directory in directories:
+            room = await self.store.get_room_to_send_NC_notification(directory)
+
+            if room:
+                rooms.append(room)
+
+        if not rooms:
+            raise SynapseError(
+                400, "No rooms are linked with this Nextcloud directory."
+            )
+
+        return rooms
+
+    async def _get_first_room_admin(self, room_id):
+        result = await self.store.get_first_room_admin(room_id)
+        return result
+
+    async def send_NC_notification_to_rooms(self, rooms, file_name, file_url, file_operation):
+
+        content = {
+            "body": file_operation,
+            "filename": file_name,
+            "msgtype": "m.file",
+            "url": "",
+        }
+
+        if file_operation in ("file_created", "file_restored", "file_moved"):
+            content["url"] = file_url
+
+        for room in rooms:
+            first_room_admin = await self._get_first_room_admin(room)
+
+            if not first_room_admin:
+                logger.warn(
+                    "No administrators are in the room. The Nextcloud notification cannot be posted.",
+                )
+                continue
+
+            requester = create_requester(first_room_admin)
+
+            event_dict = {
+                "type": EventTypes.Message,
+                "content": content,
+                "room_id": room,
+                "sender": requester.user.to_string(),
+            }
+
+            await self.event_creation_handler.create_and_send_nonmember_event(
+                requester, event_dict
+            )
