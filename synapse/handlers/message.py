@@ -98,6 +98,7 @@ class MessageHandler(object):
         event_type: str,
         state_key: str,
         is_guest: bool,
+        is_partner: bool=False, # watcha+
     ) -> dict:
         """ Get data from a room.
 

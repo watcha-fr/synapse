@@ -46,6 +46,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.user2_id, self.user2_token = self._create_user("bob")
 
         self.room = self.helper.create_room_as(self.user_id, tok=self.user_token)
+        self.helper.invite(self.room, src=self.user_id, tok=self.user_token, targ=self.user2_id) # watcha+ - need to be invited
         self.helper.join(self.room, user=self.user2_id, tok=self.user2_token)
         res = self.helper.send(self.room, body="Hi!", tok=self.user_token)
         self.parent_id = res["event_id"]
@@ -187,6 +188,9 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             user_id, token = self._create_user("test" + str(idx))
             idx += 1
 
+            # added for watcha
+            self.helper.invite(self.room, src=self.user_id, tok=self.user_token, targ=user_id) # added for Watcha: need to be invited
+            # end of added for watcha
             self.helper.join(self.room, user=user_id, tok=token)
             access_tokens.append(token)
 
@@ -254,6 +258,9 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             user_id, token = self._create_user("test" + str(idx))
             idx += 1
 
+            # added for watcha
+            self.helper.invite(self.room, src=self.user_id, tok=self.user_token, targ=user_id) # added for Watcha: need to be invited
+            # end of added for watcha
             self.helper.join(self.room, user=user_id, tok=token)
             access_tokens.append(token)
 
