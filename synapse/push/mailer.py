@@ -177,15 +177,15 @@ class Mailer:
         """
         subject = self.email_subjects.watcha_registration % {"app": self.app_name}
 
-        sender_display_name = await self.profile_handler.get_displayname(
+        sender_name = await self.profile_handler.get_displayname(
             UserID.from_string(sender_id)
         )
-        sender_email = await self.account_handler.get_email_address_for_user(sender_id)
-        sender_name = (
-            "{} ({})".format(sender_display_name, sender_email)
-            if sender_display_name
-            else sender_email
-        )
+        addresses = await self.account_handler._get_email_addresses_for_user(sender_id)
+
+        if sender_name and addresses:
+            sender_name += f" ({addresses[0]})"
+        elif addresses:
+            sender_name = addresses[0]
 
         b64_images = {
             "b64_watcha_button": self._get_b64_image("watcha_button.png"),

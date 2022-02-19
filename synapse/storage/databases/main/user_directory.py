@@ -870,6 +870,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                                 user_threepids
                             WHERE
                                 medium = 'email'
+                            GROUP BY user_id
                         )
                         AS tpid
                         ON ud.user_id = tpid.user_id

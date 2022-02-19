@@ -164,13 +164,11 @@ class ProfileRestServlet(RestServlet):
             ret["avatar_url"] = avatar_url
 
         # watcha+
-        try:
-            email = await self.account_activity_handler.get_email_address_for_user(
-                user_id
-            )
-            ret["email"] = email
-        except SynapseError:
-            logger.error("Email is not defined for this user.")
+        addresses = await self.account_activity_handler._get_email_addresses_for_user(
+            user_id
+        )
+        if addresses:
+            ret["email"] = addresses[0]
         # +watcha
         return 200, ret
 
