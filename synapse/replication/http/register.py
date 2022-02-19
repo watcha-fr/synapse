@@ -44,6 +44,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
         admin,
         user_type,
         address,
+        make_partner # watcha+
     ):
         """
         Args:

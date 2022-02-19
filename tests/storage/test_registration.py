@@ -51,6 +51,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
                 "creation_ts": 1000,
                 "user_type": None,
                 "deactivated": 0,
+                "is_partner": 0, # watcha+
             },
             (yield self.store.get_user_by_id(self.user_id)),
         )
