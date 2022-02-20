@@ -43,7 +43,10 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         )
 
         user_id = UserID("us", "test")
+        """ watcha!
         our_user = Requester(user_id, None, False, False, None, None)
+        !watcha """        
+        our_user = Requester(user_id, None, False, False, None, False, None) # watcha+
         room_creator = self.homeserver.get_room_creation_handler()
         self.room_id = self.get_success(
             room_creator.create_room(

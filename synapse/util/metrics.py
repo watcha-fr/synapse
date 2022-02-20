@@ -27,6 +27,7 @@ from synapse.logging.context import (
 from synapse.metrics import InFlightGauge
 
 logger = logging.getLogger(__name__)
+logger.disabled = True # watcha+
 
 block_counter = Counter("synapse_util_metrics_block_count", "", ["block_name"])
 

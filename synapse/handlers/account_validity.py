@@ -26,6 +26,8 @@ from synapse.metrics.background_process_metrics import wrap_as_background_proces
 from synapse.types import UserID
 from synapse.util import stringutils
 
+from synapse.api.errors import SynapseError # watcha+
+
 logger = logging.getLogger(__name__)
 
 
@@ -162,6 +164,47 @@ class AccountValidityHandler:
             )
 
         await self.store.set_renewal_mail_status(user_id=user_id, email_sent=True)
+
+    # watcha+
+    async def get_threepids_for_user(self, user_id):
+        """Retrieve the list of threepids attached to a user's account
+
+        Args:
+            user_id (str): ID of the user to lookup threepids for.
+
+        Returns:
+            defer.Deferred str: List of threepids for this account.
+        """
+
+        threepids = await self.store.user_get_threepids(user_id)
+
+        return threepids
+
+    async def get_email_address_for_user(self, user_id):
+        """Retrieve only one email address attached to a user's account
+
+        Args:
+            user_id (str): ID of the user to lookup email address for.
+
+        Returns:
+            defer.Deferred str: Email address for this account.
+        """
+
+        emails = await self._get_email_addresses_for_user(user_id)
+
+        if len(emails) > 1:
+            raise SynapseError(
+                403, "This user has multiple email addresses attached to his account."
+            )
+        if not emails:
+            raise SynapseError(
+                403, "This user has no email address attached to his account"
+            )
+
+        email = emails[0]
+
+        return email
+    # +watcha
 
     async def _get_email_addresses_for_user(self, user_id: str) -> List[str]:
         """Retrieve the list of email addresses attached to a user's account.

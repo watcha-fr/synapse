@@ -43,11 +43,13 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         self.room_id1 = self.helper.create_room_as(
             self.other_user, tok=self.other_user_tok, is_public=True
         )
+        self.helper.invite(self.room_id1, self.other_user, self.admin_user, tok=self.other_user_tok) # watcha+
         self.helper.join(self.room_id1, user=self.admin_user, tok=self.admin_user_tok)
 
         self.room_id2 = self.helper.create_room_as(
             self.other_user, tok=self.other_user_tok, is_public=True
         )
+        self.helper.invite(self.room_id2, self.other_user, self.admin_user, tok=self.other_user_tok) # watcha+
         self.helper.join(self.room_id2, user=self.admin_user, tok=self.admin_user_tok)
 
         # Two rooms and two users. Every user sends and reports every room event

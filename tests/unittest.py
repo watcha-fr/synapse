@@ -268,7 +268,10 @@ class HomeserverTestCase(TestCase):
                         "is_guest": False,
                     }
 
+                """ watcha!
                 async def get_user_by_req(request, allow_guest=False, rights="access"):
+                !watcha """
+                async def get_user_by_req(request, allow_guest=False, allow_partner=False, rights="access"): # watcha+
                     return create_requester(
                         UserID.from_string(self.helper.auth_user_id),
                         token_id,
@@ -542,7 +545,10 @@ class HomeserverTestCase(TestCase):
 
         return result
 
+    """ watcha!
     def register_user(self, username, password, admin=False):
+    !watcha """
+    def register_user(self, username, password, admin=False, is_partner=False): # watcha+
         """
         Register a user. Requires the Admin API be registered.
 
@@ -581,6 +587,7 @@ class HomeserverTestCase(TestCase):
                 "admin": admin,
                 "mac": want_mac,
                 "inhibit_login": True,
+                "is_partner": False if admin else is_partner, # watcha+
             }
         )
         request, channel = self.make_request(
@@ -627,7 +634,10 @@ class HomeserverTestCase(TestCase):
         """
         event_creator = self.hs.get_event_creation_handler()
         secrets = self.hs.get_secrets()
+        """ watcha!
         requester = Requester(user, None, False, False, None, None)
+        !watcha """
+        requester = Requester(user, None, False, False, None, False, None) # watcha+
 
         event, context = self.get_success(
             event_creator.create_event(
