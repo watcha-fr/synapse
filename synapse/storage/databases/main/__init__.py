@@ -72,6 +72,12 @@ from .ui_auth import UIAuthStore
 from .user_directory import UserDirectoryStore
 from .user_erasure_store import UserErasureStore
 
+# watcha+
+from .watcha_administration import AdministrationStore
+from .watcha_partner import PartnerStore
+from .watcha_nextcloud import NextcloudStore
+# +watcha
+
 logger = logging.getLogger(__name__)
 
 
@@ -118,6 +124,11 @@ class DataStore(
     UIAuthStore,
     CacheInvalidationWorkerStore,
     ServerMetricsStore,
+    # watcha+
+    AdministrationStore,
+    PartnerStore,
+    NextcloudStore,
+    # +watcha
 ):
     def __init__(self, database: DatabasePool, db_conn, hs):
         self.hs = hs

@@ -132,6 +132,7 @@ class HTTPPusherTests(HomeserverTestCase):
         room = self.helper.create_room_as(user_id, tok=access_token)
 
         # The other user joins
+        self.helper.invite (room, user_id, other_user_id, tok=access_token) # watcha+
         self.helper.join(room=room, user=other_user_id, tok=other_access_token)
 
         # The other user sends some messages
@@ -159,9 +160,17 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # One push was attempted to be sent -- it'll be the first message
         self.assertEqual(len(self.push_attempts), 1)
+        """ watcha!
         self.assertEqual(
             self.push_attempts[0][1], "http://example.com/_matrix/push/v1/notify"
         )
+        !watcha """
+        # watcha+ 
+        # hardcoded in synapse/push/pusherpool.py,
+        # because we need different AppIds for Android and iOS and the code doesn't support it
+        self.assertEqual(self.push_attempts[0][1],
+                         "http://127.0.0.1:5000/_matrix/push/v1/notify")
+        # +watcha
         self.assertEqual(
             self.push_attempts[0][2]["notification"]["content"]["body"], "Hi!"
         )
@@ -181,9 +190,15 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Now it'll try and send the second push message, which will be the second one
         self.assertEqual(len(self.push_attempts), 2)
+        """ watcha!
         self.assertEqual(
             self.push_attempts[1][1], "http://example.com/_matrix/push/v1/notify"
         )
+        !watcha """
+        # watcha+
+        self.assertEqual(self.push_attempts[1][1],
+                         "http://127.0.0.1:5000/_matrix/push/v1/notify")
+        # +watcha
         self.assertEqual(
             self.push_attempts[1][2]["notification"]["content"]["body"], "There!"
         )
@@ -220,6 +235,8 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Create a room
         room = self.helper.create_room_as(user_id, tok=access_token)
+
+        self.helper.invite (room, user_id, other_user_id, tok=access_token) # watcha+
 
         # The other user joins
         self.helper.join(room=room, user=other_user_id, tok=other_access_token)
@@ -276,15 +293,19 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Check our push made it with high priority
         self.assertEqual(len(self.push_attempts), 1)
+        """ watcha!
         self.assertEqual(
             self.push_attempts[0][1], "http://example.com/_matrix/push/v1/notify"
         )
+        !watcha """
+        self.assertEqual(self.push_attempts[0][1], "http://127.0.0.1:5000/_matrix/push/v1/notify") # watcha+
         self.assertEqual(self.push_attempts[0][2]["notification"]["prio"], "high")
 
         # Add yet another person — we want to make this room not a 1:1
         # (as encrypted messages in a 1:1 currently have tweaks applied
         #  so it doesn't properly exercise the condition of all encrypted
         #  messages need to be high).
+        self.helper.invite(room, user_id, yet_another_user_id, tok=access_token) # watcha+
         self.helper.join(
             room=room, user=yet_another_user_id, tok=yet_another_access_token
         )
@@ -316,9 +337,12 @@ class HTTPPusherTests(HomeserverTestCase):
         # Advance time a bit, so the pusher will register something has happened
         self.pump()
         self.assertEqual(len(self.push_attempts), 2)
+        """ watcha!
         self.assertEqual(
             self.push_attempts[1][1], "http://example.com/_matrix/push/v1/notify"
         )
+        !watcha """
+        self.assertEqual(self.push_attempts[1][1], "http://127.0.0.1:5000/_matrix/push/v1/notify") # watcha+
         self.assertEqual(self.push_attempts[1][2]["notification"]["prio"], "high")
 
     def test_sends_high_priority_for_one_to_one_only(self):
@@ -340,6 +364,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Create a room
         room = self.helper.create_room_as(user_id, tok=access_token)
+        self.helper.invite (room, user_id, other_user_id, tok=access_token) # watcha+
 
         # The other user joins
         self.helper.join(room=room, user=other_user_id, tok=other_access_token)
@@ -376,10 +401,14 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Check our push made it with high priority — this is a one-to-one room
         self.assertEqual(len(self.push_attempts), 1)
+        """ watcha!
         self.assertEqual(
             self.push_attempts[0][1], "http://example.com/_matrix/push/v1/notify"
         )
+        !watcha """
+        self.assertEqual(self.push_attempts[0][1], "http://127.0.0.1:5000/_matrix/push/v1/notify") # watcha+
         self.assertEqual(self.push_attempts[0][2]["notification"]["prio"], "high")
+        self.helper.invite(room, user_id, yet_another_user_id, tok=access_token) # watcha+
 
         # Yet another user joins
         self.helper.join(
@@ -397,9 +426,12 @@ class HTTPPusherTests(HomeserverTestCase):
         # Advance time a bit, so the pusher will register something has happened
         self.pump()
         self.assertEqual(len(self.push_attempts), 2)
+        """ watcha!
         self.assertEqual(
             self.push_attempts[1][1], "http://example.com/_matrix/push/v1/notify"
         )
+        !watcha """
+        self.assertEqual(self.push_attempts[1][1], "http://127.0.0.1:5000/_matrix/push/v1/notify") # watcha+
 
         # check that this is low-priority
         self.assertEqual(self.push_attempts[1][2]["notification"]["prio"], "low")
@@ -425,7 +457,9 @@ class HTTPPusherTests(HomeserverTestCase):
         room = self.helper.create_room_as(user_id, tok=access_token)
 
         # The other users join
+        self.helper.invite (room, user_id, other_user_id, tok=access_token) # watcha+
         self.helper.join(room=room, user=other_user_id, tok=other_access_token)
+        self.helper.invite (room, user_id, yet_another_user_id, tok=access_token) # watcha+
         self.helper.join(
             room=room, user=yet_another_user_id, tok=yet_another_access_token
         )
@@ -462,9 +496,12 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Check our push made it with high priority
         self.assertEqual(len(self.push_attempts), 1)
+        """ watcha!
         self.assertEqual(
             self.push_attempts[0][1], "http://example.com/_matrix/push/v1/notify"
         )
+        !watcha """
+        self.assertEqual(self.push_attempts[0][1], "http://127.0.0.1:5000/_matrix/push/v1/notify") # watcha+
         self.assertEqual(self.push_attempts[0][2]["notification"]["prio"], "high")
 
         # Send another event, this time with no mention
@@ -473,9 +510,12 @@ class HTTPPusherTests(HomeserverTestCase):
         # Advance time a bit, so the pusher will register something has happened
         self.pump()
         self.assertEqual(len(self.push_attempts), 2)
+        """ watcha!
         self.assertEqual(
             self.push_attempts[1][1], "http://example.com/_matrix/push/v1/notify"
         )
+        !watcha """
+        self.assertEqual(self.push_attempts[1][1], "http://127.0.0.1:5000/_matrix/push/v1/notify") # watcha+
 
         # check that this is low-priority
         self.assertEqual(self.push_attempts[1][2]["notification"]["prio"], "low")
@@ -502,7 +542,9 @@ class HTTPPusherTests(HomeserverTestCase):
         room = self.helper.create_room_as(other_user_id, tok=other_access_token)
 
         # The other users join
+        self.helper.invite (room, other_user_id, user_id, tok=other_access_token) # watcha+
         self.helper.join(room=room, user=user_id, tok=access_token)
+        self.helper.invite (room, user_id, yet_another_user_id, tok=access_token) # watcha+
         self.helper.join(
             room=room, user=yet_another_user_id, tok=yet_another_access_token
         )
@@ -543,9 +585,12 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Check our push made it with high priority
         self.assertEqual(len(self.push_attempts), 1)
+        """ watcha!
         self.assertEqual(
             self.push_attempts[0][1], "http://example.com/_matrix/push/v1/notify"
         )
+        !watcha """
+        self.assertEqual(self.push_attempts[0][1], "http://127.0.0.1:5000/_matrix/push/v1/notify") # watcha+
         self.assertEqual(self.push_attempts[0][2]["notification"]["prio"], "high")
 
         # Send another event, this time as someone without the power of @room
@@ -556,9 +601,12 @@ class HTTPPusherTests(HomeserverTestCase):
         # Advance time a bit, so the pusher will register something has happened
         self.pump()
         self.assertEqual(len(self.push_attempts), 2)
+        """ watcha!
         self.assertEqual(
             self.push_attempts[1][1], "http://example.com/_matrix/push/v1/notify"
         )
+        !watcha """
+        self.assertEqual(self.push_attempts[1][1], "http://127.0.0.1:5000/_matrix/push/v1/notify") # watcha+
 
         # check that this is low-priority
         self.assertEqual(self.push_attempts[1][2]["notification"]["prio"], "low")
@@ -614,6 +662,7 @@ class HTTPPusherTests(HomeserverTestCase):
         room_id = self.helper.create_room_as(other_user_id, tok=other_access_token)
 
         # The user to get notified joins
+        self.helper.invite(room_id, other_user_id, user_id, tok=other_access_token) # watcha+
         self.helper.join(room=room_id, user=user_id, tok=access_token)
 
         # Register the pusher
@@ -622,6 +671,7 @@ class HTTPPusherTests(HomeserverTestCase):
         )
         token_id = user_tuple.token_id
 
+        """ watcha!
         self.get_success(
             self.hs.get_pusherpool().add_pusher(
                 user_id=user_id,
@@ -635,6 +685,22 @@ class HTTPPusherTests(HomeserverTestCase):
                 data={"url": "http://example.com/_matrix/push/v1/notify"},
             )
         )
+        !watcha """
+        # watcha+
+        self.get_success(
+            self.hs.get_pusherpool().add_pusher(
+                user_id=user_id,
+                access_token=token_id,
+                kind="http",
+                app_id="m.http",
+                app_display_name="HTTP Push Notifications",
+                device_display_name="pushy push",
+                pushkey="a@example.com",
+                lang=None,
+                data={"url": "http://127.0.0.1:5000/_matrix/push/v1/notify"},
+            )
+        )
+        # +watcha
 
         # Send a message
         response = self.helper.send(
@@ -651,9 +717,16 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Check our push made it
         self.assertEqual(len(self.push_attempts), 1)
+        """ watcha!
         self.assertEqual(
             self.push_attempts[0][1], "http://example.com/_matrix/push/v1/notify"
         )
+        !watcha """
+        # watcha+
+        self.assertEqual(
+            self.push_attempts[0][1], "http://127.0.0.1:5000/_matrix/push/v1/notify"
+        )
+        # +watcha
 
         # Check that the unread count for the room is 0
         #
@@ -722,3 +795,5 @@ class HTTPPusherTests(HomeserverTestCase):
         self.push_attempts[5][0].callback({})
 
         self.assertEqual(len(self.push_attempts), 6)
+
+    test_invalid_configuration.skip = "Disabled for Watcha because of PushPool modification"
