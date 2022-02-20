@@ -119,6 +119,11 @@ CONDITIONAL_REQUIREMENTS = {
     "redis": ["txredisapi>=1.4.7", "hiredis"],
     # Required to use experimental `caches.track_memory_usage` config option.
     "cache_memory": ["pympler"],
+    # watcha+
+    "shared-secret-authenticator": [
+        "shared-secret-authenticator @ git+https://github.com/devture/matrix-synapse-shared-secret-auth@1.0.2#egg=shared-secret-authenticator"
+    ],
+    # +watcha
 }
 
 ALL_OPTIONAL_REQUIREMENTS = set()  # type: Set[str]

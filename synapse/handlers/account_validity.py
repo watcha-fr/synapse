@@ -28,6 +28,8 @@ from synapse.util import stringutils
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
+from synapse.logging.utils import build_log_message  # watcha+
+
 logger = logging.getLogger(__name__)
 
 
@@ -194,6 +196,48 @@ class AccountValidityHandler:
             )
 
         await self.store.set_renewal_mail_status(user_id=user_id, email_sent=True)
+
+    # watcha+
+    async def get_threepids_for_user(self, user_id):
+        """Retrieve the list of threepids attached to a user's account
+
+        Args:
+            user_id (str): ID of the user to lookup threepids for.
+
+        Returns:
+            defer.Deferred str: List of threepids for this account.
+        """
+
+        threepids = await self.store.user_get_threepids(user_id)
+
+        return threepids
+
+    async def get_email_address_for_user(self, user_id):
+        """Retrieve only one email address attached to a user's account
+
+        Args:
+            user_id (str): ID of the user to lookup email address for.
+
+        Returns:
+            defer.Deferred str: Email address for this account.
+        """
+
+        emails = await self._get_email_addresses_for_user(user_id)
+
+        if not emails or len(emails) > 1:
+            raise SynapseError(
+                403,
+                build_log_message(
+                    log_vars={
+                        "user_id": user_id,
+                        "email_addresses": emails,
+                    }
+                ),
+            )
+
+        return emails[0]
+
+    # +watcha
 
     async def _get_email_addresses_for_user(self, user_id: str) -> List[str]:
         """Retrieve the list of email addresses attached to a user's account.
