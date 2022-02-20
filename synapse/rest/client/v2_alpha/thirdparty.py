@@ -34,7 +34,10 @@ class ThirdPartyProtocolsServlet(RestServlet):
         self.appservice_handler = hs.get_application_service_handler()
 
     async def on_GET(self, request):
+        """ watcha!
         await self.auth.get_user_by_req(request, allow_guest=True)
+        !watcha """
+        await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True) # watcha+
 
         protocols = await self.appservice_handler.get_3pe_protocols()
         return 200, protocols

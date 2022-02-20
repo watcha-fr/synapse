@@ -109,6 +109,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
             http_client_mock.post_json_get_json.call_args[0][0],
             "https://push.example.com/_matrix/push/v1/notify",
         )
+
         self.assertEqual(
             event_id,
             http_client_mock.post_json_get_json.call_args[0][1]["notification"][
@@ -160,6 +161,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
             http_client_mock1.post_json_get_json.call_args[0][0],
             "https://push.example.com/_matrix/push/v1/notify",
         )
+
         self.assertEqual(
             event_id,
             http_client_mock1.post_json_get_json.call_args[0][1]["notification"][
@@ -182,6 +184,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
             http_client_mock2.post_json_get_json.call_args[0][0],
             "https://push.example.com/_matrix/push/v1/notify",
         )
+
         self.assertEqual(
             event_id,
             http_client_mock2.post_json_get_json.call_args[0][1]["notification"][
