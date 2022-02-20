@@ -34,7 +34,10 @@ class NotificationsServlet(RestServlet):
         self._event_serializer = hs.get_event_client_serializer()
 
     async def on_GET(self, request):
+        """ watcha!
         requester = await self.auth.get_user_by_req(request)
+        !watcha """
+        requester = await self.auth.get_user_by_req(request, allow_partner=True) # watcha+
         user_id = requester.user.to_string()
 
         from_token = parse_string(request, "from", required=False)

@@ -72,7 +72,11 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
     def test_state_event_user_in_v5_room(self):
         """Test that a regular user can add alias events before room v6"""
         self.ensure_user_joined_room()
+        """ watcha!
+        # TBH not really sure why :) but stricter so OK :)
         self.set_alias_via_state_event(200)
+        !watcha """
+        self.set_alias_via_state_event(403) # watcha +
 
     @override_config({"default_room_version": 6})
     def test_state_event_v6_room(self):
@@ -82,7 +86,10 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
 
     def test_directory_in_room(self):
         self.ensure_user_joined_room()
+        """ watcha! - TBH not really sure why :) but stricter so OK :)
         self.set_alias_via_directory(200)
+        !watcha """
+        self.set_alias_via_directory(403) # watcha+
 
     def test_room_creation_too_long(self):
         url = "/_matrix/client/r0/createRoom"

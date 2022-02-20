@@ -143,6 +143,10 @@ class OIDCConfig(Config):
         #             display_name_template: Jinja2 template for the display name to set
         #                 on first login. If unset, no displayname will be set.
         #
+        #             nextcloud_username_template: Jinja2 templates for extra attributes 
+        #                 to send back to the client during login. Note that these are 
+        #                 non-standard and clients will ignore them without modifications.
+        #
         #             extra_attributes: a map of Jinja2 templates for extra attributes
         #                 to send back to the client during login.
         #                 Note that these are non-standard and clients will ignore them
@@ -205,6 +209,7 @@ class OIDCConfig(Config):
           #      subject_claim: "id"
           #      localpart_template: "{{ user.login }}"
           #      display_name_template: "{{ user.name }}"
+          #      nextcloud_username_template: "{{ user.nextcloud_username | default(user.sub, true) }}"
         """.format(
             mapping_provider=DEFAULT_USER_MAPPING_PROVIDER
         )
