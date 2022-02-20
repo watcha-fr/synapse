@@ -95,3 +95,163 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
             )
         finally:
             self.hs.config.user_directory_search_all_users = False
+    # watcha+
+    test_search_user_dir.skip = "Disabled for watcha because of user directory modification for partners"
+    test_search_user_dir_all_users.skip = "Disabled for watcha because of user directory modification for partners"
+    test_search_user_dir_stop_words.skip = "Disabled for watcha because of user directory modification for partners"
+
+    @defer.inlineCallbacks
+    def test_search_user_dir_for_watcha(self):
+        # This only tests that it's not crashing :) after our motifs.
+        # There should be more tests !
+        r = yield defer.ensureDeferred(self.store.search_user_dir(ALICE, "bob", 10))
+        self.assertFalse(r["limited"])
+        self.assertEqual(0, len(r["results"]))
+    # +watcha
+
+
+# watcha+
+class WatchaUserDirectoryStoreTestCase(unittest.TestCase):
+    @defer.inlineCallbacks
+    def setUp(self):
+        hs = yield setup_test_homeserver(self.addCleanup)
+        self.store = hs.get_datastore()
+        self.user_id = "@user:test"
+        self.searched_user = "@searched_user:test"
+        self.partner_id = "@partner:test"
+        self.time = int(hs.get_clock().time_msec())
+
+        # Register a user who want to see other user on the user_directory :
+        yield defer.ensureDeferred(
+            self.store.register_user(
+                self.user_id, password_hash=None, create_profile_with_displayname=None
+            )
+        )
+
+        # Register an active user who @user:test want to see :
+        yield defer.ensureDeferred(
+            self.store.register_user(
+                self.searched_user,
+                password_hash=None,
+                create_profile_with_displayname=None,
+            )
+        )
+
+        # Register an active external partner :
+        yield defer.ensureDeferred(
+            self.store.register_user(
+                self.partner_id,
+                password_hash=None,
+                make_partner=True,
+                create_profile_with_displayname=None,
+            )
+        )
+
+    @defer.inlineCallbacks
+    def test_search_user_dir_with_user_id(self):
+        with self.assertLogs(
+            "synapse.storage.databases.main.user_directory", level="INFO"
+        ) as cm:
+            sqlResult = yield defer.ensureDeferred(
+                self.store.search_user_dir(self.user_id, self.searched_user, 1)
+            )
+            self.assertIn(
+                "INFO:synapse.storage.databases.main.user_directory:Searching with search term: %s"
+                % repr(self.searched_user),
+                "".join(cm.output),
+            )
+
+        self.assertFalse(sqlResult["limited"])
+        self.assertEquals(
+            sqlResult["results"], [],
+        )
+
+    @defer.inlineCallbacks
+    def test_search_user_dir_with_email(self):
+        yield defer.ensureDeferred(
+            self.store.user_add_threepid(
+                self.searched_user, "email", "example@example.com", self.time, self.time
+            )
+        )
+        sqlResult = yield defer.ensureDeferred(
+            self.store.search_user_dir(self.user_id, "example@example.com", 1)
+        )
+
+        self.assertEquals(
+            sqlResult["results"],
+            [
+                {
+                    "user_id": self.searched_user,
+                    "is_active": 1,
+                    "is_partner": 0,
+                    "display_name": None,
+                    "avatar_url": None,
+                    "presence": None,
+                    "email": "example@example.com",
+                }
+            ],
+        )
+
+    @defer.inlineCallbacks
+    def test_search_user_dir_with_displayname(self):
+        yield defer.ensureDeferred(
+            self.store.update_profile_in_user_dir(self.searched_user, "user", None)
+        )
+        sqlResult = yield defer.ensureDeferred(
+            self.store.search_user_dir(self.user_id, "user", 1)
+        )
+        self.assertEquals(
+            sqlResult["results"],
+            [
+                {
+                    "user_id": self.searched_user,
+                    "is_active": 1,
+                    "is_partner": 0,
+                    "display_name": "user",
+                    "avatar_url": None,
+                    "presence": None,
+                    "email": None,
+                }
+            ],
+        )
+
+    @defer.inlineCallbacks
+    def test_search_user_dir_with_user_invite_partner(self):
+        # User invite partner :
+        yield defer.ensureDeferred(
+            self.store.add_partner_invitation(self.partner_id, self.user_id)
+        )
+        yield defer.ensureDeferred(
+            self.store.user_add_threepid(
+                self.partner_id, "email", "partner@example.com", self.time, self.time
+            )
+        )
+
+        sqlResult = yield defer.ensureDeferred(
+            self.store.search_user_dir(self.user_id, "partner@example.com", 1)
+        )
+
+        self.assertEquals(
+            sqlResult["results"],
+            [
+                {
+                    "user_id": self.partner_id,
+                    "is_active": 1,
+                    "is_partner": 1,
+                    "display_name": None,
+                    "avatar_url": None,
+                    "presence": "invited",
+                    "email": "partner@example.com",
+                }
+            ],
+        )
+
+    @defer.inlineCallbacks
+    def test_search_user_dir_with_user_dont_invite_partner(self):
+        # User doesn't invite partner but want to see it on the user directory :
+
+        sqlResult = yield defer.ensureDeferred(
+            self.store.search_user_dir(self.user_id, self.partner_id, 1)
+        )
+        self.assertEquals(sqlResult["results"], [])
+# +watcha

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="fr">
+    <head>
+        <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+        <title>{{ title }}</title>
+        <style>
+            {%- include 'watcha_registration.css' %}
+        </style>
+    </head>
+    <body class="centered">
+        <img
+            class="centered"
+            src="https://watcha.fr/web/wp-content/uploads/2020/03/watcha-logo-nav.png"
+            alt=""
+        />
+        <p>Bonjour,</p>
+        <p>
+            <span class="hint">{{ sender_name }}</span> vous a invité(e) à
+            rejoindre l'espace de travail sécurisé Watcha. Vous pouvez y accéder
+            :
+        </p>
+        <div>
+            <div>
+                <span><b>Depuis votre navigateur :</b></span>
+                <a class="btn-primary centered" href="{{ login_url }}"
+                    >Se connecter à Watcha</a
+                >
+            </div>
+            <div>
+                <span
+                    ><b
+                        >Depuis votre mobile, en téléchargeant l'application
+                        :</b
+                    ></span
+                >
+                <div class="centered">
+                    <a
+                        href="https://play.google.com/store/apps/details?id=im.watcha.app&pcampaignid=pcampaignidMKT-Other-global-all-co-prtnr-py-PartBadge-Mar2515-1"
+                        ><img
+                            alt="Disponible sur Google Play"
+                            src="https://play.google.com/intl/en_us/badges/static/images/badges/fr_badge_web_generic.png"
+                            style="width: 220px"
+                    /></a>
+                    <a
+                        href="https://apps.apple.com/fr/app/watcha/id1383732254?itsct=apps_box&amp;itscg=30200"
+                        ><img
+                            alt="Disponible sur l'App Store"
+                            src="https://tools.applemediaservices.com/api/badges/download-on-the-app-store/black/fr-FR?size=250x83&amp;releaseDate=1528156800&h=c032c2071c008599499cd95b8dabf7e3"
+                            style="width: 187px; height: 62px; padding: 15px"
+                    /></a>
+                </div>
+            </div>
+        </div>
+        <p>
+            Vous pourrez y créer et utiliser des salons de discussion avec les
+            autres utilisateurs.
+        </p>
+        <table class="credential-table">
+            <tbody>
+                <tr>
+                    <td class="credential-title">Email&nbsp;:</td>
+                </tr>
+                <tr>
+                    <td class="credential">{{ email }}</td>
+                </tr>
+                <tr>
+                    <td>
+                        <b>Mot de passe</b> provisoire&nbsp;<b>:</b>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="credential hint">
+                        <em>{{ password }}</em>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="credential-title">Espace de travail&nbsp;:</td>
+                </tr>
+                <tr>
+                    <td class="credential">{{ server }}</td>
+                </tr>
+            </tbody>
+        </table>
+        <p class="fallback">
+            Si les liens ne fonctionnent pas ou n'apparaissent pas veuillez :
+        </p>
+        <ul>
+            <li class="fallback">
+                Depuis votre navigateur, copiez-collez l'URL suivante dans la
+                barre d'adresse de votre navigateur internet&nbsp;:<br />
+                {{ login_url }}
+            </li>
+            <li class="fallback">
+                Depuis votre mobile, recherchez l'application Watcha dans le
+                store correspondant (apple store ou play store).
+            </li>
+        </ul>
+        <p>N'hésitez pas à nous contacter en répondant à cet email,</p>
+        <p>L'équipe Watcha</p>
+    </body>
+</html>
