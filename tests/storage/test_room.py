@@ -23,6 +23,10 @@ from synapse.types import RoomAlias, RoomID, UserID
 from tests import unittest
 from tests.utils import setup_test_homeserver
 
+# watcha+
+from synapse.api.errors import StoreError, SynapseError
+from tests.utils import create_room
+# +watcha
 
 class RoomStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
@@ -157,3 +161,158 @@ class RoomEventsStoreTestCase(unittest.TestCase):
 
     # Not testing the various 'level' methods for now because there's lots
     # of them and need coalescing; see JIRA SPEC-11
+
+
+# watcha+ op433
+class WatchaRoomEventsStoreTestCase(unittest.HomeserverTestCase):
+    @defer.inlineCallbacks
+    def setUp(self):
+        hs = yield setup_test_homeserver(self.addCleanup)
+        self.event_builder_factory = hs.get_event_builder_factory()
+        self.event_creation_handler = hs.get_event_creation_handler()
+        self.store = hs.get_datastore()
+        self.storage = hs.get_storage()
+        self.user = UserID.from_string("@user:test")
+        self.room = RoomID.from_string("!abc123:test")
+        self.second_room = RoomID.from_string("!abc456:test")
+        self.nextcloud_directory_path = "/Test_NC"
+        self.nextcloud_folder_url = (
+            "http://test.watcha.fr/nextcloud/apps/files/?dir={}".format(self.nextcloud_directory_path)
+        )
+
+        yield defer.ensureDeferred(
+            create_room(hs, self.room.to_string(), self.user.to_string())
+        )
+        yield defer.ensureDeferred(
+            create_room(hs, self.second_room.to_string(), self.user.to_string())
+        )
+        yield defer.ensureDeferred(
+            self._send_room_mapping_event(
+                self.room.to_string(), self.nextcloud_folder_url
+            )
+        )
+
+    @defer.inlineCallbacks
+    def _send_room_mapping_event(self, room_id, nextcloud_folder_url):
+        builder = self.event_builder_factory.for_room_version(
+            RoomVersions.V1,
+            {
+                "type": EventTypes.VectorSetting,
+                "sender": self.user.to_string(),
+                "room_id": room_id,
+                "content": {"nextcloudShare": nextcloud_folder_url},
+            },
+        )
+
+        event, context = yield defer.ensureDeferred(
+            self.event_creation_handler.create_new_client_event(builder)
+        )
+
+        yield defer.ensureDeferred(
+            self.storage.persistence.persist_event(event, context)
+        )
+
+    @defer.inlineCallbacks
+    def test_send_room_mapping_event_without_nextcloud_content(self):
+        with self.assertRaises(SynapseError) as e:
+            builder = self.event_builder_factory.for_room_version(
+                RoomVersions.V1,
+                {
+                    "type": EventTypes.VectorSetting,
+                    "sender": self.user.to_string(),
+                    "room_id": self.room.to_string(),
+                    "content": {},
+                },
+            )
+
+            event, context = yield defer.ensureDeferred(
+                self.event_creation_handler.create_new_client_event(builder)
+            )
+
+            yield defer.ensureDeferred(
+                self.storage.persistence.persist_event(event, context)
+            )
+            self.assertEquals(e.exception.code, 400)
+            self.assertEquals(
+                e.exception.msg,
+                "The nextcloud url is needed to store room link with NC.",
+            )
+
+    @defer.inlineCallbacks
+    def test_get_NC_directory_path(self):
+        result = yield defer.ensureDeferred(
+            self.store.db_pool.simple_select_onecol(
+                table="room_nextcloud_mapping",
+                keyvalues={"room_id": self.room.to_string()},
+                retcol="directory_path",
+            )
+        )
+
+        self.assertEquals(result[0], self.nextcloud_directory_path)
+
+    @defer.inlineCallbacks
+    def test_update_NC_directory_path(self):
+        new_nextcloud_directory_path = "/Test_NC2"
+        new_nextcloud_folder_url = (
+            "http://test.watcha.fr/nextcloud/apps/files/?dir={}".format(new_nextcloud_directory_path)
+        )
+        yield self._send_room_mapping_event(
+            self.room.to_string(), new_nextcloud_folder_url
+        )
+
+        result = yield defer.ensureDeferred(
+            self.store.db_pool.simple_select_onecol(
+                table="room_nextcloud_mapping",
+                keyvalues={"room_id": self.room.to_string()},
+                retcol="directory_path",
+            )
+        )
+
+        self.assertEquals(result[0], new_nextcloud_directory_path)
+
+    @defer.inlineCallbacks
+    def test_delete_NC_directory_path(self):
+        yield self._send_room_mapping_event(self.room.to_string(), "")
+
+        result = yield defer.ensureDeferred(
+            self.store.db_pool.simple_select_onecol(
+                table="room_nextcloud_mapping",
+                keyvalues={"room_id": self.room.to_string()},
+                retcol="directory_path",
+            )
+        )
+
+        self.assertFalse(result)
+
+    @defer.inlineCallbacks
+    def test_set_same_NC_directory_path(self):
+        with self.assertRaises(StoreError) as e:
+            yield self._send_room_mapping_event(
+                self.second_room.to_string(), self.nextcloud_folder_url
+            )
+
+        self.assertEquals(e.exception.code, 500)
+        self.assertEquals(
+            e.exception.msg,
+            "This Nextcloud folder is already linked with another room.",
+        )
+
+    @defer.inlineCallbacks
+    def test_set_NC_directory_path_with_wrong_url_query(self):
+        with self.assertRaises(SynapseError) as e:
+            yield self._send_room_mapping_event(
+                self.second_room.to_string(),
+                "http://test.watcha.fr/nextcloud/apps/files/?param",
+            )
+
+        self.assertEquals(e.exception.code, 400)
+        self.assertEquals(
+            e.exception.msg, "The url doesn't point to a valid directory path."
+        )
+
+    test_send_room_mapping_event_without_nextcloud_content.skip = "Disabled in order to build OP544 and OP545 branch to welcome.watcha.fr"
+    test_set_NC_directory_path_with_wrong_url_query.skip = "Disabled in order to build OP544 and OP545 branch to welcome.watcha.fr"
+    test_set_same_NC_directory_path.skip = "Disabled in order to build OP544 and OP545 branch to welcome.watcha.fr"
+    test_get_NC_directory_path.skip = "Disabled in order to build OP544 and OP545 branch to welcome.watcha.fr"
+    test_update_NC_directory_path.skip = "Disabled in order to build OP544 and OP545 branch to welcome.watcha.fr"
+# +watcha

@@ -154,6 +154,12 @@ async def filter_events_for_client(
         else:
             visibility = "shared"
 
+        # watcha+
+        if visibility == "joined":
+            visibility = "invited"
+        if visibility == "world_readable":
+            visibility = "shared"
+        # +watcha
         if visibility not in VISIBILITY_PRIORITY:
             visibility = "shared"
 
