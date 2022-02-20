@@ -58,6 +58,7 @@ from synapse.rest.client.v2_alpha import (
     user_directory,
 )
 
+from synapse.rest.client.v1 import watcha # watcha+
 
 class ClientRestResource(JsonResource):
     """Matrix Client API REST resource.
@@ -94,6 +95,7 @@ class ClientRestResource(JsonResource):
         pusher.register_servlets(hs, client_resource)
         push_rule.register_servlets(hs, client_resource)
         logout.register_servlets(hs, client_resource)
+        watcha.register_servlets(hs, client_resource) # watcha+
 
         # "v2"
         sync.register_servlets(hs, client_resource)

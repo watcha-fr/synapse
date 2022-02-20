@@ -1352,6 +1352,17 @@ class AuthHandler(BaseHandler):
         return self._sso_auth_confirm_template.render(
             description=session.description, redirect_url=redirect_url,
         )
+    # watcha+
+    async def is_partner(self, user_id):
+        ret = await self.store.is_user_partner(
+            user_id,
+        )
+        return ret
+
+    async def is_admin(self, user_id):
+        ret = await self.store.is_user_admin(user_id)
+        return ret
+    # +watcha
 
     async def complete_sso_ui_auth(
         self, registered_user_id: str, session_id: str, request: Request,
