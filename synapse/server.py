@@ -136,6 +136,14 @@ from synapse.util.distributor import Distributor
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import random_string
 
+# watcha+
+from synapse.handlers.watcha_administration import AdministrationHandler
+from synapse.handlers.watcha_partner import PartnerHandler
+from synapse.handlers.watcha_nextcloud import NextcloudHandler
+from synapse.http.watcha_keycloak_client import KeycloakClient
+from synapse.http.watcha_nextcloud_client import NextcloudClient
+# +watcha
+
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
@@ -756,3 +764,29 @@ class HomeServer(metaclass=abc.ABCMeta):
     def should_send_federation(self) -> bool:
         "Should this server be sending federation traffic directly?"
         return self.config.send_federation
+
+    # watcha+
+
+    # clients:
+    @cache_in_self
+    def get_keycloak_client(self) -> KeycloakClient:
+        return KeycloakClient(self)
+    
+    @cache_in_self
+    def get_nextcloud_client(self) -> NextcloudClient:
+        return NextcloudClient(self)
+
+    # handlers:
+    @cache_in_self
+    def get_administration_handler(self) -> AdministrationHandler:
+        return AdministrationHandler(self)
+
+    @cache_in_self
+    def get_partner_handler(self) -> PartnerHandler:
+        return PartnerHandler(self)
+
+    @cache_in_self
+    def get_nextcloud_handler(self) -> NextcloudHandler:
+        return NextcloudHandler(self)
+
+    # +watcha
