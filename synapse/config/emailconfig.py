@@ -295,9 +295,13 @@ class EmailConfig(Config):
             self.email_notif_for_new_users = email_config.get(
                 "notif_for_new_users", True
             )
+            """ watcha!
             self.email_riot_base_url = email_config.get(
                 "client_base_url", email_config.get("riot_base_url", None)
             )
+            !watcha """
+
+        self.email_riot_base_url = email_config.get("riot_base_url", None) # watcha+
 
         if self.account_validity.renew_by_email_enabled:
             expiry_template_html = email_config.get(

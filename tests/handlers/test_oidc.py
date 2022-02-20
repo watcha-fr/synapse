@@ -84,7 +84,18 @@ class TestMappingProvider(OidcMappingProvider):
         return userinfo["sub"]
 
     async def map_user_attributes(self, userinfo, token):
+        """ watcha!
         return {"localpart": userinfo["username"], "display_name": None}
+        !watcha """
+        # watcha+ op525
+        return {
+            "localpart": userinfo["username"],
+            "display_name": None,
+            "email": userinfo.get("email"),
+            "synapse_role": userinfo.get("synapse_role"),
+            "locale": userinfo.get("locale"),
+        }
+        # +watcha
 
     # Do not include get_extra_attributes to test backwards compatibility paths.
 
@@ -701,6 +712,63 @@ class OidcHandlerTestCase(HomeserverTestCase):
         )
         self.assertEqual(str(e.value), "mxid '@test_user_3:test' is already taken")
 
+        # watcha+ op525
+        userinfo = {
+            "sub": "test_user_4",
+            "username": "test_user_4",
+            "email": "test_user@test.com",
+            "locale": "fr",
+        }
+        mxid = self.get_success(
+            self.handler._map_userinfo_to_user(
+                userinfo, token, "user-agent", "10.10.10.10"
+            )
+        )
+        self.assertEqual(mxid, "@test_user_4:test")
+
+        userinfo = {
+            "sub": "test_user_5",
+            "username": "test_user_5",
+            "synapse_role": "administrator",
+        }
+        mxid = self.get_success(
+            self.handler._map_userinfo_to_user(
+                userinfo, token, "user-agent", "10.10.10.10"
+            )
+        )
+        self.assertEqual(mxid, "@test_user_5:test")
+        mxid = self.get_success(
+            self.handler._map_userinfo_to_user(
+                userinfo, token, "user-agent", "10.10.10.10"
+            )
+        )
+        self.assertEqual(mxid, "@test_user_5:test")
+
+        userinfo = {
+            "sub": "test_user_6",
+            "username": "test_user_6",
+            "synapse_role": "partner",
+        }
+        mxid = self.get_success(
+            self.handler._map_userinfo_to_user(
+                userinfo, token, "user-agent", "10.10.10.10"
+            )
+        )
+        self.assertEqual(mxid, "@test_user_6:test")
+
+        userinfo = {
+            "sub": "test_user_7",
+            "username": "test_user_7",
+            "synapse_role": "erroneous",
+        }
+        self.get_failure(
+            self.handler._map_userinfo_to_user(
+                userinfo, token, "user-agent", "10.10.10.10"
+            ),
+            MappingException,
+        )
+        # +watcha
+
     @override_config({"oidc_config": {"allow_existing_users": True}})
     def test_map_userinfo_to_existing_user(self):
         """Existing users can log in with OpenID Connect when allow_existing_users is True."""
@@ -719,4 +787,3 @@ class OidcHandlerTestCase(HomeserverTestCase):
                 userinfo, token, "user-agent", "10.10.10.10"
             )
         )
-        self.assertEqual(mxid, "@test_user_4:test")
