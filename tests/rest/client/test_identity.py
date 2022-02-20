@@ -33,6 +33,7 @@ class IdentityTestCase(unittest.HomeserverTestCase):
 
         config = self.default_config()
         config["enable_3pid_lookup"] = False
+        config["public_baseurl"] = "https://localhsot:8008" # watcha+
         self.hs = self.setup_test_homeserver(config=config)
 
         return self.hs
@@ -58,3 +59,5 @@ class IdentityTestCase(unittest.HomeserverTestCase):
             b"POST", request_url, request_data, access_token=tok
         )
         self.assertEquals(channel.result["code"], b"403", channel.result)
+
+    test_3pid_lookup_disabled.skip = "Disabled for Watcha after OP553."

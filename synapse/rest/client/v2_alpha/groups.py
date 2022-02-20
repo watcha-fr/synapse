@@ -881,7 +881,10 @@ class PublicisedGroupsForUserServlet(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
+        """ watcha!
         await self.auth.get_user_by_req(request, allow_guest=True)
+        !watcha """
+        await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=True) # watcha+
 
         result = await self.groups_handler.get_publicised_groups_for_user(user_id)
 
