@@ -41,6 +41,7 @@ DEFAULT_SUBJECTS = {
     "invite_from_person_to_room": "[%(app)s] %(person)s has invited you to join the %(room)s room on %(app)s...",
     "password_reset": "[%(server_name)s] Password reset",
     "email_validation": "[%(server_name)s] Validate your email",
+    "watcha_registration": "[%(app)s] Invitation to the Secure Workplace", # watcha+
 }
 
 
@@ -56,6 +57,7 @@ class EmailSubjectConfig:
     invite_from_person_to_room = attr.ib(type=str)
     password_reset = attr.ib(type=str)
     email_validation = attr.ib(type=str)
+    watcha_registration = attr.ib(type=str) # watcha+
 
 
 class EmailConfig(Config):
@@ -81,7 +83,10 @@ class EmailConfig(Config):
         if "app_name" in email_config:
             self.email_app_name = email_config["app_name"]
         else:
+            """ watcha !
             self.email_app_name = "Matrix"
+            !watcha """
+            self.email_app_name = "Watcha"
 
         # TODO: Rename notif_from to something more generic, or have a separate
         # from for password resets, message notifications, etc?
@@ -217,6 +222,14 @@ class EmailConfig(Config):
             add_threepid_template_success_html = email_config.get(
                 "add_threepid_template_success_html", "add_threepid_success.html"
             )
+            # watcha+
+            watcha_registration_template_html = email_config.get(
+                "watcha_registration_template_html", "watcha_registration.html"
+            )
+            watcha_registration_template_text = email_config.get(
+                "watcha_registration_template_text", "watcha_registration.txt"
+            )
+            # +watcha
 
             # Read all templates from disk
             (
@@ -233,6 +246,10 @@ class EmailConfig(Config):
                 password_reset_template_success_html_template,
                 registration_template_success_html_template,
                 add_threepid_template_success_html_template,
+                # watcha+
+                self.watcha_registration_template_html,
+                self.watcha_registration_template_text,
+                # +watcha
             ) = self.read_templates(
                 [
                     password_reset_template_html,
@@ -248,6 +265,10 @@ class EmailConfig(Config):
                     password_reset_template_success_html,
                     registration_template_success_html,
                     add_threepid_template_success_html,
+                    # watcha+
+                    watcha_registration_template_html,
+                    watcha_registration_template_text,
+                    # +watcha
                 ],
                 template_dir,
             )
@@ -295,9 +316,17 @@ class EmailConfig(Config):
             self.email_notif_for_new_users = email_config.get(
                 "notif_for_new_users", True
             )
+            """ watcha!
             self.email_riot_base_url = email_config.get(
                 "client_base_url", email_config.get("riot_base_url", None)
             )
+            !watcha """
+
+        # watcha+
+        self.email_riot_base_url = email_config.get(
+            "client_base_url", email_config.get("riot_base_url", None)
+        )
+        # +watcha
 
         if self.account_validity_renew_by_email_enabled:
             expiry_template_html = email_config.get(
@@ -521,6 +550,9 @@ class EmailConfig(Config):
             # Subject to use when sending a verification email to assert an address's
             # ownership.
             #email_validation: "%(email_validation)s"
+            #
+            # Subject to use to notify about an invite to join a Watcha instance.
+            #watcha_registration: "%(watcha_registration)s"
         """
             % DEFAULT_SUBJECTS
         )

@@ -16,12 +16,20 @@ from unittest.mock import Mock
 import pymacaroons
 
 from synapse.api.errors import AuthError, ResourceLimitError
+from synapse.rest import admin # watcha+
 
 from tests import unittest
 from tests.test_utils import make_awaitable
 
 
 class AuthTestCase(unittest.HomeserverTestCase):
+
+    # watcha+
+    servlets = [
+        admin.register_servlets,
+    ]
+    # +watcha
+
     def prepare(self, reactor, clock, hs):
         self.auth_handler = hs.get_auth_handler()
         self.macaroon_generator = hs.get_macaroon_generator()
@@ -42,6 +50,18 @@ class AuthTestCase(unittest.HomeserverTestCase):
         # The most basic of sanity checks
         if "some_user" not in macaroon.inspect():
             self.fail("some_user was not in %s" % macaroon.inspect())
+
+    # watcha+
+    def test_token_is_a_partner_macaroon(self):
+        partner_id = self.register_user("partner", "pass", is_partner=True)
+        access_token = self.get_success(
+            self.auth_handler.get_access_token_for_user_id(
+                partner_id, device_id=None, valid_until_ms=None
+            )
+        )
+        macaroon = pymacaroons.Macaroon.deserialize(access_token)
+        self.assertIn("partner = true", macaroon.inspect())
+    # +watcha
 
     def test_macaroon_caveats(self):
         token = self.macaroon_generator.generate_access_token("a_user")
