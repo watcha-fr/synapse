@@ -58,7 +58,12 @@ class RoomUpgradeRestServlet(RestServlet):
         self._auth = hs.get_auth()
 
     async def on_POST(self, request, room_id):
+        """watcha!
         requester = await self._auth.get_user_by_req(request)
+        !watcha"""
+        # watcha+
+        requester = await self._auth.get_user_by_req(request, allow_partner=False)
+        # +watcha
 
         content = parse_json_object_from_request(request)
         assert_params_in_dict(content, ("new_version",))
