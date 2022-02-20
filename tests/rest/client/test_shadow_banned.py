@@ -129,6 +129,14 @@ class RoomTestCase(_ShadowBannedBase):
         )
 
         # The user should be in the room.
+        # watcha+
+        self.helper.invite(
+            room_id,
+            self.other_user_id,
+            self.banned_user_id,
+            tok=self.other_access_token,
+        )
+        # +watcha
         self.helper.join(room_id, self.banned_user_id, tok=self.banned_access_token)
 
         # Sending a message should complete successfully.
@@ -217,6 +225,8 @@ class RoomTestCase(_ShadowBannedBase):
                 }
             ],
         )
+
+    test_invite_3pid.skip = "Disabled for Watcha after OP553." # watcha+
 
 
 # To avoid the tests timing out don't add a delay to "annoy the requester".

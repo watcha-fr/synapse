@@ -190,6 +190,9 @@ class OIDCConfig(Config):
         #             email_template: Jinja2 template for the email address of the user.
         #                 If unset, no email address will be added to the account.
         #
+        #             nextcloud_username_template: Jinja2 templates for the Nextcloud username
+        #                 set to share folder with other users.
+        #
         #             extra_attributes: a map of Jinja2 templates for extra attributes
         #                 to send back to the client during login.
         #                 Note that these are non-standard and clients will ignore them
