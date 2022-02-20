@@ -274,10 +274,18 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         self.assertEqual(
             headers.getRawHeaders(b"Content-Type"), [self.test_image.content_type]
         )
+        """ watcha!
         self.assertEqual(
             headers.getRawHeaders(b"Content-Disposition"),
             [b"inline; filename=out" + self.test_image.extension],
         )
+        !watcha """
+        # watcha+
+        self.assertEqual(
+            headers.getRawHeaders(b"Content-Disposition"),
+            [b"attachment; filename=out" + self.test_image.extension],
+        )
+        # +watcha
 
     def test_disposition_filenamestar_utf8escaped(self):
         """
@@ -294,10 +302,18 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         self.assertEqual(
             headers.getRawHeaders(b"Content-Type"), [self.test_image.content_type]
         )
+        """ watcha!
         self.assertEqual(
             headers.getRawHeaders(b"Content-Disposition"),
             [b"inline; filename*=utf-8''" + filename + self.test_image.extension],
         )
+        !watcha """
+        # watcha+
+        self.assertEqual(
+            headers.getRawHeaders(b"Content-Disposition"),
+            [b"attachment; filename*=utf-8''" + filename + self.test_image.extension],
+        )
+        # +watcha
 
     def test_disposition_none(self):
         """

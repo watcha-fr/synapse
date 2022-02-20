@@ -33,6 +33,8 @@ from synapse.types import JsonDict, UserID
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
+from synapse.http.server import set_cors_headers # watcha+ op479
+
 logger = logging.getLogger(__name__)
 
 
@@ -317,6 +319,7 @@ class BaseSSORedirectServlet(RestServlet):
     PATTERNS = client_patterns("/login/(cas|sso)/redirect", v1=True)
 
     async def on_GET(self, request: SynapseRequest):
+        set_cors_headers(request) # watcha+ op479
         args = request.args
         if b"redirectUrl" not in args:
             return 400, "Redirect URL not specified for SSO auth"
