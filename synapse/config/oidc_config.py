@@ -163,6 +163,9 @@ class OIDCConfig(Config):
         #             email_template: Jinja2 template for the email address of the user.
         #                 If unset, no email address will be added to the account.
         #
+        #             nextcloud_username_template: Jinja2 templates for the Nextcloud username
+        #                 set to share folder with other users.
+        #
         #             extra_attributes: a map of Jinja2 templates for extra attributes
         #                 to send back to the client during login.
         #                 Note that these are non-standard and clients will ignore them
@@ -214,6 +217,13 @@ class OIDCConfig(Config):
           #  client_secret: "copy secret generated in Keycloak UI"
           #  scopes: ["openid", "profile"]
 
+          #  user_mapping_provider:
+          #   config:
+          #     localpart_template: "{{ user.mx_localpart | default(user.sub, true) }}"
+          #     display_name_template: "{{ user.name | default(user.email, true) }}"
+          #     email_template: "{{ user.email }}"
+          #     nextcloud_username_template: "{{ user.nextcloud_username | default(user.sub, true) }}"
+          #
           # For use with Github
           #
           #- idp_id: github
