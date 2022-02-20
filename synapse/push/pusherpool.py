@@ -109,6 +109,19 @@ class PusherPool:
         # stream ordering, so it will process pushes from this point onwards.
         last_stream_ordering = self.store.get_room_max_stream_ordering()
 
+        # watcha+ 
+        # we override url for iOS
+        # two options to distinguish iOS and Android push rules
+        # - app_id: for android it is "im.vector.app.android", while for iOS it is "im.watcha.app.voip"
+        # - app_display_name: android: "im.watcha" and iOS "Watcha (iOS)"
+        # below we use the first.
+        if not "android" in app_id:
+            data['url'] = "http://127.0.0.1:5000/_matrix/push/v1/notify"
+        else:
+            data['url'] = "https://matrix.org/_matrix/push/v1/notify"
+        # TODO avoid using matrix.org for android notifications.
+        # +watcha
+
         # we try to create the pusher just to validate the config: it
         # will then get pulled out of the database,
         # recreated, added and started: this means we have only one

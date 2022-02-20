@@ -40,7 +40,10 @@ class AccountDataServlet(RestServlet):
         self.handler = hs.get_account_data_handler()
 
     async def on_PUT(self, request, user_id, account_data_type):
+        """ watcha!
         requester = await self.auth.get_user_by_req(request)
+        !watcha """
+        requester = await self.auth.get_user_by_req(request, allow_partner=True) # watcha+
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
 
@@ -84,7 +87,10 @@ class RoomAccountDataServlet(RestServlet):
         self.handler = hs.get_account_data_handler()
 
     async def on_PUT(self, request, user_id, room_id, account_data_type):
+        """ watcha!
         requester = await self.auth.get_user_by_req(request)
+        !watcha """
+        requester = await self.auth.get_user_by_req(request, allow_partner=True) # watcha+
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
 
@@ -96,6 +102,13 @@ class RoomAccountDataServlet(RestServlet):
                 "Cannot set m.fully_read through this API."
                 " Use /rooms/!roomId:server.name/read_markers",
             )
+
+        # watcha+
+        if account_data_type == "org.matrix.room.preview_urls":
+            logger.info("AccountDataPreviewUrls: original=" + str(body))
+            body["disable"] = True
+            logger.info("AccountDataPreviewUrls: new=" + str(body))
+        # +watcha
 
         await self.handler.add_account_data_to_room(
             user_id, room_id, account_data_type, body
