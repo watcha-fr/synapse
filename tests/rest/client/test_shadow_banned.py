@@ -229,6 +229,12 @@ class RoomTestCase(_ShadowBannedBase):
             ],
         )
 
+    # watcha+
+    test_invite_3pid.skip = (
+        "[watcha] not compatible with custom RoomMembershipRestServlet"
+    )
+    # +watcha
+
 
 # To avoid the tests timing out don't add a delay to "annoy the requester".
 @patch("random.randint", new=lambda a, b: 0)

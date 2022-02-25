@@ -78,6 +78,12 @@ class Codes:
     # For restricted join rules.
     UNABLE_AUTHORISE_JOIN = "M_UNABLE_TO_AUTHORISE_JOIN"
     UNABLE_TO_GRANT_JOIN = "M_UNABLE_TO_GRANT_JOIN"
+    # watcha+
+    NEXTCLOUD_CAN_NOT_ADD_MEMBERS_TO_GROUP = "W_NEXTCLOUD_CAN_NOT_ADD_MEMBERS_TO_GROUP"
+    NEXTCLOUD_CAN_NOT_CREATE_GROUP = "W_NEXTCLOUD_CAN_NOT_CREATE_GROUP"
+    NEXTCLOUD_CAN_NOT_SHARE = "W_NEXTCLOUD_CAN_NOT_SHARE"
+
+    # +watcha
 
 
 class CodeMessageException(RuntimeError):
@@ -153,6 +159,25 @@ class InvalidAPICallError(SynapseError):
 
     def __init__(self, msg: str):
         super().__init__(HTTPStatus.BAD_REQUEST, msg, Codes.BAD_JSON)
+
+
+# watcha+
+class NextcloudError(CodeMessageException):
+    """A base exception type for Nextcloud errors which have an error code and error
+    message (corresponding to status code and status message from Nextcloud API documentation).
+    """
+
+    def __init__(self, code: int, msg: str):
+        """Constructs a Nextcloud error.
+
+        Args:
+            code: The integer error code (corresponding to status code in response body)
+            msg: The human-readable error message.
+        """
+        super().__init__(code, msg)
+
+
+# +watcha
 
 
 class ProxiedRequestError(SynapseError):

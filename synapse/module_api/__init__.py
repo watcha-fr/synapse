@@ -418,6 +418,7 @@ class ModuleApi:
         req: SynapseRequest,
         allow_guest: bool = False,
         allow_expired: bool = False,
+        allow_partner: bool = True,  # watcha+
     ) -> Requester:
         """Check the access_token provided for a request
 
@@ -443,6 +444,7 @@ class ModuleApi:
             req,
             allow_guest,
             allow_expired=allow_expired,
+            allow_partner=allow_partner,  # watcha+
         )
 
     async def is_user_admin(self, user_id: str) -> bool:

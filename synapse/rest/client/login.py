@@ -50,6 +50,8 @@ from synapse.types import JsonDict, UserID
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
+from synapse.http.server import set_cors_headers  # watcha+
+
 logger = logging.getLogger(__name__)
 
 
@@ -371,6 +373,12 @@ class LoginRestServlet(RestServlet):
         if refresh_token is not None:
             result["refresh_token"] = refresh_token
 
+        # watcha+
+        is_partner = await self.auth_handler.is_partner(user_id)
+        if is_partner:
+            result["is_partner"] = is_partner
+        # +watcha
+
         if callback is not None:
             await callback(result)
 
@@ -527,6 +535,7 @@ class SsoRedirectServlet(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, idp_id: Optional[str] = None
     ) -> None:
+        set_cors_headers(request)  # watcha+
         if not self._public_baseurl:
             raise SynapseError(400, "SSO requires a valid public_baseurl")
 

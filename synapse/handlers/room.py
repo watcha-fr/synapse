@@ -115,6 +115,11 @@ class RoomCreationHandler:
         self._event_auth_handler = hs.get_event_auth_handler()
         self.config = hs.config
         self.request_ratelimiter = hs.get_request_ratelimiter()
+        # watcha+
+        self.store = hs.get_datastore()
+        self.administration_handler = hs.get_administration_handler()
+        self.partner_handler = hs.get_partner_handler()
+        # +watcha
 
         # Room state based off defined presets
         self._presets_dict: Dict[str, Dict[str, Any]] = {
@@ -913,6 +918,7 @@ class RoomCreationHandler:
             medium = invite_3pid["medium"]
             # Note that do_3pid_invite can raise a  ShadowBanError, but this was
             # handled above by emptying invite_3pid_list.
+            """watcha!
             last_stream_id = await self.hs.get_room_member_handler().do_3pid_invite(
                 room_id,
                 requester.user,
@@ -923,6 +929,34 @@ class RoomCreationHandler:
                 txn_id=None,
                 id_access_token=id_access_token,
             )
+            !watcha"""
+            # watcha+
+            invitee_email = address.strip()
+            invitee_id = await self.store.get_user_id_by_threepid(
+                "email", invitee_email
+            )
+
+            if not invitee_id:
+                invitee_id = await self.partner_handler.register_partner(
+                    sender_id=requester.user.to_string(),
+                    invitee_email=invitee_email,
+                )
+
+            if await self.administration_handler.get_user_role(invitee_id) == "partner":
+                await self.store.add_partner_invitation(
+                    partner_id=invitee_id,
+                    sender_id=requester.user.to_string(),
+                )
+
+            await self.room_member_handler.update_membership(
+                requester,
+                UserID.from_string(invitee_id),
+                room_id,
+                "invite",
+                ratelimit=False,
+                content=content,
+            )
+            # +watcha
 
         result = {"room_id": room_id}
 

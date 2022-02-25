@@ -77,6 +77,12 @@ from .user_erasure_store import UserErasureStore
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+# watcha+
+from .watcha_administration import AdministrationStore
+from .watcha_nextcloud import NextcloudStore
+from .watcha_partner import PartnerStore
+
+# +watcha
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +134,11 @@ class DataStore(
     ServerMetricsStore,
     LockStore,
     SessionStore,
+    # watcha+
+    AdministrationStore,
+    PartnerStore,
+    NextcloudStore,
+    # +watcha
 ):
     def __init__(
         self,

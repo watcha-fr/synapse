@@ -84,7 +84,12 @@ class ClientDirectoryServer(RestServlet):
         if room is None:
             raise SynapseError(400, "Room does not exist")
 
+        """ watcha!
         requester = await self.auth.get_user_by_req(request)
+        !watcha """
+        # watcha+
+        requester = await self.auth.get_user_by_req(request, allow_partner=False)
+        # +watcha
 
         await self.directory_handler.create_association(
             requester, room_alias_obj, room_id, servers
@@ -112,7 +117,13 @@ class ClientDirectoryServer(RestServlet):
             # fallback to default user behaviour if they aren't an AS
             pass
 
+        """ watcha!
         requester = await self.auth.get_user_by_req(request)
+        !watcha """
+        # watcha+
+        requester = await self.auth.get_user_by_req(request, allow_partner=False)
+        # +watcha
+
         user = requester.user
 
         await self.directory_handler.delete_association(requester, room_alias_obj)
@@ -143,7 +154,12 @@ class ClientDirectoryListServer(RestServlet):
     async def on_PUT(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
+        """watcha!
         requester = await self.auth.get_user_by_req(request)
+        !watcha"""
+        # watcha+
+        requester = await self.auth.get_user_by_req(request, allow_partner=False)
+        # +watcha
 
         content = parse_json_object_from_request(request)
         visibility = content.get("visibility", "public")
@@ -157,7 +173,12 @@ class ClientDirectoryListServer(RestServlet):
     async def on_DELETE(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
+        """watcha!
         requester = await self.auth.get_user_by_req(request)
+        !watcha"""
+        # watcha+
+        requester = await self.auth.get_user_by_req(request, allow_partner=False)
+        # +watcha
 
         await self.directory_handler.edit_published_room_list(
             requester, room_id, "private"
@@ -192,7 +213,13 @@ class ClientAppserviceDirectoryListServer(RestServlet):
     async def _edit(
         self, request: SynapseRequest, network_id: str, room_id: str, visibility: str
     ) -> Tuple[int, JsonDict]:
+        """watcha!
         requester = await self.auth.get_user_by_req(request)
+        !watcha"""
+        # watcha+
+        requester = await self.auth.get_user_by_req(request, allow_partner=False)
+        # +watcha
+
         if not requester.app_service:
             raise AuthError(
                 403, "Only appservices can edit the appservice published room list"

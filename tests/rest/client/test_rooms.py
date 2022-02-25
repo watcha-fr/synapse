@@ -813,6 +813,10 @@ class RoomsCreateTestCase(RoomBase):
 
         self.assertEquals(join_mock.call_count, 0)
 
+    # watcha+
+    test_spamchecker_invites.skip = "[watcha] not compatible with custom create_room"
+    # +watcha
+
 
 class RoomTopicTestCase(RoomBase):
     """Tests /rooms/$room_id/topic REST events."""
@@ -2753,3 +2757,7 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
 
         # Also check that it stopped before calling _make_and_store_3pid_invite.
         make_invite_mock.assert_called_once()
+
+    # watcha+
+    test_threepid_invite_spamcheck.skip = "[watcha] not compatible with custom create_room"
+    # +watcha

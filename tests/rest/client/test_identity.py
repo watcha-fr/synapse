@@ -57,3 +57,9 @@ class IdentityTestCase(unittest.HomeserverTestCase):
             b"POST", request_url, request_data, access_token=tok
         )
         self.assertEquals(channel.result["code"], b"403", channel.result)
+
+    # watcha+
+    test_3pid_lookup_disabled.skip = (
+        "[watcha] do_3pid_invite is bypassed until we use IS"
+    )
+    # +watcha
