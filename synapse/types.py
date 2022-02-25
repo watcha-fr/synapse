@@ -106,6 +106,7 @@ class Requester:
     device_id: Optional[str]
     app_service: Optional["ApplicationService"]
     authenticated_entity: str
+    is_partner: bool  # watcha+
 
     def serialize(self):
         """Converts self to a type that can be serialized as JSON, and then
@@ -122,6 +123,7 @@ class Requester:
             "device_id": self.device_id,
             "app_server_id": self.app_service.id if self.app_service else None,
             "authenticated_entity": self.authenticated_entity,
+            "is_partner": self.is_partner,  # watcha+
         }
 
     @staticmethod
@@ -148,6 +150,7 @@ class Requester:
             device_id=input["device_id"],
             app_service=appservice,
             authenticated_entity=input["authenticated_entity"],
+            is_partner=input["is_partner"],  # watcha+
         )
 
 
@@ -159,6 +162,7 @@ def create_requester(
     device_id: Optional[str] = None,
     app_service: Optional["ApplicationService"] = None,
     authenticated_entity: Optional[str] = None,
+    is_partner: bool = False,  # watcha+
 ) -> Requester:
     """
     Create a new ``Requester`` object
@@ -192,6 +196,7 @@ def create_requester(
         device_id,
         app_service,
         authenticated_entity,
+        is_partner,  # watcha+
     )
 
 

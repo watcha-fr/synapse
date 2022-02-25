@@ -28,7 +28,16 @@ if TYPE_CHECKING:
 
 
 class ProfileDisplaynameRestServlet(RestServlet):
+    """watcha!
+    # BIG HACK for the iOS app which doesn't escape the user_id when setting the display name
+    # This means that user_ids with the pattern "<user_id>/displayname" will not work -
+    # but they can't occur - it's only domains names after the "/"
     PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/displayname", v1=True)
+    !watcha"""
+
+    # watcha+
+    PATTERNS = client_patterns("/profile/(?P<user_id>.*)/displayname", v1=True)
+    # +watcha
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -140,6 +149,7 @@ class ProfileRestServlet(RestServlet):
         self.hs = hs
         self.profile_handler = hs.get_profile_handler()
         self.auth = hs.get_auth()
+        self.account_activity_handler = hs.get_account_validity_handler()  # watcha+
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
@@ -163,6 +173,13 @@ class ProfileRestServlet(RestServlet):
         if avatar_url is not None:
             ret["avatar_url"] = avatar_url
 
+        # watcha+
+        addresses = await self.account_activity_handler._get_email_addresses_for_user(
+            user_id
+        )
+        if addresses:
+            ret["email"] = addresses[0]
+        # +watcha
         return 200, ret
 
 
