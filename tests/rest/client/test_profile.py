@@ -23,6 +23,10 @@ from synapse.types import UserID
 from tests import unittest
 
 
+from urllib.parse import quote  # watcha+
+from synapse.api.errors import SynapseError  # watcha+
+
+
 class ProfileTestCase(unittest.HomeserverTestCase):
 
     servlets = [
@@ -34,12 +38,14 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         self.hs = self.setup_test_homeserver()
+        self.auth = self.hs.get_auth_handler()  # watcha+
         return self.hs
 
     def prepare(self, reactor, clock, hs):
         self.owner = self.register_user("owner", "pass")
         self.owner_tok = self.login("owner", "pass")
         self.other = self.register_user("other", "pass", displayname="Bob")
+        self.time = self.hs.get_clock().time_msec()  # watcha+
 
     def test_get_displayname(self):
         res = self._get_displayname()
@@ -305,6 +311,50 @@ class ProfileTestCase(unittest.HomeserverTestCase):
                     user_id=UserID.from_string("@rin:test"),
                 )
             )
+
+    # watcha+
+    def test_get_email_threepids(self):
+
+        # Addition of email as a threepids :
+        self.get_success(
+            self.auth.add_threepid(self.owner, "email", "example@email.com", self.time)
+        )
+
+        channel = self.make_request("GET", "/profile/%s" % (quote(self.owner, safe="")))
+
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.json_body["email"], "example@email.com")
+
+    def test_do_not_get_phone_threepids(self):
+
+        # Addition of phone number as a threepids :
+        self.get_success(
+            self.auth.add_threepid(self.owner, "msisdn", "0612345678", self.time)
+        )
+
+        channel = self.make_request("GET", "/profile/%s" % (quote(self.owner, safe="")))
+
+        self.assertEqual(channel.code, 200)
+        self.assertRaises(SynapseError)
+
+    def test_get_only_one_email_threepids(self):
+
+        # Addition of two emails as a threepids :
+        self.get_success(
+            self.auth.add_threepid(self.owner, "email", "example@email.com", self.time)
+        )
+        self.get_success(
+            self.auth.add_threepid(
+                self.owner, "email", "second_example@email.com", self.time
+            )
+        )
+
+        channel = self.make_request("GET", "/profile/%s" % (quote(self.owner, safe="")))
+
+        self.assertEqual(channel.code, 200)
+        self.assertRaises(SynapseError)
+
+    # +watcha
 
 
 class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):

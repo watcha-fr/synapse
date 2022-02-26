@@ -64,6 +64,9 @@ if TYPE_CHECKING:
 
 RegisterServletsFunc = Callable[["HomeServer", HttpServer], None]
 
+from synapse.rest import watcha  # watcha+
+from synapse.rest.client import watcha as legacy_watcha  # watcha+
+
 
 class ClientRestResource(JsonResource):
     """Matrix Client API REST resource.
@@ -132,3 +135,6 @@ class ClientRestResource(JsonResource):
 
         # unstable
         shared_rooms.register_servlets(hs, client_resource)
+
+        legacy_watcha.register_servlets(hs, client_resource)  # watcha+
+        watcha.register_servlets(hs, client_resource)  # watcha+
