@@ -415,6 +415,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             shadow_banned=False,
             app_service=appservice,
             authenticated_entity="@appservice:server",
+            is_partner=False,  # watcha+
         )
         self.get_success(self.auth.check_auth_blocking(requester=requester))
 
@@ -444,6 +445,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             shadow_banned=False,
             app_service=appservice,
             authenticated_entity="@appservice:server",
+            is_partner=False,  # watcha+
         )
         self.get_failure(
             self.auth.check_auth_blocking(requester=requester), ResourceLimitError

@@ -113,6 +113,7 @@ class RootConfig:
     caches: cache.CacheConfig
     federation: federation.FederationConfig
     retention: retention.RetentionConfig
+    nextcloud: watcha_nextcloud.NextcloudConfig  # watcha+
 
     config_classes: List[Type["Config"]] = ...
     def __init__(self) -> None: ...

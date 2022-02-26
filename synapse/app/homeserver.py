@@ -72,6 +72,7 @@ from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.module_loader import load_module
+from synapse.rest.watcha import WatchaRestResource  # watcha+
 
 logger = logging.getLogger("synapse.app.homeserver")
 
@@ -201,6 +202,7 @@ class SynapseHomeServer(HomeServer):
                     "/.well-known": well_known_resource(self),
                     "/_synapse/admin": AdminRestResource(self),
                     **build_synapse_client_resource_tree(self),
+                    "/_watcha": WatchaRestResource(self),  #  watcha+
                 }
             )
 

@@ -44,6 +44,17 @@ from synapse.visibility import filter_events_for_client
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
+# watcha+
+from base64 import b64encode
+from pathlib import Path
+
+import pkg_resources
+
+from synapse.types import get_localpart_from_id
+from synapse.util.watcha import ActionStatus, build_log_message
+
+# +watcha
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
@@ -119,8 +130,89 @@ class Mailer:
         self.storage = hs.get_storage()
         self.app_name = app_name
         self.email_subjects: EmailSubjectConfig = hs.config.email.email_subjects
+        self.account_handler = self.hs.get_account_validity_handler()  # watcha+
+        self.profile_handler = self.hs.get_profile_handler()  # watcha+
 
         logger.info("Created Mailer for app_name %s" % app_name)
+
+    # watcha+
+    def _get_b64_image(self, image_name):
+        b64_image_cache = self.__dict__.setdefault("_watcha_image_cache", {})
+        b64_image = b64_image_cache.get(image_name)
+        if b64_image is not None:
+            logger.debug(
+                build_log_message(
+                    action="load base64 image from cache",
+                    status=ActionStatus.SUCCESS,
+                    log_vars={"image_name": image_name},
+                )
+            )
+            return b64_image
+        path = Path(
+            pkg_resources.resource_filename("synapse", "res/templates"), image_name
+        )
+        data = path.read_bytes()
+        b64_image = b64encode(data).decode()
+        b64_image_cache[image_name] = b64_image
+        logger.debug(
+            build_log_message(
+                action="load image from disk",
+                status=ActionStatus.SUCCESS,
+                log_vars={"image_name": image_name},
+            )
+        )
+        return b64_image
+
+    async def send_watcha_registration_email(
+        self,
+        email_address: str,
+        sender_id: str,
+        password: str,
+    ) -> None:
+        """Send an email with temporary password and connexion link to Watcha.
+
+        Args:
+            email_address: email address we're sending the invitation
+            sender_id: the user id of the user who invite the partner
+            password: a temporary password
+        """
+        subject = self.email_subjects.watcha_registration % {"app": self.app_name}
+
+        sender_name = await self.profile_handler.get_displayname(
+            UserID.from_string(sender_id)
+        )
+        addresses = await self.account_handler._get_email_addresses_for_user(sender_id)
+
+        if sender_name and addresses:
+            sender_name += f" ({addresses[0]})"
+        elif addresses:
+            sender_name = addresses[0]
+
+        b64_images = {
+            "b64_watcha_button": self._get_b64_image("watcha_button.png"),
+            "b64_google_play_badge": self._get_b64_image(
+                "watcha_google_play_badge_fr.png"
+            ),
+            "b64_app_store_badge": self._get_b64_image("watcha_app_store_badge_fr.png"),
+        }
+
+        template_vars = {
+            "title": subject,
+            "sender_name": sender_name,
+            "login_url": self.hs.config.email.email_riot_base_url,
+            "email": email_address,
+            "password": password,
+            "server": self.hs.config.server.server_name,
+            **b64_images,
+        }
+
+        await self.send_email(
+            email_address,
+            subject,
+            template_vars,
+        )
+
+    # +watcha
 
     async def send_password_reset_mail(
         self, email_address: str, token: str, client_secret: str, sid: str

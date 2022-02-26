@@ -80,6 +80,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.account_data_handler = hs.get_account_data_handler()
         self.event_auth_handler = hs.get_event_auth_handler()
+        self.nextcloud_handler = hs.get_nextcloud_handler()  # watcha+
 
         self.member_linearizer: Linearizer = Linearizer(name="member")
 
@@ -493,6 +494,19 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         Raises:
             ShadowBanError if a shadow-banned requester attempts to send an invite.
         """
+        # watcha+
+        effective_membership_state = action
+        if action == "kick":
+            effective_membership_state = Membership.LEAVE
+        if effective_membership_state in (
+            Membership.LEAVE,
+            Membership.BAN,
+        ):
+            await self.nextcloud_handler.handle_room_member_event(
+                requester, room_id, target.to_string(), effective_membership_state
+            )
+        # +watcha
+
         if action == Membership.INVITE and requester.shadow_banned:
             # We randomly sleep a bit just to annoy the requester.
             await self.clock.sleep(random.randint(1, 10))
@@ -520,6 +534,12 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 auth_event_ids=auth_event_ids,
             )
 
+        # watcha+
+        if effective_membership_state == Membership.JOIN:
+            await self.nextcloud_handler.handle_room_member_event(
+                requester, room_id, target.to_string(), effective_membership_state
+            )
+        # +watcha
         return result
 
     async def update_membership_locked(
