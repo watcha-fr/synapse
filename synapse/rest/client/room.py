@@ -195,7 +195,19 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         state_key: str,
         txn_id: Optional[str] = None,
     ) -> Tuple[int, JsonDict]:
+        """watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        !watcha"""
+        # watcha+
+        allow_partner = event_type not in (
+            EventTypes.Tombstone,
+            EventTypes.SpaceChild,
+            EventTypes.SpaceParent,
+        )
+        requester = await self.auth.get_user_by_req(
+            request, allow_guest=True, allow_partner=allow_partner
+        )
+        # +watcha
 
         if txn_id:
             set_tag("txn_id", txn_id)

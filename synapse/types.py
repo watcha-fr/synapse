@@ -97,6 +97,7 @@ class Requester:
         authenticated_entity: The entity that authenticated when making the request.
             This is different to the user_id when an admin user or the server is
             "puppeting" the user.
+        is_partner:  True if the user making this request is a partner user  # watcha+
     """
 
     user: "UserID"
