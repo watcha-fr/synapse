@@ -23,13 +23,10 @@ class NextcloudConfig(Config):
         self.nextcloud_url = None
 
     def read_config(self, config, **kwargs):
-        oidc_config = config.get("oidc_config")
-        if not oidc_config or not oidc_config.get("enabled", False):
+        oidc_providers = config.get("oidc_providers")
+        if not oidc_providers or not len(oidc_providers) or oidc_providers[0].get("idp_id") != "oidc":
             return
-
-        nextcloud_config = config.get("nextcloud")
-        if not nextcloud_config or not nextcloud_config.get("enabled", False):
-            return
+        oidc_config = oidc_providers[0]
 
         issuer = oidc_config.get("issuer", "")
         match = re.match("(https?://.+?)/realms/([^/]+)", issuer)
@@ -44,6 +41,10 @@ class NextcloudConfig(Config):
             )
         self.keycloak_url = match.group(1)
         self.realm_name = match.group(2)
+
+        nextcloud_config = config.get("nextcloud")
+        if not nextcloud_config or not nextcloud_config.get("enabled", False):
+            return
 
         self.keycloak_service_account_password = nextcloud_config[
             "keycloak_service_account_password"
