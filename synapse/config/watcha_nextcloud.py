@@ -30,17 +30,9 @@ class NextcloudConfig(Config):
 
         issuer = oidc_config.get("issuer", "")
         match = re.match("(https?://.+?)/realms/([^/]+)", issuer)
-        if match is None:
-            raise ConfigError(
-                build_log_message(
-                    action="extract `keycloak_url` and `realm_name` from issuer config",
-                    log_vars={
-                        "issuer": issuer,
-                    },
-                )
-            )
-        self.keycloak_url = match.group(1)
-        self.realm_name = match.group(2)
+        if match is not None:
+            self.keycloak_url = match.group(1)
+            self.realm_name = match.group(2)
 
         nextcloud_config = config.get("nextcloud")
         if not nextcloud_config or not nextcloud_config.get("enabled", False):
