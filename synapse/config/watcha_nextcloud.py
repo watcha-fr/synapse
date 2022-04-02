@@ -38,12 +38,12 @@ class NextcloudConfig(Config):
         if not nextcloud_config or not nextcloud_config.get("enabled", False):
             return
 
-        self.keycloak_service_account_password = nextcloud_config[
+        self.keycloak_service_account_password = nextcloud_config.get(
             "keycloak_service_account_password"
-        ]
-        self.nextcloud_service_account_password = nextcloud_config[
+        )
+        self.nextcloud_service_account_password = nextcloud_config.get(
             "nextcloud_service_account_password"
-        ]
+        )
 
         self.keycloak_service_account_name = nextcloud_config.get(
             "keycloak_service_account_name", "watcha"
