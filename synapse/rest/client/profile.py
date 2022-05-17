@@ -28,12 +28,12 @@ if TYPE_CHECKING:
 
 
 class ProfileDisplaynameRestServlet(RestServlet):
-    """watcha!
+    """ watcha!
     # BIG HACK for the iOS app which doesn't escape the user_id when setting the display name
     # This means that user_ids with the pattern "<user_id>/displayname" will not work -
     # but they can't occur - it's only domains names after the "/"
     PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/displayname", v1=True)
-    !watcha"""
+    !watcha """
 
     # watcha+
     PATTERNS = client_patterns("/profile/(?P<user_id>.*)/displayname", v1=True)

@@ -154,9 +154,9 @@ class ClientDirectoryListServer(RestServlet):
     async def on_PUT(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
-        """watcha!
+        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha"""
+        !watcha """
         # watcha+
         requester = await self.auth.get_user_by_req(request, allow_partner=False)
         # +watcha
@@ -173,9 +173,9 @@ class ClientDirectoryListServer(RestServlet):
     async def on_DELETE(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
-        """watcha!
+        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha"""
+        !watcha """
         # watcha+
         requester = await self.auth.get_user_by_req(request, allow_partner=False)
         # +watcha
@@ -213,9 +213,9 @@ class ClientAppserviceDirectoryListServer(RestServlet):
     async def _edit(
         self, request: SynapseRequest, network_id: str, room_id: str, visibility: str
     ) -> Tuple[int, JsonDict]:
-        """watcha!
+        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha"""
+        !watcha """
         # watcha+
         requester = await self.auth.get_user_by_req(request, allow_partner=False)
         # +watcha

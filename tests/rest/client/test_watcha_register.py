@@ -155,3 +155,13 @@ class RegisterTestCase(unittest.HomeserverTestCase):
             nextcloud_username, displayname
         )
         self.assertEqual(channel.code, 200)
+
+    # watcha+
+    skip_reason = (
+        "[watcha] to be adapted to conditional functionalities "
+        "(managed_idp, nextcloud_integration)"
+    )
+    test_register_user.skip = skip_reason
+    test_register_user_with_displayname.skip = skip_reason
+    test_register_user_with_password.skip = skip_reason
+    # +watcha

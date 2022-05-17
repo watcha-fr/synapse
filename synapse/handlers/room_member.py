@@ -1357,6 +1357,21 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 403, "Looking up third-party identifiers is denied from this server"
             )
 
+        # watcha+ bypass identity server flow
+        email_address = address.strip()
+        invitee = await self.store.get_user_id_by_threepid("email", email_address)
+        if not invitee:
+            invitee = await self.hs.get_watcha_registration_handler().register(
+                sender_id=requester.user.to_string(),
+                email_address=email_address,
+                is_partner=True,
+            )
+        _, stream_id = await self.update_membership(
+            requester, UserID.from_string(invitee), room_id, "invite", txn_id=txn_id
+        )
+        return stream_id
+        # +watcha
+
         invitee = await self.identity_handler.lookup_3pid(
             id_server, medium, address, id_access_token
         )

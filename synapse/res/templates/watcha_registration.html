@@ -8,7 +8,7 @@
     </head>
     <body style="font-family: sans-serif; max-width: 600px; padding: 1em">
         <p>Bonjour,</p>
-        <p>{{ sender_name | default("Un colaborateur", true) }} vous invite à rejoindre l'espace de travail sécurisé Watcha.</p>
+        <p>{{ sender_name | default("Un colaborateur", true) }} vous invite à rejoindre la suite collaborative Watcha.</p>
 
         <br />
 
@@ -28,15 +28,15 @@
             <tbody>
                 <tr>
                     <td>
-                        <b>Email</b>
+                        <b>Identifiant</b>
                     </td>
                 </tr>
                 <tr>
-                    <td style="padding-left: 2em">{{ email }}</td>
+                    <td style="padding-left: 2em">{{ identifier }}</td>
                 </tr>
                 <tr>
                     <td>
-                        <b>Mot de passe provisoire</b>
+                        <b>Mot de passe {% if not is_partner %}provisoire {% endif %}</b>
                     </td>
                 </tr>
                 <tr>
@@ -73,23 +73,45 @@
         <h3>Connectez-vous depuis votre mobile, en téléchargeant l'application</h3>
 
         <p>
-            <a href="https://play.google.com/store/apps/details?id=im.watcha.app">
+            <a href="
+                {%- if is_partner -%}
+                https://play.google.com/store/apps/details?id=im.vector.app
+                {%- else -%}
+                https://play.google.com/store/apps/details?id=im.watcha.app
+                {%- endif -%}
+            ">
                 <img
                     src="data:image/png;base64,{{ b64_google_play_badge }}"
                     alt="Télécharger l'application Android sur Google Play"
                     width="300"
-                /><br />https://play.google.com/store/apps/details?id=im.watcha.app</a
-            >
+                /><br />
+                {%- if is_partner -%}
+                https://play.google.com/store/apps/details?id=im.vector.app
+                {%- else -%}
+                https://play.google.com/store/apps/details?id=im.watcha.app
+                {%- endif -%}
+            </a>
         </p>
 
         <p>
-            <a href="https://apps.apple.com/fr/app/watcha/id1383732254">
+            <a href="
+                {%- if is_partner -%}
+                https://apps.apple.com/fr/app/element-messenger/id1083446067
+                {%- else -%}
+                https://apps.apple.com/fr/app/watcha/id1383732254
+                {%- endif -%}
+            ">
                 <img
                     src="data:image/png;base64,{{ b64_app_store_badge }}"
                     alt="Télécharger l'application iOS sur l'App Store"
                     width="300"
-                /><br />https://apps.apple.com/fr/app/watcha/id1383732254</a
-            >
+                /><br />
+                {%- if is_partner -%}
+                https://apps.apple.com/fr/app/element-messenger/id1083446067
+                {%- else -%}
+                https://apps.apple.com/fr/app/watcha/id1383732254
+                {%- endif -%}
+            </a>
         </p>
     </body>
 </html>

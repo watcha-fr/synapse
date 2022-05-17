@@ -5,7 +5,7 @@ from jsonschema import validate
 
 from synapse.api.errors import HttpResponseException
 from synapse.http.client import SimpleHttpClient
-from synapse.util.watcha import build_log_message
+from synapse.util.watcha import ActionStatus, build_log_message
 
 logger = logging.getLogger(__name__)
 
@@ -43,26 +43,26 @@ class KeycloakClient(SimpleHttpClient):
     def __init__(self, hs):
         super().__init__(hs)
 
-        self.server_url = hs.config.nextcloud.keycloak_url
-        self.realm_name = hs.config.nextcloud.realm_name
-        self.service_account_name = hs.config.nextcloud.keycloak_service_account_name
+        self.server_url = hs.config.watcha.keycloak_url
+        self.realm_name = hs.config.watcha.realm_name
+        self.service_account_name = hs.config.watcha.keycloak_service_account_name
         self.service_account_password = (
-            hs.config.nextcloud.keycloak_service_account_password
+            hs.config.watcha.keycloak_service_account_password
         )
 
-    async def add_user(self, password_hash, email, is_admin=False):
+    async def add_user(self, password_hash, email_address, is_admin=False):
         """Create a new user
 
         Args:
-            password_hash: the synapse password hash
-            email: email of the user
-            is_admin: whether the user is a synapse administrator or not
+            password_hash: The bcrypt hash of the user's password, as for Synapse.
+            email_address: The user's email address.
+            is_admin: Whether the user is a synapse administrator or not.
         """
 
         user = {
             "enabled": True,
-            "username": email,
-            "email": email,
+            "username": email_address,
+            "email": email_address,
             "credentials": [
                 {
                     "type": "password",
@@ -75,7 +75,7 @@ class KeycloakClient(SimpleHttpClient):
         }
 
         if is_admin:
-            user["attributes"]["isAdmin"] = True
+            user["groups"] = ["/admin"]
 
         try:
             return await self.post_json_get_response(
@@ -85,16 +85,10 @@ class KeycloakClient(SimpleHttpClient):
             )
         except HttpResponseException as error:
             if error.code == 409:
-                logger.info(
-                    build_log_message(
-                        log_vars={
-                            "user": user,
-                            "email": email,
-                        },
-                    )
-                )
+                logger.warn(build_log_message(log_vars={"error": error, "user": user}))
             else:
                 raise
+        logger.info(build_log_message(status=ActionStatus.SUCCESS))
 
     async def delete_user(self, user_id):
         """Delete an existing user

@@ -1,16 +1,16 @@
 Bonjour,
 
-{{ sender_name | default("Un colaborateur", true)  }} vous invite à rejoindre l'espace de travail sécurisé Watcha.
+{{ sender_name | default("Un colaborateur", true)  }} vous invite à rejoindre la suite collaborative Watcha.
 
 
 
 Paramètres de connexion :
 
-      Email :
+      Identifiant :
 
-            {{ email }}
+            {{ identifier }}
 
-      Mot de passe provisoire :
+      Mot de passe {% if not is_partner %}provisoire {% endif %}:
 
             {{ password }}
 
@@ -29,9 +29,17 @@ Connectez-vous depuis votre navigateur, en vous rendant sur la plateforme :
 Connectez-vous depuis votre mobile :
 
       Télécharger l'application Android sur Google Play :
-      
+
+            {% if is_partner -%}
+            https://play.google.com/store/apps/details?id=im.vector.app
+            {% else -%}
             https://play.google.com/store/apps/details?id=im.watcha.app
+            {%- endif %}
 
       Télécharger l'application iOS sur l'App Store :
-      
+
+            {% if is_partner -%}
+            https://apps.apple.com/fr/app/element-messenger/id1083446067
+            {% else -%}
             https://itunes.apple.com/us/app/watcha/id1383732254
+            {%- endif %}

@@ -226,3 +226,14 @@ class InvitePartnerInRoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(self.email_attempts), 0)
 
         self.assertEqual(channel.code, 200)
+
+    # watcha+
+    skip_reason = (
+        "[watcha] to be adapted to conditional functionalities "
+        "(managed_idp, nextcloud_integration, external_authentication_for_partners)"
+    )
+    test_invite_partner.skip = skip_reason
+    test_invite_existing_partner.skip = skip_reason
+    test_create_room_and_invite_partner.skip = skip_reason
+    test_create_room_and_invite_existing_partner.skip = skip_reason
+    # +watcha

@@ -32,21 +32,24 @@ NEXTCLOUD_CLIENT_ERRORS = (
 
 class NextcloudHandler:
     def __init__(self, hs: "Homeserver"):
-        self.hs = hs
+        self.config = hs.config
         self.auth = hs.get_auth()
-        self.administration_handler = hs.get_administration_handler()
+        self.store = hs.get_datastore()
+        self.administration_handler = hs.get_watcha_administration_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.state_handler = hs.get_state_handler()
-        self.store = hs.get_datastore()
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
-        self.group_displayname_prefix = (
-            hs.config.nextcloud.nextcloud_group_displayname_prefix
-        )
 
     async def handle_room_member_event(
         self, requester: Requester, room_id: str, user_id: str, membership: str
     ):
+        if (
+            await self.administration_handler.get_user_role(user_id) == "partner"
+            and not self.config.watcha.external_authentication_for_partners
+        ):
+            return
+
         if await self.store.get_share_id(room_id):
             await self.update_group(user_id, room_id, membership)
 
@@ -161,7 +164,7 @@ class NextcloudHandler:
         """
         room_state_ids = await self.state_handler.get_current_state_ids(room_id)
         room_name = await calculate_room_name(self.store, room_state_ids, None)
-        return f"{self.group_displayname_prefix} {room_name}"
+        return f"[Watcha] {room_name}"
 
     async def set_group_displayname(self, group_id: str, group_displayname: str):
         """Set the displayname of a Nextcloud group

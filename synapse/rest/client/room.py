@@ -86,9 +86,9 @@ class RoomCreateRestServlet(TransactionRestServlet):
         return self.txns.fetch_or_execute_request(request, self.on_POST, request)
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        """watcha!
+        """ watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha"""
+        !watcha """
         # watcha+
         requester = await self.auth.get_user_by_req(request, allow_partner=False)
         # +watcha
@@ -195,9 +195,9 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         state_key: str,
         txn_id: Optional[str] = None,
     ) -> Tuple[int, JsonDict]:
-        """watcha!
+        """ watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha"""
+        !watcha """
         # watcha+
         allow_partner = event_type not in (
             EventTypes.Tombstone,
@@ -402,9 +402,9 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         server = parse_string(request, "server")
 
         try:
-            """watcha!
+            """ watcha!
             await self.auth.get_user_by_req(request, allow_guest=True)
-            !watcha"""
+            !watcha """
             # watcha+
             await self.auth.get_user_by_req(
                 request, allow_guest=True, allow_partner=False
@@ -455,9 +455,9 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         return 200, data
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        """watcha!
+        """ watcha!
         await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha"""
+        !watcha """
         # watcha+
         await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=False)
         # +watcha
@@ -825,11 +825,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         super().__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
-        # watcha+
-        self.store = hs.get_datastore()
-        self.administration_handler = hs.get_administration_handler()
-        self.partner_handler = hs.get_partner_handler()
-        # +watcha
+        self.store = hs.get_datastore()  # watcha+
 
     def register(self, http_server: HttpServer) -> None:
         # /rooms/$roomid/[invite|join|leave]
@@ -859,17 +855,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             Membership.JOIN,
             Membership.LEAVE,
         }:
-            raise AuthError(
-                403,
-                build_log_message(
-                    action="change member membership",
-                    log_vars={
-                        "requester.user_id": requester.user.to_string(),
-                        "requester.is_partner": requester.is_partner,
-                        "membership_action": membership_action,
-                    },
-                ),
-            )
+            raise AuthError(403, "Partner access not allowed")
         # +watcha
 
         try:
@@ -880,7 +866,6 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             content = {}
 
         if membership_action == "invite" and self._has_3pid_invite_keys(content):
-            """watcha!
             try:
                 await self.room_member_handler.do_3pid_invite(
                     room_id,
@@ -896,27 +881,6 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 # Pretend the request succeeded.
                 pass
             return 200, {}
-            !watcha"""
-            # watcha+
-            invitee_email = content["address"].strip()
-            invitee_id = await self.store.get_user_id_by_threepid(
-                "email", invitee_email
-            )
-
-            if not invitee_id:
-                invitee_id = await self.partner_handler.register_partner(
-                    sender_id=requester.user.to_string(),
-                    invitee_email=invitee_email,
-                )
-
-            if await self.administration_handler.get_user_role(invitee_id) == "partner":
-                await self.store.add_partner_invitation(
-                    partner_id=invitee_id,
-                    sender_id=requester.user.to_string(),
-                )
-
-            content["user_id"] = invitee_id
-            # +watcha
 
         target = requester.user
         if membership_action in ["invite", "ban", "unban", "kick"]:

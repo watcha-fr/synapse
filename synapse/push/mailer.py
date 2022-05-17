@@ -45,6 +45,7 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 # watcha+
+import urllib.parse
 from base64 import b64encode
 from pathlib import Path
 
@@ -163,30 +164,40 @@ class Mailer:
         )
         return b64_image
 
-    async def send_watcha_registration_email(
+    async def send_watcha_registration_mail(
         self,
-        email_address: str,
         sender_id: str,
+        email_address: str,
         password: str,
+        is_partner: Optional[bool] = False,
     ) -> None:
         """Send an email with temporary password and connexion link to Watcha.
 
         Args:
-            email_address: email address we're sending the invitation
-            sender_id: the user id of the user who invite the partner
-            password: a temporary password
+            sender_id: The mxid of the user who invite.
+            email_address: The invitee email address.
+            password: The invitee password. The password hash is stored locally only for partners.
+            is_partner: Whether the invitee is a partner.
         """
         subject = self.email_subjects.watcha_registration % {"app": self.app_name}
 
         sender_name = await self.profile_handler.get_displayname(
             UserID.from_string(sender_id)
         )
-        addresses = await self.account_handler._get_email_addresses_for_user(sender_id)
+        sender_addresses = await self.account_handler._get_email_addresses_for_user(sender_id)
 
-        if sender_name and addresses:
-            sender_name += f" ({addresses[0]})"
-        elif addresses:
-            sender_name = addresses[0]
+        if sender_name and sender_addresses:
+            sender_name += f" ({sender_addresses[0]})"
+        elif sender_addresses:
+            sender_name = sender_addresses[0]
+
+        login_url = self.hs.config.email.email_riot_base_url
+        if (
+            is_partner
+            and not self.hs.config.watcha.external_authentication_for_partners
+        ):
+            default_username = urllib.parse.quote_plus(email_address)
+            login_url += f"/#/partner?defaultUsername={default_username}"
 
         b64_images = {
             "b64_watcha_button": self._get_b64_image("watcha_button.png"),
@@ -199,10 +210,14 @@ class Mailer:
         template_vars = {
             "title": subject,
             "sender_name": sender_name,
-            "login_url": self.hs.config.email.email_riot_base_url,
-            "email": email_address,
+            "identifier": email_address,
             "password": password,
             "server": self.hs.config.server.server_name,
+            "login_url": login_url,
+            "is_partner": (
+                is_partner
+                and not self.hs.config.watcha.external_authentication_for_partners
+            ),
             **b64_images,
         }
 

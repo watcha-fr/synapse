@@ -7,6 +7,7 @@ from jsonschema import validate
 
 from synapse.api.errors import Codes, NextcloudError
 from synapse.http.client import SimpleHttpClient
+from synapse.util.watcha import ActionStatus, build_log_message
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +23,7 @@ META_SCHEMA = {
 WITHOUT_DATA_SCHEMA = {
     "$schema": "http://json-schema.org/draft-04/schema#",
     "description": "Nextcloud API schema which data is not expected",
-    "definitions": {
-        "meta": META_SCHEMA,
-    },
+    "definitions": {"meta": META_SCHEMA},
     "type": "object",
     "properties": {
         "ocs": {
@@ -71,10 +70,10 @@ class NextcloudClient(SimpleHttpClient):
     def __init__(self, hs: "Homeserver"):
         super().__init__(hs)
 
-        self.nextcloud_url = hs.config.nextcloud.nextcloud_url
-        self.service_account_name = hs.config.nextcloud.nextcloud_service_account_name
+        self.nextcloud_url = hs.config.watcha.nextcloud_url
+        self.service_account_name = hs.config.watcha.nextcloud_service_account_name
         self.service_account_password = (
-            hs.config.nextcloud.nextcloud_service_account_password
+            hs.config.watcha.nextcloud_service_account_password
         )
         self._headers = self._get_headers()
         self._headers_for_ocs_api = self._get_headers_for_ocs_api()
@@ -133,7 +132,13 @@ class NextcloudClient(SimpleHttpClient):
         )
 
         validate(response, WITH_DATA_SCHEMA)
-        self._raise_for_status(response["ocs"]["meta"])
+
+        meta = response["ocs"]["meta"]
+        if meta["statuscode"] == 102:
+            logger.warn(build_log_message(log_vars={"meta": meta, "payload": payload}))
+        else:
+            self._raise_for_status(meta)
+        logger.info(build_log_message(status=ActionStatus.SUCCESS))
 
     async def delete_user(self, username: str):
         """Delete an existing user.
@@ -336,7 +341,7 @@ class NextcloudClient(SimpleHttpClient):
     # ===================
 
     async def get_users_own_calendars(self, user_id: str):
-        """List all calendars owned by a specific user.
+        """List all calendars owned by a specific user.
 
         Args:
             user_id: the ID of the concerned Nextcloud user
@@ -348,7 +353,7 @@ class NextcloudClient(SimpleHttpClient):
         )
 
     async def get_calendar(self, user_id: str, calendar_id: int):
-        """Get properties for a specific calendar from the perspective of a specific user.
+        """Get properties for a specific calendar from the perspective of a specific user.
 
         Args:
             user_id: the ID of the concerned Nextcloud user
