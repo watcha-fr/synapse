@@ -562,13 +562,13 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # Alice's display name remains the same in the user directory.
         search_result = self.get_success(self.handler.search_users(bob, alice, 10))
-        """ watcha!
+        """watcha!
         self.assertEqual(
             search_result["results"],
             [{"display_name": "alice", "avatar_url": None, "user_id": alice}],
             0,
         )
-        !watcha """
+        !watcha"""
         # watcha+ to match custom search_user_dir SQL
         self.assertEqual(
             search_result["results"],
@@ -647,13 +647,13 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # Alice's display name remains the same in the user directory.
         search_result = self.get_success(self.handler.search_users(bob, alice, 10))
-        """ watcha!
+        """watcha!
         self.assertEqual(
             search_result["results"],
             [{"display_name": "alice", "avatar_url": None, "user_id": alice}],
             0,
         )
-        !watcha """
+        !watcha"""
         # watcha+ to match custom search_user_dir SQL
         self.assertEqual(
             search_result["results"],

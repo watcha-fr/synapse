@@ -86,9 +86,9 @@ class RoomCreateRestServlet(TransactionRestServlet):
         return self.txns.fetch_or_execute_request(request, self.on_POST, request)
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        """ watcha!
+        """watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha """
+        !watcha"""
         # watcha+
         requester = await self.auth.get_user_by_req(request, allow_partner=False)
         # +watcha
@@ -195,9 +195,9 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         state_key: str,
         txn_id: Optional[str] = None,
     ) -> Tuple[int, JsonDict]:
-        """ watcha!
+        """watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha """
+        !watcha"""
         # watcha+
         allow_partner = event_type not in (
             EventTypes.Tombstone,
@@ -402,9 +402,9 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         server = parse_string(request, "server")
 
         try:
-            """ watcha!
+            """watcha!
             await self.auth.get_user_by_req(request, allow_guest=True)
-            !watcha """
+            !watcha"""
             # watcha+
             await self.auth.get_user_by_req(
                 request, allow_guest=True, allow_partner=False
@@ -455,9 +455,9 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         return 200, data
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        """ watcha!
+        """watcha!
         await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha """
+        !watcha"""
         # watcha+
         await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=False)
         # +watcha

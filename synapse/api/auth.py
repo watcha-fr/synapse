@@ -155,11 +155,11 @@ class Auth:
         """
         parent_span = active_span()
         with start_active_span("get_user_by_req"):
-            """ watcha!
+            """watcha!
             requester = await self._wrapped_get_user_by_req(
                 request, allow_guest, rights, allow_expired
             )
-            !watcha """
+            !watcha"""
             # watcha+
             requester = await self._wrapped_get_user_by_req(
                 request, allow_guest, rights, allow_expired, allow_partner

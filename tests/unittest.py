@@ -292,9 +292,9 @@ class HomeserverTestCase(TestCase):
                         "is_guest": False,
                     }
 
-                """ watcha!
+                """watcha!
                 async def get_user_by_req(request, allow_guest=False, rights="access"):
-                !watcha """
+                !watcha"""
                 # watcha+
                 async def get_user_by_req(
                     request, allow_guest=False, allow_partner=True, rights="access"

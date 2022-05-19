@@ -635,11 +635,11 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
         return await self.db_pool.runInteraction("get_users_by_id_case_insensitive", f)
 
-    """ watcha!
+    """watcha!
     async def record_user_external_id(
         self, auth_provider: str, external_id: str, user_id: str
     ) -> None:
-    !watcha """
+    !watcha"""
     # watcha+
     async def record_user_external_id(
         self,

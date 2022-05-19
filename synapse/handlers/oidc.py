@@ -1408,11 +1408,11 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         if email:
             emails.append(email)
 
-        """ watcha!
+        """watcha!
         return UserAttributeDict(
             localpart=localpart, display_name=display_name, emails=emails
         )
-        !watcha """
+        !watcha"""
         # watcha+
         is_admin: Optional[bool] = userinfo.get("is_admin")
         if not isinstance(is_admin, bool) and is_admin is not None:

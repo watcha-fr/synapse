@@ -55,9 +55,9 @@ class UserDirectorySearchRestServlet(RestServlet):
                     ]
                 }
         """
-        """ watcha!
+        """watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=False)
-        !watcha """
+        !watcha"""
         # watcha+
         requester = await self.auth.get_user_by_req(
             request, allow_guest=False, allow_partner=False

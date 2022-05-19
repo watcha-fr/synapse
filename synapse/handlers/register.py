@@ -984,13 +984,13 @@ class RegistrationHandler:
         # if email notifications are enabled (so people don't start
         # getting mail spam where they weren't before if email
         # notifs are set up on a homeserver)
-        """ watcha!
+        """watcha!
         if (
             self.hs.config.email.email_enable_notifs
             and self.hs.config.email.email_notif_for_new_users
             and token
         ):
-        !watcha """
+        !watcha"""
         # watcha+
         if (
             self.hs.config.email.email_enable_notifs
@@ -1003,10 +1003,10 @@ class RegistrationHandler:
             # invasive change I'd rather do separately.
             user_tuple = await self.store.get_user_by_access_token(token)
             # The token better still exist.
-            """ watcha!
+            """watcha!
             assert user_tuple
             token_id = user_tuple.token_id
-            !watcha """
+            !watcha"""
             # watcha+
             try:
                 assert user_tuple
