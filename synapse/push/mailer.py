@@ -45,7 +45,6 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 # watcha+
-import urllib.parse
 from base64 import b64encode
 from pathlib import Path
 
@@ -199,6 +198,8 @@ class Mailer:
             default_username = urllib.parse.quote_plus(email_address)
             login_url += f"/#/partner?defaultUsername={default_username}"
 
+        workspace = urllib.parse.urlparse(login_url).netloc
+
         b64_images = {
             "b64_watcha_button": self._get_b64_image("watcha_button.png"),
             "b64_google_play_badge": self._get_b64_image(
@@ -212,7 +213,7 @@ class Mailer:
             "sender_name": sender_name,
             "identifier": email_address,
             "password": password,
-            "server": self.hs.config.server.server_name,
+            "workspace": workspace,
             "login_url": login_url,
             "is_partner": (
                 is_partner
