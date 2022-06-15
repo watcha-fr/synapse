@@ -45,6 +45,7 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 # watcha+
+import re
 from base64 import b64encode
 from pathlib import Path
 
@@ -136,6 +137,9 @@ class Mailer:
         logger.info("Created Mailer for app_name %s" % app_name)
 
     # watcha+
+    def _disguise_html_link(self, link: str) -> str:
+        return re.sub("[.@]", "<span>\g<0></span>", link)
+
     def _get_b64_image(self, image_name):
         b64_image_cache = self.__dict__.setdefault("_watcha_image_cache", {})
         b64_image = b64_image_cache.get(image_name)
@@ -183,7 +187,9 @@ class Mailer:
         sender_name = await self.profile_handler.get_displayname(
             UserID.from_string(sender_id)
         )
-        sender_addresses = await self.account_handler._get_email_addresses_for_user(sender_id)
+        sender_addresses = await self.account_handler._get_email_addresses_for_user(
+            sender_id
+        )
 
         if sender_name and sender_addresses:
             sender_name += f" ({sender_addresses[0]})"
@@ -211,9 +217,9 @@ class Mailer:
         template_vars = {
             "title": subject,
             "sender_name": sender_name,
-            "identifier": email_address,
+            "identifier": self._disguise_html_link(email_address),
             "password": password,
-            "workspace": workspace,
+            "workspace": self._disguise_html_link(workspace),
             "login_url": login_url,
             "is_partner": (
                 is_partner

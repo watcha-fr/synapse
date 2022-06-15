@@ -32,7 +32,7 @@
                     </td>
                 </tr>
                 <tr>
-                    <td style="padding-left: 2em">{{ identifier }}</td>
+                    <td style="padding-left: 2em">{{ identifier | safe }}</td>
                 </tr>
                 <tr>
                     <td>
@@ -48,7 +48,7 @@
                     </td>
                 </tr>
                 <tr>
-                    <td style="padding-left: 2em">{{ workspace }}</td>
+                    <td style="padding-left: 2em">{{ workspace | safe }}</td>
                 </tr>
             </tbody>
         </table>
