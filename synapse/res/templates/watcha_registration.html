@@ -7,12 +7,12 @@
         <title>{{ title }}</title>
     </head>
     <body style="font-family: sans-serif; max-width: 600px; padding: 1em">
-        <p>Bonjour,</p>
-        <p>{{ sender_name | default("Un colaborateur", true) }} vous invite à rejoindre la suite collaborative Watcha.</p>
+        <p>Hi,</p>
+        <p>{{ sender_name | default("A collaborator", true) }} invites you to join the Watcha collaborative suite.</p>
 
         <br />
 
-        <h3>Paramètres de connexion</h3>
+        <h3>Connection settings</h3>
 
         <table
             style="
@@ -28,7 +28,7 @@
             <tbody>
                 <tr>
                     <td>
-                        <b>Identifiant</b>
+                        <b>Identifier</b>
                     </td>
                 </tr>
                 <tr>
@@ -36,7 +36,7 @@
                 </tr>
                 <tr>
                     <td>
-                        <b>Mot de passe {% if not is_partner %}provisoire {% endif %}</b>
+                        <b>Password {% if not is_partner %}temporary {% endif %}</b>
                     </td>
                 </tr>
                 <tr>
@@ -44,11 +44,11 @@
                 </tr>
                 <tr>
                     <td>
-                        <b>Espace de travail</b>
+                        <b>Workspace</b>
                     </td>
                 </tr>
                 <tr>
-                    <td style="padding-left: 2em">{{ server }}</td>
+                    <td style="padding-left: 2em">{{ workspace }}</td>
                 </tr>
             </tbody>
         </table>
@@ -56,7 +56,7 @@
         <br />
         <br />
 
-        <h3>Connectez-vous depuis votre navigateur, en vous rendant sur la platforme</h3>
+        <h3>Connect from your browser, by accessing the platform</h3>
 
         <p>
             <a href="{{ login_url }}">
@@ -70,7 +70,7 @@
 
         <br />
 
-        <h3>Connectez-vous depuis votre mobile, en téléchargeant l'application</h3>
+        <h3>Connect from your mobile</h3>
 
         <p>
             <a href="
@@ -82,7 +82,7 @@
             ">
                 <img
                     src="data:image/png;base64,{{ b64_google_play_badge }}"
-                    alt="Télécharger l'application Android sur Google Play"
+                    alt="Download the Android application on Google Play"
                     width="300"
                 /><br />
                 {%- if is_partner -%}
@@ -103,7 +103,7 @@
             ">
                 <img
                     src="data:image/png;base64,{{ b64_app_store_badge }}"
-                    alt="Télécharger l'application iOS sur l'App Store"
+                    alt="Download the iOS application on the Apple Store"
                     width="300"
                 /><br />
                 {%- if is_partner -%}
