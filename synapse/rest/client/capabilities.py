@@ -40,10 +40,20 @@ class CapabilitiesRestServlet(RestServlet):
         self.config = hs.config
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
+        self.store = hs.get_datastores().main  # watcha+
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        """watcha!
         await self.auth.get_user_by_req(request, allow_guest=True)
         change_password = self.auth_handler.can_change_password()
+        !watcha"""
+        # watcha+
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        user = await self.store.get_user_by_id(requester.user.to_string())
+        change_password = (
+            bool(user["password_hash"]) and self.auth_handler.can_change_password()
+        )
+        # +watcha
 
         response: JsonDict = {
             "capabilities": {
@@ -64,6 +74,13 @@ class CapabilitiesRestServlet(RestServlet):
                 "m.3pid_changes": {
                     "enabled": self.config.registration.enable_3pid_changes
                 },
+                # watcha+
+                "watcha": {
+                    "external_authentication_for_partners": {
+                        "enabled": self.config.watcha.external_authentication_for_partners
+                    },
+                }
+                # +watcha
             }
         }
 

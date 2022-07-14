@@ -51,6 +51,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
         user_type: Optional[str],
         address: Optional[str],
         shadow_banned: bool,
+        make_partner: bool,  # watcha+
     ) -> JsonDict:
         """
         Args:

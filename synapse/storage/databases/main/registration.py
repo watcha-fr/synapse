@@ -76,6 +76,7 @@ class TokenLookupResult:
     valid_until_ms: Optional[int] = None
     token_owner: str = attr.ib()
     token_used: bool = False
+    is_partner: bool = False  # watcha+
 
     # Make the token owner default to the user ID, which is the common case.
     @token_owner.default
@@ -174,6 +175,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 "password_hash",
                 "is_guest",
                 "admin",
+                "is_partner",  # watcha+
                 "consent_version",
                 "consent_server_notice_sent",
                 "appservice_id",
@@ -547,6 +549,22 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             INNER JOIN access_tokens on users.name = COALESCE(puppets_user_id, access_tokens.user_id)
             WHERE token = ?
         """
+        # watcha+
+        sql = """
+            SELECT users.name as user_id,
+                users.is_guest,
+                users.shadow_banned,
+                users.is_partner,
+                access_tokens.id as token_id,
+                access_tokens.device_id,
+                access_tokens.valid_until_ms,
+                access_tokens.user_id as token_owner,
+                access_tokens.used as token_used
+            FROM users
+            INNER JOIN access_tokens on users.name = COALESCE(puppets_user_id, access_tokens.user_id)
+            WHERE token = ?
+        """
+        # +watcha
 
         txn.execute(sql, (token,))
         rows = self.db_pool.cursor_to_dict(txn)
@@ -625,9 +643,20 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
         return await self.db_pool.runInteraction("get_users_by_id_case_insensitive", f)
 
+    """watcha!
     async def record_user_external_id(
         self, auth_provider: str, external_id: str, user_id: str
     ) -> None:
+    !watcha"""
+    # watcha+
+    async def record_user_external_id(
+        self,
+        auth_provider: str,
+        external_id: str,
+        user_id: str,
+        nextcloud_username: str = None,
+    ) -> None:
+        # +watcha
         """Record a mapping from an external user id to a mxid
 
         See notes in _record_user_external_id_txn about what constitutes valid data.
@@ -648,6 +677,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 auth_provider,
                 external_id,
                 user_id,
+                nextcloud_username,  # watcha+
             )
         except self.database_engine.module.IntegrityError:
             raise ExternalIDReuseException()
@@ -658,6 +688,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         auth_provider: str,
         external_id: str,
         user_id: str,
+        nextcloud_username: str,  # watcha+
     ) -> None:
         """
         Record a mapping from an external user id to a mxid.
@@ -682,6 +713,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 "auth_provider": auth_provider,
                 "external_id": external_id,
                 "user_id": user_id,
+                "nextcloud_username": nextcloud_username,  # watcha+
             },
         )
 
@@ -709,6 +741,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         self,
         record_external_ids: List[Tuple[str, str]],
         user_id: str,
+        nextcloud_username: str = None,  # watcha+
     ) -> None:
         """Replace mappings from external user ids to a mxid in a single transaction.
         All mappings are deleted and the new ones are created.
@@ -752,6 +785,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                     auth_provider,
                     external_id,
                     user_id,
+                    nextcloud_username,  # watcha+
                 )
 
         try:
@@ -2064,6 +2098,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         admin: bool = False,
         user_type: Optional[str] = None,
         shadow_banned: bool = False,
+        make_partner: bool = False,  # watcha+
     ) -> None:
         """Attempts to register an account.
 
@@ -2098,6 +2133,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             admin,
             user_type,
             shadow_banned,
+            make_partner,  # watcha+
         )
 
     def _register_user(
@@ -2112,6 +2148,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         admin: bool,
         user_type: Optional[str],
         shadow_banned: bool,
+        make_partner: bool,  # watcha+
     ) -> None:
         user_id_obj = UserID.from_string(user_id)
 
@@ -2157,6 +2194,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                         "admin": 1 if admin else 0,
                         "user_type": user_type,
                         "shadow_banned": shadow_banned,
+                        "is_partner": 1 if make_partner and not admin else 0,  # watcha+
                     },
                 )
 
@@ -2498,6 +2536,19 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             "start_or_continue_validation_session",
             start_or_continue_validation_session_txn,
         )
+
+    # watcha+
+    async def is_partner(self, user_id):
+        is_partner = await self.db_pool.simple_select_one_onecol(
+            "users",
+            keyvalues={"name": user_id},
+            retcol="is_partner",
+            allow_none=True,
+            desc="is_partner",
+        )
+        return bool(is_partner)
+
+    # +watcha
 
 
 def find_max_generated_user_id_localpart(cur: Cursor) -> int:

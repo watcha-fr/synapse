@@ -3121,6 +3121,10 @@ This setting has the following sub-options:
      * `password_reset`: Subject to use when sending a password reset email. Defaults to "[%(server_name)s] Password reset"
      * `email_validation`: Subject to use when sending a verification email to assert an address's
         ownership. Defaults to "[%(server_name)s] Validate your email"
+     <!-- watcha+ -->
+     * `watcha_registration`: Subject to use to notify about an invite to join a Watcha instance.
+        Defaults to "Invitation %(app)s - Collaborative suite"
+     <!-- +watcha -->
 
 Example configuration:
 ```yaml
