@@ -28,6 +28,8 @@ from synapse.util.async_helpers import delay_cancellation
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
+from synapse.util.watcha import build_log_message  # watcha+
+
 logger = logging.getLogger(__name__)
 
 # Types for callbacks to be registered via the module api

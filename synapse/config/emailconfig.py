@@ -47,6 +47,7 @@ DEFAULT_SUBJECTS = {
     "invite_from_person_to_space": "[%(app)s] %(person)s has invited you to join the %(space)s space on %(app)s...",
     "password_reset": "[%(server_name)s] Password reset",
     "email_validation": "[%(server_name)s] Validate your email",
+    "watcha_registration": "Invitation %(app)s - Collaborative suite",  # watcha+
 }
 
 LEGACY_TEMPLATE_DIR_WARNING = """
@@ -71,6 +72,7 @@ class EmailSubjectConfig:
     invite_from_person_to_space: str
     password_reset: str
     email_validation: str
+    watcha_registration: str  # watcha+
 
 
 class EmailConfig(Config):
@@ -217,6 +219,14 @@ class EmailConfig(Config):
             add_threepid_template_success_html = email_config.get(
                 "add_threepid_template_success_html", "add_threepid_success.html"
             )
+            # watcha+
+            watcha_registration_template_html = email_config.get(
+                "watcha_registration_template_html", "watcha_registration.html"
+            )
+            watcha_registration_template_text = email_config.get(
+                "watcha_registration_template_text", "watcha_registration.txt"
+            )
+            # +watcha
 
             # Read all templates from disk
             (
@@ -233,6 +243,8 @@ class EmailConfig(Config):
                 password_reset_template_success_html_template,
                 registration_template_success_html_template,
                 add_threepid_template_success_html_template,
+                self.watcha_registration_template_html,  # watcha+
+                self.watcha_registration_template_text,  # watcha+
             ) = self.read_templates(
                 [
                     password_reset_template_html,
@@ -248,6 +260,8 @@ class EmailConfig(Config):
                     password_reset_template_success_html,
                     registration_template_success_html,
                     add_threepid_template_success_html,
+                    watcha_registration_template_html,  # watcha+
+                    watcha_registration_template_text,  # watcha+
                 ],
                 (
                     td
@@ -309,6 +323,12 @@ class EmailConfig(Config):
             self.email_riot_base_url = email_config.get(
                 "client_base_url", email_config.get("riot_base_url", None)
             )
+
+        # watcha+ even not email_enable_notifs
+        self.email_riot_base_url = email_config.get(
+            "client_base_url", email_config.get("riot_base_url", None)
+        )
+        # +watcha
 
         if self.root.account_validity.account_validity_renew_by_email_enabled:
             expiry_template_html = email_config.get(

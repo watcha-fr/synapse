@@ -82,7 +82,12 @@ class ClientDirectoryServer(RestServlet):
         if room is None:
             raise SynapseError(400, "Room does not exist")
 
+        """watcha!
         requester = await self.auth.get_user_by_req(request)
+        !watcha"""
+        # watcha+
+        requester = await self.auth.get_user_by_req(request, allow_partner=False)
+        # +watcha
 
         await self.directory_handler.create_association(
             requester, room_alias_obj, room_id, servers
@@ -96,7 +101,12 @@ class ClientDirectoryServer(RestServlet):
         if not RoomAlias.is_valid(room_alias):
             raise SynapseError(400, "Room alias invalid", errcode=Codes.INVALID_PARAM)
         room_alias_obj = RoomAlias.from_string(room_alias)
+        """watcha!
         requester = await self.auth.get_user_by_req(request)
+        !watcha"""
+        # watcha+
+        requester = await self.auth.get_user_by_req(request, allow_partner=False)
+        # +watcha
 
         if requester.app_service:
             await self.directory_handler.delete_appservice_association(
@@ -140,7 +150,12 @@ class ClientDirectoryListServer(RestServlet):
     async def on_PUT(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
+        """watcha!
         requester = await self.auth.get_user_by_req(request)
+        !watcha"""
+        # watcha+
+        requester = await self.auth.get_user_by_req(request, allow_partner=False)
+        # +watcha
 
         content = parse_json_object_from_request(request)
         visibility = content.get("visibility", "public")
@@ -178,7 +193,13 @@ class ClientAppserviceDirectoryListServer(RestServlet):
     async def _edit(
         self, request: SynapseRequest, network_id: str, room_id: str, visibility: str
     ) -> Tuple[int, JsonDict]:
+        """watcha!
         requester = await self.auth.get_user_by_req(request)
+        !watcha"""
+        # watcha+
+        requester = await self.auth.get_user_by_req(request, allow_partner=False)
+        # +watcha
+
         if not requester.app_service:
             raise AuthError(
                 403, "Only appservices can edit the appservice published room list"

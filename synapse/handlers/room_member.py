@@ -77,6 +77,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.account_data_handler = hs.get_account_data_handler()
         self.event_auth_handler = hs.get_event_auth_handler()
+        self.nextcloud_handler = hs.get_nextcloud_handler()  # watcha+
 
         self.member_linearizer: Linearizer = Linearizer(name="member")
         self.member_as_limiter = Linearizer(max_count=10, name="member_as_limiter")
@@ -492,6 +493,19 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         Raises:
             ShadowBanError if a shadow-banned requester attempts to send an invite.
         """
+        # watcha+
+        effective_membership_state = action
+        if action == "kick":
+            effective_membership_state = Membership.LEAVE
+        if effective_membership_state in (
+            Membership.LEAVE,
+            Membership.BAN,
+        ):
+            await self.nextcloud_handler.handle_room_member_event(
+                requester, room_id, target.to_string(), effective_membership_state
+            )
+        # +watcha
+
         if action == Membership.INVITE and requester.shadow_banned:
             # We randomly sleep a bit just to annoy the requester.
             await self.clock.sleep(random.randint(1, 10))
@@ -526,6 +540,12 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     state_event_ids=state_event_ids,
                 )
 
+        # watcha+
+        if effective_membership_state == Membership.JOIN:
+            await self.nextcloud_handler.handle_room_member_event(
+                requester, room_id, target.to_string(), effective_membership_state
+            )
+        # +watcha
         return result
 
     async def update_membership_locked(
@@ -1334,6 +1354,21 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             raise SynapseError(
                 403, "Looking up third-party identifiers is denied from this server"
             )
+
+        # watcha+ bypass identity server flow
+        email_address = address.strip()
+        invitee = await self.store.get_user_id_by_threepid("email", email_address)
+        if not invitee:
+            invitee = await self.hs.get_watcha_registration_handler().register(
+                sender_id=requester.user.to_string(),
+                email_address=email_address,
+                is_partner=True,
+            )
+        _, stream_id = await self.update_membership(
+            requester, UserID.from_string(invitee), room_id, "invite", txn_id=txn_id
+        )
+        return stream_id
+        # +watcha
 
         invitee = await self.identity_handler.lookup_3pid(
             id_server, medium, address, id_access_token
