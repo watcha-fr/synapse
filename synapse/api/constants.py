@@ -122,6 +122,9 @@ class EventTypes:
     MSC2716_BATCH: Final = "org.matrix.msc2716.batch"
     MSC2716_MARKER: Final = "org.matrix.msc2716.marker"
 
+    VectorSetting: Final = "im.vector.web.settings"  # watcha+
+    NextcloudCalendar: Final = "watcha.room.nextcloud_calendar"  # watcha+
+
 
 class ToDeviceEventTypes:
     RoomKeyRequest: Final = "m.room_key_request"

@@ -53,6 +53,7 @@ from .tracer import TracerConfig
 from .user_directory import UserDirectoryConfig
 from .voip import VoipConfig
 from .workers import WorkerConfig
+from .watcha import WatchaConfig  # watcha+
 
 
 class HomeServerConfig(RootConfig):
@@ -99,4 +100,5 @@ class HomeServerConfig(RootConfig):
         RedisConfig,
         ExperimentalConfig,
         BackgroundUpdateConfig,
+        WatchaConfig,  # watcha+
     ]

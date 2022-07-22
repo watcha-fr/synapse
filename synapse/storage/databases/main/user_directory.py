@@ -876,6 +876,57 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 "order_statements": " ".join(additional_ordering_statements),
             }
             args = join_args + (search_query,) + ordering_arguments + (limit + 1,)
+            # watcha+
+            sql = """
+                SELECT DISTINCT
+                    ud.user_id,
+                    ud.display_name,
+                    ud.avatar_url,
+                    tpid.address AS email
+                FROM
+                    user_directory AS ud
+                    LEFT OUTER JOIN
+                        (
+                            SELECT
+                                user_id,
+                                address
+                            FROM
+                                user_threepids
+                            WHERE
+                                medium = 'email'
+                            GROUP BY user_id
+                        )
+                        AS tpid
+                        ON ud.user_id = tpid.user_id
+                    LEFT OUTER JOIN
+                        (
+                            SELECT
+                                name,
+                                is_partner
+                            FROM
+                                users
+                        )
+                        as users
+                        ON ud.user_id = users.name
+                    LEFT OUTER JOIN
+                        partners_invitations AS pi
+                        ON ud.user_id = pi.user_id
+                WHERE
+                    (
+                        display_name LIKE ?
+                        OR address LIKE ?
+                        OR ud.user_id LIKE ?
+                    )
+                    AND
+                    (
+                        is_partner = 0
+                        OR invited_by = ?
+                    )
+                LIMIT ?
+            """
+            search_term = f"%{search_term}%"
+            args = (search_term,) * 3 + (user_id,) + (limit + 1,)
+            # +watcha
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")

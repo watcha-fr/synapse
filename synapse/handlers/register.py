@@ -217,6 +217,7 @@ class RegistrationHandler:
         by_admin: bool = False,
         user_agent_ips: Optional[List[Tuple[str, str]]] = None,
         auth_provider_id: Optional[str] = None,
+        make_partner: bool = False,  # watcha+
     ) -> str:
         """Registers a new client on the server.
 
@@ -304,6 +305,7 @@ class RegistrationHandler:
                 user_type=user_type,
                 address=address,
                 shadow_banned=shadow_banned,
+                make_partner=make_partner,  # watcha+
             )
 
             profile = await self.store.get_profileinfo(localpart)
@@ -336,6 +338,7 @@ class RegistrationHandler:
                         create_profile_with_displayname=default_display_name,
                         address=address,
                         shadow_banned=shadow_banned,
+                        make_partner=make_partner,  # watcha+
                     )
 
                     # Successfully registered
@@ -692,6 +695,7 @@ class RegistrationHandler:
         user_type: Optional[str] = None,
         address: Optional[str] = None,
         shadow_banned: bool = False,
+        make_partner: bool = False,  # watcha+
     ) -> None:
         """Register user in the datastore.
 
@@ -723,6 +727,7 @@ class RegistrationHandler:
                 user_type=user_type,
                 address=address,
                 shadow_banned=shadow_banned,
+                make_partner=make_partner,  # watcha+
             )
         else:
             await self.store.register_user(
@@ -735,6 +740,7 @@ class RegistrationHandler:
                 admin=admin,
                 user_type=user_type,
                 shadow_banned=shadow_banned,
+                make_partner=make_partner,  # watcha+
             )
 
             # Only call the account validity module(s) on the main process, to avoid
@@ -980,19 +986,36 @@ class RegistrationHandler:
         # if email notifications are enabled (so people don't start
         # getting mail spam where they weren't before if email
         # notifs are set up on a homeserver)
+        """watcha!
         if (
             self.hs.config.email.email_enable_notifs
             and self.hs.config.email.email_notif_for_new_users
             and token
         ):
+        !watcha"""
+        # watcha+
+        if (
+            self.hs.config.email.email_enable_notifs
+            and self.hs.config.email.email_notif_for_new_users
+        ):
+            # +watcha
             # Pull the ID of the access token back out of the db
             # It would really make more sense for this to be passed
             # up when the access token is saved, but that's quite an
             # invasive change I'd rather do separately.
             user_tuple = await self.store.get_user_by_access_token(token)
             # The token better still exist.
+            """watcha!
             assert user_tuple
             token_id = user_tuple.token_id
+            !watcha"""
+            # watcha+
+            try:
+                assert user_tuple
+                token_id = user_tuple.token_id
+            except AssertionError:
+                token_id = None
+            # +watcha
 
             await self.pusher_pool.add_pusher(
                 user_id=user_id,
