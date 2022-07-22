@@ -315,7 +315,12 @@ class HomeserverTestCase(TestCase):
                         "is_guest": False,
                     }
 
+                """watcha!
                 async def get_user_by_req(request, allow_guest=False):
+                !watcha"""
+                # watcha+
+                async def get_user_by_req(request, allow_guest=False, allow_partner=True):
+                # +watcha
                     assert self.helper.auth_user_id is not None
                     return create_requester(
                         UserID.from_string(self.helper.auth_user_id),
@@ -589,6 +594,7 @@ class HomeserverTestCase(TestCase):
         password: str,
         admin: Optional[bool] = False,
         displayname: Optional[str] = None,
+        is_partner: Optional[bool] = False,  # watcha+
     ) -> str:
         """
         Register a user. Requires the Admin API be registered.
@@ -628,6 +634,7 @@ class HomeserverTestCase(TestCase):
                 "admin": admin,
                 "mac": want_mac_digest,
                 "inhibit_login": True,
+                "is_partner": False if admin else is_partner,  # watcha+
             }
         )
         channel = self.make_request(
