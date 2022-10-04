@@ -364,6 +364,13 @@ class RegistrationHandler:
                     "Skipping auto-join for %s because auto-join for guests is disabled",
                     user_id,
                 )
+            # watcha+
+            elif make_partner:
+                logger.info(
+                    "Skipping auto-join for %s because auto-join for partners is disabled",
+                    user_id,
+                )
+            # +watcha
             else:
                 await self._auto_join_rooms(user_id)
         else:
