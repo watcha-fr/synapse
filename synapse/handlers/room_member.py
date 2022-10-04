@@ -25,6 +25,7 @@ from synapse.api.constants import (
     EventTypes,
     GuestAccess,
     Membership,
+    JoinRules,  # watcha+
 )
 from synapse.api.errors import AuthError, Codes, ShadowBanError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
@@ -77,6 +78,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.account_data_handler = hs.get_account_data_handler()
         self.event_auth_handler = hs.get_event_auth_handler()
+        self.auth_handler = hs.get_auth_handler()  # watcha+
         self.nextcloud_handler = hs.get_nextcloud_handler()  # watcha+
 
         self.member_linearizer: Linearizer = Linearizer(name="member")
@@ -510,6 +512,46 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             ShadowBanError if a shadow-banned requester attempts to send an invite.
         """
         # watcha+
+        async def raise_for_not_invited_partner_to_join_public_room():
+            user_id = requester.user.to_string()
+            is_partner = await self.auth_handler.is_partner(user_id)
+            if not is_partner:
+                return
+
+            filtered_room_state = (
+                await self._storage_controllers.state.get_current_state(
+                    room_id,
+                    StateFilter.from_types(
+                        [
+                            (EventTypes.Member, user_id),
+                            (EventTypes.JoinRules, ""),
+                        ]
+                    ),
+                )
+            )
+
+            member_event = filtered_room_state.get((EventTypes.Member, user_id))
+            if member_event:
+                membership = member_event.content.get("membership", "")
+                if membership == Membership.INVITE:
+                    return
+
+            join_rules = filtered_room_state.get((EventTypes.JoinRules, ""))
+            if join_rules:
+                is_public = join_rules.content.get("join_rule") == JoinRules.PUBLIC
+                if not is_public:
+                    return
+
+            logger.info(f"[watcha] Partner access not allowed ({user_id})")
+            raise AuthError(
+                403,
+                "Partner access not allowed",
+                errcode=Codes.PARTNER_ACCESS_FORBIDDEN,
+            )
+
+        if action == Membership.JOIN:
+            await raise_for_not_invited_partner_to_join_public_room()
+
         effective_membership_state = action
         if action == "kick":
             effective_membership_state = Membership.LEAVE
