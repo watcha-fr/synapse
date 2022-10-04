@@ -709,7 +709,7 @@ class RoomsCreateTestCase(RoomBase):
         self.assertEqual(200, channel.code, channel.result)
         self.assertTrue("room_id" in channel.json_body)
         assert channel.resource_usage is not None
-        self.assertEqual(42, channel.resource_usage.db_txn_count); return  # watcha+ +5 txn probably because of our modifications
+        self.assertEqual(43, channel.resource_usage.db_txn_count); return  # watcha+ +6 txn probably because of our modifications
         self.assertEqual(37, channel.resource_usage.db_txn_count)
 
     def test_post_room_initial_state(self) -> None:
@@ -723,7 +723,7 @@ class RoomsCreateTestCase(RoomBase):
         self.assertEqual(200, channel.code, channel.result)
         self.assertTrue("room_id" in channel.json_body)
         assert channel.resource_usage is not None
-        self.assertEqual(46, channel.resource_usage.db_txn_count); return  # watcha+ +5 txn probably because of our modifications
+        self.assertEqual(47, channel.resource_usage.db_txn_count); return  # watcha+ +6 txn probably because of our modifications
         self.assertEqual(41, channel.resource_usage.db_txn_count)
 
     def test_post_room_visibility_key(self) -> None:
