@@ -692,19 +692,6 @@ class SsoHandler:
             attributes.localpart
         ):
             raise MappingException("localpart is invalid: %s" % (attributes.localpart,))
-        # watcha+
-        for email in attributes.emails:
-            user_id = await self._store.get_user_id_by_threepid("email", email)
-            if user_id:
-                raise MappingException(
-                    build_log_message(
-                        log_vars={
-                            "user_id": user_id,
-                            "email": email,
-                        },
-                    )
-                )
-        # +watcha
 
         logger.debug("Mapped SSO user to local part %s", attributes.localpart)
         registered_user_id = await self._registration_handler.register_user(
