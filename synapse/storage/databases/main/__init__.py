@@ -74,15 +74,10 @@ from .transactions import TransactionWorkerStore
 from .ui_auth import UIAuthStore
 from .user_directory import UserDirectoryStore
 from .user_erasure_store import UserErasureStore
+from .watcha_nextcloud import NextcloudStore  # watcha+
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
-# watcha+
-from .watcha_administration import AdministrationStore
-from .watcha_nextcloud import NextcloudStore
-from .watcha_partner import PartnerStore
-
-# +watcha
 
 logger = logging.getLogger(__name__)
 
@@ -133,11 +128,7 @@ class DataStore(
     CacheInvalidationWorkerStore,
     LockStore,
     SessionStore,
-    # watcha+
-    AdministrationStore,
-    PartnerStore,
-    NextcloudStore,
-    # +watcha
+    NextcloudStore,  # watcha+
 ):
     def __init__(
         self,

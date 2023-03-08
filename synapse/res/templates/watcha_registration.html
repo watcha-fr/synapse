@@ -36,7 +36,7 @@
                 </tr>
                 <tr>
                     <td>
-                        <b>Password {% if not is_partner %}temporary {% endif %}</b>
+                        <b>Password {% if not is_external_user %}temporary {% endif %}</b>
                     </td>
                 </tr>
                 <tr>
@@ -74,7 +74,7 @@
 
         <p>
             <a href="
-                {%- if is_partner -%}
+                {%- if is_external_user -%}
                 https://play.google.com/store/apps/details?id=im.vector.app
                 {%- else -%}
                 https://play.google.com/store/apps/details?id=im.watcha.app
@@ -85,7 +85,7 @@
                     alt="Download the Android application on Google Play"
                     width="300"
                 /><br />
-                {%- if is_partner -%}
+                {%- if is_external_user -%}
                 https://play.google.com/store/apps/details?id=im.vector.app
                 {%- else -%}
                 https://play.google.com/store/apps/details?id=im.watcha.app
@@ -95,7 +95,7 @@
 
         <p>
             <a href="
-                {%- if is_partner -%}
+                {%- if is_external_user -%}
                 https://apps.apple.com/fr/app/element-messenger/id1083446067
                 {%- else -%}
                 https://apps.apple.com/fr/app/watcha/id1383732254
@@ -106,7 +106,7 @@
                     alt="Download the iOS application on the Apple Store"
                     width="300"
                 /><br />
-                {%- if is_partner -%}
+                {%- if is_external_user -%}
                 https://apps.apple.com/fr/app/element-messenger/id1083446067
                 {%- else -%}
                 https://apps.apple.com/fr/app/watcha/id1383732254

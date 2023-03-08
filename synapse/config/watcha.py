@@ -7,7 +7,6 @@ from ._base import Config, ConfigError
 
 
 class WatchaConfig(Config):
-
     section = "watcha"
 
     def __init__(self, *args):
@@ -125,7 +124,7 @@ class WatchaConfig(Config):
           #
           #nextcloud_url: "https://example.com/nextcloud"
 
-          # Whether partner accounts are only created in the Synapse database
+          # Whether external user accounts are only created in the Synapse database
           # Optional, defaults to false.
           # Note: The value is ignored when managed_idp is false
           #

@@ -175,6 +175,8 @@ class UserTypes:
     SUPPORT: Final = "support"
     BOT: Final = "bot"
     ALL_USER_TYPES: Final = (SUPPORT, BOT)
+    EXTERNAL: Final = "watcha_external"  # watcha+
+    ALL_USER_TYPES: Final = (*ALL_USER_TYPES, EXTERNAL)  # watcha+ # type: ignore
 
 
 class RelationTypes:

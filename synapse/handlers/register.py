@@ -41,6 +41,7 @@ from synapse.replication.http.register import (
 from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.storage.state import StateFilter
 from synapse.types import RoomAlias, UserID, create_requester
+from synapse.api.constants import UserTypes  # watcha+
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -217,7 +218,6 @@ class RegistrationHandler:
         by_admin: bool = False,
         user_agent_ips: Optional[List[Tuple[str, str]]] = None,
         auth_provider_id: Optional[str] = None,
-        make_partner: bool = False,  # watcha+
     ) -> str:
         """Registers a new client on the server.
 
@@ -305,7 +305,6 @@ class RegistrationHandler:
                 user_type=user_type,
                 address=address,
                 shadow_banned=shadow_banned,
-                make_partner=make_partner,  # watcha+
             )
 
             profile = await self.store.get_profileinfo(localpart)
@@ -338,7 +337,6 @@ class RegistrationHandler:
                         create_profile_with_displayname=default_display_name,
                         address=address,
                         shadow_banned=shadow_banned,
-                        make_partner=make_partner,  # watcha+
                     )
 
                     # Successfully registered
@@ -365,9 +363,9 @@ class RegistrationHandler:
                     user_id,
                 )
             # watcha+
-            elif make_partner:
+            elif user_type == UserTypes.EXTERNAL:
                 logger.info(
-                    "Skipping auto-join for %s because auto-join for partners is disabled",
+                    "Skipping auto-join for %s because auto-join for external users is disabled",
                     user_id,
                 )
             # +watcha
@@ -702,7 +700,6 @@ class RegistrationHandler:
         user_type: Optional[str] = None,
         address: Optional[str] = None,
         shadow_banned: bool = False,
-        make_partner: bool = False,  # watcha+
     ) -> None:
         """Register user in the datastore.
 
@@ -734,7 +731,6 @@ class RegistrationHandler:
                 user_type=user_type,
                 address=address,
                 shadow_banned=shadow_banned,
-                make_partner=make_partner,  # watcha+
             )
         else:
             await self.store.register_user(
@@ -747,7 +743,6 @@ class RegistrationHandler:
                 admin=admin,
                 user_type=user_type,
                 shadow_banned=shadow_banned,
-                make_partner=make_partner,  # watcha+
             )
 
             # Only call the account validity module(s) on the main process, to avoid

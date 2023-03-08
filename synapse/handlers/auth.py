@@ -1826,12 +1826,6 @@ class AuthHandler:
         url_parts[4] = urllib.parse.urlencode(query)
         return urllib.parse.urlunparse(url_parts)
 
-    # watcha+
-    async def is_partner(self, user_id):
-        return await self.store.is_partner(user_id)
-
-    # +watcha
-
 
 def load_legacy_password_auth_providers(hs: "HomeServer") -> None:
     module_api = hs.get_module_api()

@@ -35,7 +35,6 @@ class NextcloudHandler:
         self.config = hs.config
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
-        self.administration_handler = hs.get_watcha_administration_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
         self._storage_controllers = hs.get_storage_controllers()
         self.keycloak_client = hs.get_keycloak_client()
@@ -45,7 +44,7 @@ class NextcloudHandler:
         self, requester: Requester, room_id: str, user_id: str, membership: str
     ):
         if (
-            await self.administration_handler.get_user_role(user_id) == "partner"
+            await self.store.is_external_user(user_id)
             and not self.config.watcha.external_authentication_for_partners
         ):
             return

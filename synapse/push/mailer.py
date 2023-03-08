@@ -173,15 +173,15 @@ class Mailer:
         sender_id: str,
         email_address: str,
         password: str,
-        is_partner: Optional[bool] = False,
+        is_external_user: Optional[bool] = False,
     ) -> None:
         """Send an email with temporary password and connexion link to Watcha.
 
         Args:
             sender_id: The mxid of the user who invite.
             email_address: The invitee email address.
-            password: The invitee password. The password hash is stored locally only for partners.
-            is_partner: Whether the invitee is a partner.
+            password: The invitee password. The password hash is stored locally only for external users.
+            is_external_user: Whether the invitee is an external user.
         """
         subject = self.email_subjects.watcha_registration % {"app": self.app_name}
 
@@ -199,13 +199,13 @@ class Mailer:
 
         login_url = self.hs.config.email.email_riot_base_url
         if (
-            is_partner
+            is_external_user
             and not self.hs.config.watcha.external_authentication_for_partners
         ):
             default_username = urllib.parse.quote_plus(email_address)
             login_url += f"/#/partner?defaultUsername={default_username}"
 
-        workspace = urllib.parse.urlparse(login_url).netloc
+        workspace = urllib.parse.urlparse(login_url).netloc.decode()
 
         b64_images = {
             "b64_watcha_button": self._get_b64_image("watcha_button.png"),
@@ -222,8 +222,8 @@ class Mailer:
             "password": password,
             "workspace": self._disguise_html_link(workspace),
             "login_url": login_url,
-            "is_partner": (
-                is_partner
+            "is_external_user": (
+                is_external_user
                 and not self.hs.config.watcha.external_authentication_for_partners
             ),
             **b64_images,

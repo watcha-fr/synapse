@@ -512,10 +512,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             ShadowBanError if a shadow-banned requester attempts to send an invite.
         """
         # watcha+
-        async def raise_for_not_invited_partner_to_join_public_room():
+        async def raise_for_not_invited_external_user_to_join_public_room():
             user_id = requester.user.to_string()
-            is_partner = await self.auth_handler.is_partner(user_id)
-            if not is_partner:
+            if not await self.store.is_external_user(user_id):
                 return
 
             filtered_room_state = (
@@ -542,15 +541,15 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 if not is_public:
                     return
 
-            logger.info(f"[watcha] Partner access not allowed ({user_id})")
+            logger.info(f"[watcha] External user access not allowed ({user_id})")
             raise AuthError(
                 403,
-                "Partner access not allowed",
-                errcode=Codes.PARTNER_ACCESS_FORBIDDEN,
+                "External user access not allowed",
+                errcode=Codes.EXTERNAL_USER_ACCESS_FORBIDDEN,
             )
 
         if action == Membership.JOIN:
-            await raise_for_not_invited_partner_to_join_public_room()
+            await raise_for_not_invited_external_user_to_join_public_room()
 
         effective_membership_state = action
         if action == "kick":
@@ -1442,7 +1441,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             invitee = await self.hs.get_watcha_registration_handler().register(
                 sender_id=requester.user.to_string(),
                 email_address=email_address,
-                is_partner=True,
+                is_external_user=True,
             )
         _, stream_id = await self.update_membership(
             requester, UserID.from_string(invitee), room_id, "invite", txn_id=txn_id

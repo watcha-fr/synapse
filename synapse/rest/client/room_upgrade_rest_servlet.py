@@ -28,6 +28,7 @@ from synapse.types import JsonDict
 from synapse.util import stringutils
 
 from ._base import client_patterns
+from ._base import raise_for_external_user_access  # watcha+
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -60,16 +61,13 @@ class RoomUpgradeRestServlet(RestServlet):
         self._hs = hs
         self._room_creation_handler = hs.get_room_creation_handler()
         self._auth = hs.get_auth()
+        self.store = hs.get_datastores().main  # watcha+
 
     async def on_POST(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
-        """watcha!
         requester = await self._auth.get_user_by_req(request)
-        !watcha"""
-        # watcha+
-        requester = await self._auth.get_user_by_req(request, allow_partner=False)
-        # +watcha
+        await raise_for_external_user_access(requester, self.store)  # watcha+
 
         content = parse_json_object_from_request(request)
         assert_params_in_dict(content, ("new_version",))

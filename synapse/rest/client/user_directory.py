@@ -22,6 +22,7 @@ from synapse.http.site import SynapseRequest
 from synapse.types import JsonMapping
 
 from ._base import client_patterns
+from ._base import raise_for_external_user_access  # watcha+
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -37,6 +38,7 @@ class UserDirectorySearchRestServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.user_directory_handler = hs.get_user_directory_handler()
+        self.store = hs.get_datastores().main  # watcha+
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonMapping]:
         """Searches for users in directory
@@ -55,14 +57,8 @@ class UserDirectorySearchRestServlet(RestServlet):
                     ]
                 }
         """
-        """watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=False)
-        !watcha"""
-        # watcha+
-        requester = await self.auth.get_user_by_req(
-            request, allow_guest=False, allow_partner=False
-        )
-        # +watcha
+        await raise_for_external_user_access(requester, self.store)  # watcha+
         user_id = requester.user.to_string()
 
         if not self.hs.config.userdirectory.user_directory_search_enabled:

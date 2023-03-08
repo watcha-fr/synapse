@@ -563,27 +563,11 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # Alice's display name remains the same in the user directory.
         search_result = self.get_success(self.handler.search_users(bob, alice, 10))
-        """watcha!
         self.assertEqual(
             search_result["results"],
             [{"display_name": "alice", "avatar_url": None, "user_id": alice}],
             0,
         )
-        !watcha"""
-        # watcha+ to match custom search_user_dir SQL
-        self.assertEqual(
-            search_result["results"],
-            [
-                {
-                    "display_name": "alice",
-                    "avatar_url": None,
-                    "user_id": alice,
-                    "email": None,
-                }
-            ],
-            0,
-        )
-        # +watcha
 
     def test_making_room_public_doesnt_alter_directory_entry(self) -> None:
         """Per-room names shouldn't go to the directory when the room becomes public.
@@ -648,27 +632,11 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # Alice's display name remains the same in the user directory.
         search_result = self.get_success(self.handler.search_users(bob, alice, 10))
-        """watcha!
         self.assertEqual(
             search_result["results"],
             [{"display_name": "alice", "avatar_url": None, "user_id": alice}],
             0,
         )
-        !watcha"""
-        # watcha+ to match custom search_user_dir SQL
-        self.assertEqual(
-            search_result["results"],
-            [
-                {
-                    "display_name": "alice",
-                    "avatar_url": None,
-                    "user_id": alice,
-                    "email": None,
-                }
-            ],
-            0,
-        )
-        # +watcha
 
     def test_private_room(self) -> None:
         """
@@ -1065,13 +1033,6 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             self.get_success(self.user_dir_helper.get_profiles_in_user_directory()),
             {alice: ProfileInfo(display_name=None, avatar_url=MXC_DUMMY)},
         )
-    # watcha+
-    skip_reason = "[watcha] not compatible with custom search_user_dir SQL"
-    test_private_room.skip = skip_reason
-    test_spam_checker.skip = skip_reason
-    test_legacy_spam_checker.skip = skip_reason
-    test_initial_share_all_users.skip = skip_reason
-    # +watcha
 
 
 class TestUserDirSearchDisabled(unittest.HomeserverTestCase):

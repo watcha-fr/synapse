@@ -2,9 +2,8 @@ import logging
 import uuid
 from typing import Optional
 
-from jsonschema.exceptions import SchemaError, ValidationError
-
-from synapse.api.errors import HttpResponseException, NextcloudError, SynapseError
+from synapse.api.constants import UserTypes
+from synapse.api.errors import SynapseError
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.push.mailer import Mailer
 from synapse.util.watcha import ActionStatus, Secrets, build_log_message
@@ -37,7 +36,7 @@ class RegistrationHandler:
         sender_id: str,
         email_address: str,
         password: Optional[str] = None,
-        is_partner: Optional[bool] = False,
+        is_external_user: Optional[bool] = False,
         is_admin: Optional[bool] = False,
         default_display_name: Optional[str] = None,
     ):
@@ -47,7 +46,7 @@ class RegistrationHandler:
             sender_id: The mxid of the user who invite.
             email_address: The invitee email address.
             password: The invitee password.
-            is_partner: True if the user should be registered as a partner.
+            is_external_user: True if the user should be registered as an external user.
             is_admin: True if the user should be registered as a server admin.
             default_display_name: If set, the new user's displayname will be set to this. Defaults to 'email_address'.
 
@@ -72,14 +71,15 @@ class RegistrationHandler:
             default_display_name = email_address
 
         register_kc_user = self.config.watcha.managed_idp and (
-            not is_partner or self.config.watcha.external_authentication_for_partners
+            not is_external_user
+            or self.config.watcha.external_authentication_for_partners
         )
 
         register_nc_user = (
             self.config.watcha.managed_idp
             and self.config.watcha.nextcloud_integration
             and (
-                not is_partner
+                not is_external_user
                 or self.config.watcha.external_authentication_for_partners
             )
         )
@@ -108,9 +108,9 @@ class RegistrationHandler:
                 localpart=localpart,
                 password_hash=local_password_hash,
                 admin=is_admin,
+                user_type=UserTypes.EXTERNAL if is_external_user else None,
                 default_display_name=default_display_name,
                 bind_emails=[email_address],
-                make_partner=is_partner,
             )
         except SynapseError:
             if register_kc_user:
@@ -118,12 +118,6 @@ class RegistrationHandler:
             if register_nc_user:
                 await self.nextcloud_client.delete_user(localpart)
             raise
-
-        if is_partner:
-            await self.store.add_partner_invitation(
-                sender_id=sender_id,
-                partner_id=user_id,
-            )
 
         if self.hs.config.userdirectory.user_directory_search_all_users:
             profile = await self.store.get_profileinfo(localpart)
@@ -135,7 +129,7 @@ class RegistrationHandler:
             sender_id=sender_id,
             email_address=email_address,
             password=password,
-            is_partner=is_partner,
+            is_external_user=is_external_user,
         )
 
         logger.info(build_log_message(status=ActionStatus.SUCCESS))

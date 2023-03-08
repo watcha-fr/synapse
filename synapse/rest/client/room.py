@@ -54,11 +54,10 @@ from synapse.streams.config import PaginationConfig
 from synapse.types import JsonDict, StreamToken, ThirdPartyInstanceID, UserID
 from synapse.util import json_decoder
 from synapse.util.stringutils import parse_and_validate_server_name, random_string
+from ._base import raise_for_external_user_access  # watcha+
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
-
-from synapse.util.watcha import build_log_message  # watcha+
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +75,7 @@ class RoomCreateRestServlet(TransactionRestServlet):
         super().__init__(hs)
         self._room_creation_handler = hs.get_room_creation_handler()
         self.auth = hs.get_auth()
+        self.store = hs.get_datastores().main  # watcha+
 
     def register(self, http_server: HttpServer) -> None:
         PATTERNS = "/createRoom"
@@ -88,12 +88,8 @@ class RoomCreateRestServlet(TransactionRestServlet):
         return self.txns.fetch_or_execute_request(request, self.on_POST, request)
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        """watcha!
         requester = await self.auth.get_user_by_req(request)
-        !watcha"""
-        # watcha+
-        requester = await self.auth.get_user_by_req(request, allow_partner=False)
-        # +watcha
+        await raise_for_external_user_access(requester, self.store)  # watcha+
 
         info, _ = await self._room_creation_handler.create_room(
             requester, self.get_room_config(request)
@@ -114,6 +110,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         self.room_member_handler = hs.get_room_member_handler()
         self.message_handler = hs.get_message_handler()
         self.auth = hs.get_auth()
+        self.store = hs.get_datastores().main  # watcha+
         self.nextcloud_handler = hs.get_nextcloud_handler()  # watcha+
 
     def register(self, http_server: HttpServer) -> None:
@@ -199,18 +196,14 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         state_key: str,
         txn_id: Optional[str] = None,
     ) -> Tuple[int, JsonDict]:
-        """watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha"""
         # watcha+
-        allow_partner = event_type not in (
+        if event_type in (
             EventTypes.Tombstone,
             EventTypes.SpaceChild,
             EventTypes.SpaceParent,
-        )
-        requester = await self.auth.get_user_by_req(
-            request, allow_guest=True, allow_partner=allow_partner
-        )
+        ):
+            await raise_for_external_user_access(requester, self.store)
         # +watcha
 
         if txn_id:
@@ -401,19 +394,15 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         super().__init__(hs)
         self.hs = hs
         self.auth = hs.get_auth()
+        self.store = hs.get_datastores().main  # watcha+
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         server = parse_string(request, "server")
 
         try:
-            """watcha!
+            await raise_for_external_user_access(  # watcha+
             await self.auth.get_user_by_req(request, allow_guest=True)
-            !watcha"""
-            # watcha+
-            await self.auth.get_user_by_req(
-                request, allow_guest=True, allow_partner=False
-            )
-            # +watcha
+            , self.store)  # watcha+
         except InvalidClientCredentialsError as e:
             # Option to allow servers to require auth when accessing
             # /publicRooms via CS API. This is especially helpful in private
@@ -459,12 +448,9 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         return 200, data
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        """watcha!
+        await raise_for_external_user_access(  # watcha+
         await self.auth.get_user_by_req(request, allow_guest=True)
-        !watcha"""
-        # watcha+
-        await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=False)
-        # +watcha
+        , self.store)  # watcha+
 
         server = parse_string(request, "server")
         content = parse_json_object_from_request(request)
@@ -905,11 +891,16 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             raise AuthError(403, "Guest access not allowed")
 
         # watcha+
-        if requester.is_partner and membership_action not in {
+        user_id = requester.user.to_string()
+        if await self.store.is_external_user(user_id) and membership_action not in {
             Membership.JOIN,
             Membership.LEAVE,
         }:
-            raise AuthError(403, "Partner access not allowed")
+            raise AuthError(
+                403,
+                "External user access not allowed",
+                errcode=Codes.EXTERNAL_USER_ACCESS_FORBIDDEN,
+            )
         # +watcha
 
         try:

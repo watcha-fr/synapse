@@ -12,13 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Iterable, Pattern, Tuple
+from typing import Iterable, Pattern, TYPE_CHECKING, Tuple
 
 from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
-from synapse.types import JsonDict, UserID
+from synapse.rest.client._base import raise_for_external_user_access
+from synapse.types import JsonDict
 
 from ._base import watcha_patterns
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 
 def nextcloud_patterns(path_regex: str) -> Iterable[Pattern]:
@@ -43,10 +47,12 @@ class ListUsersOwnCalendarsRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self.auth = hs.get_auth()
+        self.store = hs.get_datastores().main
         self.nextcloud_handler = hs.get_nextcloud_handler()
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request, allow_partner=False)
+        requester = await self.auth.get_user_by_req(request)
+        await raise_for_external_user_access(requester, self.store)
         user_id = requester.user.to_string()
         response = await self.nextcloud_handler.list_users_own_calendars(user_id)
         return 200, response
@@ -59,12 +65,14 @@ class GetCalendarRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self.auth = hs.get_auth()
+        self.store = hs.get_datastores().main
         self.nextcloud_handler = hs.get_nextcloud_handler()
 
     async def on_GET(
         self, request: SynapseRequest, calendar_id: str
     ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request, allow_partner=False)
+        requester = await self.auth.get_user_by_req(request)
+        await raise_for_external_user_access(requester, self.store)
         user_id = requester.user.to_string()
         response = await self.nextcloud_handler.get_calendar(user_id, calendar_id)
         return 200, response
@@ -77,12 +85,14 @@ class ReorderCalendarsRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self.auth = hs.get_auth()
+        self.store = hs.get_datastores().main
         self.nextcloud_handler = hs.get_nextcloud_handler()
 
     async def on_PUT(
         self, request: SynapseRequest, calendar_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
+        # await raise_for_external_user_access(requester, self.store)
         user_id = requester.user.to_string()
         response = await self.nextcloud_handler.reorder_calendars(user_id, calendar_id)
-        return 200, {}
+        return 200, response

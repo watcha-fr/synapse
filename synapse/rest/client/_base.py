@@ -17,10 +17,18 @@
 import logging
 import re
 from typing import Any, Awaitable, Callable, Iterable, Pattern, Tuple, TypeVar, cast
+from typing import TYPE_CHECKING  # watcha+
 
 from synapse.api.errors import InteractiveAuthIncompleteError
 from synapse.api.urls import CLIENT_API_PREFIX
 from synapse.types import JsonDict
+# watcha+
+from synapse.api.errors import AuthError, Codes
+from synapse.types import Requester
+
+if TYPE_CHECKING:
+    from synapse.storage.databases.main import DataStore
+# +watcha
 
 logger = logging.getLogger(__name__)
 
@@ -101,3 +109,18 @@ def interactive_auth_handler(orig: C) -> C:
             return 401, e.result
 
     return cast(C, wrapped)
+
+
+# watcha+
+async def raise_for_external_user_access(requester: Requester, store: "DataStore"):
+        user_id = requester.user.to_string()
+        is_external_user = await store.is_external_user(user_id)
+        if is_external_user:
+            raise AuthError(
+                403,
+                "External user access not allowed",
+                errcode=Codes.GUEST_ACCESS_FORBIDDEN,
+            )
+
+
+# +watcha

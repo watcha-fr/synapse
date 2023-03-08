@@ -63,6 +63,7 @@ class LoginResponse(TypedDict, total=False):
     refresh_token: Optional[str]
     device_id: str
     well_known: Optional[Dict[str, Any]]
+    is_external_user: Optional[bool]  # watcha+
 
 
 class LoginRestServlet(RestServlet):
@@ -115,6 +116,7 @@ class LoginRestServlet(RestServlet):
             rate_hz=self.hs.config.ratelimiting.rc_login_account.per_second,
             burst_count=self.hs.config.ratelimiting.rc_login_account.burst_count,
         )
+        self.store = hs.get_datastores().main  # watcha+
 
         # ensure the CAS/SAML/OIDC handlers are loaded on this worker instance.
         # The reason for this is to ensure that the auth_provider_ids are registered
@@ -382,9 +384,9 @@ class LoginRestServlet(RestServlet):
             result["refresh_token"] = refresh_token
 
         # watcha+
-        is_partner = await self.auth_handler.is_partner(user_id)
-        if is_partner:
-            result["is_partner"] = is_partner
+        is_external_user = await self.store.is_external_user(user_id)
+        if is_external_user:
+            result["is_external_user"] = is_external_user
         # +watcha
 
         if callback is not None:

@@ -408,22 +408,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 400)
         self.assertEqual(channel.json_body["errcode"], "M_INVALID_PARAM")
 
-    # watcha+
-    def test_login_as_partner(self):
-        self.register_user("partner", "pass", is_partner=True)
-
-        params = {
-            "type": "m.login.password",
-            "identifier": {"type": "m.id.user", "user": "partner"},
-            "password": "pass",
-        }
-        channel = self.make_request(b"POST", LOGIN_URL, params)
-
-        self.assertEqual(channel.code, 200)
-        self.assertTrue(loads(channel.result["body"])["is_partner"])
-
-    # +watcha
-
 
 @skip_unless(has_saml2 and HAS_OIDC, "Requires SAML2 and OIDC")
 class MultiSSOTestCase(unittest.HomeserverTestCase):

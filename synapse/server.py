@@ -135,7 +135,6 @@ from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import random_string
 
 # watcha+
-from synapse.handlers.watcha_administration import AdministrationHandler as WatchaAdministrationHandler
 from synapse.handlers.watcha_registration import RegistrationHandler as WatchaRegistrationHandler
 from synapse.handlers.watcha_nextcloud import NextcloudHandler
 from synapse.http.watcha_keycloak_client import KeycloakClient
@@ -845,10 +844,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_nextcloud_client(self) -> NextcloudClient:
         return NextcloudClient(self)
-
-    @cache_in_self
-    def get_watcha_administration_handler(self) -> WatchaAdministrationHandler:
-        return WatchaAdministrationHandler(self)
 
     @cache_in_self
     def get_watcha_registration_handler(self) -> WatchaRegistrationHandler:
