@@ -1120,7 +1120,7 @@ class UserAttributeDict(TypedDict):
     display_name: Optional[str]
     emails: List[str]
     is_admin: Optional[bool]  # watcha+
-    nextcloud_username: Optional[str]  # watcha+
+    nextcloud_user_id: Optional[str]  # watcha+
 
 
 C = TypeVar("C")
@@ -1211,7 +1211,7 @@ class JinjaOidcMappingConfig:
     localpart_template: Optional[Template]
     display_name_template: Optional[Template]
     email_template: Optional[Template]
-    nextcloud_username_template: Optional[Template]  # watcha+
+    nextcloud_user_id_template: Optional[Template]  # watcha+
     extra_attributes: Dict[str, Template]
     confirm_localpart: bool = False
 
@@ -1241,8 +1241,8 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         display_name_template = parse_template_config("display_name_template")
         email_template = parse_template_config("email_template")
         # watcha+
-        nextcloud_username_template = parse_template_config(
-            "nextcloud_username_template"
+        nextcloud_user_id_template = parse_template_config(
+            "nextcloud_user_id_template"
         )
         # +watcha
 
@@ -1271,7 +1271,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             email_template=email_template,
             extra_attributes=extra_attributes,
             confirm_localpart=confirm_localpart,
-            nextcloud_username_template=nextcloud_username_template,  # watcha+
+            nextcloud_user_id_template=nextcloud_user_id_template,  # watcha+
         )
 
     def get_remote_user_id(self, userinfo: UserInfo) -> str:
@@ -1306,37 +1306,26 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         if email:
             emails.append(email)
 
-        """watcha!
+        # watcha+
+        is_admin: Optional[bool] = userinfo.get("is_admin")
+        if not isinstance(is_admin, bool) and is_admin is not None:
+            raise MappingException(
+                f'"is_admin" claim must be a boolean ("is_admin": {is_admin})'
+            )
+
+        nextcloud_user_id = render_template_field(
+            self._config.nextcloud_user_id_template
+        )
+        # +watcha
+
         return UserAttributeDict(
             localpart=localpart,
             display_name=display_name,
             emails=emails,
             confirm_localpart=self._config.confirm_localpart,
+            is_admin=is_admin,  # watcha+
+            nextcloud_user_id=nextcloud_user_id,  # watcha+
         )
-        !watcha"""
-        # watcha+
-        is_admin: Optional[bool] = userinfo.get("is_admin")
-        if not isinstance(is_admin, bool) and is_admin is not None:
-            raise MappingException(
-                build_log_message(
-                    log_vars={
-                        "is_admin": is_admin,
-                    },
-                )
-            )
-
-        nextcloud_username = render_template_field(
-            self._config.nextcloud_username_template
-        )
-
-        return UserAttributeDict(
-            localpart=localpart,
-            display_name=display_name,
-            emails=emails,
-            is_admin=is_admin,
-            nextcloud_username=nextcloud_username,
-        )
-        # +watcha
 
     async def get_extra_attributes(self, userinfo: UserInfo, token: Token) -> JsonDict:
         extras: Dict[str, str] = {}

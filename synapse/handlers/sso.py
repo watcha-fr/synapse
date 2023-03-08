@@ -138,7 +138,7 @@ class UserAttributes:
     display_name: Optional[str] = None
     emails: Collection[str] = attr.Factory(list)
     is_admin: Optional[bool] = False  # watcha+
-    nextcloud_username: Optional[str] = None  # watcha+
+    nextcloud_user_id: Optional[str] = None  # watcha+
 
 
 @attr.s(slots=True, auto_attribs=True)
@@ -446,19 +446,16 @@ class SsoHandler:
                 user_id = await grandfather_existing_users()
                 if user_id:
                     # Future logins should also match this user ID.
-                    """watcha!
                     await self._store.record_user_external_id(
                         auth_provider_id, remote_user_id, user_id
                     )
-                    !watcha"""
                     # watcha+
                     attributes = await sso_to_matrix_id_mapper(0)
-                    await self._store.record_user_external_id(
-                        auth_provider_id,
-                        remote_user_id,
-                        user_id,
-                        attributes.nextcloud_username,
-                    )
+                    nextcloud_user_id = attributes.nextcloud_user_id
+                    if nextcloud_user_id:
+                        await self._store.record_user_external_id(
+                            "nextcloud", nextcloud_user_id, user_id
+                        )
                     # +watcha
 
             # Otherwise, generate a new user.
@@ -700,21 +697,18 @@ class SsoHandler:
             bind_emails=attributes.emails,
             user_agent_ips=[(user_agent, ip_address)],
             auth_provider_id=auth_provider_id,
-            admin=attributes.is_admin,  # watcha+
+            admin=attributes.is_admin if attributes.is_admin else False,  # watcha+
         )
 
-        """watcha!
         await self._store.record_user_external_id(
             auth_provider_id, remote_user_id, registered_user_id
         )
-        !watcha"""
         # watcha+
-        await self._store.record_user_external_id(
-            auth_provider_id,
-            remote_user_id,
-            registered_user_id,
-            attributes.nextcloud_username,
-        )
+        nextcloud_user_id = attributes.nextcloud_user_id
+        if nextcloud_user_id:
+            await self._store.record_user_external_id(
+                "nextcloud", nextcloud_user_id, registered_user_id
+            )
         # +watcha
         return registered_user_id
 

@@ -46,19 +46,19 @@ class NextcloudStore(SQLBaseStore):
             desc="delete_nextcloud_share",
         )
 
-    async def get_username(self, user_id: str):
-        """Look up a Nextcloud username by their user_id
+    async def get_nextcloud_user_id(self, user_id: str):
+        """Retrieve a Nextcloud user ID
 
         Args:
-            user_id: The matrix ID of the user
+            user_id: The Matrix user ID
 
         Returns:
-            the Nextcloud username of the user, or None if they are not known
+            the Nextcloud user ID bound to the provided Matrix user ID, or None if not known
         """
         return await self.db_pool.simple_select_one_onecol(
             table="user_external_ids",
-            keyvalues={"user_id": user_id},
-            retcol="nextcloud_username",
+            keyvalues={"auth_provider": "nextcloud", "user_id": user_id},
+            retcol="external_id",
             allow_none=True,
-            desc="get_nextcloud_username",
+            desc="get_nextcloud_user_id",
         )

@@ -197,16 +197,16 @@ class NextcloudHandler:
         user_ids = await self.store.get_users_in_room(room_id)
 
         for user_id in user_ids:
-            nextcloud_username = await self.store.get_username(user_id)
+            nextcloud_user_id = await self.store.get_nextcloud_user_id(user_id)
             try:
                 await self.nextcloud_client.add_user_to_group(
-                    nextcloud_username, group_id
+                    nextcloud_user_id, group_id
                 )
             except NEXTCLOUD_CLIENT_ERRORS as error:
                 log_message = build_log_message(
                     log_vars={
                         "user_id": user_id,
-                        "nextcloud_username": nextcloud_username,
+                        "nextcloud_user_id": nextcloud_user_id,
                         "group_id": group_id,
                         "room_id": room_id,
                         "error": error,
@@ -232,17 +232,17 @@ class NextcloudHandler:
             path: the path of the Nextcloud folder to bind.
         """
         group_id = await self.build_group_id(room_id)
-        nextcloud_username = await self.store.get_username(requester_id)
+        nextcloud_user_id = await self.store.get_nextcloud_user_id(requester_id)
 
         old_share_id = await self.store.get_share_id(room_id)
         if old_share_id:
             try:
-                await self.nextcloud_client.unshare(nextcloud_username, old_share_id)
+                await self.nextcloud_client.unshare(nextcloud_user_id, old_share_id)
             except NEXTCLOUD_CLIENT_ERRORS as error:
                 logger.error(
                     build_log_message(
                         log_vars={
-                            "nextcloud_username": nextcloud_username,
+                            "nextcloud_user_id": nextcloud_user_id,
                             "old_share_id": old_share_id,
                             "error": error,
                         }
@@ -251,7 +251,7 @@ class NextcloudHandler:
 
         try:
             new_share_id = await self.nextcloud_client.share(
-                nextcloud_username, path, group_id
+                nextcloud_user_id, path, group_id
             )
         except NEXTCLOUD_CLIENT_ERRORS as error:
             await self.unbind(requester_id, room_id)
@@ -265,7 +265,7 @@ class NextcloudHandler:
                 http_code,
                 build_log_message(
                     log_vars={
-                        "nextcloud_username": nextcloud_username,
+                        "nextcloud_user_id": nextcloud_user_id,
                         "path": path,
                         "group_id": group_id,
                         "error": error,
@@ -283,16 +283,16 @@ class NextcloudHandler:
             requester_id: the mxid of the requester.
             room_id: the id of the room to bind
         """
-        nextcloud_username = await self.store.get_username(requester_id)
+        nextcloud_user_id = await self.store.get_nextcloud_user_id(requester_id)
         share_id = await self.store.get_share_id(room_id)
         if share_id:
             try:
-                await self.nextcloud_client.unshare(nextcloud_username, share_id)
+                await self.nextcloud_client.unshare(nextcloud_user_id, share_id)
             except NEXTCLOUD_CLIENT_ERRORS as error:
                 logger.error(
                     build_log_message(
                         log_vars={
-                            "nextcloud_username": nextcloud_username,
+                            "nextcloud_user_id": nextcloud_user_id,
                             "share_id": share_id,
                             "error": error,
                         }
@@ -317,24 +317,24 @@ class NextcloudHandler:
             room_id: The id of the room where the membership event was sent
             membership: The type of membership event
         """
-        nextcloud_username = await self.store.get_username(user_id)
+        nextcloud_user_id = await self.store.get_nextcloud_user_id(user_id)
         group_id = await self.build_group_id(room_id)
 
         try:
             if membership == Membership.JOIN:
                 await self.nextcloud_client.add_user_to_group(
-                    nextcloud_username, group_id
+                    nextcloud_user_id, group_id
                 )
             else:
                 await self.nextcloud_client.remove_user_from_group(
-                    nextcloud_username, group_id
+                    nextcloud_user_id, group_id
                 )
         except NEXTCLOUD_CLIENT_ERRORS as error:
             log_vars = {
                 "user_id": user_id,
                 "room_id": room_id,
                 "membership": membership,
-                "nextcloud_username": nextcloud_username,
+                "nextcloud_user_id": nextcloud_user_id,
                 "group_id": group_id,
                 "error": error,
             }
@@ -344,9 +344,9 @@ class NextcloudHandler:
     # ================
 
     async def list_users_own_calendars(self, user_id: str):
-        nextcloud_username = await self.store.get_username(user_id)
+        nextcloud_user_id = await self.store.get_nextcloud_user_id(user_id)
         calendars = await self.nextcloud_client.get_users_own_calendars(
-            nextcloud_username
+            nextcloud_user_id
         )
         aggregated_calendars = {key: list() for key in CalendarComponentTypes.ALL}
         for calendar in calendars:
@@ -361,13 +361,13 @@ class NextcloudHandler:
         return aggregated_calendars
 
     async def get_calendar(self, user_id: str, calendar_id: str):
-        nextcloud_username = await self.store.get_username(user_id)
-        return await self.nextcloud_client.get_calendar(nextcloud_username, calendar_id)
+        nextcloud_user_id = await self.store.get_nextcloud_user_id(user_id)
+        return await self.nextcloud_client.get_calendar(nextcloud_user_id, calendar_id)
 
     async def reorder_calendars(self, user_id: str, calendar_id: str):
-        nextcloud_username = await self.store.get_username(user_id)
+        nextcloud_user_id = await self.store.get_nextcloud_user_id(user_id)
         return await self.nextcloud_client.reorder_calendars(
-            nextcloud_username, calendar_id
+            nextcloud_user_id, calendar_id
         )
 
     async def update_calendar_share(
@@ -408,35 +408,35 @@ class NextcloudHandler:
             await self._validate_calendar(room_id, fake_calendar)
             displayname = await self.build_group_displayname(room_id)
             user_ids = await self.store.get_users_in_room(room_id)
-            nextcloud_usernames = [
-                await self.store.get_username(user_id) for user_id in user_ids
+            nextcloud_user_ids = [
+                await self.store.get_nextcloud_user_id(user_id) for user_id in user_ids
             ]
             calendar = await self.nextcloud_client.create_and_share_calendar(
-                room_id, displayname, nextcloud_usernames
+                room_id, displayname, nextcloud_user_ids
             )
             event_dict["content"] = self._make_calendar_event_content(calendar)
             event_dict["state_key"] = CalendarComponentTypes.VEVENT_VTODO
 
         else:
-            nextcloud_username = await self.store.get_username(user_id)
+            nextcloud_user_id = await self.store.get_nextcloud_user_id(user_id)
             calendar_id = content["id"]
             calendar = await self.nextcloud_client.get_calendar(
-                nextcloud_username, calendar_id
+                nextcloud_user_id, calendar_id
             )
             await self._validate_calendar(room_id, calendar)
             components = calendar["components"]
             event_dict["state_key"] = CalendarComponentTypes.serialize(components)
             displayname = await self.build_group_displayname(room_id)
             user_ids = await self.store.get_users_in_room(room_id)
-            nextcloud_usernames = [
-                await self.store.get_username(user_id) for user_id in user_ids
+            nextcloud_user_ids = [
+                await self.store.get_nextcloud_user_id(user_id) for user_id in user_ids
             ]
             calendar = await self.nextcloud_client.share_calendar(
-                nextcloud_username,
+                nextcloud_user_id,
                 calendar_id,
                 room_id,
                 displayname,
-                nextcloud_usernames,
+                nextcloud_user_ids,
             )
             event_dict["content"] = self._make_calendar_event_content(calendar)
 
@@ -454,11 +454,11 @@ class NextcloudHandler:
         calendar_events: List[EventBase],
     ):
         if membership == Membership.JOIN:
-            nextcloud_username = await self.store.get_username(user_id)
+            nextcloud_user_id = await self.store.get_nextcloud_user_id(user_id)
             calendar_ids = [event["content"]["id"] for event in calendar_events]
             displayname = await self.build_group_displayname(room_id)
             await self.nextcloud_client.add_user_access_to_calendars(
-                nextcloud_username, room_id, calendar_ids, displayname
+                nextcloud_user_id, room_id, calendar_ids, displayname
             )
             return
 
@@ -489,9 +489,9 @@ class NextcloudHandler:
             )
 
         if not delete_group:
-            nextcloud_username = await self.store.get_username(user_id)
+            nextcloud_user_id = await self.store.get_nextcloud_user_id(user_id)
             await self.nextcloud_client.remove_user_access_to_calendars(
-                nextcloud_username, room_id
+                nextcloud_user_id, room_id
             )
 
     def _is_own_calendar(self, user_id: str, calendar_event: EventBase):

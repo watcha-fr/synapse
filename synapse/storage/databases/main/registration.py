@@ -604,6 +604,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         return await self.db_pool.runInteraction(
             "is_external_user", self.is_external_user_txn, user_id
         )
+
     # +watcha
 
     def is_real_user_txn(self, txn: LoggingTransaction, user_id: str) -> bool:
@@ -636,6 +637,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             allow_none=True,
         )
         return True if res == UserTypes.EXTERNAL else False
+
     # +watcha
 
     async def get_users_by_id_case_insensitive(self, user_id: str) -> Dict[str, str]:
@@ -653,20 +655,9 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
         return await self.db_pool.runInteraction("get_users_by_id_case_insensitive", f)
 
-    """watcha!
     async def record_user_external_id(
         self, auth_provider: str, external_id: str, user_id: str
     ) -> None:
-    !watcha"""
-    # watcha+
-    async def record_user_external_id(
-        self,
-        auth_provider: str,
-        external_id: str,
-        user_id: str,
-        nextcloud_username: str = None,
-    ) -> None:
-        # +watcha
         """Record a mapping from an external user id to a mxid
 
         See notes in _record_user_external_id_txn about what constitutes valid data.
@@ -687,7 +678,6 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 auth_provider,
                 external_id,
                 user_id,
-                nextcloud_username,  # watcha+
             )
         except self.database_engine.module.IntegrityError:
             raise ExternalIDReuseException()
@@ -698,7 +688,6 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         auth_provider: str,
         external_id: str,
         user_id: str,
-        nextcloud_username: str,  # watcha+
     ) -> None:
         """
         Record a mapping from an external user id to a mxid.
@@ -723,7 +712,6 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 "auth_provider": auth_provider,
                 "external_id": external_id,
                 "user_id": user_id,
-                "nextcloud_username": nextcloud_username,  # watcha+
             },
         )
 
@@ -751,7 +739,6 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         self,
         record_external_ids: List[Tuple[str, str]],
         user_id: str,
-        nextcloud_username: str = None,  # watcha+
     ) -> None:
         """Replace mappings from external user ids to a mxid in a single transaction.
         All mappings are deleted and the new ones are created.
@@ -795,7 +782,6 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                     auth_provider,
                     external_id,
                     user_id,
-                    nextcloud_username,  # watcha+
                 )
 
         try:
