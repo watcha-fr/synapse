@@ -1,5 +1,5 @@
 import logging
-from typing import Iterable, List, Optional, Set
+from typing import List, Optional, Set, TYPE_CHECKING
 from urllib import parse as urlparse
 
 from jsonschema.exceptions import SchemaError, ValidationError
@@ -16,6 +16,9 @@ from synapse.push.presentable_names import calculate_room_name
 from synapse.types import Requester
 from synapse.util.watcha import build_log_message
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
 # echo -n watcha | md5sum | head -c 10
@@ -31,7 +34,7 @@ NEXTCLOUD_CLIENT_ERRORS = (
 
 
 class NextcloudHandler:
-    def __init__(self, hs: "Homeserver"):
+    def __init__(self, hs: "HomeServer"):
         self.config = hs.config
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
@@ -49,7 +52,7 @@ class NextcloudHandler:
         ):
             return
 
-        if await self.store.get_share_id(room_id):
+        if await self._get_share_id(room_id):
             await self.update_group(user_id, room_id, membership)
 
         events = await self._get_calendar_events(room_id)
@@ -68,7 +71,7 @@ class NextcloudHandler:
         room_id = event_dict["room_id"]
         displayname = await self.build_group_displayname(room_id)
 
-        if await self.store.get_share_id(room_id):
+        if await self._get_share_id(room_id):
             group_id = await self.build_group_id(room_id)
             await self.set_group_displayname(group_id, displayname)
 
@@ -83,10 +86,15 @@ class NextcloudHandler:
     # file sharing
     # ============
 
-    async def update_share(self, room_id: str, user_id: str, event_content: dict):
+    async def update_share(
+        self, requester: Requester, event_dict: dict, txn_id: Optional[str] = None
+    ):
+        user_id = requester.user.to_string()
+        room_id = event_dict["room_id"]
+
         await self.auth.check_user_in_room(room_id, user_id)
 
-        nextcloud_url = event_content["nextcloudShare"]
+        nextcloud_url = event_dict["content"]["nextcloudShare"]
 
         if nextcloud_url:
             url_query = urlparse.parse_qs(urlparse.urlparse(nextcloud_url).query)
@@ -99,12 +107,20 @@ class NextcloudHandler:
                     ),
                 )
             nextcloud_folder_path = url_query["dir"][0]
-            await self.bind(user_id, room_id, nextcloud_folder_path)
+            share_id = await self.bind(user_id, room_id, nextcloud_folder_path)
+            event_dict["content"]["nextcloudShareId"] = share_id
 
         else:
             await self.unbind(user_id, room_id)
+            del event_dict["content"]["nextcloudShare"]
+            del event_dict["content"]["nextcloudShareId"]
 
-    async def bind(self, requester_id: str, room_id: str, path: str):
+        event, _ = await self.event_creation_handler.create_and_send_nonmember_event(
+            requester, event_dict, txn_id=txn_id
+        )
+        return event.event_id
+
+    async def bind(self, requester_id: str, room_id: str, path: str) -> str:
         """Bind a Nextcloud folder with a room in three steps :
             1 - create a new Nextcloud group
             2 - add all room members in the new group
@@ -114,10 +130,13 @@ class NextcloudHandler:
            requester_id: the mxid of the requester.
            room_id: the id of the room to bind.
            path: the path of the Nextcloud folder to bind.
+
+        Returns:
+            The Nextcloud share ID
         """
         await self.create_group(room_id)
         await self.add_room_members_to_group(room_id)
-        await self.create_share(requester_id, room_id, path)
+        return await self.create_share(requester_id, room_id, path)
 
     async def create_group(self, room_id: str):
         """Create a Nextcloud group with specific id and displayname.
@@ -161,7 +180,9 @@ class NextcloudHandler:
         Args:
             room_id: the id of the room
         """
-        room_state_ids = await self._storage_controllers.state.get_current_state_ids(room_id)
+        room_state_ids = await self._storage_controllers.state.get_current_state_ids(
+            room_id
+        )
         room_name = await calculate_room_name(self.store, room_state_ids, None)
         return f"[Watcha] {room_name}"
 
@@ -222,7 +243,7 @@ class NextcloudHandler:
                         Codes.NEXTCLOUD_CAN_NOT_ADD_MEMBERS_TO_GROUP,
                     )
 
-    async def create_share(self, requester_id: str, room_id: str, path: str):
+    async def create_share(self, requester_id: str, room_id: str, path: str) -> str:
         """Create a new share on folder for a specific Nextcloud group.
         Before that, delete old existing share for this group if it exist.
 
@@ -230,11 +251,14 @@ class NextcloudHandler:
             requester_id: the mxid of the requester.
             room_id: the id of the room to bind.
             path: the path of the Nextcloud folder to bind.
+
+        Returns:
+            The Nextcloud share ID
         """
         group_id = await self.build_group_id(room_id)
         nextcloud_user_id = await self.store.get_nextcloud_user_id(requester_id)
 
-        old_share_id = await self.store.get_share_id(room_id)
+        old_share_id = await self._get_share_id(room_id)
         if old_share_id:
             try:
                 await self.nextcloud_client.unshare(nextcloud_user_id, old_share_id)
@@ -250,9 +274,7 @@ class NextcloudHandler:
                 )
 
         try:
-            new_share_id = await self.nextcloud_client.share(
-                nextcloud_user_id, path, group_id
-            )
+            return await self.nextcloud_client.share(nextcloud_user_id, path, group_id)
         except NEXTCLOUD_CLIENT_ERRORS as error:
             await self.unbind(requester_id, room_id)
             # raise 404 error if folder to share do not exist
@@ -274,8 +296,6 @@ class NextcloudHandler:
                 Codes.NEXTCLOUD_CAN_NOT_SHARE,
             )
 
-        await self.store.register_share(room_id, new_share_id)
-
     async def unbind(self, requester_id: str, room_id: str):
         """Unbind a Nextcloud folder from a room.
 
@@ -284,7 +304,7 @@ class NextcloudHandler:
             room_id: the id of the room to bind
         """
         nextcloud_user_id = await self.store.get_nextcloud_user_id(requester_id)
-        share_id = await self.store.get_share_id(room_id)
+        share_id = await self._get_share_id(room_id)
         if share_id:
             try:
                 await self.nextcloud_client.unshare(nextcloud_user_id, share_id)
@@ -306,8 +326,6 @@ class NextcloudHandler:
             logger.error(
                 build_log_message(log_vars={"group_id": group_id, "error": error})
             )
-
-        await self.store.delete_share(room_id)
 
     async def update_group(self, user_id: str, room_id: str, membership: str):
         """Update a Nextcloud group by adding or removing users.
@@ -339,6 +357,12 @@ class NextcloudHandler:
                 "error": error,
             }
             logger.warn(build_log_message(log_vars=log_vars))
+
+    async def _get_share_id(self, room_id: str) -> Optional[int]:
+        room_state = await self._storage_controllers.state.get_current_state(room_id)
+        event = room_state.get((EventTypes.VectorSetting, ""))
+        if event:
+            return event.get("content", {}).get("nextcloudShareId")
 
     # calendar sharing
     # ================
@@ -381,8 +405,10 @@ class NextcloudHandler:
 
         if not content:
             state_key = event_dict["state_key"]
-            calendar_event = await self._storage_controllers.state.get_current_state_event(
-                room_id, EventTypes.NextcloudCalendar, state_key
+            calendar_event = (
+                await self._storage_controllers.state.get_current_state_event(
+                    room_id, EventTypes.NextcloudCalendar, state_key
+                )
             )
             if calendar_event is None or not calendar_event["content"]:
                 raise SynapseError(

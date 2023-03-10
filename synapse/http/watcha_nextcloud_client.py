@@ -1,13 +1,16 @@
 import logging
 import secrets
 from base64 import b64encode
-from typing import Any, List
+from typing import Any, List, TYPE_CHECKING
 
 from jsonschema import validate
 
 from synapse.api.errors import Codes, NextcloudError
 from synapse.http.client import SimpleHttpClient
 from synapse.util.watcha import ActionStatus, build_log_message
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +70,7 @@ class NextcloudClient(SimpleHttpClient):
 
     NEXTCLOUD_APP_NAME = "watcha"
 
-    def __init__(self, hs: "Homeserver"):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
         self.nextcloud_url = hs.config.watcha.nextcloud_url
@@ -267,7 +270,7 @@ class NextcloudClient(SimpleHttpClient):
         validate(response, WITHOUT_DATA_SCHEMA)
         self._raise_for_status(response["ocs"]["meta"])
 
-    async def share(self, requester: str, path: str, group_id: str):
+    async def share(self, requester: str, path: str, group_id: str) -> str:
         """Share an existing file or folder with all permissions for a group.
 
         Args:
@@ -298,7 +301,7 @@ class NextcloudClient(SimpleHttpClient):
             404: File or folder couldn’t be shared
 
         Returns:
-            the id of Nextcloud share
+            The Nextcloud share ID
         """
         response = await self.post_json_get_json(
             uri=f"{self.base_url}/documents",

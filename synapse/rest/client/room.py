@@ -110,6 +110,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         self.room_member_handler = hs.get_room_member_handler()
         self.message_handler = hs.get_message_handler()
         self.auth = hs.get_auth()
+        self.hs = hs  # watcha+
         self.store = hs.get_datastores().main  # watcha+
         self.nextcloud_handler = hs.get_nextcloud_handler()  # watcha+
 
@@ -231,25 +232,31 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     action=membership,
                     content=content,
                 )
-                # watcha+
-            elif event_type == EventTypes.Name:
-                event_id = await self.nextcloud_handler.handle_room_name_event(
+            # watcha+
+            elif (
+                self.hs.config.watcha.nextcloud_integration
+                and event_type == EventTypes.VectorSetting
+                and "nextcloudShare" in content
+            ):
+                event_id = await self.nextcloud_handler.update_share(
                     requester, event_dict, txn_id=txn_id
                 )
-            elif event_type == EventTypes.NextcloudCalendar:
+            elif (
+                self.hs.config.watcha.nextcloud_integration
+                and event_type == EventTypes.NextcloudCalendar
+            ):
                 event_id = await self.nextcloud_handler.update_calendar_share(
                     requester, event_dict, txn_id=txn_id
                 )
-                # +watcha
+            elif (
+                self.hs.config.watcha.nextcloud_integration
+                and event_type == EventTypes.Name
+            ):
+                event_id = await self.nextcloud_handler.handle_room_name_event(
+                    requester, event_dict, txn_id=txn_id
+                )
+            # +watcha
             else:
-                # watcha+
-                if (
-                    event_type == EventTypes.VectorSetting
-                    and "nextcloudShare" in content
-                ):
-                    user_id = requester.user.to_string()
-                    await self.nextcloud_handler.update_share(room_id, user_id, content)
-                # +watcha
                 (
                     event,
                     _,
