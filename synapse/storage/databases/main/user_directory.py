@@ -768,6 +768,23 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         if self.hs.config.userdirectory.user_directory_search_all_users:
             join_args = (user_id,)
             where_clause = "user_id != ?"
+            # watcha+
+            join_args += (user_id,)
+            where_clause += """
+                AND (
+                    EXISTS (
+                        SELECT 1 FROM users as u
+                        WHERE user_id = u.name AND u.user_type != 'watcha_external'
+                    ) OR (
+                        EXISTS (SELECT 1 FROM users_in_public_rooms WHERE user_id = t.user_id)
+                        OR EXISTS (
+                            SELECT 1 FROM users_who_share_private_rooms
+                            WHERE user_id = ? AND other_user_id = t.user_id
+                        )
+                    )
+                )
+            """
+            # +watcha
         else:
             join_args = (user_id,)
             where_clause = """
