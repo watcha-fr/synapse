@@ -60,6 +60,7 @@ from synapse.config import (
     user_directory,
     voip,
     workers,
+    watcha,  # watcha+
 )
 
 class ConfigError(Exception):
@@ -119,7 +120,7 @@ class RootConfig:
     federation: federation.FederationConfig
     retention: retention.RetentionConfig
     background_updates: background_updates.BackgroundUpdateConfig
-    nextcloud: watcha_nextcloud.NextcloudConfig  # watcha+
+    watcha: watcha.WatchaConfig  # watcha+
 
     config_classes: List[Type["Config"]] = ...
     config_files: List[str]

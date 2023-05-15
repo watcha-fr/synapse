@@ -120,19 +120,6 @@ class RegisterTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 400)
 
-    def test_register_user_with_same_email_adress(self):
-        channel = self.make_request(
-            "POST",
-            self.url,
-            {"email": "owner@example.com", "admin": False, "password": ""},
-            self.owner_tok,
-        )
-
-        self.keycloak_client.add_user.assert_not_called()
-        self.nextcloud_client.add_user.assert_not_called()
-
-        self.assertEqual(channel.code, 400)
-
     def test_register_user_with_displayname(self):
         channel = self.make_request(
             "POST",

@@ -1,13 +1,16 @@
 import logging
 import secrets
 from base64 import b64encode
-from typing import Any, List
+from typing import List, Optional, TYPE_CHECKING
 
 from jsonschema import validate
 
-from synapse.api.errors import Codes, NextcloudError
+from synapse.api.errors import NextcloudError
 from synapse.http.client import SimpleHttpClient
 from synapse.util.watcha import ActionStatus, build_log_message
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +70,7 @@ class NextcloudClient(SimpleHttpClient):
 
     NEXTCLOUD_APP_NAME = "watcha"
 
-    def __init__(self, hs: "Homeserver"):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
         self.nextcloud_url = hs.config.watcha.nextcloud_url
@@ -95,14 +98,21 @@ class NextcloudClient(SimpleHttpClient):
     def _get_headers_for_ocs_api(self):
         return {"OCS-APIRequest": ["true"], **self._get_headers()}
 
-    def _raise_for_status(self, meta: List[Any]):
+    def _raise_for_status(self, meta):
         if meta["status"] == "failure":
             raise NextcloudError(
                 meta["statuscode"],
                 meta["message"],
             )
 
-    async def add_user(self, username: str, displayname: str = None):
+    async def add_user(
+        self,
+        username: str,
+        displayname: Optional[str] = None,
+        email: Optional[str] = None,
+        is_admin: Optional[bool] = False,
+        groups: Optional[List] = None
+    ):
         """Create a new user.
 
         Args:
@@ -120,10 +130,17 @@ class NextcloudClient(SimpleHttpClient):
         payload = {
             "userid": username,
             "password": password,
+            "groups": groups or []
         }
 
         if displayname:
             payload["displayName"] = displayname
+
+        if email:
+            payload["email"] = email
+
+        if is_admin:
+            payload["groups"].append("admin")
 
         response = await self.post_json_get_json(
             uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/users",
@@ -131,14 +148,12 @@ class NextcloudClient(SimpleHttpClient):
             headers=self._headers_for_ocs_api,
         )
 
-        validate(response, WITH_DATA_SCHEMA)
-
         meta = response["ocs"]["meta"]
         if meta["statuscode"] == 102:
             logger.warn(build_log_message(log_vars={"meta": meta, "payload": payload}))
         else:
             self._raise_for_status(meta)
-        logger.info(build_log_message(status=ActionStatus.SUCCESS))
+            logger.info(build_log_message(status=ActionStatus.SUCCESS))
 
     async def delete_user(self, username: str):
         """Delete an existing user.

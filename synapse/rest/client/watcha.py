@@ -124,7 +124,7 @@ class WatchaRegisterRestServlet(RestServlet):
 
         params = parse_json_object_from_request(request)
 
-        email_address = params["email"].strip()
+        email_address = params["email"].lower().strip()
         if not email_address:
             raise SynapseError(
                 400,
@@ -137,9 +137,10 @@ class WatchaRegisterRestServlet(RestServlet):
         user_id = await self.registration_handler.register(
             sender_id=requester.user.to_string(),
             email_address=email_address,
-            password=params.get("password"),
             is_admin=params.get("admin", False),
             default_display_name=params.get("displayname", "").strip() or None,
+            keycloak_username=params.get("keycloak_username"),
+            keycloak_as_broker=params.get("keycloak_as_broker", False),
         )
 
         return 200, {"user_id": user_id}

@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import List, Optional
 
 from jsonschema import validate
 
@@ -50,7 +50,14 @@ class KeycloakClient(SimpleHttpClient):
             hs.config.watcha.keycloak_service_account_password
         )
 
-    async def add_user(self, password_hash, email_address, is_admin=False):
+    async def add_user(
+        self,
+        password_hash: str,
+        email_address: str,
+        is_admin: Optional[bool] = False,
+        keycloak_username: Optional[str] = None,
+        keycloak_as_broker: Optional[bool] = False,
+    ):
         """Create a new user
 
         Args:
@@ -61,24 +68,32 @@ class KeycloakClient(SimpleHttpClient):
 
         user = {
             "enabled": True,
-            "username": email_address,
+            "username": keycloak_username or email_address,
             "email": email_address,
-            "credentials": [
-                {
-                    "type": "password",
-                    "secretData": '{{"value":"{}","salt":""}}'.format(password_hash),
-                    "credentialData": '{"hashIterations":-1,"algorithm":"bcrypt"}',
-                }
-            ],
             "attributes": {"locale": ["fr"]},
-            "requiredActions": ["UPDATE_PASSWORD", "UPDATE_PROFILE"],
         }
+
+        if not keycloak_as_broker:
+            user.update(
+                {
+                    "credentials": [
+                        {
+                            "type": "password",
+                            "secretData": '{{"value":"{}","salt":""}}'.format(
+                                password_hash
+                            ),
+                            "credentialData": '{"hashIterations":-1,"algorithm":"bcrypt"}',
+                        }
+                    ],
+                    "requiredActions": ["UPDATE_PASSWORD", "UPDATE_PROFILE"],
+                }
+            )
 
         if is_admin:
             user["groups"] = ["/admin"]
 
         try:
-            return await self.post_json_get_response(
+            response = await self.post_json_get_response(
                 uri=self._get_endpoint("admin/realms/{}/users", self.realm_name),
                 headers=await self._get_header(),
                 post_json=user,
@@ -86,9 +101,10 @@ class KeycloakClient(SimpleHttpClient):
         except HttpResponseException as error:
             if error.code == 409:
                 logger.warn(build_log_message(log_vars={"error": error, "user": user}))
-            else:
-                raise
+            raise
+
         logger.info(build_log_message(status=ActionStatus.SUCCESS))
+        return response
 
     async def delete_user(self, user_id):
         """Delete an existing user
@@ -104,7 +120,7 @@ class KeycloakClient(SimpleHttpClient):
             headers=await self._get_header(),
         )
 
-    async def get_user(self, localpart) -> dict:
+    async def get_user_by_email(self, email) -> dict:
         """Get a specific Keycloak user.
 
         Returns:
@@ -115,7 +131,7 @@ class KeycloakClient(SimpleHttpClient):
         response = await self.get_json(
             uri=self._get_endpoint("admin/realms/{}/users", self.realm_name),
             headers=await self._get_header(),
-            args={"username": localpart},
+            args={"email": email, "exact": "true"},
         )
 
         validate(response, USER_SCHEMA)

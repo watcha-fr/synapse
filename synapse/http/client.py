@@ -865,7 +865,7 @@ class SimpleHttpClient:
         body = await make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            return json_decoder.decode(body.decode("utf-8"))
+            return json_decoder.decode(body.decode("utf-8")) if body else {}
         else:
             raise HttpResponseException(
                 response.code, response.phrase.decode("ascii", errors="replace"), body
