@@ -1,18 +1,24 @@
-# Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2017-2018 New Vector Ltd
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2014-2016 OpenMarket Ltd
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 import argparse
 import errno
@@ -20,12 +26,12 @@ import logging
 import os
 import re
 from collections import OrderedDict
+from enum import Enum, auto
 from hashlib import sha256
 from textwrap import dedent
 from typing import (
     Any,
     ClassVar,
-    Collection,
     Dict,
     Iterable,
     Iterator,
@@ -43,6 +49,7 @@ import jinja2
 import pkg_resources
 import yaml
 
+from synapse.types import StrSequence
 from synapse.util.templates import _create_mxc_to_http_filter, _format_ts_filter
 
 logger = logging.getLogger(__name__)
@@ -57,7 +64,7 @@ class ConfigError(Exception):
            the problem lies.
     """
 
-    def __init__(self, msg: str, path: Optional[Iterable[str]] = None):
+    def __init__(self, msg: str, path: Optional[StrSequence] = None):
         self.msg = msg
         self.path = path
 
@@ -127,7 +134,7 @@ CONFIG_FILE_HEADER = """\
 #
 # For more information on how to configure Synapse, including a complete accounting of
 # each option, go to docs/usage/configuration/config_documentation.md or
-# https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html
+# https://element-hq.github.io/synapse/latest/usage/configuration/config_documentation.html
 """
 
 
@@ -173,15 +180,30 @@ class Config:
 
     @staticmethod
     def parse_size(value: Union[str, int]) -> int:
-        if isinstance(value, int):
+        """Interpret `value` as a number of bytes.
+
+        If an integer is provided it is treated as bytes and is unchanged.
+
+        String byte sizes can have a suffix of 'K', `M`, `G` or `T`,
+        representing kibibytes, mebibytes, gibibytes and tebibytes respectively.
+        No suffix is understood as a plain byte count.
+
+        Raises:
+            TypeError, if given something other than an integer or a string
+            ValueError: if given a string not of the form described above.
+        """
+        if type(value) is int:  # noqa: E721
             return value
-        sizes = {"K": 1024, "M": 1024 * 1024}
-        size = 1
-        suffix = value[-1]
-        if suffix in sizes:
-            value = value[:-1]
-            size = sizes[suffix]
-        return int(value) * size
+        elif isinstance(value, str):
+            sizes = {"K": 1024, "M": 1024 * 1024, "G": 1024**3, "T": 1024**4}
+            size = 1
+            suffix = value[-1]
+            if suffix in sizes:
+                value = value[:-1]
+                size = sizes[suffix]
+            return int(value) * size
+        else:
+            raise TypeError(f"Bad byte size {value!r}")
 
     @staticmethod
     def parse_duration(value: Union[str, int]) -> int:
@@ -197,22 +219,36 @@ class Config:
 
         Returns:
             The number of milliseconds in the duration.
+
+        Raises:
+            TypeError, if given something other than an integer or a string
+            ValueError: if given a string not of the form described above.
         """
-        if isinstance(value, int):
+        if type(value) is int:  # noqa: E721
             return value
-        second = 1000
-        minute = 60 * second
-        hour = 60 * minute
-        day = 24 * hour
-        week = 7 * day
-        year = 365 * day
-        sizes = {"s": second, "m": minute, "h": hour, "d": day, "w": week, "y": year}
-        size = 1
-        suffix = value[-1]
-        if suffix in sizes:
-            value = value[:-1]
-            size = sizes[suffix]
-        return int(value) * size
+        elif isinstance(value, str):
+            second = 1000
+            minute = 60 * second
+            hour = 60 * minute
+            day = 24 * hour
+            week = 7 * day
+            year = 365 * day
+            sizes = {
+                "s": second,
+                "m": minute,
+                "h": hour,
+                "d": day,
+                "w": week,
+                "y": year,
+            }
+            size = 1
+            suffix = value[-1]
+            if suffix in sizes:
+                value = value[:-1]
+                size = sizes[suffix]
+            return int(value) * size
+        else:
+            raise TypeError(f"Bad duration {value!r}")
 
     @staticmethod
     def abspath(file_path: str) -> str:
@@ -353,7 +389,7 @@ class RootConfig:
 
     config_classes: List[Type[Config]] = []
 
-    def __init__(self, config_files: Collection[str] = ()):
+    def __init__(self, config_files: StrSequence = ()):
         # Capture absolute paths here, so we can reload config after we daemonize.
         self.config_files = [os.path.abspath(path) for path in config_files]
 
@@ -603,18 +639,44 @@ class RootConfig:
             " may specify directories containing *.yaml files.",
         )
 
-        generate_group = parser.add_argument_group("Config generation")
-        generate_group.add_argument(
-            "--generate-config",
-            action="store_true",
-            help="Generate a config file, then exit.",
+        # we nest the mutually-exclusive group inside another group so that the help
+        # text shows them in their own group.
+        generate_mode_group = parser.add_argument_group(
+            "Config generation mode",
         )
-        generate_group.add_argument(
+        generate_mode_exclusive = generate_mode_group.add_mutually_exclusive_group()
+        generate_mode_exclusive.add_argument(
+            # hidden option to make the type and default work
+            "--generate-mode",
+            help=argparse.SUPPRESS,
+            type=_ConfigGenerateMode,
+            default=_ConfigGenerateMode.GENERATE_MISSING_AND_RUN,
+        )
+        generate_mode_exclusive.add_argument(
+            "--generate-config",
+            help="Generate a config file, then exit.",
+            action="store_const",
+            const=_ConfigGenerateMode.GENERATE_EVERYTHING_AND_EXIT,
+            dest="generate_mode",
+        )
+        generate_mode_exclusive.add_argument(
             "--generate-missing-configs",
             "--generate-keys",
-            action="store_true",
             help="Generate any missing additional config files, then exit.",
+            action="store_const",
+            const=_ConfigGenerateMode.GENERATE_MISSING_AND_EXIT,
+            dest="generate_mode",
         )
+        generate_mode_exclusive.add_argument(
+            "--generate-missing-and-run",
+            help="Generate any missing additional config files, then run. This is the "
+            "default behaviour.",
+            action="store_const",
+            const=_ConfigGenerateMode.GENERATE_MISSING_AND_RUN,
+            dest="generate_mode",
+        )
+
+        generate_group = parser.add_argument_group("Details for --generate-config")
         generate_group.add_argument(
             "-H", "--server-name", help="The server name to generate a config file for."
         )
@@ -670,11 +732,12 @@ class RootConfig:
         config_dir_path = os.path.abspath(config_dir_path)
         data_dir_path = os.getcwd()
 
-        generate_missing_configs = config_args.generate_missing_configs
-
         obj = cls(config_files)
 
-        if config_args.generate_config:
+        if (
+            config_args.generate_mode
+            == _ConfigGenerateMode.GENERATE_EVERYTHING_AND_EXIT
+        ):
             if config_args.report_stats is None:
                 parser.error(
                     "Please specify either --report-stats=yes or --report-stats=no\n\n"
@@ -732,11 +795,14 @@ class RootConfig:
                     )
                     % (config_path,)
                 )
-                generate_missing_configs = True
 
         config_dict = read_config_files(config_files)
-        if generate_missing_configs:
-            obj.generate_missing_files(config_dict, config_dir_path)
+        obj.generate_missing_files(config_dict, config_dir_path)
+
+        if config_args.generate_mode in (
+            _ConfigGenerateMode.GENERATE_EVERYTHING_AND_EXIT,
+            _ConfigGenerateMode.GENERATE_MISSING_AND_EXIT,
+        ):
             return None
 
         obj.parse_config_dict(
@@ -963,6 +1029,12 @@ def read_file(file_path: Any, config_path: Iterable[str]) -> str:
             return file_stream.read()
     except OSError as e:
         raise ConfigError("Error accessing file %r" % (file_path,), config_path) from e
+
+
+class _ConfigGenerateMode(Enum):
+    GENERATE_MISSING_AND_RUN = auto()
+    GENERATE_MISSING_AND_EXIT = auto()
+    GENERATE_EVERYTHING_AND_EXIT = auto()
 
 
 __all__ = [

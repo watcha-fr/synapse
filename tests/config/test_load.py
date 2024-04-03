@@ -1,17 +1,24 @@
-# Copyright 2016 OpenMarket Ltd
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2021 The Matrix.org Foundation C.I.C.
+# Copyright 2016 OpenMarket Ltd
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 import yaml
 
 from synapse.config import ConfigError
@@ -21,14 +28,14 @@ from tests.config.utils import ConfigFileTestCase
 
 
 class ConfigLoadingFileTestCase(ConfigFileTestCase):
-    def test_load_fails_if_server_name_missing(self):
+    def test_load_fails_if_server_name_missing(self) -> None:
         self.generate_config_and_remove_lines_containing("server_name")
         with self.assertRaises(ConfigError):
             HomeServerConfig.load_config("", ["-c", self.config_file])
         with self.assertRaises(ConfigError):
             HomeServerConfig.load_or_generate_config("", ["-c", self.config_file])
 
-    def test_generates_and_loads_macaroon_secret_key(self):
+    def test_generates_and_loads_macaroon_secret_key(self) -> None:
         self.generate_config()
 
         with open(self.config_file) as f:
@@ -58,7 +65,7 @@ class ConfigLoadingFileTestCase(ConfigFileTestCase):
                 "was: %r" % (config2.key.macaroon_secret_key,)
             )
 
-    def test_load_succeeds_if_macaroon_secret_key_missing(self):
+    def test_load_succeeds_if_macaroon_secret_key_missing(self) -> None:
         self.generate_config_and_remove_lines_containing("macaroon")
         config1 = HomeServerConfig.load_config("", ["-c", self.config_file])
         config2 = HomeServerConfig.load_config("", ["-c", self.config_file])
@@ -73,7 +80,7 @@ class ConfigLoadingFileTestCase(ConfigFileTestCase):
             config1.key.macaroon_secret_key, config3.key.macaroon_secret_key
         )
 
-    def test_disable_registration(self):
+    def test_disable_registration(self) -> None:
         self.generate_config()
         self.add_lines_to_config(
             ["enable_registration: true", "disable_registration: true"]
@@ -93,7 +100,7 @@ class ConfigLoadingFileTestCase(ConfigFileTestCase):
         assert config3 is not None
         self.assertTrue(config3.registration.enable_registration)
 
-    def test_stats_enabled(self):
+    def test_stats_enabled(self) -> None:
         self.generate_config_and_remove_lines_containing("enable_metrics")
         self.add_lines_to_config(["enable_metrics: true"])
 
@@ -101,7 +108,7 @@ class ConfigLoadingFileTestCase(ConfigFileTestCase):
         config = HomeServerConfig.load_config("", ["-c", self.config_file])
         self.assertFalse(config.metrics.metrics_flags.known_servers)
 
-    def test_depreciated_identity_server_flag_throws_error(self):
+    def test_depreciated_identity_server_flag_throws_error(self) -> None:
         self.generate_config()
         # Needed to ensure that actual key/value pair added below don't end up on a line with a comment
         self.add_lines_to_config([" "])

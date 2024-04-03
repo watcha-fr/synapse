@@ -1,23 +1,37 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2020 The Matrix.org Foundation C.I.C.
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
+from typing import List, Optional
+
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.room_versions import RoomVersions
+from synapse.events import EventBase
 from synapse.federation.federation_base import event_from_pdu_json
 from synapse.rest import admin
 from synapse.rest.client import login, room
+from synapse.server import HomeServer
+from synapse.types import StateMap
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
@@ -29,9 +43,13 @@ class ExtremPruneTestCase(HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, homeserver):
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         self.state = self.hs.get_state_handler()
-        self._persistence = self.hs.get_storage_controllers().persistence
+        persistence = self.hs.get_storage_controllers().persistence
+        assert persistence is not None
+        self._persistence = persistence
         self._state_storage_controller = self.hs.get_storage_controllers().state
         self.store = self.hs.get_datastores().main
 
@@ -67,21 +85,27 @@ class ExtremPruneTestCase(HomeserverTestCase):
         # Check that the current extremities is the remote event.
         self.assert_extremities([self.remote_event_1.event_id])
 
-    def persist_event(self, event, state=None):
+    def persist_event(
+        self, event: EventBase, state: Optional[StateMap[str]] = None
+    ) -> None:
         """Persist the event, with optional state"""
         context = self.get_success(
-            self.state.compute_event_context(event, state_ids_before_event=state)
+            self.state.compute_event_context(
+                event,
+                state_ids_before_event=state,
+                partial_state=None if state is None else False,
+            )
         )
         self.get_success(self._persistence.persist_event(event, context))
 
-    def assert_extremities(self, expected_extremities):
+    def assert_extremities(self, expected_extremities: List[str]) -> None:
         """Assert the current extremities for the room"""
         extremities = self.get_success(
             self.store.get_prev_events_for_room(self.room_id)
         )
         self.assertCountEqual(extremities, expected_extremities)
 
-    def test_prune_gap(self):
+    def test_prune_gap(self) -> None:
         """Test that we drop extremities after a gap when we see an event from
         the same domain.
         """
@@ -113,7 +137,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
         # Check the new extremity is just the new remote event.
         self.assert_extremities([remote_event_2.event_id])
 
-    def test_do_not_prune_gap_if_state_different(self):
+    def test_do_not_prune_gap_if_state_different(self) -> None:
         """Test that we don't prune extremities after a gap if the resolved
         state is different.
         """
@@ -148,6 +172,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
             self.state.compute_event_context(
                 remote_event_2,
                 state_ids_before_event=state_before_gap,
+                partial_state=False,
             )
         )
 
@@ -156,7 +181,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
         # Check that we haven't dropped the old extremity.
         self.assert_extremities([self.remote_event_1.event_id, remote_event_2.event_id])
 
-    def test_prune_gap_if_old(self):
+    def test_prune_gap_if_old(self) -> None:
         """Test that we drop extremities after a gap when the previous extremity
         is "old"
         """
@@ -192,7 +217,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
         # Check the new extremity is just the new remote event.
         self.assert_extremities([remote_event_2.event_id])
 
-    def test_do_not_prune_gap_if_other_server(self):
+    def test_do_not_prune_gap_if_other_server(self) -> None:
         """Test that we do not drop extremities after a gap when we see an event
         from a different domain.
         """
@@ -224,7 +249,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
         # Check the new extremity is just the new remote event.
         self.assert_extremities([self.remote_event_1.event_id, remote_event_2.event_id])
 
-    def test_prune_gap_if_dummy_remote(self):
+    def test_prune_gap_if_dummy_remote(self) -> None:
         """Test that we drop extremities after a gap when the previous extremity
         is a local dummy event and only points to remote events.
         """
@@ -266,7 +291,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
         # Check the new extremity is just the new remote event.
         self.assert_extremities([remote_event_2.event_id])
 
-    def test_prune_gap_if_dummy_local(self):
+    def test_prune_gap_if_dummy_local(self) -> None:
         """Test that we don't drop extremities after a gap when the previous
         extremity is a local dummy event and points to local events.
         """
@@ -310,7 +335,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
         # Check the new extremity is just the new remote event.
         self.assert_extremities([remote_event_2.event_id, local_message_event_id])
 
-    def test_do_not_prune_gap_if_not_dummy(self):
+    def test_do_not_prune_gap_if_not_dummy(self) -> None:
         """Test that we do not drop extremities after a gap when the previous extremity
         is not a dummy event.
         """
@@ -354,12 +379,16 @@ class InvalideUsersInRoomCacheTestCase(HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, homeserver):
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         self.state = self.hs.get_state_handler()
-        self._persistence = self.hs.get_storage_controllers().persistence
+        persistence = self.hs.get_storage_controllers().persistence
+        assert persistence is not None
+        self._persistence = persistence
         self.store = self.hs.get_datastores().main
 
-    def test_remote_user_rooms_cache_invalidated(self):
+    def test_remote_user_rooms_cache_invalidated(self) -> None:
         """Test that if the server leaves a room the `get_rooms_for_user` cache
         is invalidated for remote users.
         """
@@ -406,7 +435,7 @@ class InvalideUsersInRoomCacheTestCase(HomeserverTestCase):
         rooms = self.get_success(self.store.get_rooms_for_user(remote_user))
         self.assertEqual(set(rooms), set())
 
-    def test_room_remote_user_cache_invalidated(self):
+    def test_room_remote_user_cache_invalidated(self) -> None:
         """Test that if the server leaves a room the `get_users_in_room` cache
         is invalidated for remote users.
         """

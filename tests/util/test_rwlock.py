@@ -1,16 +1,23 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2016 OpenMarket Ltd
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 from typing import AsyncContextManager, Callable, Sequence, Tuple
 
@@ -49,7 +56,7 @@ class ReadWriteLockTestCase(unittest.TestCase):
         acquired_d: "Deferred[None]" = Deferred()
         unblock_d: "Deferred[None]" = Deferred()
 
-        async def reader_or_writer():
+        async def reader_or_writer() -> str:
             async with read_or_write(key):
                 acquired_d.callback(None)
                 await unblock_d
@@ -134,7 +141,7 @@ class ReadWriteLockTestCase(unittest.TestCase):
                 d.called, msg="deferred %d was unexpectedly resolved" % (i + n)
             )
 
-    def test_rwlock(self):
+    def test_rwlock(self) -> None:
         rwlock = ReadWriteLock()
         key = "key"
 
@@ -197,7 +204,7 @@ class ReadWriteLockTestCase(unittest.TestCase):
         _, acquired_d = self._start_nonblocking_reader(rwlock, key, "last reader")
         self.assertTrue(acquired_d.called)
 
-    def test_lock_handoff_to_nonblocking_writer(self):
+    def test_lock_handoff_to_nonblocking_writer(self) -> None:
         """Test a writer handing the lock to another writer that completes instantly."""
         rwlock = ReadWriteLock()
         key = "key"
@@ -216,7 +223,7 @@ class ReadWriteLockTestCase(unittest.TestCase):
         d3, _ = self._start_nonblocking_writer(rwlock, key, "write 3 completed")
         self.assertTrue(d3.called)
 
-    def test_cancellation_while_holding_read_lock(self):
+    def test_cancellation_while_holding_read_lock(self) -> None:
         """Test cancellation while holding a read lock.
 
         A waiting writer should be given the lock when the reader holding the lock is
@@ -242,7 +249,7 @@ class ReadWriteLockTestCase(unittest.TestCase):
         )
         self.assertEqual("write completed", self.successResultOf(writer_d))
 
-    def test_cancellation_while_holding_write_lock(self):
+    def test_cancellation_while_holding_write_lock(self) -> None:
         """Test cancellation while holding a write lock.
 
         A waiting reader should be given the lock when the writer holding the lock is
@@ -268,7 +275,7 @@ class ReadWriteLockTestCase(unittest.TestCase):
         )
         self.assertEqual("read completed", self.successResultOf(reader_d))
 
-    def test_cancellation_while_waiting_for_read_lock(self):
+    def test_cancellation_while_waiting_for_read_lock(self) -> None:
         """Test cancellation while waiting for a read lock.
 
         Tests that cancelling a waiting reader:
@@ -319,7 +326,7 @@ class ReadWriteLockTestCase(unittest.TestCase):
         )
         self.assertEqual("write 2 completed", self.successResultOf(writer2_d))
 
-    def test_cancellation_while_waiting_for_write_lock(self):
+    def test_cancellation_while_waiting_for_write_lock(self) -> None:
         """Test cancellation while waiting for a write lock.
 
         Tests that cancelling a waiting writer:

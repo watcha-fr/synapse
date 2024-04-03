@@ -1,16 +1,22 @@
-# Copyright 2018 New Vector Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This file is licensed under the Affero General Public License (AGPL) version 3.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
+#
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 import heapq
 import itertools
@@ -19,12 +25,10 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    Collection,
     Dict,
     Generator,
     Iterable,
     List,
-    Mapping,
     Optional,
     Sequence,
     Set,
@@ -39,7 +43,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
 from synapse.api.room_versions import RoomVersion
 from synapse.events import EventBase
-from synapse.types import MutableStateMap, StateMap
+from synapse.types import MutableStateMap, StateMap, StrCollection
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +60,7 @@ class StateResolutionStore(Protocol):
     # This is usually synapse.state.StateResolutionStore, but it's replaced with a
     # TestStateResolutionStore in tests.
     def get_events(
-        self, event_ids: Collection[str], allow_rejected: bool = False
+        self, event_ids: StrCollection, allow_rejected: bool = False
     ) -> Awaitable[Dict[str, EventBase]]:
         ...
 
@@ -270,41 +274,42 @@ async def _get_power_level_for_sender(
 
 async def _get_auth_chain_difference(
     room_id: str,
-    state_sets: Sequence[Mapping[Any, str]],
-    event_map: Dict[str, EventBase],
+    state_sets: Sequence[StateMap[str]],
+    unpersisted_events: Dict[str, EventBase],
     state_res_store: StateResolutionStore,
 ) -> Set[str]:
     """Compare the auth chains of each state set and return the set of events
-    that only appear in some but not all of the auth chains.
+    that only appear in some, but not all of the auth chains.
 
     Args:
-        state_sets
-        event_map
-        state_res_store
+        state_sets: The input state sets we are trying to resolve across.
+        unpersisted_events: A map from event ID to EventBase containing all unpersisted
+            events involved in this resolution.
+        state_res_store:
 
     Returns:
-        Set of event IDs
+        The auth difference of the given state sets, as a set of event IDs.
     """
 
     # The `StateResolutionStore.get_auth_chain_difference` function assumes that
     # all events passed to it (and their auth chains) have been persisted
-    # previously. This is not the case for any events in the `event_map`, and so
-    # we need to manually handle those events.
+    # previously. We need to manually handle any other events that are yet to be
+    # persisted.
     #
-    # We do this by:
-    #   1. calculating the auth chain difference for the state sets based on the
-    #      events in `event_map` alone
-    #   2. replacing any events in the state_sets that are also in `event_map`
-    #      with their auth events (recursively), and then calling
-    #      `store.get_auth_chain_difference` as normal
-    #   3. adding the results of 1 and 2 together.
+    # We do this in three steps:
+    #   1. Compute the set of unpersisted events belonging to the auth difference.
+    #   2. Replacing any unpersisted events in the state_sets with their auth events,
+    #      recursively, until the state_sets contain only persisted events.
+    #      Then we call `store.get_auth_chain_difference` as normal, which computes
+    #      the set of persisted events belonging to the auth difference.
+    #   3. Adding the results of 1 and 2 together.
 
-    # Map from event ID in `event_map` to their auth event IDs, and their auth
-    # event IDs if they appear in the `event_map`. This is the intersection of
-    # the event's auth chain with the events in the `event_map` *plus* their
+    # Map from event ID in `unpersisted_events` to their auth event IDs, and their auth
+    # event IDs if they appear in the `unpersisted_events`. This is the intersection of
+    # the event's auth chain with the events in `unpersisted_events` *plus* their
     # auth event IDs.
     events_to_auth_chain: Dict[str, Set[str]] = {}
-    for event in event_map.values():
+    for event in unpersisted_events.values():
         chain = {event.event_id}
         events_to_auth_chain[event.event_id] = chain
 
@@ -312,16 +317,16 @@ async def _get_auth_chain_difference(
         while to_search:
             for auth_id in to_search.pop().auth_event_ids():
                 chain.add(auth_id)
-                auth_event = event_map.get(auth_id)
+                auth_event = unpersisted_events.get(auth_id)
                 if auth_event:
                     to_search.append(auth_event)
 
-    # We now a) calculate the auth chain difference for the unpersisted events
-    # and b) work out the state sets to pass to the store.
+    # We now 1) calculate the auth chain difference for the unpersisted events
+    # and 2) work out the state sets to pass to the store.
     #
-    # Note: If the `event_map` is empty (which is the common case), we can do a
+    # Note: If there are no `unpersisted_events` (which is the common case), we can do a
     # much simpler calculation.
-    if event_map:
+    if unpersisted_events:
         # The list of state sets to pass to the store, where each state set is a set
         # of the event ids making up the state. This is similar to `state_sets`,
         # except that (a) we only have event ids, not the complete
@@ -344,14 +349,18 @@ async def _get_auth_chain_difference(
             for event_id in state_set.values():
                 event_chain = events_to_auth_chain.get(event_id)
                 if event_chain is not None:
-                    # We have an event in `event_map`. We add all the auth
-                    # events that it references (that aren't also in `event_map`).
-                    set_ids.update(e for e in event_chain if e not in event_map)
+                    # We have an unpersisted event. We add all the auth
+                    # events that it references which are also unpersisted.
+                    set_ids.update(
+                        e for e in event_chain if e not in unpersisted_events
+                    )
 
                     # We also add the full chain of unpersisted event IDs
                     # referenced by this state set, so that we can work out the
                     # auth chain difference of the unpersisted events.
-                    unpersisted_ids.update(e for e in event_chain if e in event_map)
+                    unpersisted_ids.update(
+                        e for e in event_chain if e in unpersisted_events
+                    )
                 else:
                     set_ids.add(event_id)
 
@@ -361,15 +370,15 @@ async def _get_auth_chain_difference(
         union = unpersisted_set_ids[0].union(*unpersisted_set_ids[1:])
         intersection = unpersisted_set_ids[0].intersection(*unpersisted_set_ids[1:])
 
-        difference_from_event_map: Collection[str] = union - intersection
+        auth_difference_unpersisted_part: StrCollection = union - intersection
     else:
-        difference_from_event_map = ()
+        auth_difference_unpersisted_part = ()
         state_sets_ids = [set(state_set.values()) for state_set in state_sets]
 
     difference = await state_res_store.get_auth_chain_difference(
         room_id, state_sets_ids
     )
-    difference.update(difference_from_event_map)
+    difference.update(auth_difference_unpersisted_part)
 
     return difference
 
@@ -401,7 +410,7 @@ def _seperate(
 
     # mypy doesn't understand that discarding None above means that conflicted
     # state is StateMap[Set[str]], not StateMap[Set[Optional[Str]]].
-    return unconflicted_state, conflicted_state  # type: ignore
+    return unconflicted_state, conflicted_state  # type: ignore[return-value]
 
 
 def _is_power_event(event: EventBase) -> bool:
@@ -434,7 +443,7 @@ async def _add_event_and_auth_chain_to_graph(
     event_id: str,
     event_map: Dict[str, EventBase],
     state_res_store: StateResolutionStore,
-    auth_diff: Set[str],
+    full_conflicted_set: Set[str],
 ) -> None:
     """Helper function for _reverse_topological_power_sort that add the event
     and its auth chain (that is in the auth diff) to the graph
@@ -445,7 +454,7 @@ async def _add_event_and_auth_chain_to_graph(
         event_id: Event to add to the graph
         event_map
         state_res_store
-        auth_diff: Set of event IDs that are in the auth difference.
+        full_conflicted_set: Set of event IDs that are in the full conflicted set.
     """
 
     state = [event_id]
@@ -455,7 +464,7 @@ async def _add_event_and_auth_chain_to_graph(
 
         event = await _get_event(room_id, eid, event_map, state_res_store)
         for aid in event.auth_event_ids():
-            if aid in auth_diff:
+            if aid in full_conflicted_set:
                 if aid not in graph:
                     state.append(aid)
 
@@ -468,7 +477,7 @@ async def _reverse_topological_power_sort(
     event_ids: Iterable[str],
     event_map: Dict[str, EventBase],
     state_res_store: StateResolutionStore,
-    auth_diff: Set[str],
+    full_conflicted_set: Set[str],
 ) -> List[str]:
     """Returns a list of the event_ids sorted by reverse topological ordering,
     and then by power level and origin_server_ts
@@ -479,7 +488,7 @@ async def _reverse_topological_power_sort(
         event_ids: The events to sort
         event_map
         state_res_store
-        auth_diff: Set of event IDs that are in the auth difference.
+        full_conflicted_set: Set of event IDs that are in the full conflicted set.
 
     Returns:
         The sorted list
@@ -488,7 +497,7 @@ async def _reverse_topological_power_sort(
     graph: Dict[str, Set[str]] = {}
     for idx, event_id in enumerate(event_ids, start=1):
         await _add_event_and_auth_chain_to_graph(
-            graph, room_id, event_id, event_map, state_res_store, auth_diff
+            graph, room_id, event_id, event_map, state_res_store, full_conflicted_set
         )
 
         # We await occasionally when we're working with large data sets to
@@ -572,6 +581,21 @@ async def _iterative_auth_checks(
                 if ev.rejected_reason is None:
                     auth_events[key] = event_map[ev_id]
 
+        if event.rejected_reason is not None:
+            # Do not admit previously rejected events into state.
+            # TODO: This isn't spec compliant. Events that were previously rejected due
+            #       to failing auth checks at their state, but pass auth checks during
+            #       state resolution should be accepted. Synapse does not handle the
+            #       change of rejection status well, so we preserve the previous
+            #       rejection status for now.
+            #
+            #       Note that events rejected for non-state reasons, such as having the
+            #       wrong auth events, should remain rejected.
+            #
+            #       https://spec.matrix.org/v1.2/rooms/v9/#rejected-events
+            #       https://github.com/matrix-org/synapse/issues/13797
+            continue
+
         try:
             event_auth.check_state_dependent_auth_rules(
                 event,
@@ -647,7 +671,7 @@ async def _mainline_sort(
     order_map = {}
     for idx, ev_id in enumerate(event_ids, start=1):
         depth = await _get_mainline_depth_for_event(
-            event_map[ev_id], mainline_map, event_map, state_res_store
+            clock, event_map[ev_id], mainline_map, event_map, state_res_store
         )
         order_map[ev_id] = (depth, event_map[ev_id].origin_server_ts, ev_id)
 
@@ -662,6 +686,7 @@ async def _mainline_sort(
 
 
 async def _get_mainline_depth_for_event(
+    clock: Clock,
     event: EventBase,
     mainline_map: Dict[str, int],
     event_map: Dict[str, EventBase],
@@ -684,6 +709,7 @@ async def _get_mainline_depth_for_event(
 
     # We do an iterative search, replacing `event with the power level in its
     # auth events (if any)
+    idx = 0
     while tmp_event:
         depth = mainline_map.get(tmp_event.event_id)
         if depth is not None:
@@ -699,6 +725,11 @@ async def _get_mainline_depth_for_event(
             if aev and (aev.type, aev.state_key) == (EventTypes.PowerLevels, ""):
                 tmp_event = aev
                 break
+
+        idx += 1
+
+        if idx % _AWAIT_AFTER_ITERATIONS == 0:
+            await clock.sleep(0)
 
     # Didn't find a power level auth event, so we just return 0
     return 0

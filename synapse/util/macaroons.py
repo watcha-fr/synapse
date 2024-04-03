@@ -1,17 +1,24 @@
-# Copyright 2020 Quentin Gliech
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2021 The Matrix.org Foundation C.I.C.
+# Copyright 2020 Quentin Gliech
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 """Utilities for manipulating macaroons"""
 
@@ -24,7 +31,7 @@ from typing_extensions import Literal
 
 from synapse.util import Clock, stringutils
 
-MacaroonType = Literal["access", "delete_pusher", "session", "login"]
+MacaroonType = Literal["access", "delete_pusher", "session"]
 
 
 def get_value_from_macaroon(macaroon: pymacaroons.Macaroon, key: str) -> str:
@@ -110,18 +117,8 @@ class OidcSessionData:
     ui_auth_session_id: str
     """The session ID of the ongoing UI Auth ("" if this is a login)"""
 
-
-@attr.s(slots=True, frozen=True, auto_attribs=True)
-class LoginTokenAttributes:
-    """Data we store in a short-term login token"""
-
-    user_id: str
-
-    auth_provider_id: str
-    """The SSO Identity Provider that the user authenticated with, to get this token."""
-
-    auth_provider_session_id: Optional[str]
-    """The session ID advertised by the SSO Identity Provider."""
+    code_verifier: str
+    """The random string used in the RFC7636 code challenge ("" if PKCE is not being used)."""
 
 
 class MacaroonGenerator:
@@ -165,35 +162,6 @@ class MacaroonGenerator:
         macaroon.add_first_party_caveat(f"pushkey = {pushkey}")
         return macaroon.serialize()
 
-    def generate_short_term_login_token(
-        self,
-        user_id: str,
-        auth_provider_id: str,
-        auth_provider_session_id: Optional[str] = None,
-        duration_in_ms: int = (2 * 60 * 1000),
-    ) -> str:
-        """Generate a short-term login token used during SSO logins
-
-        Args:
-            user_id: The user for which the token is valid.
-            auth_provider_id: The SSO IdP the user used.
-            auth_provider_session_id: The session ID got during login from the SSO IdP.
-
-        Returns:
-            A signed token valid for using as a ``m.login.token`` token.
-        """
-        now = self._clock.time_msec()
-        expiry = now + duration_in_ms
-        macaroon = self._generate_base_macaroon("login")
-        macaroon.add_first_party_caveat(f"user_id = {user_id}")
-        macaroon.add_first_party_caveat(f"time < {expiry}")
-        macaroon.add_first_party_caveat(f"auth_provider_id = {auth_provider_id}")
-        if auth_provider_session_id is not None:
-            macaroon.add_first_party_caveat(
-                f"auth_provider_session_id = {auth_provider_session_id}"
-            )
-        return macaroon.serialize()
-
     def generate_oidc_session_token(
         self,
         state: str,
@@ -229,52 +197,10 @@ class MacaroonGenerator:
         macaroon.add_first_party_caveat(
             f"ui_auth_session_id = {session_data.ui_auth_session_id}"
         )
+        macaroon.add_first_party_caveat(f"code_verifier = {session_data.code_verifier}")
         macaroon.add_first_party_caveat(f"time < {expiry}")
 
         return macaroon.serialize()
-
-    def verify_short_term_login_token(self, token: str) -> LoginTokenAttributes:
-        """Verify a short-term-login macaroon
-
-        Checks that the given token is a valid, unexpired short-term-login token
-        minted by this server.
-
-        Args:
-            token: The login token to verify.
-
-        Returns:
-            A set of attributes carried by this token, including the
-            ``user_id`` and informations about the SSO IDP used during that
-            login.
-
-        Raises:
-            MacaroonVerificationFailedException if the verification failed
-        """
-        macaroon = pymacaroons.Macaroon.deserialize(token)
-
-        v = self._base_verifier("login")
-        v.satisfy_general(lambda c: c.startswith("user_id = "))
-        v.satisfy_general(lambda c: c.startswith("auth_provider_id = "))
-        v.satisfy_general(lambda c: c.startswith("auth_provider_session_id = "))
-        satisfy_expiry(v, self._clock.time_msec)
-        v.verify(macaroon, self._secret_key)
-
-        user_id = get_value_from_macaroon(macaroon, "user_id")
-        auth_provider_id = get_value_from_macaroon(macaroon, "auth_provider_id")
-
-        auth_provider_session_id: Optional[str] = None
-        try:
-            auth_provider_session_id = get_value_from_macaroon(
-                macaroon, "auth_provider_session_id"
-            )
-        except MacaroonVerificationFailedException:
-            pass
-
-        return LoginTokenAttributes(
-            user_id=user_id,
-            auth_provider_id=auth_provider_id,
-            auth_provider_session_id=auth_provider_session_id,
-        )
 
     def verify_guest_token(self, token: str) -> str:
         """Verify a guest access token macaroon
@@ -299,7 +225,7 @@ class MacaroonGenerator:
         # to avoid validating those as guest tokens, we explicitely verify if
         # the macaroon includes the "guest = true" caveat.
         is_guest = any(
-            (caveat.caveat_id == "guest = true" for caveat in macaroon.caveats)
+            caveat.caveat_id == "guest = true" for caveat in macaroon.caveats
         )
 
         if not is_guest:
@@ -363,6 +289,7 @@ class MacaroonGenerator:
         v.satisfy_general(lambda c: c.startswith("idp_id = "))
         v.satisfy_general(lambda c: c.startswith("client_redirect_url = "))
         v.satisfy_general(lambda c: c.startswith("ui_auth_session_id = "))
+        v.satisfy_general(lambda c: c.startswith("code_verifier = "))
         satisfy_expiry(v, self._clock.time_msec)
 
         v.verify(macaroon, self._secret_key)
@@ -372,11 +299,13 @@ class MacaroonGenerator:
         idp_id = get_value_from_macaroon(macaroon, "idp_id")
         client_redirect_url = get_value_from_macaroon(macaroon, "client_redirect_url")
         ui_auth_session_id = get_value_from_macaroon(macaroon, "ui_auth_session_id")
+        code_verifier = get_value_from_macaroon(macaroon, "code_verifier")
         return OidcSessionData(
             nonce=nonce,
             idp_id=idp_id,
             client_redirect_url=client_redirect_url,
             ui_auth_session_id=ui_auth_session_id,
+            code_verifier=code_verifier,
         )
 
     def _generate_base_macaroon(self, type: MacaroonType) -> pymacaroons.Macaroon:

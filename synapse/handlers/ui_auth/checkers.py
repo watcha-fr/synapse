@@ -1,25 +1,32 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 import logging
-from typing import TYPE_CHECKING, Any
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, Any, ClassVar, Sequence, Type
 
 from twisted.web.client import PartialDownloadError
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, LoginError, SynapseError
-from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.util import json_decoder
 
 if TYPE_CHECKING:
@@ -28,19 +35,28 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class UserInteractiveAuthChecker:
+class UserInteractiveAuthChecker(ABC):
     """Abstract base class for an interactive auth checker"""
 
-    def __init__(self, hs: "HomeServer"):
+    # This should really be an "abstract class property", i.e. it should
+    # be an error to instantiate a subclass that doesn't specify an AUTH_TYPE.
+    # But calling this a `ClassVar` is simpler than a decorator stack of
+    # @property @abstractmethod and @classmethod (if that's even the right order).
+    AUTH_TYPE: ClassVar[str]
+
+    def __init__(self, hs: "HomeServer"):  # noqa: B027
         pass
 
+    @abstractmethod
     def is_enabled(self) -> bool:
         """Check if the configuration of the homeserver allows this checker to work
 
         Returns:
             True if this login type is enabled.
         """
+        raise NotImplementedError()
 
+    @abstractmethod
     async def check_auth(self, authdict: dict, clientip: str) -> Any:
         """Given the authentication dict from the client, attempt to check this step
 
@@ -120,6 +136,9 @@ class RecaptchaAuthChecker(UserInteractiveAuthChecker):
         except PartialDownloadError as pde:
             # Twisted is silly
             data = pde.response
+            # For mypy's benefit. A general Error.response is Optional[bytes], but
+            # a PartialDownloadError.response should be bytes AFAICS.
+            assert data is not None
             resp_body = json_decoder.decode(data.decode("utf-8"))
 
         if "success" in resp_body:
@@ -153,7 +172,7 @@ class _BaseThreepidAuthChecker:
 
         logger.info("Getting validated threepid. threepidcreds: %r", (threepid_creds,))
 
-        # msisdns are currently always ThreepidBehaviour.REMOTE
+        # msisdns are currently always verified via the IS
         if medium == "msisdn":
             if not self.hs.config.registration.account_threepid_delegate_msisdn:
                 raise SynapseError(
@@ -164,18 +183,7 @@ class _BaseThreepidAuthChecker:
                 threepid_creds,
             )
         elif medium == "email":
-            if (
-                self.hs.config.email.threepid_behaviour_email
-                == ThreepidBehaviour.REMOTE
-            ):
-                assert self.hs.config.registration.account_threepid_delegate_email
-                threepid = await identity_handler.threepid_from_creds(
-                    self.hs.config.registration.account_threepid_delegate_email,
-                    threepid_creds,
-                )
-            elif (
-                self.hs.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL
-            ):
+            if self.hs.config.email.can_verify_email:
                 threepid = None
                 row = await self.store.get_threepid_validation_session(
                     medium,
@@ -186,9 +194,9 @@ class _BaseThreepidAuthChecker:
 
                 if row:
                     threepid = {
-                        "medium": row["medium"],
-                        "address": row["address"],
-                        "validated_at": row["validated_at"],
+                        "medium": row.medium,
+                        "address": row.address,
+                        "validated_at": row.validated_at,
                     }
 
                     # Valid threepid returned, delete from the db
@@ -227,10 +235,7 @@ class EmailIdentityAuthChecker(UserInteractiveAuthChecker, _BaseThreepidAuthChec
         _BaseThreepidAuthChecker.__init__(self, hs)
 
     def is_enabled(self) -> bool:
-        return self.hs.config.email.threepid_behaviour_email in (
-            ThreepidBehaviour.REMOTE,
-            ThreepidBehaviour.LOCAL,
-        )
+        return self.hs.config.email.can_verify_email
 
     async def check_auth(self, authdict: dict, clientip: str) -> Any:
         return await self._check_threepid("email", authdict)
@@ -316,7 +321,7 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
             )
 
 
-INTERACTIVE_AUTH_CHECKERS = [
+INTERACTIVE_AUTH_CHECKERS: Sequence[Type[UserInteractiveAuthChecker]] = [
     DummyAuthChecker,
     TermsAuthChecker,
     RecaptchaAuthChecker,

@@ -1,24 +1,32 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 import abc
 import html
 import logging
 import types
 import urllib
+import urllib.parse
 from http import HTTPStatus
+from http.client import FOUND
 from inspect import isawaitable
 from typing import (
     TYPE_CHECKING,
@@ -29,11 +37,9 @@ from typing import (
     Iterable,
     Iterator,
     List,
-    NoReturn,
     Optional,
     Pattern,
     Tuple,
-    TypeVar,
     Union,
 )
 
@@ -47,6 +53,13 @@ from twisted.internet import defer, interfaces
 from twisted.internet.defer import CancelledError
 from twisted.python import failure
 from twisted.web import resource
+
+try:
+    from twisted.web.pages import notFound
+except ImportError:
+    from twisted.web.resource import NoResource as notFound  # type: ignore[assignment]
+
+from twisted.web.resource import IResource
 from twisted.web.server import NOT_DONE_YET, Request
 from twisted.web.static import File
 from twisted.web.util import redirectTo
@@ -58,16 +71,18 @@ from synapse.api.errors import (
     SynapseError,
     UnrecognizedRequestError,
 )
-from synapse.http.site import SynapseRequest
+from synapse.config.homeserver import HomeServerConfig
 from synapse.logging.context import defer_to_thread, preserve_fn, run_in_background
 from synapse.logging.opentracing import active_span, start_active_span, trace_servlet
 from synapse.util import json_encoder
 from synapse.util.caches import intern_dict
+from synapse.util.cancellation import is_function_cancellable
 from synapse.util.iterutils import chunk_seq
 
 if TYPE_CHECKING:
     import opentracing
 
+    from synapse.http.site import SynapseRequest
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -93,78 +108,26 @@ HTML_ERROR_TEMPLATE = """<!DOCTYPE html>
 HTTP_STATUS_REQUEST_CANCELLED = 499
 
 
-F = TypeVar("F", bound=Callable[..., Any])
-
-
-_cancellable_method_names = frozenset(
-    {
-        # `RestServlet`, `BaseFederationServlet` and `BaseFederationServerServlet`
-        # methods
-        "on_GET",
-        "on_PUT",
-        "on_POST",
-        "on_DELETE",
-        # `_AsyncResource`, `DirectServeHtmlResource` and `DirectServeJsonResource`
-        # methods
-        "_async_render_GET",
-        "_async_render_PUT",
-        "_async_render_POST",
-        "_async_render_DELETE",
-        "_async_render_OPTIONS",
-        # `ReplicationEndpoint` methods
-        "_handle_request",
-    }
-)
-
-
-def cancellable(method: F) -> F:
-    """Marks a servlet method as cancellable.
-
-    Methods with this decorator will be cancelled if the client disconnects before we
-    finish processing the request.
-
-    During cancellation, `Deferred.cancel()` will be invoked on the `Deferred` wrapping
-    the method. The `cancel()` call will propagate down to the `Deferred` that is
-    currently being waited on. That `Deferred` will raise a `CancelledError`, which will
-    propagate up, as per normal exception handling.
-
-    Before applying this decorator to a new endpoint, you MUST recursively check
-    that all `await`s in the function are on `async` functions or `Deferred`s that
-    handle cancellation cleanly, otherwise a variety of bugs may occur, ranging from
-    premature logging context closure, to stuck requests, to database corruption.
-
-    Usage:
-        class SomeServlet(RestServlet):
-            @cancellable
-            async def on_GET(self, request: SynapseRequest) -> ...:
-                ...
-    """
-    if method.__name__ not in _cancellable_method_names and not any(
-        method.__name__.startswith(prefix) for prefix in _cancellable_method_names
-    ):
-        raise ValueError(
-            "@cancellable decorator can only be applied to servlet methods."
-        )
-
-    method.cancellable = True  # type: ignore[attr-defined]
-    return method
-
-
-def is_method_cancellable(method: Callable[..., Any]) -> bool:
-    """Checks whether a servlet method has the `@cancellable` flag."""
-    return getattr(method, "cancellable", False)
-
-
-def return_json_error(f: failure.Failure, request: SynapseRequest) -> None:
+def return_json_error(
+    f: failure.Failure, request: "SynapseRequest", config: Optional[HomeServerConfig]
+) -> None:
     """Sends a JSON error response to clients."""
 
     if f.check(SynapseError):
         # mypy doesn't understand that f.check asserts the type.
-        exc: SynapseError = f.value  # type: ignore
+        exc: SynapseError = f.value
         error_code = exc.code
-        error_dict = exc.error_dict()
-
-        logger.info("%s SynapseError: %s - %s", request, error_code, exc.msg)
+        error_dict = exc.error_dict(config)
+        if exc.headers is not None:
+            for header, value in exc.headers.items():
+                request.setHeader(header, value)
+        error_ctx = exc.debug_context
+        if error_ctx:
+            logger.info(
+                "%s SynapseError: %s - %s (%s)", request, error_code, exc.msg, error_ctx
+            )
+        else:
+            logger.info("%s SynapseError: %s - %s", request, error_code, exc.msg)
     elif f.check(CancelledError):
         error_code = HTTP_STATUS_REQUEST_CANCELLED
         error_dict = {"error": "Request cancelled", "errcode": Codes.UNKNOWN}
@@ -174,7 +137,7 @@ def return_json_error(f: failure.Failure, request: SynapseRequest) -> None:
                 "Got cancellation before client disconnection from %r: %r",
                 request.request_metrics.name,
                 request,
-                exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore[arg-type]
+                exc_info=(f.type, f.value, f.getTracebackObject()),
             )
     else:
         error_code = 500
@@ -184,7 +147,7 @@ def return_json_error(f: failure.Failure, request: SynapseRequest) -> None:
             "Failed handle request via %r: %r",
             request.request_metrics.name,
             request,
-            exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore[arg-type]
+            exc_info=(f.type, f.value, f.getTracebackObject()),
         )
 
     # Only respond with an error response if we haven't already started writing,
@@ -222,9 +185,12 @@ def return_html_error(
     """
     if f.check(CodeMessageException):
         # mypy doesn't understand that f.check asserts the type.
-        cme: CodeMessageException = f.value  # type: ignore
+        cme: CodeMessageException = f.value
         code = cme.code
         msg = cme.msg
+        if cme.headers is not None:
+            for header, value in cme.headers.items():
+                request.setHeader(header, value)
 
         if isinstance(cme, RedirectException):
             logger.info("%s redirect to %s", request, cme.location)
@@ -236,7 +202,7 @@ def return_html_error(
             logger.error(
                 "Failed handle request %r",
                 request,
-                exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore[arg-type]
+                exc_info=(f.type, f.value, f.getTracebackObject()),
             )
     elif f.check(CancelledError):
         code = HTTP_STATUS_REQUEST_CANCELLED
@@ -246,7 +212,7 @@ def return_html_error(
             logger.error(
                 "Got cancellation before client disconnection when handling request %r",
                 request,
-                exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore[arg-type]
+                exc_info=(f.type, f.value, f.getTracebackObject()),
             )
     else:
         code = HTTPStatus.INTERNAL_SERVER_ERROR
@@ -255,7 +221,7 @@ def return_html_error(
         logger.error(
             "Failed handle request %r",
             request,
-            exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore[arg-type]
+            exc_info=(f.type, f.value, f.getTracebackObject()),
         )
 
     if isinstance(error_template, str):
@@ -267,8 +233,8 @@ def return_html_error(
 
 
 def wrap_async_request_handler(
-    h: Callable[["_AsyncResource", SynapseRequest], Awaitable[None]]
-) -> Callable[["_AsyncResource", SynapseRequest], "defer.Deferred[None]"]:
+    h: Callable[["_AsyncResource", "SynapseRequest"], Awaitable[None]]
+) -> Callable[["_AsyncResource", "SynapseRequest"], "defer.Deferred[None]"]:
     """Wraps an async request handler so that it calls request.processing.
 
     This helps ensure that work done by the request handler after the request is completed
@@ -282,7 +248,7 @@ def wrap_async_request_handler(
     """
 
     async def wrapped_async_request_handler(
-        self: "_AsyncResource", request: SynapseRequest
+        self: "_AsyncResource", request: "SynapseRequest"
     ) -> None:
         with request.processing():
             await h(self, request)
@@ -306,7 +272,7 @@ class HttpServer(Protocol):
     def register_paths(
         self,
         method: str,
-        path_patterns: Iterable[Pattern],
+        path_patterns: Iterable[Pattern[str]],
         callback: ServletCallback,
         servlet_classname: str,
     ) -> None:
@@ -326,7 +292,7 @@ class HttpServer(Protocol):
                 request. The first argument will be the request object and
                 subsequent arguments will be any matched groups from the regex.
                 This should return either tuple of (code, response), or None.
-            servlet_classname (str): The name of the handler to be used in prometheus
+            servlet_classname: The name of the handler to be used in prometheus
                 and opentracing logs.
         """
 
@@ -347,7 +313,7 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
 
         self._extract_context = extract_context
 
-    def render(self, request: SynapseRequest) -> int:
+    def render(self, request: "SynapseRequest") -> int:
         """This gets called by twisted every time someone sends us a request."""
         request.render_deferred = defer.ensureDeferred(
             self._async_render_wrapper(request)
@@ -355,7 +321,7 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
         return NOT_DONE_YET
 
     @wrap_async_request_handler
-    async def _async_render_wrapper(self, request: SynapseRequest) -> None:
+    async def _async_render_wrapper(self, request: "SynapseRequest") -> None:
         """This is a wrapper that delegates to `_async_render` and handles
         exceptions, return values, metrics, etc.
         """
@@ -375,7 +341,9 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
             f = failure.Failure()
             self._send_error_response(f, request)
 
-    async def _async_render(self, request: SynapseRequest) -> Optional[Tuple[int, Any]]:
+    async def _async_render(
+        self, request: "SynapseRequest"
+    ) -> Optional[Tuple[int, Any]]:
         """Delegates to `_async_render_<METHOD>` methods, or returns a 400 if
         no appropriate method exists. Can be overridden in sub classes for
         different routing.
@@ -387,7 +355,7 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
 
         method_handler = getattr(self, "_async_render_%s" % (request_method,), None)
         if method_handler:
-            request.is_render_cancellable = is_method_cancellable(method_handler)
+            request.is_render_cancellable = is_function_cancellable(method_handler)
 
             raw_callback_return = method_handler(request)
 
@@ -399,12 +367,13 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
 
             return callback_return
 
-        _unrecognised_request_handler(request)
+        # A request with an unknown method (for a known endpoint) was received.
+        raise UnrecognizedRequestError(code=405)
 
     @abc.abstractmethod
     def _send_response(
         self,
-        request: SynapseRequest,
+        request: "SynapseRequest",
         code: int,
         response_object: Any,
     ) -> None:
@@ -414,7 +383,7 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
     def _send_error_response(
         self,
         f: failure.Failure,
-        request: SynapseRequest,
+        request: "SynapseRequest",
     ) -> None:
         raise NotImplementedError()
 
@@ -430,7 +399,7 @@ class DirectServeJsonResource(_AsyncResource):
 
     def _send_response(
         self,
-        request: SynapseRequest,
+        request: "SynapseRequest",
         code: int,
         response_object: Any,
     ) -> None:
@@ -447,15 +416,14 @@ class DirectServeJsonResource(_AsyncResource):
     def _send_error_response(
         self,
         f: failure.Failure,
-        request: SynapseRequest,
+        request: "SynapseRequest",
     ) -> None:
         """Implements _AsyncResource._send_error_response"""
-        return_json_error(f, request)
+        return_json_error(f, request, None)
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class _PathEntry:
-    pattern: Pattern
     callback: ServletCallback
     servlet_classname: str
 
@@ -484,13 +452,14 @@ class JsonResource(DirectServeJsonResource):
     ):
         super().__init__(canonical_json, extract_context)
         self.clock = hs.get_clock()
-        self.path_regexs: Dict[bytes, List[_PathEntry]] = {}
+        # Map of path regex -> method -> callback.
+        self._routes: Dict[Pattern[str], Dict[bytes, _PathEntry]] = {}
         self.hs = hs
 
     def register_paths(
         self,
         method: str,
-        path_patterns: Iterable[Pattern],
+        path_patterns: Iterable[Pattern[str]],
         callback: ServletCallback,
         servlet_classname: str,
     ) -> None:
@@ -514,12 +483,12 @@ class JsonResource(DirectServeJsonResource):
 
         for path_pattern in path_patterns:
             logger.debug("Registering for %s %s", method, path_pattern.pattern)
-            self.path_regexs.setdefault(method_bytes, []).append(
-                _PathEntry(path_pattern, callback, servlet_classname)
+            self._routes.setdefault(path_pattern, {})[method_bytes] = _PathEntry(
+                callback, servlet_classname
             )
 
     def _get_handler_for_request(
-        self, request: SynapseRequest
+        self, request: "SynapseRequest"
     ) -> Tuple[ServletCallback, str, Dict[str, str]]:
         """Finds a callback method to handle the given request.
 
@@ -537,19 +506,22 @@ class JsonResource(DirectServeJsonResource):
 
         # Loop through all the registered callbacks to check if the method
         # and path regex match
-        for path_entry in self.path_regexs.get(request_method, []):
-            m = path_entry.pattern.match(request_path)
+        for path_pattern, methods in self._routes.items():
+            m = path_pattern.match(request_path)
             if m:
-                # We found a match!
+                # We found a matching path!
+                path_entry = methods.get(request_method)
+                if not path_entry:
+                    raise UnrecognizedRequestError(code=405)
                 return path_entry.callback, path_entry.servlet_classname, m.groupdict()
 
-        # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
-        return _unrecognised_request_handler, "unrecognised_request_handler", {}
+        # Huh. No one wanted to handle that? Fiiiiiine.
+        raise UnrecognizedRequestError(code=404)
 
-    async def _async_render(self, request: SynapseRequest) -> Tuple[int, Any]:
+    async def _async_render(self, request: "SynapseRequest") -> Tuple[int, Any]:
         callback, servlet_classname, group_dict = self._get_handler_for_request(request)
 
-        request.is_render_cancellable = is_method_cancellable(callback)
+        request.is_render_cancellable = is_function_cancellable(callback)
 
         # Make sure we have an appropriate name for this handler in prometheus
         # (rather than the default of JsonResource).
@@ -575,6 +547,14 @@ class JsonResource(DirectServeJsonResource):
 
         return callback_return
 
+    def _send_error_response(
+        self,
+        f: failure.Failure,
+        request: "SynapseRequest",
+    ) -> None:
+        """Implements _AsyncResource._send_error_response"""
+        return_json_error(f, request, self.hs.config)
+
 
 class DirectServeHtmlResource(_AsyncResource):
     """A resource that will call `self._async_on_<METHOD>` on new requests,
@@ -586,7 +566,7 @@ class DirectServeHtmlResource(_AsyncResource):
 
     def _send_response(
         self,
-        request: SynapseRequest,
+        request: "SynapseRequest",
         code: int,
         response_object: Any,
     ) -> None:
@@ -595,12 +575,12 @@ class DirectServeHtmlResource(_AsyncResource):
         assert isinstance(response_object, bytes)
         html_bytes = response_object
 
-        respond_with_html_bytes(request, 200, html_bytes)
+        respond_with_html_bytes(request, code, html_bytes)
 
     def _send_error_response(
         self,
         f: failure.Failure,
-        request: SynapseRequest,
+        request: "SynapseRequest",
     ) -> None:
         """Implements _AsyncResource._send_error_response"""
         return_html_error(f, request, self.ERROR_TEMPLATE)
@@ -617,18 +597,25 @@ class StaticResource(File):
         set_clickjacking_protection_headers(request)
         return super().render_GET(request)
 
+    def directoryListing(self) -> IResource:
+        return notFound()
 
-def _unrecognised_request_handler(request: Request) -> NoReturn:
-    """Request handler for unrecognised requests
 
-    This is a request handler suitable for return from
-    _get_handler_for_request. It actually just raises an
-    UnrecognizedRequestError.
-
-    Args:
-        request: Unused, but passed in to match the signature of ServletCallback.
+class UnrecognizedRequestResource(resource.Resource):
     """
-    raise UnrecognizedRequestError()
+    Similar to twisted.web.resource.NoResource, but returns a JSON 404 with an
+    errcode of M_UNRECOGNIZED.
+    """
+
+    def render(self, request: "SynapseRequest") -> int:
+        f = failure.Failure(UnrecognizedRequestError(code=404))
+        return_json_error(f, request, None)
+        # A response has already been sent but Twisted requires either NOT_DONE_YET
+        # or the response bytes as a return value.
+        return NOT_DONE_YET
+
+    def getChild(self, name: str, request: Request) -> resource.Resource:
+        return self
 
 
 class RootRedirect(resource.Resource):
@@ -650,7 +637,7 @@ class RootRedirect(resource.Resource):
 class OptionsResource(resource.Resource):
     """Responds to OPTION requests for itself and all children."""
 
-    def render_OPTIONS(self, request: Request) -> bytes:
+    def render_OPTIONS(self, request: "SynapseRequest") -> bytes:
         request.setResponseCode(204)
         request.setHeader(b"Content-Length", b"0")
 
@@ -757,7 +744,7 @@ class _ByteProducer:
         self._request = None
 
 
-def _encode_json_bytes(json_object: Any) -> bytes:
+def _encode_json_bytes(json_object: object) -> bytes:
     """
     Encode an object into JSON. Returns an iterator of bytes.
     """
@@ -765,7 +752,7 @@ def _encode_json_bytes(json_object: Any) -> bytes:
 
 
 def respond_with_json(
-    request: SynapseRequest,
+    request: "SynapseRequest",
     code: int,
     json_object: Any,
     send_cors: bool = False,
@@ -798,7 +785,7 @@ def respond_with_json(
         return None
 
     if canonical_json:
-        encoder = encode_canonical_json
+        encoder: Callable[[object], bytes] = encode_canonical_json
     else:
         encoder = _encode_json_bytes
 
@@ -815,7 +802,7 @@ def respond_with_json(
 
 
 def respond_with_json_bytes(
-    request: Request,
+    request: "SynapseRequest",
     code: int,
     json_bytes: bytes,
     send_cors: bool = False,
@@ -853,7 +840,7 @@ def respond_with_json_bytes(
 
 
 async def _async_write_json_to_request_in_thread(
-    request: SynapseRequest,
+    request: "SynapseRequest",
     json_encoder: Callable[[Any], bytes],
     json_object: Any,
 ) -> None:
@@ -911,7 +898,7 @@ def _write_bytes_to_request(request: Request, bytes_to_write: bytes) -> None:
     _ByteProducer(request, bytes_generator)
 
 
-def set_cors_headers(request: Request) -> None:
+def set_cors_headers(request: "SynapseRequest") -> None:
     """Set the CORS headers so that javascript running in a web browsers can
     use this API
 
@@ -922,10 +909,24 @@ def set_cors_headers(request: Request) -> None:
     request.setHeader(
         b"Access-Control-Allow-Methods", b"GET, HEAD, POST, PUT, DELETE, OPTIONS"
     )
-    request.setHeader(
-        b"Access-Control-Allow-Headers",
-        b"X-Requested-With, Content-Type, Authorization, Date",
-    )
+    if request.experimental_cors_msc3886:
+        request.setHeader(
+            b"Access-Control-Allow-Headers",
+            b"X-Requested-With, Content-Type, Authorization, Date, If-Match, If-None-Match",
+        )
+        request.setHeader(
+            b"Access-Control-Expose-Headers",
+            b"ETag, Location, X-Max-Bytes",
+        )
+    else:
+        request.setHeader(
+            b"Access-Control-Allow-Headers",
+            b"X-Requested-With, Content-Type, Authorization, Date",
+        )
+        request.setHeader(
+            b"Access-Control-Expose-Headers",
+            b"Synapse-Trace-Id, Server",
+        )
 
 
 def set_corp_headers(request: Request) -> None:
@@ -994,10 +995,25 @@ def set_clickjacking_protection_headers(request: Request) -> None:
     request.setHeader(b"Content-Security-Policy", b"frame-ancestors 'none';")
 
 
-def respond_with_redirect(request: Request, url: bytes) -> None:
-    """Write a 302 response to the request, if it is still alive."""
+def respond_with_redirect(
+    request: "SynapseRequest", url: bytes, statusCode: int = FOUND, cors: bool = False
+) -> None:
+    """
+    Write a 302 (or other specified status code) response to the request, if it is still alive.
+
+    Args:
+        request: The http request to respond to.
+        url: The URL to redirect to.
+        statusCode: The HTTP status code to use for the redirect (defaults to 302).
+        cors: Whether to set CORS headers on the response.
+    """
     logger.debug("Redirect to %s", url.decode("utf-8"))
-    request.redirect(url)
+
+    if cors:
+        set_cors_headers(request)
+
+    request.setResponseCode(statusCode)
+    request.setHeader(b"location", url)
     finish_request(request)
 
 

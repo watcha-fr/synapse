@@ -1,17 +1,24 @@
-# Copyright 2020 Quentin Gliech
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2020-2021 The Matrix.org Foundation C.I.C.
+# Copyright 2020 Quentin Gliech
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 from collections import Counter
 from typing import Any, Collection, Iterable, List, Mapping, Optional, Tuple, Type
@@ -117,12 +124,15 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
             # to avoid importing authlib here.
             "enum": ["client_secret_basic", "client_secret_post", "none"],
         },
+        "pkce_method": {"type": "string", "enum": ["auto", "always", "never"]},
         "scopes": {"type": "array", "items": {"type": "string"}},
         "authorization_endpoint": {"type": "string"},
         "token_endpoint": {"type": "string"},
         "userinfo_endpoint": {"type": "string"},
         "jwks_uri": {"type": "string"},
         "skip_verification": {"type": "boolean"},
+        "backchannel_logout_enabled": {"type": "boolean"},
+        "backchannel_logout_ignore_sub": {"type": "boolean"},
         "user_profile_method": {
             "type": "string",
             "enum": ["auto", "userinfo_endpoint"],
@@ -133,6 +143,7 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
             "type": "array",
             "items": SsoAttributeRequirement.JSON_SCHEMA,
         },
+        "enable_registration": {"type": "boolean"},
     },
 }
 
@@ -276,6 +287,33 @@ def _parse_oidc_config_dict(
         for x in oidc_config.get("attribute_requirements", [])
     ]
 
+    # Read from either `client_secret_path` or `client_secret`. If both exist, error.
+    client_secret = oidc_config.get("client_secret")
+    client_secret_path = oidc_config.get("client_secret_path")
+    if client_secret_path is not None:
+        if client_secret is None:
+            client_secret = read_file(
+                client_secret_path, config_path + ("client_secret_path",)
+            ).rstrip("\n")
+        else:
+            raise ConfigError(
+                "Cannot specify both client_secret and client_secret_path",
+                config_path + ("client_secret",),
+            )
+
+    # If no client secret is specified then the auth method must be None
+    client_auth_method = oidc_config.get("client_auth_method")
+    if client_secret is None and client_secret_jwt_key is None:
+        if client_auth_method is None:
+            client_auth_method = "none"
+        elif client_auth_method != "none":
+            raise ConfigError(
+                "No 'client_secret' is set in OIDC config, and 'client_auth_method' is not set to 'none'"
+            )
+
+    if client_auth_method is None:
+        client_auth_method = "client_secret_basic"
+
     return OidcProviderConfig(
         idp_id=idp_id,
         idp_name=oidc_config.get("idp_name", "OIDC"),
@@ -284,20 +322,26 @@ def _parse_oidc_config_dict(
         discover=oidc_config.get("discover", True),
         issuer=oidc_config["issuer"],
         client_id=oidc_config["client_id"],
-        client_secret=oidc_config.get("client_secret"),
+        client_secret=client_secret,
         client_secret_jwt_key=client_secret_jwt_key,
-        client_auth_method=oidc_config.get("client_auth_method", "client_secret_basic"),
+        client_auth_method=client_auth_method,
+        pkce_method=oidc_config.get("pkce_method", "auto"),
         scopes=oidc_config.get("scopes", ["openid"]),
         authorization_endpoint=oidc_config.get("authorization_endpoint"),
         token_endpoint=oidc_config.get("token_endpoint"),
         userinfo_endpoint=oidc_config.get("userinfo_endpoint"),
         jwks_uri=oidc_config.get("jwks_uri"),
+        backchannel_logout_enabled=oidc_config.get("backchannel_logout_enabled", False),
+        backchannel_logout_ignore_sub=oidc_config.get(
+            "backchannel_logout_ignore_sub", False
+        ),
         skip_verification=oidc_config.get("skip_verification", False),
         user_profile_method=oidc_config.get("user_profile_method", "auto"),
         allow_existing_users=oidc_config.get("allow_existing_users", False),
         user_mapping_provider_class=user_mapping_provider_class,
         user_mapping_provider_config=user_mapping_provider_config,
         attribute_requirements=attribute_requirements,
+        enable_registration=oidc_config.get("enable_registration", True),
     )
 
 
@@ -351,6 +395,10 @@ class OidcProviderConfig:
     # 'none'.
     client_auth_method: str
 
+    # Whether to enable PKCE when exchanging the authorization & token.
+    # Valid values are 'auto', 'always', and 'never'.
+    pkce_method: str
+
     # list of scopes to request
     scopes: Collection[str]
 
@@ -367,6 +415,12 @@ class OidcProviderConfig:
     # URI where to fetch the JWKS. Required if discovery is disabled and the
     # "openid" scope is used.
     jwks_uri: Optional[str]
+
+    # Whether Synapse should react to backchannel logouts
+    backchannel_logout_enabled: bool
+
+    # Whether Synapse should ignore the `sub` claim in backchannel logouts or not.
+    backchannel_logout_ignore_sub: bool
 
     # Whether to skip metadata verification
     skip_verification: bool
@@ -387,3 +441,6 @@ class OidcProviderConfig:
 
     # required attributes to require in userinfo to allow login/registration
     attribute_requirements: List[SsoAttributeRequirement]
+
+    # Whether automatic registrations are enabled in the ODIC flow. Defaults to True
+    enable_registration: bool

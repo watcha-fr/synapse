@@ -1,46 +1,70 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2021 The Matrix.org Foundation C.I.C.
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the 'License');
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an 'AS IS' BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 import json
+
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import RoomTypes
 from synapse.rest import admin
 from synapse.rest.client import login, room
+from synapse.server import HomeServer
 from synapse.storage.databases.main.room import _BackgroundUpdates
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
 
 class RoomBackgroundUpdateStoreTestCase(HomeserverTestCase):
-
     servlets = [
         admin.register_servlets,
         room.register_servlets,
         login.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
         self.user_id = self.register_user("foo", "pass")
         self.token = self.login("foo", "pass")
 
     def _generate_room(self) -> str:
-        room_id = self.helper.create_room_as(self.user_id, tok=self.token)
+        """Create a room and return the room ID."""
+        return self.helper.create_room_as(self.user_id, tok=self.token)
 
-        return room_id
+    def run_background_updates(self, update_name: str) -> None:
+        """Insert and run the background update."""
+        self.get_success(
+            self.store.db_pool.simple_insert(
+                "background_updates",
+                {"update_name": update_name, "progress_json": "{}"},
+            )
+        )
 
-    def test_background_populate_rooms_creator_column(self):
+        # ... and tell the DataStore that it hasn't finished all updates yet
+        self.store.db_pool.updates._all_done = False
+
+        # Now let's actually drive the updates to completion
+        self.wait_for_background_updates()
+
+    def test_background_populate_rooms_creator_column(self) -> None:
         """Test that the background update to populate the rooms creator column
         works properly.
         """
@@ -67,22 +91,7 @@ class RoomBackgroundUpdateStoreTestCase(HomeserverTestCase):
         )
         self.assertEqual(room_creator_before, None)
 
-        # Insert and run the background update.
-        self.get_success(
-            self.store.db_pool.simple_insert(
-                "background_updates",
-                {
-                    "update_name": _BackgroundUpdates.POPULATE_ROOMS_CREATOR_COLUMN,
-                    "progress_json": "{}",
-                },
-            )
-        )
-
-        # ... and tell the DataStore that it hasn't finished all updates yet
-        self.store.db_pool.updates._all_done = False
-
-        # Now let's actually drive the updates to completion
-        self.wait_for_background_updates()
+        self.run_background_updates(_BackgroundUpdates.POPULATE_ROOMS_CREATOR_COLUMN)
 
         # Make sure the background update filled in the room creator
         room_creator_after = self.get_success(
@@ -95,7 +104,7 @@ class RoomBackgroundUpdateStoreTestCase(HomeserverTestCase):
         )
         self.assertEqual(room_creator_after, self.user_id)
 
-    def test_background_add_room_type_column(self):
+    def test_background_add_room_type_column(self) -> None:
         """Test that the background update to populate the `room_type` column in
         `room_stats_state` works properly.
         """
@@ -133,22 +142,7 @@ class RoomBackgroundUpdateStoreTestCase(HomeserverTestCase):
             )
         )
 
-        # Insert and run the background update
-        self.get_success(
-            self.store.db_pool.simple_insert(
-                "background_updates",
-                {
-                    "update_name": _BackgroundUpdates.ADD_ROOM_TYPE_COLUMN,
-                    "progress_json": "{}",
-                },
-            )
-        )
-
-        # ... and tell the DataStore that it hasn't finished all updates yet
-        self.store.db_pool.updates._all_done = False
-
-        # Now let's actually drive the updates to completion
-        self.wait_for_background_updates()
+        self.run_background_updates(_BackgroundUpdates.ADD_ROOM_TYPE_COLUMN)
 
         # Make sure the background update filled in the room type
         room_type_after = self.get_success(
@@ -160,3 +154,39 @@ class RoomBackgroundUpdateStoreTestCase(HomeserverTestCase):
             )
         )
         self.assertEqual(room_type_after, RoomTypes.SPACE)
+
+    def test_populate_stats_broken_rooms(self) -> None:
+        """Ensure that re-populating room stats skips broken rooms."""
+
+        # Create a good room.
+        good_room_id = self._generate_room()
+
+        # Create a room and then break it by having no room version.
+        room_id = self._generate_room()
+        self.get_success(
+            self.store.db_pool.simple_update(
+                table="rooms",
+                keyvalues={"room_id": room_id},
+                updatevalues={"room_version": None},
+                desc="test",
+            )
+        )
+
+        # Nuke any current stats in the database.
+        self.get_success(
+            self.store.db_pool.simple_delete(
+                table="room_stats_state", keyvalues={"1": 1}, desc="test"
+            )
+        )
+
+        self.run_background_updates("populate_stats_process_rooms")
+
+        # Only the good room appears in the stats tables.
+        results = self.get_success(
+            self.store.db_pool.simple_select_onecol(
+                table="room_stats_state",
+                keyvalues={},
+                retcol="room_id",
+            )
+        )
+        self.assertEqual(results, [good_room_id])

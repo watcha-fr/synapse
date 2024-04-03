@@ -1,34 +1,50 @@
-# Copyright 2018, 2019 New Vector Ltd
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 import logging
 from enum import Enum
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union, cast
-
-from typing_extensions import Counter
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Counter,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    cast,
+)
 
 from twisted.internet.defer import DeferredLock
 
-from synapse.api.constants import EventContentFields, EventTypes, Membership
+from synapse.api.constants import Direction, EventContentFields, EventTypes, Membership
 from synapse.api.errors import StoreError
 from synapse.storage.database import (
     DatabasePool,
     LoggingDatabaseConnection,
     LoggingTransaction,
 )
+from synapse.storage.databases.main.events_worker import InvalidEventError
 from synapse.storage.databases.main.state_deltas import StateDeltasStore
 from synapse.types import JsonDict
 from synapse.util.caches.descriptors import cached
@@ -97,6 +113,8 @@ class UserSortOrder(Enum):
     AVATAR_URL = "avatar_url"
     SHADOW_BANNED = "shadow_banned"
     CREATION_TS = "creation_ts"
+    LAST_SEEN_TS = "last_seen_ts"
+    LOCKED = "locked"
 
 
 class StatsStore(StateDeltasStore):
@@ -446,59 +464,41 @@ class StatsStore(StateDeltasStore):
             absolutes: Absolute (set) fields
             additive_relatives: Fields that will be added onto if existing row present.
         """
-        if self.database_engine.can_native_upsert:
-            absolute_updates = [
-                "%(field)s = EXCLUDED.%(field)s" % {"field": field}
-                for field in absolutes.keys()
-            ]
+        absolute_updates = [
+            "%(field)s = EXCLUDED.%(field)s" % {"field": field}
+            for field in absolutes.keys()
+        ]
 
-            relative_updates = [
-                "%(field)s = EXCLUDED.%(field)s + COALESCE(%(table)s.%(field)s, 0)"
-                % {"table": table, "field": field}
-                for field in additive_relatives.keys()
-            ]
+        relative_updates = [
+            "%(field)s = EXCLUDED.%(field)s + COALESCE(%(table)s.%(field)s, 0)"
+            % {"table": table, "field": field}
+            for field in additive_relatives.keys()
+        ]
 
-            insert_cols = []
-            qargs = []
+        insert_cols = []
+        qargs = []
 
-            for (key, val) in chain(
-                keyvalues.items(), absolutes.items(), additive_relatives.items()
-            ):
-                insert_cols.append(key)
-                qargs.append(val)
+        for key, val in chain(
+            keyvalues.items(), absolutes.items(), additive_relatives.items()
+        ):
+            insert_cols.append(key)
+            qargs.append(val)
 
-            sql = """
-                INSERT INTO %(table)s (%(insert_cols_cs)s)
-                VALUES (%(insert_vals_qs)s)
-                ON CONFLICT (%(key_columns)s) DO UPDATE SET %(updates)s
-            """ % {
-                "table": table,
-                "insert_cols_cs": ", ".join(insert_cols),
-                "insert_vals_qs": ", ".join(
-                    ["?"] * (len(keyvalues) + len(absolutes) + len(additive_relatives))
-                ),
-                "key_columns": ", ".join(keyvalues),
-                "updates": ", ".join(chain(absolute_updates, relative_updates)),
-            }
+        sql = """
+            INSERT INTO %(table)s (%(insert_cols_cs)s)
+            VALUES (%(insert_vals_qs)s)
+            ON CONFLICT (%(key_columns)s) DO UPDATE SET %(updates)s
+        """ % {
+            "table": table,
+            "insert_cols_cs": ", ".join(insert_cols),
+            "insert_vals_qs": ", ".join(
+                ["?"] * (len(keyvalues) + len(absolutes) + len(additive_relatives))
+            ),
+            "key_columns": ", ".join(keyvalues),
+            "updates": ", ".join(chain(absolute_updates, relative_updates)),
+        }
 
-            txn.execute(sql, qargs)
-        else:
-            self.database_engine.lock_table(txn, table)
-            retcols = list(chain(absolutes.keys(), additive_relatives.keys()))
-            current_row = self.db_pool.simple_select_one_txn(
-                txn, table, keyvalues, retcols, allow_none=True
-            )
-            if current_row is None:
-                merged_dict = {**keyvalues, **absolutes, **additive_relatives}
-                self.db_pool.simple_insert_txn(txn, table, merged_dict)
-            else:
-                for (key, val) in additive_relatives.items():
-                    if current_row[key] is None:
-                        current_row[key] = val
-                    else:
-                        current_row[key] += val
-                current_row.update(absolutes)
-                self.db_pool.simple_update_one_txn(txn, table, keyvalues, current_row)
+        txn.execute(sql, qargs)
 
     async def _calculate_and_set_initial_state_for_room(self, room_id: str) -> None:
         """Calculate and insert an entry into room_stats_current.
@@ -512,25 +512,28 @@ class StatsStore(StateDeltasStore):
         ) -> Tuple[List[str], Dict[str, int], int, List[str], int]:
             pos = self.get_room_max_stream_ordering()  # type: ignore[attr-defined]
 
-            rows = self.db_pool.simple_select_many_txn(
-                txn,
-                table="current_state_events",
-                column="type",
-                iterable=[
-                    EventTypes.Create,
-                    EventTypes.JoinRules,
-                    EventTypes.RoomHistoryVisibility,
-                    EventTypes.RoomEncryption,
-                    EventTypes.Name,
-                    EventTypes.Topic,
-                    EventTypes.RoomAvatar,
-                    EventTypes.CanonicalAlias,
-                ],
-                keyvalues={"room_id": room_id, "state_key": ""},
-                retcols=["event_id"],
+            rows = cast(
+                List[Tuple[str]],
+                self.db_pool.simple_select_many_txn(
+                    txn,
+                    table="current_state_events",
+                    column="type",
+                    iterable=[
+                        EventTypes.Create,
+                        EventTypes.JoinRules,
+                        EventTypes.RoomHistoryVisibility,
+                        EventTypes.RoomEncryption,
+                        EventTypes.Name,
+                        EventTypes.Topic,
+                        EventTypes.RoomAvatar,
+                        EventTypes.CanonicalAlias,
+                    ],
+                    keyvalues={"room_id": room_id, "state_key": ""},
+                    retcols=["event_id"],
+                ),
             )
 
-            event_ids = cast(List[str], [row["event_id"] for row in rows])
+            event_ids = [row[0] for row in rows]
 
             txn.execute(
                 """
@@ -540,7 +543,7 @@ class StatsStore(StateDeltasStore):
                 """,
                 (room_id,),
             )
-            membership_counts = {membership: cnt for membership, cnt in txn}
+            membership_counts = dict(cast(Iterable[Tuple[str, int]], txn))
 
             txn.execute(
                 """
@@ -572,7 +575,17 @@ class StatsStore(StateDeltasStore):
             "get_initial_state_for_room", _fetch_current_state_stats
         )
 
-        state_event_map = await self.get_events(event_ids, get_prev_content=False)  # type: ignore[attr-defined]
+        try:
+            state_event_map = await self.get_events(event_ids, get_prev_content=False)  # type: ignore[attr-defined]
+        except InvalidEventError as e:
+            # If an exception occurs fetching events then the room is broken;
+            # skip process it to avoid being stuck on a room.
+            logger.warning(
+                "Failed to fetch events for room %s, skipping stats calculation: %r.",
+                room_id,
+                e,
+            )
+            return
 
         room_state: Dict[str, Union[None, bool, str]] = {
             "join_rules": None,
@@ -670,9 +683,9 @@ class StatsStore(StateDeltasStore):
         from_ts: Optional[int] = None,
         until_ts: Optional[int] = None,
         order_by: Optional[str] = UserSortOrder.USER_ID.value,
-        direction: Optional[str] = "f",
+        direction: Direction = Direction.FORWARDS,
         search_term: Optional[str] = None,
-    ) -> Tuple[List[JsonDict], int]:
+    ) -> Tuple[List[Tuple[str, Optional[str], int, int]], int]:
         """Function to retrieve a paginated list of users and their uploaded local media
         (size and number). This will return a json list of users and the
         total number of users matching the filter criteria.
@@ -685,16 +698,21 @@ class StatsStore(StateDeltasStore):
             order_by: the sort order of the returned list
             direction: sort ascending or descending
             search_term: a string to filter user names by
+
         Returns:
-            A list of user dicts and an integer representing the total number of
-            users that exist given this query
+            A tuple of:
+                A list of tuples of user information (the user ID, displayname,
+                total number of media, total length of media) and
+
+                An integer representing the total number of users that exist
+                given this query
         """
 
         def get_users_media_usage_paginate_txn(
             txn: LoggingTransaction,
-        ) -> Tuple[List[JsonDict], int]:
+        ) -> Tuple[List[Tuple[str, Optional[str], int, int]], int]:
             filters = []
-            args = [self.hs.config.server.server_name]
+            args: list = []
 
             if search_term:
                 filters.append("(lmr.user_id LIKE ? OR displayname LIKE ?)")
@@ -721,7 +739,7 @@ class StatsStore(StateDeltasStore):
                     500, "Incorrect value for order_by provided: %s" % order_by
                 )
 
-            if direction == "b":
+            if direction == Direction.BACKWARDS:
                 order = "DESC"
             else:
                 order = "ASC"
@@ -730,7 +748,7 @@ class StatsStore(StateDeltasStore):
 
             sql_base = """
                 FROM local_media_repository as lmr
-                LEFT JOIN profiles AS p ON lmr.user_id = '@' || p.user_id || ':' || ?
+                LEFT JOIN profiles AS p ON lmr.user_id = p.full_user_id
                 {}
                 GROUP BY lmr.user_id, displayname
             """.format(
@@ -766,7 +784,7 @@ class StatsStore(StateDeltasStore):
 
             args += [limit, start]
             txn.execute(sql, args)
-            users = self.db_pool.cursor_to_dict(txn)
+            users = cast(List[Tuple[str, Optional[str], int, int]], txn.fetchall())
 
             return users, count
 

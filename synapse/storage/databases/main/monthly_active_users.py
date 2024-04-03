@@ -1,18 +1,24 @@
-# Copyright 2018 New Vector
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This file is licensed under the Affero General Public License (AGPL) version 3.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
+#
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 import logging
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Tuple, cast
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage.database import (
@@ -66,6 +72,7 @@ class MonthlyActiveUsersWorkerStore(RegistrationWorkerStore):
                 "initialise_mau_threepids",
                 [],
                 [],
+                [],
                 self._initialise_reserved_users,
                 hs.config.server.mau_limits_reserved_threepids[: self._max_mau_value],
             )
@@ -94,7 +101,7 @@ class MonthlyActiveUsersWorkerStore(RegistrationWorkerStore):
         return await self.db_pool.runInteraction("count_users", _count_users)
 
     @cached(num_args=0)
-    async def get_monthly_active_count_by_service(self) -> Dict[str, int]:
+    async def get_monthly_active_count_by_service(self) -> Mapping[str, int]:
         """Generates current count of monthly active users broken down by service.
         A service is typically an appservice but also includes native matrix users.
         Since the `monthly_active_users` table is populated from the `user_ips` table
@@ -216,7 +223,7 @@ class MonthlyActiveUsersWorkerStore(RegistrationWorkerStore):
         def _reap_users(txn: LoggingTransaction, reserved_users: List[str]) -> None:
             """
             Args:
-                reserved_users (tuple): reserved users to preserve
+                reserved_users: reserved users to preserve
             """
 
             thirty_days_ago = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
@@ -316,7 +323,7 @@ class MonthlyActiveUsersWorkerStore(RegistrationWorkerStore):
             if user_id:
                 is_support = self.is_support_user_txn(txn, user_id)
                 if not is_support:
-                    # We do this manually here to avoid hitting #6791
+                    # We do this manually here to avoid hitting https://github.com/matrix-org/synapse/issues/6791
                     self.db_pool.simple_upsert_txn(
                         txn,
                         table="monthly_active_users",
@@ -369,8 +376,8 @@ class MonthlyActiveUsersWorkerStore(RegistrationWorkerStore):
         should not appear in the MAU stats).
 
         Args:
-            txn (cursor):
-            user_id (str): user to add/update
+            txn:
+            user_id: user to add/update
         """
         assert (
             self._update_on_this_worker
@@ -400,7 +407,7 @@ class MonthlyActiveUsersWorkerStore(RegistrationWorkerStore):
         add the user to the monthly active tables
 
         Args:
-            user_id(str): the user_id to query
+            user_id: the user_id to query
         """
         assert (
             self._update_on_this_worker

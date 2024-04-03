@@ -1,16 +1,23 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2022 The Matrix.org Foundation C.I.C.
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 from pymacaroons.exceptions import MacaroonVerificationFailedException
 
@@ -21,14 +28,14 @@ from tests.unittest import TestCase
 
 
 class MacaroonGeneratorTestCase(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.reactor, hs_clock = get_clock()
         self.macaroon_generator = MacaroonGenerator(hs_clock, "tesths", b"verysecret")
         self.other_macaroon_generator = MacaroonGenerator(
             hs_clock, "tesths", b"anothersecretkey"
         )
 
-    def test_guest_access_token(self):
+    def test_guest_access_token(self) -> None:
         """Test the generation and verification of guest access tokens"""
         token = self.macaroon_generator.generate_guest_access_token("@user:tesths")
         user_id = self.macaroon_generator.verify_guest_token(token)
@@ -47,7 +54,7 @@ class MacaroonGeneratorTestCase(TestCase):
         with self.assertRaises(MacaroonVerificationFailedException):
             self.macaroon_generator.verify_guest_token(token)
 
-    def test_delete_pusher_token(self):
+    def test_delete_pusher_token(self) -> None:
         """Test the generation and verification of delete_pusher tokens"""
         token = self.macaroon_generator.generate_delete_pusher_token(
             "@user:tesths", "m.mail", "john@example.com"
@@ -84,35 +91,7 @@ class MacaroonGeneratorTestCase(TestCase):
         )
         self.assertEqual(user_id, "@user:tesths")
 
-    def test_short_term_login_token(self):
-        """Test the generation and verification of short-term login tokens"""
-        token = self.macaroon_generator.generate_short_term_login_token(
-            user_id="@user:tesths",
-            auth_provider_id="oidc",
-            auth_provider_session_id="sid",
-            duration_in_ms=2 * 60 * 1000,
-        )
-
-        info = self.macaroon_generator.verify_short_term_login_token(token)
-        self.assertEqual(info.user_id, "@user:tesths")
-        self.assertEqual(info.auth_provider_id, "oidc")
-        self.assertEqual(info.auth_provider_session_id, "sid")
-
-        # Raises with another secret key
-        with self.assertRaises(MacaroonVerificationFailedException):
-            self.other_macaroon_generator.verify_short_term_login_token(token)
-
-        # Wait a minute
-        self.reactor.pump([60])
-        # Shouldn't raise
-        self.macaroon_generator.verify_short_term_login_token(token)
-        # Wait another minute
-        self.reactor.pump([60])
-        # Should raise since it expired
-        with self.assertRaises(MacaroonVerificationFailedException):
-            self.macaroon_generator.verify_short_term_login_token(token)
-
-    def test_oidc_session_token(self):
+    def test_oidc_session_token(self) -> None:
         """Test the generation and verification of OIDC session cookies"""
         state = "arandomstate"
         session_data = OidcSessionData(
@@ -120,6 +99,7 @@ class MacaroonGeneratorTestCase(TestCase):
             nonce="nonce",
             client_redirect_url="https://example.com/",
             ui_auth_session_id="",
+            code_verifier="",
         )
         token = self.macaroon_generator.generate_oidc_session_token(
             state, session_data, duration_in_ms=2 * 60 * 1000

@@ -1,23 +1,30 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2016 OpenMarket Ltd
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 import logging
 from functools import wraps
 from types import TracebackType
-from typing import Awaitable, Callable, Optional, Type, TypeVar
+from typing import Awaitable, Callable, Dict, Generator, Optional, Type, TypeVar
 
-from prometheus_client import Counter
+from prometheus_client import CollectorRegistry, Counter, Metric
 from typing_extensions import Concatenate, ParamSpec, Protocol
 
 from synapse.logging.context import (
@@ -208,3 +215,33 @@ class Measure:
         metrics.real_time_sum += duration
 
         # TODO: Add other in flight metrics.
+
+
+class DynamicCollectorRegistry(CollectorRegistry):
+    """
+    Custom Prometheus Collector registry that calls a hook first, allowing you
+    to update metrics on-demand.
+
+    Don't forget to register this registry with the main registry!
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._pre_update_hooks: Dict[str, Callable[[], None]] = {}
+
+    def collect(self) -> Generator[Metric, None, None]:
+        """
+        Collects metrics, calling pre-update hooks first.
+        """
+
+        for pre_update_hook in self._pre_update_hooks.values():
+            pre_update_hook()
+
+        yield from super().collect()
+
+    def register_hook(self, metric_name: str, hook: Callable[[], None]) -> None:
+        """
+        Registers a hook that is called before metric collection.
+        """
+
+        self._pre_update_hooks[metric_name] = hook

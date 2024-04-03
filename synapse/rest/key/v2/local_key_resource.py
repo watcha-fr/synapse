@@ -1,28 +1,34 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 import logging
-from typing import TYPE_CHECKING, Optional
+import re
+from typing import TYPE_CHECKING, Optional, Tuple
 
-from canonicaljson import encode_canonical_json
 from signedjson.sign import sign_json
 from unpaddedbase64 import encode_base64
 
-from twisted.web.resource import Resource
 from twisted.web.server import Request
 
-from synapse.http.server import respond_with_json_bytes
+from synapse.http.servlet import RestServlet
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
@@ -31,9 +37,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class LocalKey(Resource):
+class LocalKey(RestServlet):
     """HTTP resource containing encoding the TLS X.509 certificate and NACL
     signature verification keys for this server::
+
+        GET /_matrix/key/v2/server HTTP/1.1
 
         GET /_matrix/key/v2/server/a.key.id HTTP/1.1
 
@@ -61,18 +69,17 @@ class LocalKey(Resource):
         }
     """
 
-    isLeaf = True
+    PATTERNS = (re.compile("^/_matrix/key/v2/server(/(?P<key_id>[^/]*))?$"),)
 
     def __init__(self, hs: "HomeServer"):
         self.config = hs.config
         self.clock = hs.get_clock()
         self.update_response_body(self.clock.time_msec())
-        Resource.__init__(self)
 
     def update_response_body(self, time_now_msec: int) -> None:
         refresh_interval = self.config.key.key_refresh_interval
         self.valid_until_ts = int(time_now_msec + refresh_interval)
-        self.response_body = encode_canonical_json(self.response_json_object())
+        self.response_body = self.response_json_object()
 
     def response_json_object(self) -> JsonDict:
         verify_keys = {}
@@ -99,9 +106,20 @@ class LocalKey(Resource):
             json_object = sign_json(json_object, self.config.server.server_name, key)
         return json_object
 
-    def render_GET(self, request: Request) -> Optional[int]:
+    def on_GET(
+        self, request: Request, key_id: Optional[str] = None
+    ) -> Tuple[int, JsonDict]:
+        # Matrix 1.6 drops support for passing the key_id, this is incompatible
+        # with earlier versions and is allowed in order to support both.
+        # A warning is issued to help determine when it is safe to drop this.
+        if key_id:
+            logger.warning(
+                "Request for local server key with deprecated key ID (logging to determine usage level for future removal): %s",
+                key_id,
+            )
+
         time_now = self.clock.time_msec()
         # Update the expiry time if less than half the interval remains.
         if time_now + self.config.key.key_refresh_interval / 2 > self.valid_until_ts:
             self.update_response_body(time_now)
-        return respond_with_json_bytes(request, 200, self.response_body)
+        return 200, self.response_body

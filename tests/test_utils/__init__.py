@@ -1,31 +1,47 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2019-2021 The Matrix.org Foundation C.I.C.
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 """
 Utilities for running the unit tests
 """
+import json
 import sys
 import warnings
-from asyncio import Future
 from binascii import unhexlify
-from typing import Awaitable, Callable, TypeVar
-from unittest.mock import Mock
+from typing import TYPE_CHECKING, Awaitable, Callable, Tuple, TypeVar
 
 import attr
+import zope.interface
 
+from twisted.internet.interfaces import IProtocol
 from twisted.python.failure import Failure
 from twisted.web.client import ResponseDone
+from twisted.web.http import RESPONSES
+from twisted.web.http_headers import Headers
+from twisted.web.iweb import IResponse
+
+from synapse.types import JsonSerializable
+
+if TYPE_CHECKING:
+    from sys import UnraisableHookArgs
 
 TV = TypeVar("TV")
 
@@ -46,77 +62,71 @@ def get_awaitable_result(awaitable: Awaitable[TV]) -> TV:
     raise Exception("awaitable has not yet completed")
 
 
-def make_awaitable(result: TV) -> Awaitable[TV]:
-    """
-    Makes an awaitable, suitable for mocking an `async` function.
-    This uses Futures as they can be awaited multiple times so can be returned
-    to multiple callers.
-    """
-    future: Future[TV] = Future()
-    future.set_result(result)
-    return future
-
-
 def setup_awaitable_errors() -> Callable[[], None]:
     """
     Convert warnings from a non-awaited coroutines into errors.
     """
     warnings.simplefilter("error", RuntimeWarning)
 
-    # unraisablehook was added in Python 3.8.
-    if not hasattr(sys, "unraisablehook"):
-        return lambda: None
-
     # State shared between unraisablehook and check_for_unraisable_exceptions.
     unraisable_exceptions = []
     orig_unraisablehook = sys.unraisablehook
 
-    def unraisablehook(unraisable):
+    def unraisablehook(unraisable: "UnraisableHookArgs") -> None:
         unraisable_exceptions.append(unraisable.exc_value)
 
-    def cleanup():
+    def cleanup() -> None:
         """
         A method to be used as a clean-up that fails a test-case if there are any new unraisable exceptions.
         """
         sys.unraisablehook = orig_unraisablehook
         if unraisable_exceptions:
-            raise unraisable_exceptions.pop()
+            exc = unraisable_exceptions.pop()
+            assert exc is not None
+            raise exc
 
     sys.unraisablehook = unraisablehook
 
     return cleanup
 
 
-def simple_async_mock(return_value=None, raises=None) -> Mock:
-    # AsyncMock is not available in python3.5, this mimics part of its behaviour
-    async def cb(*args, **kwargs):
-        if raises:
-            raise raises
-        return return_value
-
-    return Mock(side_effect=cb)
-
-
-@attr.s
-class FakeResponse:
+# Type ignore: it does not fully implement IResponse, but is good enough for tests
+@zope.interface.implementer(IResponse)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class FakeResponse:  # type: ignore[misc]
     """A fake twisted.web.IResponse object
 
     there is a similar class at treq.test.test_response, but it lacks a `phrase`
     attribute, and didn't support deliverBody until recently.
     """
 
-    # HTTP response code
-    code = attr.ib(type=int)
+    version: Tuple[bytes, int, int] = (b"HTTP", 1, 1)
 
-    # HTTP response phrase (eg b'OK' for a 200)
-    phrase = attr.ib(type=bytes)
+    # HTTP response code
+    code: int = 200
 
     # body of the response
-    body = attr.ib(type=bytes)
+    body: bytes = b""
 
-    def deliverBody(self, protocol):
+    headers: Headers = attr.Factory(Headers)
+
+    @property
+    def phrase(self) -> bytes:
+        return RESPONSES.get(self.code, b"Unknown Status")
+
+    @property
+    def length(self) -> int:
+        return len(self.body)
+
+    def deliverBody(self, protocol: IProtocol) -> None:
         protocol.dataReceived(self.body)
         protocol.connectionLost(Failure(ResponseDone()))
+
+    @classmethod
+    def json(cls, *, code: int = 200, payload: JsonSerializable) -> "FakeResponse":
+        headers = Headers({"Content-Type": ["application/json"]})
+        body = json.dumps(payload).encode("utf-8")
+        return cls(code=code, body=body, headers=headers)
 
 
 # A small image used in some tests.

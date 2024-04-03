@@ -1,16 +1,23 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2014, 2015 OpenMarket Ltd
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 import logging
 import os
@@ -41,6 +48,18 @@ THUMBNAIL_SIZE_YAML = """\
         #    height: %(height)i
         #    method: %(method)s
 """
+
+# A map from the given media type to the type of thumbnail we should generate
+# for it.
+THUMBNAIL_SUPPORTED_MEDIA_FORMAT_MAP = {
+    "image/jpeg": "jpeg",
+    "image/jpg": "jpeg",
+    "image/webp": "jpeg",
+    # Thumbnails can only be jpeg or png. We choose png thumbnails for gif
+    # because it can have transparency.
+    "image/gif": "png",
+    "image/png": "png",
+}
 
 HTTP_PROXY_SET_WARNING = """\
 The Synapse config url_preview_ip_range_blacklist will be ignored as an HTTP(s) proxy is configured."""
@@ -79,13 +98,22 @@ def parse_thumbnail_requirements(
         width = size["width"]
         height = size["height"]
         method = size["method"]
-        jpeg_thumbnail = ThumbnailRequirement(width, height, method, "image/jpeg")
-        png_thumbnail = ThumbnailRequirement(width, height, method, "image/png")
-        requirements.setdefault("image/jpeg", []).append(jpeg_thumbnail)
-        requirements.setdefault("image/jpg", []).append(jpeg_thumbnail)
-        requirements.setdefault("image/webp", []).append(jpeg_thumbnail)
-        requirements.setdefault("image/gif", []).append(png_thumbnail)
-        requirements.setdefault("image/png", []).append(png_thumbnail)
+
+        for format, thumbnail_format in THUMBNAIL_SUPPORTED_MEDIA_FORMAT_MAP.items():
+            requirement = requirements.setdefault(format, [])
+            if thumbnail_format == "jpeg":
+                requirement.append(
+                    ThumbnailRequirement(width, height, method, "image/jpeg")
+                )
+            elif thumbnail_format == "png":
+                requirement.append(
+                    ThumbnailRequirement(width, height, method, "image/png")
+                )
+            else:
+                raise Exception(
+                    "Unknown thumbnail mapping from %s to %s. This is a Synapse problem, please report!"
+                    % (format, thumbnail_format)
+                )
     return {
         media_type: tuple(thumbnails) for media_type, thumbnails in requirements.items()
     }
@@ -95,7 +123,6 @@ class ContentRepositoryConfig(Config):
     section = "media"
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
-
         # Only enable the media repo if either the media repo is enabled or the
         # current worker app is the media repo.
         if (
@@ -116,6 +143,16 @@ class ContentRepositoryConfig(Config):
         self.max_upload_size = self.parse_size(config.get("max_upload_size", "50M"))
         self.max_image_pixels = self.parse_size(config.get("max_image_pixels", "32M"))
         self.max_spider_size = self.parse_size(config.get("max_spider_size", "10M"))
+
+        self.prevent_media_downloads_from = config.get(
+            "prevent_media_downloads_from", []
+        )
+
+        self.unused_expiration_time = self.parse_duration(
+            config.get("unused_expiration_time", "24h")
+        )
+
+        self.max_pending_media_uploads = config.get("max_pending_media_uploads", 5)
 
         self.media_store_path = self.ensure_directory(
             config.get("media_store_path", "media_store")
@@ -158,11 +195,13 @@ class ContentRepositoryConfig(Config):
         for i, provider_config in enumerate(storage_providers):
             # We special case the module "file_system" so as not to need to
             # expose FileStorageProviderBackend
-            if provider_config["module"] == "file_system":
-                provider_config["module"] = (
-                    "synapse.rest.media.v1.storage_provider"
-                    ".FileStorageProviderBackend"
-                )
+            if (
+                provider_config["module"] == "file_system"
+                or provider_config["module"] == "synapse.rest.media.v1.storage_provider"
+            ):
+                provider_config[
+                    "module"
+                ] = "synapse.media.storage_provider.FileStorageProviderBackend"
 
             provider_class, parsed_config = load_module(
                 provider_config, ("media_storage_providers", "<item %i>" % i)
@@ -184,7 +223,7 @@ class ContentRepositoryConfig(Config):
         )
         self.url_preview_enabled = config.get("url_preview_enabled", False)
         if self.url_preview_enabled:
-            check_requirements("url_preview")
+            check_requirements("url-preview")
 
             proxy_env = getproxies_environment()
             if "url_preview_ip_range_blacklist" not in config:
@@ -198,20 +237,20 @@ class ContentRepositoryConfig(Config):
                 if "http" in proxy_env or "https" in proxy_env:
                     logger.warning("".join(HTTP_PROXY_SET_WARNING))
 
-            # we always blacklist '0.0.0.0' and '::', which are supposed to be
+            # we always block '0.0.0.0' and '::', which are supposed to be
             # unroutable addresses.
-            self.url_preview_ip_range_blacklist = generate_ip_set(
+            self.url_preview_ip_range_blocklist = generate_ip_set(
                 config["url_preview_ip_range_blacklist"],
                 ["0.0.0.0", "::"],
                 config_path=("url_preview_ip_range_blacklist",),
             )
 
-            self.url_preview_ip_range_whitelist = generate_ip_set(
+            self.url_preview_ip_range_allowlist = generate_ip_set(
                 config.get("url_preview_ip_range_whitelist", ()),
                 config_path=("url_preview_ip_range_whitelist",),
             )
 
-            self.url_preview_url_blacklist = config.get("url_preview_url_blacklist", ())
+            self.url_preview_url_blocklist = config.get("url_preview_url_blacklist", ())
 
             self.url_preview_accept_language = config.get(
                 "url_preview_accept_language"

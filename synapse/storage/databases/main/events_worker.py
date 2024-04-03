@@ -1,29 +1,36 @@
-# Copyright 2018 New Vector Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This file is licensed under the Affero General Public License (AGPL) version 3.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
+#
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 import logging
 import threading
 import weakref
 from enum import Enum, auto
+from itertools import chain
 from typing import (
     TYPE_CHECKING,
     Any,
     Collection,
-    Container,
     Dict,
     Iterable,
     List,
+    Mapping,
     MutableMapping,
     Optional,
     Set,
@@ -38,7 +45,7 @@ from typing_extensions import Literal
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import Direction, EventTypes
 from synapse.api.errors import NotFoundError, SynapseError
 from synapse.api.room_versions import (
     KNOWN_ROOM_VERSIONS,
@@ -54,13 +61,14 @@ from synapse.logging.context import (
     current_context,
     make_deferred_yieldable,
 )
+from synapse.logging.opentracing import start_active_span, tag_args, trace
 from synapse.metrics.background_process_metrics import (
     run_as_background_process,
     wrap_as_background_process,
 )
-from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
-from synapse.replication.tcp.streams import BackfillStream
+from synapse.replication.tcp.streams import BackfillStream, UnPartialStatedEventStream
 from synapse.replication.tcp.streams.events import EventsStream
+from synapse.replication.tcp.streams.partial_state import UnPartialStatedEventStreamRow
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import (
     DatabasePool,
@@ -70,16 +78,19 @@ from synapse.storage.database import (
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.types import Cursor
 from synapse.storage.util.id_generators import (
-    AbstractStreamIdTracker,
+    AbstractStreamIdGenerator,
     MultiWriterIdGenerator,
     StreamIdGenerator,
 )
 from synapse.storage.util.sequence import build_sequence_generator
 from synapse.types import JsonDict, get_domain_from_id
+from synapse.types.state import StateFilter
 from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import ObservableDeferred, delay_cancellation
 from synapse.util.caches.descriptors import cached, cachedList
-from synapse.util.caches.lrucache import LruCache
+from synapse.util.caches.lrucache import AsyncLruCache
+from synapse.util.caches.stream_change_cache import StreamChangeCache
+from synapse.util.cancellation import cancellable
 from synapse.util.iterutils import batch_iter
 from synapse.util.metrics import Measure
 
@@ -103,6 +114,10 @@ event_fetch_ongoing_gauge = Gauge(
     "synapse_event_fetch_ongoing",
     "The number of event fetchers that are running",
 )
+
+
+class InvalidEventError(Exception):
+    """The event retrieved from the database is invalid and cannot be used."""
 
 
 @attr.s(slots=True, auto_attribs=True)
@@ -178,14 +193,15 @@ class EventsWorkerStore(SQLBaseStore):
     ):
         super().__init__(database, db_conn, hs)
 
-        self._stream_id_gen: AbstractStreamIdTracker
-        self._backfill_id_gen: AbstractStreamIdTracker
+        self._stream_id_gen: AbstractStreamIdGenerator
+        self._backfill_id_gen: AbstractStreamIdGenerator
         if isinstance(database.engine, PostgresEngine):
             # If we're using Postgres than we can use `MultiWriterIdGenerator`
             # regardless of whether this process writes to the streams or not.
             self._stream_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
+                notifier=hs.get_replication_notifier(),
                 stream_name="events",
                 instance_name=hs.get_instance_name(),
                 tables=[("events", "instance_name", "stream_ordering")],
@@ -195,6 +211,7 @@ class EventsWorkerStore(SQLBaseStore):
             self._backfill_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
+                notifier=hs.get_replication_notifier(),
                 stream_name="backfill",
                 instance_name=hs.get_instance_name(),
                 tables=[("events", "instance_name", "stream_ordering")],
@@ -203,33 +220,41 @@ class EventsWorkerStore(SQLBaseStore):
                 writers=hs.config.worker.writers.events,
             )
         else:
+            # Multiple writers are not supported for SQLite.
+            #
             # We shouldn't be running in worker mode with SQLite, but its useful
             # to support it for unit tests.
-            #
-            # If this process is the writer than we need to use
-            # `StreamIdGenerator`, otherwise we use `SlavedIdTracker` which gets
-            # updated over replication. (Multiple writers are not supported for
-            # SQLite).
-            if hs.get_instance_name() in hs.config.worker.writers.events:
-                self._stream_id_gen = StreamIdGenerator(
-                    db_conn,
-                    "events",
-                    "stream_ordering",
-                )
-                self._backfill_id_gen = StreamIdGenerator(
-                    db_conn,
-                    "events",
-                    "stream_ordering",
-                    step=-1,
-                    extra_tables=[("ex_outlier_stream", "event_stream_ordering")],
-                )
-            else:
-                self._stream_id_gen = SlavedIdTracker(
-                    db_conn, "events", "stream_ordering"
-                )
-                self._backfill_id_gen = SlavedIdTracker(
-                    db_conn, "events", "stream_ordering", step=-1
-                )
+            self._stream_id_gen = StreamIdGenerator(
+                db_conn,
+                hs.get_replication_notifier(),
+                "events",
+                "stream_ordering",
+                is_writer=hs.get_instance_name() in hs.config.worker.writers.events,
+            )
+            self._backfill_id_gen = StreamIdGenerator(
+                db_conn,
+                hs.get_replication_notifier(),
+                "events",
+                "stream_ordering",
+                step=-1,
+                extra_tables=[("ex_outlier_stream", "event_stream_ordering")],
+                is_writer=hs.get_instance_name() in hs.config.worker.writers.events,
+            )
+
+        events_max = self._stream_id_gen.get_current_token()
+        curr_state_delta_prefill, min_curr_state_delta_id = self.db_pool.get_cache_dict(
+            db_conn,
+            "current_state_delta_stream",
+            entity_column="room_id",
+            stream_column="stream_id",
+            max_value=events_max,  # As we share the stream id with events token
+            limit=1000,
+        )
+        self._curr_state_delta_stream_cache: StreamChangeCache = StreamChangeCache(
+            "_curr_state_delta_stream_cache",
+            min_curr_state_delta_id,
+            prefilled_cache=curr_state_delta_prefill,
+        )
 
         if hs.config.worker.run_background_tasks:
             # We periodically clean out old transaction ID mappings
@@ -238,9 +263,13 @@ class EventsWorkerStore(SQLBaseStore):
                 5 * 60 * 1000,
             )
 
-        self._get_event_cache: LruCache[Tuple[str], EventCacheEntry] = LruCache(
+        self._get_event_cache: AsyncLruCache[
+            Tuple[str], EventCacheEntry
+        ] = AsyncLruCache(
             cache_name="*getEvent*",
             max_size=hs.config.caches.event_cache_size,
+            # `extra_index_cb` Returns a tuple as that is the key type
+            extra_index_cb=lambda _, v: (v.event.room_id,),
         )
 
         # Map from event ID to a deferred that will result in a map from event
@@ -278,6 +307,98 @@ class EventsWorkerStore(SQLBaseStore):
             id_column="chain_id",
         )
 
+        self._un_partial_stated_events_stream_id_gen: AbstractStreamIdGenerator
+
+        if isinstance(database.engine, PostgresEngine):
+            self._un_partial_stated_events_stream_id_gen = MultiWriterIdGenerator(
+                db_conn=db_conn,
+                db=database,
+                notifier=hs.get_replication_notifier(),
+                stream_name="un_partial_stated_event_stream",
+                instance_name=hs.get_instance_name(),
+                tables=[
+                    ("un_partial_stated_event_stream", "instance_name", "stream_id")
+                ],
+                sequence_name="un_partial_stated_event_stream_sequence",
+                # TODO(faster_joins, multiple writers) Support multiple writers.
+                writers=["master"],
+            )
+        else:
+            self._un_partial_stated_events_stream_id_gen = StreamIdGenerator(
+                db_conn,
+                hs.get_replication_notifier(),
+                "un_partial_stated_event_stream",
+                "stream_id",
+            )
+
+    def get_un_partial_stated_events_token(self, instance_name: str) -> int:
+        return (
+            self._un_partial_stated_events_stream_id_gen.get_current_token_for_writer(
+                instance_name
+            )
+        )
+
+    async def get_un_partial_stated_events_from_stream(
+        self, instance_name: str, last_id: int, current_id: int, limit: int
+    ) -> Tuple[List[Tuple[int, Tuple[str, bool]]], int, bool]:
+        """Get updates for the un-partial-stated events replication stream.
+
+        Args:
+            instance_name: The writer we want to fetch updates from. Unused
+                here since there is only ever one writer.
+            last_id: The token to fetch updates from. Exclusive.
+            current_id: The token to fetch updates up to. Inclusive.
+            limit: The requested limit for the number of rows to return. The
+                function may return more or fewer rows.
+
+        Returns:
+            A tuple consisting of: the updates, a token to use to fetch
+            subsequent updates, and whether we returned fewer rows than exists
+            between the requested tokens due to the limit.
+
+            The token returned can be used in a subsequent call to this
+            function to get further updatees.
+
+            The updates are a list of 2-tuples of stream ID and the row data
+        """
+
+        if last_id == current_id:
+            return [], current_id, False
+
+        def get_un_partial_stated_events_from_stream_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[List[Tuple[int, Tuple[str, bool]]], int, bool]:
+            sql = """
+                SELECT stream_id, event_id, rejection_status_changed
+                FROM un_partial_stated_event_stream
+                WHERE ? < stream_id AND stream_id <= ? AND instance_name = ?
+                ORDER BY stream_id ASC
+                LIMIT ?
+            """
+            txn.execute(sql, (last_id, current_id, instance_name, limit))
+            updates = [
+                (
+                    row[0],
+                    (
+                        row[1],
+                        bool(row[2]),
+                    ),
+                )
+                for row in txn
+            ]
+            limited = False
+            upto_token = current_id
+            if len(updates) >= limit:
+                upto_token = updates[-1][0]
+                limited = True
+
+            return updates, upto_token, limited
+
+        return await self.db_pool.runInteraction(
+            "get_un_partial_stated_events_from_stream",
+            get_un_partial_stated_events_from_stream_txn,
+        )
+
     def process_replication_rows(
         self,
         stream_name: str,
@@ -285,31 +406,29 @@ class EventsWorkerStore(SQLBaseStore):
         token: int,
         rows: Iterable[Any],
     ) -> None:
+        if stream_name == UnPartialStatedEventStream.NAME:
+            for row in rows:
+                assert isinstance(row, UnPartialStatedEventStreamRow)
+
+                self.is_partial_state_event.invalidate((row.event_id,))
+
+                if row.rejection_status_changed:
+                    # If the partial-stated event became rejected or unrejected
+                    # when it wasn't before, we need to invalidate this cache.
+                    self._invalidate_local_get_event_cache(row.event_id)
+
+        super().process_replication_rows(stream_name, instance_name, token, rows)
+
+    def process_replication_position(
+        self, stream_name: str, instance_name: str, token: int
+    ) -> None:
         if stream_name == EventsStream.NAME:
             self._stream_id_gen.advance(instance_name, token)
         elif stream_name == BackfillStream.NAME:
             self._backfill_id_gen.advance(instance_name, -token)
-
-        super().process_replication_rows(stream_name, instance_name, token, rows)
-
-    async def get_received_ts(self, event_id: str) -> Optional[int]:
-        """Get received_ts (when it was persisted) for the event.
-
-        Raises an exception for unknown events.
-
-        Args:
-            event_id: The event ID to query.
-
-        Returns:
-            Timestamp in milliseconds, or None for events that were persisted
-            before received_ts was implemented.
-        """
-        return await self.db_pool.simple_select_one_onecol(
-            table="events",
-            keyvalues={"event_id": event_id},
-            retcol="received_ts",
-            desc="get_received_ts",
-        )
+        elif stream_name == UnPartialStatedEventStream.NAME:
+            self._un_partial_stated_events_stream_id_gen.advance(instance_name, token)
+        super().process_replication_position(stream_name, instance_name, token)
 
     async def have_censored_event(self, event_id: str) -> bool:
         """Check if an event has been censored, i.e. if the content of the event has been erased
@@ -355,6 +474,7 @@ class EventsWorkerStore(SQLBaseStore):
     ) -> Optional[EventBase]:
         ...
 
+    @cancellable
     async def get_event(
         self,
         event_id: str,
@@ -388,7 +508,7 @@ class EventsWorkerStore(SQLBaseStore):
                 If there is a mismatch, behave as per allow_none.
 
         Returns:
-            The event, or None if the event was not found.
+            The event, or None if the event was not found and allow_none is `True`.
         """
         if not isinstance(event_id, str):
             raise TypeError("Invalid event event_id %r" % (event_id,))
@@ -447,6 +567,9 @@ class EventsWorkerStore(SQLBaseStore):
 
         return {e.event_id: e for e in events}
 
+    @trace
+    @tag_args
+    @cancellable
     async def get_events_as_list(
         self,
         event_ids: Collection[str],
@@ -485,7 +608,7 @@ class EventsWorkerStore(SQLBaseStore):
             return []
 
         # there may be duplicates so we cast the list to a set
-        event_entry_map = await self._get_events_from_cache_or_db(
+        event_entry_map = await self.get_unredacted_events_from_cache_or_db(
             set(event_ids), allow_rejected=allow_rejected
         )
 
@@ -520,7 +643,9 @@ class EventsWorkerStore(SQLBaseStore):
                     continue
 
                 redacted_event_id = entry.event.redacts
-                event_map = await self._get_events_from_cache_or_db([redacted_event_id])
+                event_map = await self.get_unredacted_events_from_cache_or_db(
+                    [redacted_event_id]
+                )
                 original_event_entry = event_map.get(redacted_event_id)
                 if not original_event_entry:
                     # we don't have the redacted event (or it was rejected).
@@ -598,10 +723,16 @@ class EventsWorkerStore(SQLBaseStore):
 
         return events
 
-    async def _get_events_from_cache_or_db(
-        self, event_ids: Iterable[str], allow_rejected: bool = False
+    @cancellable
+    async def get_unredacted_events_from_cache_or_db(
+        self,
+        event_ids: Iterable[str],
+        allow_rejected: bool = False,
     ) -> Dict[str, EventCacheEntry]:
         """Fetch a bunch of events from the cache or the database.
+
+        Note that the events pulled by this function will not have any redactions
+        applied, and no guarantee is made about the ordering of the events returned.
 
         If events are pulled from the database, they will be cached for future lookups.
 
@@ -617,7 +748,11 @@ class EventsWorkerStore(SQLBaseStore):
         Returns:
             map from event id to result
         """
-        event_entry_map = self._get_events_from_cache(
+        # Shortcut: check if we have any events in the *in memory* cache - this function
+        # may be called repeatedly for the same event so at this point we cannot reach
+        # out to any external cache for performance reasons. The external cache is
+        # checked later on in the `get_missing_events_from_cache_or_db` function below.
+        event_entry_map = self._get_events_from_local_cache(
             event_ids,
         )
 
@@ -649,7 +784,9 @@ class EventsWorkerStore(SQLBaseStore):
 
         if missing_events_ids:
 
-            async def get_missing_events_from_db() -> Dict[str, EventCacheEntry]:
+            async def get_missing_events_from_cache_or_db() -> (
+                Dict[str, EventCacheEntry]
+            ):
                 """Fetches the events in `missing_event_ids` from the database.
 
                 Also creates entries in `self._current_event_fetches` to allow
@@ -675,9 +812,16 @@ class EventsWorkerStore(SQLBaseStore):
                 # out of the database to check it.
                 #
                 try:
-                    missing_events = await self._get_events_from_db(
+                    # Try to fetch from any external cache. We already checked the
+                    # in-memory cache above.
+                    missing_events = await self._get_events_from_external_cache(
                         missing_events_ids,
                     )
+                    # Now actually fetch any remaining events from the DB
+                    db_missing_events = await self._get_events_from_db(
+                        missing_events_ids - missing_events.keys(),
+                    )
+                    missing_events.update(db_missing_events)
                 except Exception as e:
                     with PreserveLoggingContext():
                         fetching_deferred.errback(e)
@@ -696,7 +840,7 @@ class EventsWorkerStore(SQLBaseStore):
             # cancellations, since multiple `_get_events_from_cache_or_db` calls can
             # reuse the same fetch.
             missing_events: Dict[str, EventCacheEntry] = await delay_cancellation(
-                get_missing_events_from_db()
+                get_missing_events_from_cache_or_db()
             )
             event_entry_map.update(missing_events)
 
@@ -729,15 +873,105 @@ class EventsWorkerStore(SQLBaseStore):
 
         return event_entry_map
 
-    def _invalidate_get_event_cache(self, event_id: str) -> None:
-        self._get_event_cache.invalidate((event_id,))
+    def invalidate_get_event_cache_after_txn(
+        self, txn: LoggingTransaction, event_id: str
+    ) -> None:
+        """
+        Prepares a database transaction to invalidate the get event cache for a given
+        event ID when executed successfully. This is achieved by attaching two callbacks
+        to the transaction, one to invalidate the async cache and one for the in memory
+        sync cache (importantly called in that order).
+
+        Arguments:
+            txn: the database transaction to attach the callbacks to
+            event_id: the event ID to be invalidated from caches
+        """
+
+        txn.async_call_after(self._invalidate_async_get_event_cache, event_id)
+        txn.call_after(self._invalidate_local_get_event_cache, event_id)
+
+    async def _invalidate_async_get_event_cache(self, event_id: str) -> None:
+        """
+        Invalidates an event in the asynchronous get event cache, which may be remote.
+
+        Arguments:
+            event_id: the event ID to invalidate
+        """
+
+        await self._get_event_cache.invalidate((event_id,))
+
+    def _invalidate_local_get_event_cache(self, event_id: str) -> None:
+        """
+        Invalidates an event in local in-memory get event caches.
+
+        Arguments:
+            event_id: the event ID to invalidate
+        """
+
+        self._get_event_cache.invalidate_local((event_id,))
         self._event_ref.pop(event_id, None)
         self._current_event_fetches.pop(event_id, None)
 
-    def _get_events_from_cache(
+    def _invalidate_local_get_event_cache_room_id(self, room_id: str) -> None:
+        """Clears the in-memory get event caches for a room.
+
+        Used when we purge room history.
+        """
+        self._get_event_cache.invalidate_on_extra_index_local((room_id,))
+        self._event_ref.clear()
+        self._current_event_fetches.clear()
+
+    async def _get_events_from_cache(
         self, events: Iterable[str], update_metrics: bool = True
     ) -> Dict[str, EventCacheEntry]:
-        """Fetch events from the caches.
+        """Fetch events from the caches, both in memory and any external.
+
+        May return rejected events.
+
+        Args:
+            events: list of event_ids to fetch
+            update_metrics: Whether to update the cache hit ratio metrics
+        """
+        event_map = self._get_events_from_local_cache(
+            events, update_metrics=update_metrics
+        )
+
+        missing_event_ids = (e for e in events if e not in event_map)
+        event_map.update(
+            await self._get_events_from_external_cache(
+                events=missing_event_ids,
+                update_metrics=update_metrics,
+            )
+        )
+
+        return event_map
+
+    async def _get_events_from_external_cache(
+        self, events: Iterable[str], update_metrics: bool = True
+    ) -> Dict[str, EventCacheEntry]:
+        """Fetch events from any configured external cache.
+
+        May return rejected events.
+
+        Args:
+            events: list of event_ids to fetch
+            update_metrics: Whether to update the cache hit ratio metrics
+        """
+        event_map = {}
+
+        for event_id in events:
+            ret = await self._get_event_cache.get_external(
+                (event_id,), None, update_metrics=update_metrics
+            )
+            if ret:
+                event_map[event_id] = ret
+
+        return event_map
+
+    def _get_events_from_local_cache(
+        self, events: Iterable[str], update_metrics: bool = True
+    ) -> Dict[str, EventCacheEntry]:
+        """Fetch events from the local, in memory, caches.
 
         May return rejected events.
 
@@ -749,7 +983,7 @@ class EventsWorkerStore(SQLBaseStore):
 
         for event_id in events:
             # First check if it's in the event cache
-            ret = self._get_event_cache.get(
+            ret = self._get_event_cache.get_local(
                 (event_id,), None, update_metrics=update_metrics
             )
             if ret:
@@ -771,14 +1005,14 @@ class EventsWorkerStore(SQLBaseStore):
 
                 # We add the entry back into the cache as we want to keep
                 # recently queried events in the cache.
-                self._get_event_cache.set((event_id,), cache_entry)
+                self._get_event_cache.set_local((event_id,), cache_entry)
 
         return event_map
 
     async def get_stripped_room_state_from_event_context(
         self,
         context: EventContext,
-        state_types_to_include: Container[str],
+        state_keys_to_include: StateFilter,
         membership_user_id: Optional[str] = None,
     ) -> List[JsonDict]:
         """
@@ -791,7 +1025,7 @@ class EventsWorkerStore(SQLBaseStore):
 
         Args:
             context: The event context to retrieve state of the room from.
-            state_types_to_include: The type of state events to include.
+            state_keys_to_include: The state events to include, for each event type.
             membership_user_id: An optional user ID to include the stripped membership state
                 events of. This is useful when generating the stripped state of a room for
                 invites. We want to send membership events of the inviter, so that the
@@ -800,21 +1034,25 @@ class EventsWorkerStore(SQLBaseStore):
         Returns:
             A list of dictionaries, each representing a stripped state event from the room.
         """
-        current_state_ids = await context.get_current_state_ids()
+        if membership_user_id:
+            types = chain(
+                state_keys_to_include.to_types(),
+                [(EventTypes.Member, membership_user_id)],
+            )
+            filter = StateFilter.from_types(types)
+        else:
+            filter = state_keys_to_include
+        selected_state_ids = await context.get_current_state_ids(filter)
 
         # We know this event is not an outlier, so this must be
         # non-None.
-        assert current_state_ids is not None
+        assert selected_state_ids is not None
 
-        # The state to include
-        state_to_include_ids = [
-            e_id
-            for k, e_id in current_state_ids.items()
-            if k[0] in state_types_to_include
-            or (membership_user_id and k == (EventTypes.Member, membership_user_id))
-        ]
+        # Confusingly, get_current_state_events may return events that are discarded by
+        # the filter, if they're in context._state_delta_due_to_event. Strip these away.
+        selected_state_ids = filter.filter_state(selected_state_ids)
 
-        state_to_include = await self.get_events(state_to_include_ids)
+        state_to_include = await self.get_events(selected_state_ids.values())
 
         return [
             {
@@ -965,7 +1203,13 @@ class EventsWorkerStore(SQLBaseStore):
                 }
 
                 row_dict = self.db_pool.new_transaction(
-                    conn, "do_fetch", [], [], self._fetch_event_rows, events_to_fetch
+                    conn,
+                    "do_fetch",
+                    [],
+                    [],
+                    [],
+                    self._fetch_event_rows,
+                    events_to_fetch,
                 )
 
                 # We only want to resolve deferreds from the main thread
@@ -1006,23 +1250,42 @@ class EventsWorkerStore(SQLBaseStore):
         """
         fetched_event_ids: Set[str] = set()
         fetched_events: Dict[str, _EventRow] = {}
-        events_to_fetch = event_ids
 
-        while events_to_fetch:
-            row_map = await self._enqueue_events(events_to_fetch)
+        async def _fetch_event_ids_and_get_outstanding_redactions(
+            event_ids_to_fetch: Collection[str],
+        ) -> Collection[str]:
+            """
+            Fetch all of the given event_ids and return any associated redaction event_ids
+            that we still need to fetch in the next iteration.
+            """
+            row_map = await self._enqueue_events(event_ids_to_fetch)
 
             # we need to recursively fetch any redactions of those events
             redaction_ids: Set[str] = set()
-            for event_id in events_to_fetch:
+            for event_id in event_ids_to_fetch:
                 row = row_map.get(event_id)
                 fetched_event_ids.add(event_id)
                 if row:
                     fetched_events[event_id] = row
                     redaction_ids.update(row.redactions)
 
-            events_to_fetch = redaction_ids.difference(fetched_event_ids)
-            if events_to_fetch:
-                logger.debug("Also fetching redaction events %s", events_to_fetch)
+            event_ids_to_fetch = redaction_ids.difference(fetched_event_ids)
+            return event_ids_to_fetch
+
+        # Grab the initial list of events requested
+        event_ids_to_fetch = await _fetch_event_ids_and_get_outstanding_redactions(
+            event_ids
+        )
+        # Then go and recursively find all of the associated redactions
+        with start_active_span("recursively fetching redactions"):
+            while event_ids_to_fetch:
+                logger.debug("Also fetching redaction events %s", event_ids_to_fetch)
+
+                event_ids_to_fetch = (
+                    await _fetch_event_ids_and_get_outstanding_redactions(
+                        event_ids_to_fetch
+                    )
+                )
 
         # build a map from event_id to EventBase
         event_map: Dict[str, EventBase] = {}
@@ -1050,25 +1313,27 @@ class EventsWorkerStore(SQLBaseStore):
             if format_version is None:
                 # This means that we stored the event before we had the concept
                 # of a event format version, so it must be a V1 event.
-                format_version = EventFormatVersions.V1
+                format_version = EventFormatVersions.ROOM_V1_V2
 
             room_version_id = row.room_version_id
 
             room_version: Optional[RoomVersion]
             if not room_version_id:
                 # this should only happen for out-of-band membership events which
-                # arrived before #6983 landed. For all other events, we should have
+                # arrived before https://github.com/matrix-org/synapse/issues/6983
+                # landed. For all other events, we should have
                 # an entry in the 'rooms' table.
                 #
                 # However, the 'out_of_band_membership' flag is unreliable for older
                 # invites, so just accept it for all membership events.
                 #
                 if d["type"] != EventTypes.Member:
-                    raise Exception(
+                    raise InvalidEventError(
                         "Room %s for event %s is unknown" % (d["room_id"], event_id)
                     )
 
-                # so, assuming this is an out-of-band-invite that arrived before #6983
+                # so, assuming this is an out-of-band-invite that arrived before
+                # https://github.com/matrix-org/synapse/issues/6983
                 # landed, we know that the room version must be v5 or earlier (because
                 # v6 hadn't been invented at that point, so invites from such rooms
                 # would have been rejected.)
@@ -1080,10 +1345,10 @@ class EventsWorkerStore(SQLBaseStore):
                 #
                 # So, the following approximations should be adequate.
 
-                if format_version == EventFormatVersions.V1:
+                if format_version == EventFormatVersions.ROOM_V1_V2:
                     # if it's event format v1 then it must be room v1 or v2
                     room_version = RoomVersions.V1
-                elif format_version == EventFormatVersions.V2:
+                elif format_version == EventFormatVersions.ROOM_V3:
                     # if it's event format v2 then it must be room v3
                     room_version = RoomVersions.V3
                 else:
@@ -1148,7 +1413,7 @@ class EventsWorkerStore(SQLBaseStore):
                 event=original_ev, redacted_event=redacted_event
             )
 
-            self._get_event_cache.set((event_id,), cache_entry)
+            await self._get_event_cache.set((event_id,), cache_entry)
             result_map[event_id] = cache_entry
 
             if not redacted_event:
@@ -1233,7 +1498,7 @@ class EventsWorkerStore(SQLBaseStore):
                     room_version_id=row[5],
                     rejected_reason=row[6],
                     redactions=[],
-                    outlier=row[7],
+                    outlier=bool(row[7]),  # This is an int in SQLite3
                 )
 
             # check for redactions
@@ -1243,7 +1508,7 @@ class EventsWorkerStore(SQLBaseStore):
 
             txn.execute(redactions_sql + clause, args)
 
-            for (redacter, redacted) in txn:
+            for redacter, redacted in txn:
                 d = event_dict.get(redacted)
                 if d:
                     d.redactions.append(redacter)
@@ -1329,17 +1594,22 @@ class EventsWorkerStore(SQLBaseStore):
         """Given a list of event ids, check if we have already processed and
         stored them as non outliers.
         """
-        rows = await self.db_pool.simple_select_many_batch(
-            table="events",
-            retcols=("event_id",),
-            column="event_id",
-            iterable=list(event_ids),
-            keyvalues={"outlier": False},
-            desc="have_events_in_timeline",
+        rows = cast(
+            List[Tuple[str]],
+            await self.db_pool.simple_select_many_batch(
+                table="events",
+                retcols=("event_id",),
+                column="event_id",
+                iterable=list(event_ids),
+                keyvalues={"outlier": False},
+                desc="have_events_in_timeline",
+            ),
         )
 
-        return {r["event_id"] for r in rows}
+        return {r[0] for r in rows}
 
+    @trace
+    @tag_args
     async def have_seen_events(
         self, room_id: str, event_ids: Iterable[str]
     ) -> Set[str]:
@@ -1362,34 +1632,36 @@ class EventsWorkerStore(SQLBaseStore):
         # the batches as big as possible.
 
         results: Set[str] = set()
-        for chunk in batch_iter(event_ids, 500):
-            r = await self._have_seen_events_dict(
-                [(room_id, event_id) for event_id in chunk]
+        for event_ids_chunk in batch_iter(event_ids, 500):
+            events_seen_dict = await self._have_seen_events_dict(
+                room_id, event_ids_chunk
             )
-            results.update(eid for ((_rid, eid), have_event) in r.items() if have_event)
+            results.update(
+                eid for (eid, have_event) in events_seen_dict.items() if have_event
+            )
 
         return results
 
-    @cachedList(cached_method_name="have_seen_event", list_name="keys")
+    @cachedList(cached_method_name="have_seen_event", list_name="event_ids")
     async def _have_seen_events_dict(
-        self, keys: Collection[Tuple[str, str]]
-    ) -> Dict[Tuple[str, str], bool]:
+        self,
+        room_id: str,
+        event_ids: Collection[str],
+    ) -> Mapping[str, bool]:
         """Helper for have_seen_events
 
         Returns:
-             a dict {(room_id, event_id)-> bool}
+             a dict {event_id -> bool}
         """
-        # if the event cache contains the event, obviously we've seen it.
+        # TODO: We used to query the _get_event_cache here as a fast-path before
+        #  hitting the database. For if an event were in the cache, we've presumably
+        #  seen it before.
+        #
+        #  But this is currently an invalid assumption due to the _get_event_cache
+        #  not being invalidated when purging events from a room. The optimisation can
+        #  be re-added after https://github.com/matrix-org/synapse/issues/13476
 
-        cache_results = {
-            (rid, eid) for (rid, eid) in keys if self._get_event_cache.contains((eid,))
-        }
-        results = dict.fromkeys(cache_results, True)
-        remaining = [k for k in keys if k not in cache_results]
-        if not remaining:
-            return results
-
-        def have_seen_events_txn(txn: LoggingTransaction) -> None:
+        def have_seen_events_txn(txn: LoggingTransaction) -> Dict[str, bool]:
             # we deliberately do *not* query the database for room_id, to make the
             # query an index-only lookup on `events_event_id_key`.
             #
@@ -1397,23 +1669,22 @@ class EventsWorkerStore(SQLBaseStore):
 
             sql = "SELECT event_id FROM events AS e WHERE "
             clause, args = make_in_list_sql_clause(
-                txn.database_engine, "e.event_id", [eid for (_rid, eid) in remaining]
+                txn.database_engine, "e.event_id", event_ids
             )
             txn.execute(sql + clause, args)
             found_events = {eid for eid, in txn}
 
             # ... and then we can update the results for each key
-            results.update(
-                {(rid, eid): (eid in found_events) for (rid, eid) in remaining}
-            )
+            return {eid: (eid in found_events) for eid in event_ids}
 
-        await self.db_pool.runInteraction("have_seen_events", have_seen_events_txn)
-        return results
+        return await self.db_pool.runInteraction(
+            "have_seen_events", have_seen_events_txn
+        )
 
     @cached(max_entries=100000, tree=True)
     async def have_seen_event(self, room_id: str, event_id: str) -> bool:
-        res = await self._have_seen_events_dict(((room_id, event_id),))
-        return res[(room_id, event_id)]
+        res = await self._have_seen_events_dict(room_id, [event_id])
+        return res[event_id]
 
     def _get_current_state_event_counts_txn(
         self, txn: LoggingTransaction, room_id: str
@@ -1453,7 +1724,7 @@ class EventsWorkerStore(SQLBaseStore):
             room_id: The room ID to query.
 
         Returns:
-            dict[str:float] of complexity version to complexity.
+            Map of complexity version to complexity.
         """
         state_events = await self.get_current_state_event_counts(room_id)
 
@@ -1465,7 +1736,7 @@ class EventsWorkerStore(SQLBaseStore):
 
     async def get_all_new_forward_event_rows(
         self, instance_name: str, last_id: int, current_id: int, limit: int
-    ) -> List[Tuple[int, str, str, str, str, str, str, str, str]]:
+    ) -> List[Tuple[int, str, str, str, str, str, str, str, bool, bool]]:
         """Returns new events, for the Events replication stream
 
         Args:
@@ -1481,10 +1752,11 @@ class EventsWorkerStore(SQLBaseStore):
 
         def get_all_new_forward_event_rows(
             txn: LoggingTransaction,
-        ) -> List[Tuple[int, str, str, str, str, str, str, str, str]]:
+        ) -> List[Tuple[int, str, str, str, str, str, str, str, bool, bool]]:
             sql = (
                 "SELECT e.stream_ordering, e.event_id, e.room_id, e.type,"
-                " se.state_key, redacts, relates_to_id, membership, rejections.reason IS NOT NULL"
+                " se.state_key, redacts, relates_to_id, membership, rejections.reason IS NOT NULL,"
+                " e.outlier"
                 " FROM events AS e"
                 " LEFT JOIN redactions USING (event_id)"
                 " LEFT JOIN state_events AS se USING (event_id)"
@@ -1498,7 +1770,8 @@ class EventsWorkerStore(SQLBaseStore):
             )
             txn.execute(sql, (last_id, current_id, instance_name, limit))
             return cast(
-                List[Tuple[int, str, str, str, str, str, str, str, str]], txn.fetchall()
+                List[Tuple[int, str, str, str, str, str, str, str, bool, bool]],
+                txn.fetchall(),
             )
 
         return await self.db_pool.runInteraction(
@@ -1507,7 +1780,7 @@ class EventsWorkerStore(SQLBaseStore):
 
     async def get_ex_outlier_stream_rows(
         self, instance_name: str, last_id: int, current_id: int
-    ) -> List[Tuple[int, str, str, str, str, str, str, str, str]]:
+    ) -> List[Tuple[int, str, str, str, str, str, str, str, bool, bool]]:
         """Returns de-outliered events, for the Events replication stream
 
         Args:
@@ -1522,26 +1795,30 @@ class EventsWorkerStore(SQLBaseStore):
 
         def get_ex_outlier_stream_rows_txn(
             txn: LoggingTransaction,
-        ) -> List[Tuple[int, str, str, str, str, str, str, str, str]]:
+        ) -> List[Tuple[int, str, str, str, str, str, str, str, bool, bool]]:
             sql = (
-                "SELECT event_stream_ordering, e.event_id, e.room_id, e.type,"
-                " se.state_key, redacts, relates_to_id, membership, rejections.reason IS NOT NULL"
+                "SELECT out.event_stream_ordering, e.event_id, e.room_id, e.type,"
+                " se.state_key, redacts, relates_to_id, membership, rejections.reason IS NOT NULL,"
+                " e.outlier"
                 " FROM events AS e"
+                # NB: the next line (inner join) is what makes this query different from
+                # get_all_new_forward_event_rows.
                 " INNER JOIN ex_outlier_stream AS out USING (event_id)"
                 " LEFT JOIN redactions USING (event_id)"
                 " LEFT JOIN state_events AS se USING (event_id)"
                 " LEFT JOIN event_relations USING (event_id)"
                 " LEFT JOIN room_memberships USING (event_id)"
                 " LEFT JOIN rejections USING (event_id)"
-                " WHERE ? < event_stream_ordering"
-                " AND event_stream_ordering <= ?"
+                " WHERE ? < out.event_stream_ordering"
+                " AND out.event_stream_ordering <= ?"
                 " AND out.instance_name = ?"
-                " ORDER BY event_stream_ordering ASC"
+                " ORDER BY out.event_stream_ordering ASC"
             )
 
             txn.execute(sql, (last_id, current_id, instance_name))
             return cast(
-                List[Tuple[int, str, str, str, str, str, str, str, str]], txn.fetchall()
+                List[Tuple[int, str, str, str, str, str, str, str, bool, bool]],
+                txn.fetchall(),
             )
 
         return await self.db_pool.runInteraction(
@@ -1719,12 +1996,6 @@ class EventsWorkerStore(SQLBaseStore):
 
         return rows, to_token, True
 
-    async def is_event_after(self, event_id1: str, event_id2: str) -> bool:
-        """Returns True if event_id1 is after event_id2 in the stream"""
-        to_1, so_1 = await self.get_event_ordering(event_id1)
-        to_2, so_2 = await self.get_event_ordering(event_id2)
-        return (to_1, so_1) > (to_2, so_2)
-
     @cached(max_entries=5000)
     async def get_event_ordering(self, event_id: str) -> Tuple[int, int]:
         res = await self.db_pool.simple_select_one(
@@ -1737,7 +2008,7 @@ class EventsWorkerStore(SQLBaseStore):
         if not res:
             raise SynapseError(404, "Could not find event %s" % (event_id,))
 
-        return int(res["topological_ordering"]), int(res["stream_ordering"])
+        return int(res[0]), int(res[1])
 
     async def get_next_event_to_expire(self) -> Optional[Tuple[str, int]]:
         """Retrieve the entry with the lowest expiry timestamp in the event_expiry
@@ -1765,23 +2036,23 @@ class EventsWorkerStore(SQLBaseStore):
             desc="get_next_event_to_expire", func=get_next_event_to_expire_txn
         )
 
-    async def get_event_id_from_transaction_id(
-        self, room_id: str, user_id: str, token_id: int, txn_id: str
+    async def get_event_id_from_transaction_id_and_device_id(
+        self, room_id: str, user_id: str, device_id: str, txn_id: str
     ) -> Optional[str]:
         """Look up if we have already persisted an event for the transaction ID,
         returning the event ID if so.
         """
         return await self.db_pool.simple_select_one_onecol(
-            table="event_txn_id",
+            table="event_txn_id_device_id",
             keyvalues={
                 "room_id": room_id,
                 "user_id": user_id,
-                "token_id": token_id,
+                "device_id": device_id,
                 "txn_id": txn_id,
             },
             retcol="event_id",
             allow_none=True,
-            desc="get_event_id_from_transaction_id",
+            desc="get_event_id_from_transaction_id_and_device_id",
         )
 
     async def get_already_persisted_events(
@@ -1796,29 +2067,35 @@ class EventsWorkerStore(SQLBaseStore):
         """
 
         mapping = {}
-        txn_id_to_event: Dict[Tuple[str, int, str], str] = {}
+        txn_id_to_event: Dict[Tuple[str, str, str, str], str] = {}
 
         for event in events:
-            token_id = getattr(event.internal_metadata, "token_id", None)
+            device_id = getattr(event.internal_metadata, "device_id", None)
             txn_id = getattr(event.internal_metadata, "txn_id", None)
 
-            if token_id and txn_id:
+            if device_id and txn_id:
                 # Check if this is a duplicate of an event in the given events.
-                existing = txn_id_to_event.get((event.room_id, token_id, txn_id))
+                existing = txn_id_to_event.get(
+                    (event.room_id, event.sender, device_id, txn_id)
+                )
                 if existing:
                     mapping[event.event_id] = existing
                     continue
 
                 # Check if this is a duplicate of an event we've already
                 # persisted.
-                existing = await self.get_event_id_from_transaction_id(
-                    event.room_id, event.sender, token_id, txn_id
+                existing = await self.get_event_id_from_transaction_id_and_device_id(
+                    event.room_id, event.sender, device_id, txn_id
                 )
                 if existing:
                     mapping[event.event_id] = existing
-                    txn_id_to_event[(event.room_id, token_id, txn_id)] = existing
+                    txn_id_to_event[
+                        (event.room_id, event.sender, device_id, txn_id)
+                    ] = existing
                 else:
-                    txn_id_to_event[(event.room_id, token_id, txn_id)] = event.event_id
+                    txn_id_to_event[
+                        (event.room_id, event.sender, device_id, txn_id)
+                    ] = event.event_id
 
         return mapping
 
@@ -1827,11 +2104,11 @@ class EventsWorkerStore(SQLBaseStore):
         """Cleans out transaction id mappings older than 24hrs."""
 
         def _cleanup_old_transaction_ids_txn(txn: LoggingTransaction) -> None:
+            one_day_ago = self._clock.time_msec() - 24 * 60 * 60 * 1000
             sql = """
-                DELETE FROM event_txn_id
+                DELETE FROM event_txn_id_device_id
                 WHERE inserted_ts < ?
             """
-            one_day_ago = self._clock.time_msec() - 24 * 60 * 60 * 1000
             txn.execute(sql, (one_day_ago,))
 
         return await self.db_pool.runInteraction(
@@ -1845,11 +2122,16 @@ class EventsWorkerStore(SQLBaseStore):
 
         Args:
             room_id: room where the event lives
-            event_id: event to check
+            event: event to check (can't be an `outlier`)
 
         Returns:
             Boolean indicating whether it's an extremity
         """
+
+        assert not event.internal_metadata.is_outlier(), (
+            "is_event_next_to_backward_gap(...) can't be used with `outlier` events. "
+            "This function relies on `event_backward_extremities` which won't be filled in for `outliers`."
+        )
 
         def is_event_next_to_backward_gap_txn(txn: LoggingTransaction) -> bool:
             # If the event in question has any of its prev_events listed as a
@@ -1900,11 +2182,16 @@ class EventsWorkerStore(SQLBaseStore):
 
         Args:
             room_id: room where the event lives
-            event_id: event to check
+            event: event to check (can't be an `outlier`)
 
         Returns:
             Boolean indicating whether it's an extremity
         """
+
+        assert not event.internal_metadata.is_outlier(), (
+            "is_event_next_to_forward_gap(...) can't be used with `outlier` events. "
+            "This function relies on `event_edges` and `event_forward_extremities` which won't be filled in for `outliers`."
+        )
 
         def is_event_next_to_gap_txn(txn: LoggingTransaction) -> bool:
             # If the event in question is a forward extremity, we will just
@@ -1971,7 +2258,7 @@ class EventsWorkerStore(SQLBaseStore):
         )
 
     async def get_event_id_for_timestamp(
-        self, room_id: str, timestamp: int, direction: str
+        self, room_id: str, timestamp: int, direction: Direction
     ) -> Optional[str]:
         """Find the closest event to the given timestamp in the given direction.
 
@@ -1979,42 +2266,57 @@ class EventsWorkerStore(SQLBaseStore):
             room_id: Room to fetch the event from
             timestamp: The point in time (inclusive) we should navigate from in
                 the given direction to find the closest event.
-            direction: ["f"|"b"] to indicate whether we should navigate forward
+            direction: indicates whether we should navigate forward
                 or backward from the given timestamp to find the closest event.
 
         Returns:
             The closest event_id otherwise None if we can't find any event in
             the given direction.
         """
+        if direction == Direction.BACKWARDS:
+            # Find closest event *before* a given timestamp. We use descending
+            # (which gives values largest to smallest) because we want the
+            # largest possible timestamp *before* the given timestamp.
+            comparison_operator = "<="
+            order = "DESC"
+        else:
+            # Find closest event *after* a given timestamp. We use ascending
+            # (which gives values smallest to largest) because we want the
+            # closest possible timestamp *after* the given timestamp.
+            comparison_operator = ">="
+            order = "ASC"
 
-        sql_template = """
+        sql_template = f"""
             SELECT event_id FROM events
             LEFT JOIN rejections USING (event_id)
             WHERE
-                origin_server_ts %s ?
-                AND room_id = ?
+                room_id = ?
+                AND origin_server_ts {comparison_operator} ?
+                /**
+                 * Make sure the event isn't an `outlier` because we have no way
+                 * to later check whether it's next to a gap. `outliers` do not
+                 * have entries in the `event_edges`, `event_forward_extremeties`,
+                 * and `event_backward_extremities` tables to check against
+                 * (used by `is_event_next_to_backward_gap` and `is_event_next_to_forward_gap`).
+                 */
+                AND NOT outlier
                 /* Make sure event is not rejected */
                 AND rejections.event_id IS NULL
-            ORDER BY origin_server_ts %s
+            /**
+             * First sort by the message timestamp. If the message timestamps are the
+             * same, we want the message that logically comes "next" (before/after
+             * the given timestamp) based on the DAG and its topological order (`depth`).
+             * Finally, we can tie-break based on when it was received on the server
+             * (`stream_ordering`).
+             */
+            ORDER BY origin_server_ts {order}, depth {order}, stream_ordering {order}
             LIMIT 1;
         """
 
         def get_event_id_for_timestamp_txn(txn: LoggingTransaction) -> Optional[str]:
-            if direction == "b":
-                # Find closest event *before* a given timestamp. We use descending
-                # (which gives values largest to smallest) because we want the
-                # largest possible timestamp *before* the given timestamp.
-                comparison_operator = "<="
-                order = "DESC"
-            else:
-                # Find closest event *after* a given timestamp. We use ascending
-                # (which gives values smallest to largest) because we want the
-                # closest possible timestamp *after* the given timestamp.
-                comparison_operator = ">="
-                order = "ASC"
-
             txn.execute(
-                sql_template % (comparison_operator, order), (timestamp, room_id)
+                sql_template,
+                (room_id, timestamp),
             )
             row = txn.fetchone()
             if row:
@@ -2022,9 +2324,6 @@ class EventsWorkerStore(SQLBaseStore):
                 return event_id
 
             return None
-
-        if direction not in ("f", "b"):
-            raise ValueError("Unknown direction: %s" % (direction,))
 
         return await self.db_pool.runInteraction(
             "get_event_id_for_timestamp_txn",
@@ -2034,7 +2333,7 @@ class EventsWorkerStore(SQLBaseStore):
     @cachedList(cached_method_name="is_partial_state_event", list_name="event_ids")
     async def get_partial_state_events(
         self, event_ids: Collection[str]
-    ) -> Dict[str, bool]:
+    ) -> Mapping[str, bool]:
         """Checks which of the given events have partial state
 
         Args:
@@ -2044,15 +2343,18 @@ class EventsWorkerStore(SQLBaseStore):
             a dict mapping from event id to partial-stateness. We return True for
             any of the events which are unknown (or are outliers).
         """
-        result = await self.db_pool.simple_select_many_batch(
-            table="partial_state_events",
-            column="event_id",
-            iterable=event_ids,
-            retcols=["event_id"],
-            desc="get_partial_state_events",
+        result = cast(
+            List[Tuple[str]],
+            await self.db_pool.simple_select_many_batch(
+                table="partial_state_events",
+                column="event_id",
+                iterable=event_ids,
+                retcols=["event_id"],
+                desc="get_partial_state_events",
+            ),
         )
         # convert the result to a dict, to make @cachedList work
-        partial = {r["event_id"] for r in result}
+        partial = {r[0] for r in result}
         return {e_id: e_id in partial for e_id in event_ids}
 
     @cached()
@@ -2068,7 +2370,15 @@ class EventsWorkerStore(SQLBaseStore):
         return result is not None
 
     async def get_partial_state_events_batch(self, room_id: str) -> List[str]:
-        """Get a list of events in the given room that have partial state"""
+        """
+        Get a list of events in the given room that:
+        - have partial state; and
+        - are ready to be resynced (because they have no prev_events that are
+          partial-stated)
+
+        See the docstring on `_get_partial_state_events_batch_txn` for more
+        information.
+        """
         return await self.db_pool.runInteraction(
             "get_partial_state_events_batch",
             self._get_partial_state_events_batch_txn,
@@ -2079,14 +2389,84 @@ class EventsWorkerStore(SQLBaseStore):
     def _get_partial_state_events_batch_txn(
         txn: LoggingTransaction, room_id: str
     ) -> List[str]:
+        # we want to work through the events from oldest to newest, so
+        # we only want events whose prev_events do *not* have partial state - hence
+        # the 'NOT EXISTS' clause in the below.
+        #
+        # This is necessary because ordering by stream ordering isn't quite enough
+        # to ensure that we work from oldest to newest event (in particular,
+        # if an event is initially persisted as an outlier and later de-outliered,
+        # it can end up with a lower stream_ordering than its prev_events).
+        #
+        # Typically this means we'll only return one event per batch, but that's
+        # hard to do much about.
+        #
+        # See also: https://github.com/matrix-org/synapse/issues/13001
         txn.execute(
             """
             SELECT event_id FROM partial_state_events AS pse
                 JOIN events USING (event_id)
-            WHERE pse.room_id = ?
+            WHERE pse.room_id = ? AND
+               NOT EXISTS(
+                  SELECT 1 FROM event_edges AS ee
+                     JOIN partial_state_events AS prev_pse ON (prev_pse.event_id=ee.prev_event_id)
+                     WHERE ee.event_id=pse.event_id
+               )
             ORDER BY events.stream_ordering
             LIMIT 100
             """,
             (room_id,),
         )
         return [row[0] for row in txn]
+
+    def mark_event_rejected_txn(
+        self,
+        txn: LoggingTransaction,
+        event_id: str,
+        rejection_reason: Optional[str],
+    ) -> None:
+        """Mark an event that was previously accepted as rejected, or vice versa
+
+        This can happen, for example, when resyncing state during a faster join.
+
+        It is the caller's responsibility to ensure that other workers are
+        sent a notification so that they call `_invalidate_local_get_event_cache()`.
+
+        Args:
+            txn:
+            event_id: ID of event to update
+            rejection_reason: reason it has been rejected, or None if it is now accepted
+        """
+        if rejection_reason is None:
+            logger.info(
+                "Marking previously-processed event %s as accepted",
+                event_id,
+            )
+            self.db_pool.simple_delete_txn(
+                txn,
+                "rejections",
+                keyvalues={"event_id": event_id},
+            )
+        else:
+            logger.info(
+                "Marking previously-processed event %s as rejected(%s)",
+                event_id,
+                rejection_reason,
+            )
+            self.db_pool.simple_upsert_txn(
+                txn,
+                table="rejections",
+                keyvalues={"event_id": event_id},
+                values={
+                    "reason": rejection_reason,
+                    "last_check": self._clock.time_msec(),
+                },
+            )
+        self.db_pool.simple_update_txn(
+            txn,
+            table="events",
+            keyvalues={"event_id": event_id},
+            updatevalues={"rejection_reason": rejection_reason},
+        )
+
+        self.invalidate_get_event_cache_after_txn(txn, event_id)

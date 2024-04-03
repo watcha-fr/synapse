@@ -1,23 +1,30 @@
-# Copyright 2014-2016 OpenMarket Ltd
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2020 The Matrix.org Foundation C.I.C.
+# Copyright 2014-2016 OpenMarket Ltd
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 from collections import OrderedDict
 from typing import Hashable, Optional, Tuple
 
 from synapse.api.errors import LimitExceededError
-from synapse.config.ratelimiting import RateLimitConfig
+from synapse.config.ratelimiting import RatelimitSettings
 from synapse.storage.databases.main import DataStore
 from synapse.types import Requester
 from synapse.util import Clock
@@ -27,27 +34,75 @@ class Ratelimiter:
     """
     Ratelimit actions marked by arbitrary keys.
 
+    (Note that the source code speaks of "actions" and "burst_count" rather than
+    "tokens" and a "bucket_size".)
+
+    This is a "leaky bucket as a meter". For each key to be tracked there is a bucket
+    containing some number 0 <= T <= `burst_count` of tokens corresponding to previously
+    permitted requests for that key. Each bucket starts empty, and gradually leaks
+    tokens at a rate of `rate_hz`.
+
+    Upon an incoming request, we must determine:
+    - the key that this request falls under (which bucket to inspect), and
+    - the cost C of this request in tokens.
+    Then, if there is room in the bucket for C tokens (T + C <= `burst_count`),
+    the request is permitted and `cost` tokens are added to the bucket.
+    Otherwise, the request is denied, and the bucket continues to hold T tokens.
+
+    This means that the limiter enforces an average request frequency of `rate_hz`,
+    while accumulating a buffer of up to `burst_count` requests which can be consumed
+    instantaneously.
+
+    The tricky bit is the leaking. We do not want to have a periodic process which
+    leaks every bucket! Instead, we track
+    - the time point when the bucket was last completely empty, and
+    - how many tokens have added to the bucket permitted since then.
+    Then for each incoming request, we can calculate how many tokens have leaked
+    since this time point, and use that to decide if we should accept or reject the
+    request.
+
     Args:
+        store: The datastore providing get_ratelimit_for_user.
         clock: A homeserver clock, for retrieving the current time
-        rate_hz: The long term number of actions that can be performed in a second.
-        burst_count: How many actions that can be performed before being limited.
+        cfg: The ratelimit configuration for this rate limiter including the
+            allowed rate and burst count.
     """
 
     def __init__(
-        self, store: DataStore, clock: Clock, rate_hz: float, burst_count: int
+        self,
+        store: DataStore,
+        clock: Clock,
+        cfg: RatelimitSettings,
     ):
         self.clock = clock
-        self.rate_hz = rate_hz
-        self.burst_count = burst_count
+        self.rate_hz = cfg.per_second
+        self.burst_count = cfg.burst_count
         self.store = store
+        self._limiter_name = cfg.key
 
-        # A ordered dictionary keeping track of actions, when they were last
-        # performed and how often. Each entry is a mapping from a key of arbitrary type
-        # to a tuple representing:
-        #   * How many times an action has occurred since a point in time
-        #   * The point in time
-        #   * The rate_hz of this particular entry. This can vary per request
+        # An ordered dictionary representing the token buckets tracked by this rate
+        # limiter. Each entry maps a key of arbitrary type to a tuple representing:
+        #   * The number of tokens currently in the bucket,
+        #   * The time point when the bucket was last completely empty, and
+        #   * The rate_hz (leak rate) of this particular bucket.
         self.actions: OrderedDict[Hashable, Tuple[float, float, float]] = OrderedDict()
+
+    def _get_key(
+        self, requester: Optional[Requester], key: Optional[Hashable]
+    ) -> Hashable:
+        """Use the requester's MXID as a fallback key if no key is provided."""
+        if key is None:
+            if not requester:
+                raise ValueError("Must supply at least one of `requester` or `key`")
+
+            key = requester.user.to_string()
+        return key
+
+    def _get_action_counts(
+        self, key: Hashable, time_now_s: float
+    ) -> Tuple[float, float, float]:
+        """Retrieve the action counts, with a fallback representing an empty bucket."""
+        return self.actions.get(key, (0.0, time_now_s, 0.0))
 
     async def can_do_action(
         self,
@@ -88,11 +143,7 @@ class Ratelimiter:
                 * The reactor timestamp for when the action can be performed next.
                   -1 if rate_hz is less than or equal to zero
         """
-        if key is None:
-            if not requester:
-                raise ValueError("Must supply at least one of `requester` or `key`")
-
-            key = requester.user.to_string()
+        key = self._get_key(requester, key)
 
         if requester:
             # Disable rate limiting of users belonging to any AS that is configured
@@ -121,7 +172,7 @@ class Ratelimiter:
         self._prune_message_counts(time_now_s)
 
         # Check if there is an existing count entry for this key
-        action_count, time_start, _ = self.actions.get(key, (0.0, time_now_s, 0.0))
+        action_count, time_start, _ = self._get_action_counts(key, time_now_s)
 
         # Check whether performing another action is allowed
         time_delta = time_now_s - time_start
@@ -163,6 +214,37 @@ class Ratelimiter:
             time_allowed = -1
 
         return allowed, time_allowed
+
+    def record_action(
+        self,
+        requester: Optional[Requester],
+        key: Optional[Hashable] = None,
+        n_actions: int = 1,
+        _time_now_s: Optional[float] = None,
+    ) -> None:
+        """Record that an action(s) took place, even if they violate the rate limit.
+
+        This is useful for tracking the frequency of events that happen across
+        federation which we still want to impose local rate limits on. For instance, if
+        we are alice.com monitoring a particular room, we cannot prevent bob.com
+        from joining users to that room. However, we can track the number of recent
+        joins in the room and refuse to serve new joins ourselves if there have been too
+        many in the room across both homeservers.
+
+        Args:
+            requester: The requester that is doing the action, if any.
+            key: An arbitrary key used to classify an action. Defaults to the
+                requester's user ID.
+            n_actions: The number of times the user wants to do this action. If the user
+                cannot do all of the actions, the user's action count is not incremented
+                at all.
+            _time_now_s: The current time. Optional, defaults to the current time according
+                to self.clock. Only used by tests.
+        """
+        key = self._get_key(requester, key)
+        time_now_s = _time_now_s if _time_now_s is not None else self.clock.time()
+        action_count, time_start, rate_hz = self._get_action_counts(key, time_now_s)
+        self.actions[key] = (action_count + n_actions, time_start, rate_hz)
 
     def _prune_message_counts(self, time_now_s: float) -> None:
         """Remove message count entries that have not exceeded their defined
@@ -235,7 +317,8 @@ class Ratelimiter:
 
         if not allowed:
             raise LimitExceededError(
-                retry_after_ms=int(1000 * (time_allowed - time_now_s))
+                limiter_name=self._limiter_name,
+                retry_after_ms=int(1000 * (time_allowed - time_now_s)),
             )
 
 
@@ -244,15 +327,17 @@ class RequestRatelimiter:
         self,
         store: DataStore,
         clock: Clock,
-        rc_message: RateLimitConfig,
-        rc_admin_redaction: Optional[RateLimitConfig],
+        rc_message: RatelimitSettings,
+        rc_admin_redaction: Optional[RatelimitSettings],
     ):
         self.store = store
         self.clock = clock
 
         # The rate_hz and burst_count are overridden on a per-user basis
         self.request_ratelimiter = Ratelimiter(
-            store=self.store, clock=self.clock, rate_hz=0, burst_count=0
+            store=self.store,
+            clock=self.clock,
+            cfg=RatelimitSettings(key=rc_message.key, per_second=0, burst_count=0),
         )
         self._rc_message = rc_message
 
@@ -262,8 +347,7 @@ class RequestRatelimiter:
             self.admin_redaction_ratelimiter: Optional[Ratelimiter] = Ratelimiter(
                 store=self.store,
                 clock=self.clock,
-                rate_hz=rc_admin_redaction.per_second,
-                burst_count=rc_admin_redaction.burst_count,
+                cfg=rc_admin_redaction,
             )
         else:
             self.admin_redaction_ratelimiter = None
@@ -273,6 +357,7 @@ class RequestRatelimiter:
         requester: Requester,
         update: bool = True,
         is_admin_redaction: bool = False,
+        n_actions: int = 1,
     ) -> None:
         """Ratelimits requests.
 
@@ -285,6 +370,8 @@ class RequestRatelimiter:
             is_admin_redaction: Whether this is a room admin/moderator
                 redacting an event. If so then we may apply different
                 ratelimits depending on config.
+            n_actions: Multiplier for the number of actions to apply to the
+                rate limiter at once.
 
         Raises:
             LimitExceededError if the request should be ratelimited
@@ -313,7 +400,9 @@ class RequestRatelimiter:
         if is_admin_redaction and self.admin_redaction_ratelimiter:
             # If we have separate config for admin redactions, use a separate
             # ratelimiter as to not have user_ids clash
-            await self.admin_redaction_ratelimiter.ratelimit(requester, update=update)
+            await self.admin_redaction_ratelimiter.ratelimit(
+                requester, update=update, n_actions=n_actions
+            )
         else:
             # Override rate and burst count per-user
             await self.request_ratelimiter.ratelimit(
@@ -321,4 +410,5 @@ class RequestRatelimiter:
                 rate_hz=messages_per_second,
                 burst_count=burst_count,
                 update=update,
+                n_actions=n_actions,
             )

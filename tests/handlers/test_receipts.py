@@ -1,31 +1,42 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2021 Šimon Brandner <simon.bra.ag@gmail.com>
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 from copy import deepcopy
 from typing import List
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.api.constants import EduTypes, ReceiptTypes
+from synapse.server import HomeServer
 from synapse.types import JsonDict
+from synapse.util import Clock
 
 from tests import unittest
 
 
 class ReceiptsTestCase(unittest.HomeserverTestCase):
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.event_source = hs.get_event_sources().sources.receipt
 
-    def test_filters_out_private_receipt(self):
+    def test_filters_out_private_receipt(self) -> None:
         self._test_filters_private(
             [
                 {
@@ -45,7 +56,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             [],
         )
 
-    def test_filters_out_private_receipt_and_ignores_rest(self):
+    def test_filters_out_private_receipt_and_ignores_rest(self) -> None:
         self._test_filters_private(
             [
                 {
@@ -84,7 +95,9 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-    def test_filters_out_event_with_only_private_receipts_and_ignores_the_rest(self):
+    def test_filters_out_event_with_only_private_receipts_and_ignores_the_rest(
+        self,
+    ) -> None:
         self._test_filters_private(
             [
                 {
@@ -125,7 +138,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-    def test_handles_empty_event(self):
+    def test_handles_empty_event(self) -> None:
         self._test_filters_private(
             [
                 {
@@ -160,7 +173,9 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-    def test_filters_out_receipt_event_with_only_private_receipt_and_ignores_rest(self):
+    def test_filters_out_receipt_event_with_only_private_receipt_and_ignores_rest(
+        self,
+    ) -> None:
         self._test_filters_private(
             [
                 {
@@ -207,7 +222,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-    def test_handles_string_data(self):
+    def test_handles_string_data(self) -> None:
         """
         Tests that an invalid shape for read-receipts is handled.
         Context: https://github.com/matrix-org/synapse/issues/10603
@@ -242,7 +257,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-    def test_leaves_our_private_and_their_public(self):
+    def test_leaves_our_private_and_their_public(self) -> None:
         self._test_filters_private(
             [
                 {
@@ -296,7 +311,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-    def test_we_do_not_mutate(self):
+    def test_we_do_not_mutate(self) -> None:
         """Ensure the input values are not modified."""
         events = [
             {
@@ -320,7 +335,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
 
     def _test_filters_private(
         self, events: List[JsonDict], expected_output: List[JsonDict]
-    ):
+    ) -> None:
         """Tests that the _filter_out_private returns the expected output"""
         filtered_events = self.event_source.filter_out_private_receipts(
             events, "@me:server.org"

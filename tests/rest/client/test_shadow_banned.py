@@ -1,16 +1,23 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 #  Copyright 2020 The Matrix.org Foundation C.I.C.
+# Copyright (C) 2023 New Vector, Ltd
 #
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#      http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 from unittest.mock import Mock, patch
 
@@ -26,7 +33,7 @@ from synapse.rest.client import (
     room_upgrade_rest_servlet,
 )
 from synapse.server import HomeServer
-from synapse.types import UserID
+from synapse.types import UserID, create_requester
 from synapse.util import Clock
 
 from tests import unittest
@@ -84,7 +91,7 @@ class RoomTestCase(_ShadowBannedBase):
     def test_invite_3pid(self) -> None:
         """Ensure that a 3PID invite does not attempt to contact the identity server."""
         identity_handler = self.hs.get_identity_handler()
-        identity_handler.lookup_3pid = Mock(
+        identity_handler.lookup_3pid = Mock(  # type: ignore[method-assign]
             side_effect=AssertionError("This should not get called")
         )
 
@@ -97,7 +104,12 @@ class RoomTestCase(_ShadowBannedBase):
         channel = self.make_request(
             "POST",
             "/rooms/%s/invite" % (room_id,),
-            {"id_server": "test", "medium": "email", "address": "test@test.test"},
+            {
+                "id_server": "test",
+                "medium": "email",
+                "address": "test@test.test",
+                "id_access_token": "anytoken",
+            },
             access_token=self.banned_access_token,
         )
         self.assertEqual(200, channel.code, channel.result)
@@ -217,7 +229,7 @@ class RoomTestCase(_ShadowBannedBase):
             event_source.get_new_events(
                 user=UserID.from_string(self.other_user_id),
                 from_key=0,
-                limit=None,
+                limit=10,
                 room_ids=[room_id],
                 is_guest=False,
             )
@@ -281,12 +293,13 @@ class ProfileTestCase(_ShadowBannedBase):
         message_handler = self.hs.get_message_handler()
         event = self.get_success(
             message_handler.get_room_data(
-                self.banned_user_id,
+                create_requester(self.banned_user_id),
                 room_id,
                 "m.room.member",
                 self.banned_user_id,
             )
         )
+        assert event is not None
         self.assertEqual(
             event.content, {"membership": "join", "displayname": original_display_name}
         )
@@ -316,12 +329,13 @@ class ProfileTestCase(_ShadowBannedBase):
         message_handler = self.hs.get_message_handler()
         event = self.get_success(
             message_handler.get_room_data(
-                self.banned_user_id,
+                create_requester(self.banned_user_id),
                 room_id,
                 "m.room.member",
                 self.banned_user_id,
             )
         )
+        assert event is not None
         self.assertEqual(
             event.content, {"membership": "join", "displayname": original_display_name}
         )

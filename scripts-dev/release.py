@@ -1,37 +1,46 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2020 The Matrix.org Foundation C.I.C.
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 """An interactive script for doing a release. See `cli()` below.
 """
 
 import glob
+import json
 import os
 import re
 import subprocess
 import sys
+import time
 import urllib.request
 from os import path
 from tempfile import TemporaryDirectory
-from typing import Any, List, Optional, cast
+from typing import Any, List, Match, Optional, Union
 
 import attr
 import click
 import commonmark
 import git
 from click.exceptions import ClickException
+from git import GitCommandError, Repo
 from github import Github
 from packaging import version
 
@@ -55,9 +64,12 @@ def run_until_successful(
 def cli() -> None:
     """An interactive script to walk through the parts of creating a release.
 
-    Requires the dev dependencies be installed, which can be done via:
+    Requirements:
+      - The dev dependencies be installed, which can be done via:
 
-        pip install -e .[dev]
+            pip install -e .[dev]
+
+      - A checkout of the sytest repository at ../sytest
 
     Then to use:
 
@@ -67,15 +79,20 @@ def cli() -> None:
 
         ./scripts-dev/release.py tag
 
-        # ... wait for assets to build ...
+        # wait for assets to build, either manually or with:
+        ./scripts-dev/release.py wait-for-actions
 
         ./scripts-dev/release.py publish
 
         ./scripts-dev/release.py upload
 
-        # Optional: generate some nice links for the announcement
+        ./scripts-dev/release.py merge-back
 
+        # Optional: generate some nice links for the announcement
         ./scripts-dev/release.py announce
+
+    Alternatively, `./scripts-dev/release.py full` will do all the above
+    as well as guiding you through the manual steps.
 
     If the env var GH_TOKEN (or GITHUB_TOKEN) is set, or passed into the
     `tag`/`publish` command, then a new draft release will be created/published.
@@ -84,15 +101,21 @@ def cli() -> None:
 
 @cli.command()
 def prepare() -> None:
+    _prepare()
+
+
+def _prepare() -> None:
     """Do the initial stages of creating a release, including creating release
     branch, updating changelog and pushing to GitHub.
     """
 
     # Make sure we're in a git repo.
-    repo = get_repo_and_check_clean_checkout()
+    synapse_repo = get_repo_and_check_clean_checkout()
+    sytest_repo = get_repo_and_check_clean_checkout("../sytest", "sytest")
 
-    click.secho("Updating git repo...")
-    repo.remote().fetch()
+    click.secho("Updating Synapse and Sytest git repos...")
+    synapse_repo.remote().fetch()
+    sytest_repo.remote().fetch()
 
     # Get the current version and AST from root Synapse module.
     current_version = get_package_version()
@@ -157,21 +180,19 @@ def prepare() -> None:
         click.get_current_context().abort()
 
     # Switch to the release branch.
-    # Cast safety: parse() won't return a version.LegacyVersion from our
-    # version string format.
-    parsed_new_version = cast(version.Version, version.parse(new_version))
+    parsed_new_version = version.parse(new_version)
 
     # We assume for debian changelogs that we only do RCs or full releases.
     assert not parsed_new_version.is_devrelease
     assert not parsed_new_version.is_postrelease
 
     release_branch_name = get_release_branch_name(parsed_new_version)
-    release_branch = find_ref(repo, release_branch_name)
+    release_branch = find_ref(synapse_repo, release_branch_name)
     if release_branch:
         if release_branch.is_remote():
             # If the release branch only exists on the remote we check it out
             # locally.
-            repo.git.checkout(release_branch_name)
+            synapse_repo.git.checkout(release_branch_name)
     else:
         # If a branch doesn't exist we create one. We ask which one branch it
         # should be based off, defaulting to sensible values depending on the
@@ -187,31 +208,38 @@ def prepare() -> None:
             "Which branch should the release be based on?", default=default
         )
 
-        base_branch = find_ref(repo, branch_name)
-        if not base_branch:
-            print(f"Could not find base branch {branch_name}!")
-            click.get_current_context().abort()
+        for repo_name, repo in {"synapse": synapse_repo, "sytest": sytest_repo}.items():
+            base_branch = find_ref(repo, branch_name)
+            if not base_branch:
+                print(f"Could not find base branch {branch_name} for {repo_name}!")
+                click.get_current_context().abort()
 
-        # Check out the base branch and ensure it's up to date
-        repo.head.set_reference(base_branch, "check out the base branch")
-        repo.head.reset(index=True, working_tree=True)
-        if not base_branch.is_remote():
-            update_branch(repo)
+            # Check out the base branch and ensure it's up to date
+            repo.head.set_reference(
+                base_branch, f"check out the base branch for {repo_name}"
+            )
+            repo.head.reset(index=True, working_tree=True)
+            if not base_branch.is_remote():
+                update_branch(repo)
 
-        # Create the new release branch
-        # Type ignore will no longer be needed after GitPython 3.1.28.
-        # See https://github.com/gitpython-developers/GitPython/pull/1419
-        repo.create_head(release_branch_name, commit=base_branch)  # type: ignore[arg-type]
+            # Create the new release branch
+            repo.create_head(release_branch_name, commit=base_branch)
+
+        # Special-case SyTest: we don't actually prepare any files so we may
+        # as well push it now (and only when we create a release branch;
+        # not on subsequent RCs or full releases).
+        if click.confirm("Push new SyTest branch?", default=True):
+            sytest_repo.git.push("-u", sytest_repo.remote().name, release_branch_name)
 
     # Switch to the release branch and ensure it's up to date.
-    repo.git.checkout(release_branch_name)
-    update_branch(repo)
+    synapse_repo.git.checkout(release_branch_name)
+    update_branch(synapse_repo)
 
     # Update the version specified in pyproject.toml.
     subprocess.check_output(["poetry", "version", new_version])
 
     # Generate changelogs.
-    generate_and_write_changelog(current_version, new_version)
+    generate_and_write_changelog(synapse_repo, current_version, new_version)
 
     # Generate debian changelogs
     if parsed_new_version.pre is not None:
@@ -223,22 +251,28 @@ def prepare() -> None:
     else:
         debian_version = new_version
 
-    run_until_successful(
-        f'dch -M -v {debian_version} "New Synapse release {new_version}."',
-        shell=True,
-    )
-    run_until_successful('dch -M -r -D stable ""', shell=True)
+    if sys.platform == "darwin":
+        run_until_successful(
+            f"docker run --rm -v .:/synapse ubuntu:latest /synapse/scripts-dev/docker_update_debian_changelog.sh {new_version}",
+            shell=True,
+        )
+    else:
+        run_until_successful(
+            f'dch -M -v {debian_version} "New Synapse release {new_version}."',
+            shell=True,
+        )
+        run_until_successful('dch -M -r -D stable ""', shell=True)
 
     # Show the user the changes and ask if they want to edit the change log.
-    repo.git.add("-u")
+    synapse_repo.git.add("-u")
     subprocess.run("git diff --cached", shell=True)
 
     if click.confirm("Edit changelog?", default=False):
         click.edit(filename="CHANGES.md")
 
     # Commit the changes.
-    repo.git.add("-u")
-    repo.git.commit("-m", new_version)
+    synapse_repo.git.add("-u")
+    synapse_repo.git.commit("-m", new_version)
 
     # We give the option to bail here in case the user wants to make sure things
     # are OK before pushing.
@@ -246,23 +280,31 @@ def prepare() -> None:
         print("")
         print("Run when ready to push:")
         print("")
-        print(f"\tgit push -u {repo.remote().name} {repo.active_branch.name}")
+        print(
+            f"\tgit push -u {synapse_repo.remote().name} {synapse_repo.active_branch.name}"
+        )
         print("")
         sys.exit(0)
 
     # Otherwise, push and open the changelog in the browser.
-    repo.git.push("-u", repo.remote().name, repo.active_branch.name)
+    synapse_repo.git.push(
+        "-u", synapse_repo.remote().name, synapse_repo.active_branch.name
+    )
 
     print("Opening the changelog in your browser...")
-    print("Please ask others to give it a check.")
+    print("Please ask #synapse-dev to give it a check.")
     click.launch(
-        f"https://github.com/matrix-org/synapse/blob/{repo.active_branch.name}/CHANGES.md"
+        f"https://github.com/element-hq/synapse/blob/{synapse_repo.active_branch.name}/CHANGES.md"
     )
 
 
 @cli.command()
 @click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"])
 def tag(gh_token: Optional[str]) -> None:
+    _tag(gh_token)
+
+
+def _tag(gh_token: Optional[str]) -> None:
     """Tags the release and generates a draft GitHub release"""
 
     # Make sure we're in a git repo.
@@ -320,18 +362,18 @@ def tag(gh_token: Optional[str]) -> None:
             print("As this is an RC, remember to mark it as a pre-release!")
         print("(by the way, this step can be automated by passing --gh-token,")
         print("or one of the GH_TOKEN or GITHUB_TOKEN env vars.)")
-        click.launch(f"https://github.com/matrix-org/synapse/releases/edit/{tag_name}")
+        click.launch(f"https://github.com/element-hq/synapse/releases/edit/{tag_name}")
 
         print("Once done, you need to wait for the release assets to build.")
         if click.confirm("Launch the release assets actions page?", default=True):
             click.launch(
-                f"https://github.com/matrix-org/synapse/actions?query=branch%3A{tag_name}"
+                f"https://github.com/element-hq/synapse/actions?query=branch%3A{tag_name}"
             )
         return
 
     # Create a new draft release
     gh = Github(gh_token)
-    gh_repo = gh.get_repo("matrix-org/synapse")
+    gh_repo = gh.get_repo("element-hq/synapse")
     release = gh_repo.create_git_release(
         tag=tag_name,
         name=tag_name,
@@ -344,7 +386,7 @@ def tag(gh_token: Optional[str]) -> None:
     print("Launching the release page and the actions page.")
     click.launch(release.html_url)
     click.launch(
-        f"https://github.com/matrix-org/synapse/actions?query=branch%3A{tag_name}"
+        f"https://github.com/element-hq/synapse/actions?query=branch%3A{tag_name}"
     )
 
     click.echo("Wait for release assets to be built")
@@ -353,6 +395,10 @@ def tag(gh_token: Optional[str]) -> None:
 @cli.command()
 @click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"], required=True)
 def publish(gh_token: str) -> None:
+    _publish(gh_token)
+
+
+def _publish(gh_token: str) -> None:
     """Publish release on GitHub."""
 
     # Make sure we're in a git repo.
@@ -366,7 +412,7 @@ def publish(gh_token: str) -> None:
 
     # Publish the draft release
     gh = Github(gh_token)
-    gh_repo = gh.get_repo("matrix-org/synapse")
+    gh_repo = gh.get_repo("element-hq/synapse")
     for release in gh_repo.get_releases():
         if release.title == tag_name:
             break
@@ -389,7 +435,12 @@ def publish(gh_token: str) -> None:
 
 
 @cli.command()
-def upload() -> None:
+@click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"], required=False)
+def upload(gh_token: Optional[str]) -> None:
+    _upload(gh_token)
+
+
+def _upload(gh_token: Optional[str]) -> None:
     """Upload release to pypi."""
 
     current_version = get_package_version()
@@ -399,21 +450,43 @@ def upload() -> None:
     repo = get_repo_and_check_clean_checkout()
     tag = repo.tag(f"refs/tags/{tag_name}")
     if repo.head.commit != tag.commit:
-        click.echo("Tag {tag_name} (tag.commit) is not currently checked out!")
+        click.echo(f"Tag {tag_name} ({tag.commit}) is not currently checked out!")
         click.get_current_context().abort()
 
-    pypi_asset_names = [
-        f"matrix_synapse-{current_version}-py3-none-any.whl",
-        f"matrix-synapse-{current_version}.tar.gz",
-    ]
+    # Query all the assets corresponding to this release.
+    gh = Github(gh_token)
+    gh_repo = gh.get_repo("element-hq/synapse")
+    gh_release = gh_repo.get_release(tag_name)
+
+    all_assets = set(gh_release.get_assets())
+
+    # Only accept the wheels and sdist.
+    # Notably: we don't care about debs.tar.xz.
+    asset_names_and_urls = sorted(
+        (asset.name, asset.browser_download_url)
+        for asset in all_assets
+        if asset.name.endswith((".whl", ".tar.gz"))
+    )
+
+    # Print out what we've determined.
+    print("Found relevant assets:")
+    for asset_name, _ in asset_names_and_urls:
+        print(f" - {asset_name}")
+
+    ignored_asset_names = sorted(
+        {asset.name for asset in all_assets}
+        - {asset_name for asset_name, _ in asset_names_and_urls}
+    )
+    print("\nIgnoring irrelevant assets:")
+    for asset_name in ignored_asset_names:
+        print(f" - {asset_name}")
 
     with TemporaryDirectory(prefix=f"synapse_upload_{tag_name}_") as tmpdir:
-        for name in pypi_asset_names:
+        for name, asset_download_url in asset_names_and_urls:
             filename = path.join(tmpdir, name)
-            url = f"https://github.com/matrix-org/synapse/releases/download/{tag_name}/{name}"
 
             click.echo(f"Downloading {name} into {filename}")
-            urllib.request.urlretrieve(url, filename=filename)
+            urllib.request.urlretrieve(asset_download_url, filename=filename)
 
         if click.confirm("Upload to PyPI?", default=True):
             subprocess.run("twine upload *", shell=True, cwd=tmpdir)
@@ -423,8 +496,160 @@ def upload() -> None:
     )
 
 
+def _merge_into(repo: Repo, source: str, target: str) -> None:
+    """
+    Merges branch `source` into branch `target`.
+    Pulls both before merging and pushes the result.
+    """
+
+    # Update our branches and switch to the target branch
+    for branch in [source, target]:
+        click.echo(f"Switching to {branch} and pulling...")
+        repo.heads[branch].checkout()
+        # Pull so we're up to date
+        repo.remote().pull()
+
+    assert repo.active_branch.name == target
+
+    try:
+        # TODO This seemed easier than using GitPython directly
+        click.echo(f"Merging {source}...")
+        repo.git.merge(source)
+    except GitCommandError as exc:
+        # If a merge conflict occurs, give some context and try to
+        # make it easy to abort if necessary.
+        click.echo(exc)
+        if not click.confirm(
+            f"Likely merge conflict whilst merging ({source} → {target}). "
+            f"Have you resolved it?"
+        ):
+            repo.git.merge("--abort")
+            return
+
+    # Push result.
+    click.echo("Pushing...")
+    repo.remote().push()
+
+
+@cli.command()
+@click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"], required=False)
+def wait_for_actions(gh_token: Optional[str]) -> None:
+    _wait_for_actions(gh_token)
+
+
+def _wait_for_actions(gh_token: Optional[str]) -> None:
+    # Find out the version and tag name.
+    current_version = get_package_version()
+    tag_name = f"v{current_version}"
+
+    # Authentication is optional on this endpoint,
+    # but use a token if we have one to reduce the chance of being rate-limited.
+    url = f"https://api.github.com/repos/element-hq/synapse/actions/runs?branch={tag_name}"
+    headers = {"Accept": "application/vnd.github+json"}
+    if gh_token is not None:
+        headers["authorization"] = f"token {gh_token}"
+    req = urllib.request.Request(url, headers=headers)
+
+    time.sleep(10 * 60)
+    while True:
+        time.sleep(5 * 60)
+        response = urllib.request.urlopen(req)
+        resp = json.loads(response.read())
+
+        if len(resp["workflow_runs"]) == 0:
+            continue
+
+        if all(
+            workflow["status"] != "in_progress" for workflow in resp["workflow_runs"]
+        ):
+            success = (
+                workflow["status"] == "completed" for workflow in resp["workflow_runs"]
+            )
+            if success:
+                _notify("Workflows successful. You can now continue the release.")
+            else:
+                _notify("Workflows failed.")
+                click.confirm("Continue anyway?", abort=True)
+
+            break
+
+
+def _notify(message: str) -> None:
+    # Send a bell character. Most terminals will play a sound or show a notification
+    # for this.
+    click.echo(f"\a{message}")
+
+    app_name = "Synapse Release Script"
+
+    # Try and run notify-send, but don't raise an Exception if this fails
+    # (This is best-effort)
+    if sys.platform == "darwin":
+        # See https://developer.apple.com/library/archive/documentation/AppleScript/Conceptual/AppleScriptLangGuide/reference/ASLR_cmds.html#//apple_ref/doc/uid/TP40000983-CH216-SW224
+        subprocess.run(
+            f"""osascript -e 'display notification "{message}" with title "{app_name}"'""",
+            shell=True,
+        )
+    else:
+        subprocess.run(
+            [
+                "notify-send",
+                "--app-name",
+                app_name,
+                "--expire-time",
+                "3600000",
+                message,
+            ]
+        )
+
+
+@cli.command()
+def merge_back() -> None:
+    _merge_back()
+
+
+def _merge_back() -> None:
+    """Merge the release branch back into the appropriate branches.
+    All branches will be automatically pulled from the remote and the results
+    will be pushed to the remote."""
+
+    synapse_repo = get_repo_and_check_clean_checkout()
+    branch_name = synapse_repo.active_branch.name
+
+    if not branch_name.startswith("release-v"):
+        raise RuntimeError("Not on a release branch. This does not seem sensible.")
+
+    # Pull so we're up to date
+    synapse_repo.remote().pull()
+
+    current_version = get_package_version()
+
+    if current_version.is_prerelease:
+        # Release candidate
+        if click.confirm(f"Merge {branch_name} → develop?", default=True):
+            _merge_into(synapse_repo, branch_name, "develop")
+    else:
+        # Full release
+        sytest_repo = get_repo_and_check_clean_checkout("../sytest", "sytest")
+
+        if click.confirm(f"Merge {branch_name} → master?", default=True):
+            _merge_into(synapse_repo, branch_name, "master")
+
+        if click.confirm("Merge master → develop?", default=True):
+            _merge_into(synapse_repo, "master", "develop")
+
+        if click.confirm(f"On SyTest, merge {branch_name} → master?", default=True):
+            _merge_into(sytest_repo, branch_name, "master")
+
+        if click.confirm("On SyTest, merge master → develop?", default=True):
+            _merge_into(sytest_repo, "master", "develop")
+
+
 @cli.command()
 def announce() -> None:
+    _announce()
+
+
+def _announce() -> None:
     """Generate markdown to announce the release."""
 
     current_version = get_package_version()
@@ -434,7 +659,7 @@ def announce() -> None:
         f"""
 Hi everyone. Synapse {current_version} has just been released.
 
-[notes](https://github.com/matrix-org/synapse/releases/tag/{tag_name}) | \
+[notes](https://github.com/element-hq/synapse/releases/tag/{tag_name}) | \
 [docker](https://hub.docker.com/r/matrixdotorg/synapse/tags?name={tag_name}) | \
 [debs](https://packages.matrix.org/debian/) | \
 [pypi](https://pypi.org/project/matrix-synapse/{current_version}/)"""
@@ -454,8 +679,58 @@ Announce the release in
 - #homeowners:matrix.org (Synapse Announcements), bumping the version in the topic
 - #synapse:matrix.org (Synapse Admins), bumping the version in the topic
 - #synapse-dev:matrix.org
-- #synapse-package-maintainers:matrix.org"""
+- #synapse-package-maintainers:matrix.org
+
+Ask the designated people to do the blog and tweets."""
         )
+
+
+@cli.command()
+@click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"], required=True)
+def full(gh_token: str) -> None:
+    click.echo("1. If this is a security release, read the security wiki page.")
+    click.echo("2. Check for any release blockers before proceeding.")
+    click.echo("    https://github.com/element-hq/synapse/labels/X-Release-Blocker")
+    click.echo(
+        "3. Check for any other special release notes, including announcements to add to the changelog or special deployment instructions."
+    )
+    click.echo("    See the 'Synapse Maintainer Report'.")
+
+    click.confirm("Ready?", abort=True)
+
+    click.echo("\n*** prepare ***")
+    _prepare()
+
+    click.echo("Deploy to matrix.org and ensure that it hasn't fallen over.")
+    click.echo("Remember to silence the alerts to prevent alert spam.")
+    click.confirm("Deployed?", abort=True)
+
+    click.echo("\n*** tag ***")
+    _tag(gh_token)
+
+    click.echo("\n*** wait for actions ***")
+    _wait_for_actions(gh_token)
+
+    click.echo("\n*** publish ***")
+    _publish(gh_token)
+
+    click.echo("\n*** upload ***")
+    _upload(gh_token)
+
+    click.echo("\n*** merge back ***")
+    _merge_back()
+
+    click.echo("\nUpdate the Debian repository")
+    click.confirm("Started updating Debian repository?", abort=True)
+
+    click.echo("\nWait for all release methods to be ready.")
+    # Docker should be ready because it was done by the workflows earlier
+    # PyPI should be ready because we just ran upload().
+    # TODO Automatically poll until the Debs have made it to packages.matrix.org
+    click.confirm("Debs ready?", abort=True)
+
+    click.echo("\n*** announce ***")
+    _announce()
 
 
 def get_package_version() -> version.Version:
@@ -469,14 +744,18 @@ def get_release_branch_name(version_number: version.Version) -> str:
     return f"release-v{version_number.major}.{version_number.minor}"
 
 
-def get_repo_and_check_clean_checkout() -> git.Repo:
+def get_repo_and_check_clean_checkout(
+    path: str = ".", name: str = "synapse"
+) -> git.Repo:
     """Get the project repo and check it's not got any uncommitted changes."""
     try:
-        repo = git.Repo()
+        repo = git.Repo(path=path)
     except git.InvalidGitRepositoryError:
-        raise click.ClickException("Not in Synapse repo.")
+        raise click.ClickException(
+            f"{path} is not a git repository (expecting a {name} repository)."
+        )
     if repo.is_dirty():
-        raise click.ClickException("Uncommitted changes exist.")
+        raise click.ClickException(f"Uncommitted changes exist in {path}.")
     return repo
 
 
@@ -559,7 +838,7 @@ def get_changes_for_version(wanted_version: version.Version) -> str:
 
 
 def generate_and_write_changelog(
-    current_version: version.Version, new_version: str
+    repo: Repo, current_version: version.Version, new_version: str
 ) -> None:
     # We do this by getting a draft so that we can edit it before writing to the
     # changelog.
@@ -571,6 +850,10 @@ def generate_and_write_changelog(
     new_changes = result.stdout.decode("utf-8")
     new_changes = new_changes.replace(
         "No significant changes.", f"No significant changes since {current_version}."
+    )
+    new_changes += build_dependabot_changelog(
+        repo,
+        current_version,
     )
 
     # Prepend changes to changelog
@@ -584,6 +867,50 @@ def generate_and_write_changelog(
     # Remove all the news fragments
     for filename in glob.iglob("changelog.d/*.*"):
         os.remove(filename)
+
+
+def build_dependabot_changelog(repo: Repo, current_version: version.Version) -> str:
+    """Summarise dependabot commits between `current_version` and `release_branch`.
+
+    Returns an empty string if there have been no such commits; otherwise outputs a
+    third-level markdown header followed by an unordered list."""
+    last_release_commit = repo.tag("v" + str(current_version)).commit
+    rev_spec = f"{last_release_commit.hexsha}.."
+    commits = list(git.objects.Commit.iter_items(repo, rev_spec))
+    messages = []
+    for commit in reversed(commits):
+        if commit.author.name == "dependabot[bot]":
+            message: Union[str, bytes] = commit.message
+            if isinstance(message, bytes):
+                message = message.decode("utf-8")
+            messages.append(message.split("\n", maxsplit=1)[0])
+
+    if not messages:
+        print(f"No dependabot commits in range {rev_spec}", file=sys.stderr)
+        return ""
+
+    messages.sort()
+
+    def replacer(match: Match[str]) -> str:
+        desc = match.group(1)
+        number = match.group(2)
+        return f"* {desc}. ([\\#{number}](https://github.com/element-hq/synapse/issues/{number}))"
+
+    for i, message in enumerate(messages):
+        messages[i] = re.sub(r"(.*) \(#(\d+)\)$", replacer, message)
+    messages.insert(0, "### Updates to locked dependencies\n")
+    # Add an extra blank line to the bottom of the section
+    messages.append("")
+    return "\n".join(messages)
+
+
+@cli.command()
+@click.argument("since")
+def test_dependabot_changelog(since: str) -> None:
+    """Test building the dependabot changelog.
+
+    Summarises all dependabot commits between the SINCE tag and the current git HEAD."""
+    print(build_dependabot_changelog(git.Repo("."), version.Version(since)))
 
 
 if __name__ == "__main__":

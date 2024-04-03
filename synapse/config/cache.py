@@ -1,22 +1,29 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2019-2021 Matrix.org Foundation C.I.C.
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 import logging
 import os
 import re
 import threading
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Mapping, Optional
 
 import attr
 
@@ -94,7 +101,7 @@ def add_resizable_cache(
 
 class CacheConfig(Config):
     section = "caches"
-    _environ = os.environ
+    _environ: Mapping[str, str] = os.environ
 
     event_cache_size: int
     cache_factors: Dict[str, float]
@@ -126,7 +133,7 @@ class CacheConfig(Config):
 
         cache_config = config.get("caches") or {}
         self.global_factor = cache_config.get("global_factor", _DEFAULT_FACTOR_SIZE)
-        if not isinstance(self.global_factor, (int, float)):
+        if type(self.global_factor) not in (int, float):
             raise ConfigError("caches.global_factor must be a number.")
 
         # Load cache factors from the config
@@ -151,7 +158,7 @@ class CacheConfig(Config):
         )
 
         for cache, factor in individual_factors.items():
-            if not isinstance(factor, (int, float)):
+            if type(factor) not in (int, float):
                 raise ConfigError(
                     "caches.per_cache_factors.%s must be a number" % (cache,)
                 )
@@ -159,7 +166,7 @@ class CacheConfig(Config):
 
         self.track_memory_usage = cache_config.get("track_memory_usage", False)
         if self.track_memory_usage:
-            check_requirements("cache_memory")
+            check_requirements("cache-memory")
 
         expire_caches = cache_config.get("expire_caches", True)
         cache_entry_ttl = cache_config.get("cache_entry_ttl", "30m")

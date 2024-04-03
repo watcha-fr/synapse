@@ -1,16 +1,23 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 from signedjson.key import decode_signing_key_base64
 from signedjson.types import SigningKey
@@ -33,12 +40,12 @@ HOSTNAME = "domain"
 
 
 class EventSigningTestCase(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.signing_key: SigningKey = decode_signing_key_base64(
             KEY_ALG, KEY_VER, SIGNING_KEY_SEED
         )
 
-    def test_sign_minimal(self):
+    def test_sign_minimal(self) -> None:
         event_dict = {
             "event_id": "$0:domain",
             "origin": "domain",
@@ -69,7 +76,7 @@ class EventSigningTestCase(unittest.TestCase):
             "aIbygsSdLOFzvdDjww8zUVKCmI02eP9xtyJxc/cLiBA",
         )
 
-    def test_sign_message(self):
+    def test_sign_message(self) -> None:
         event_dict = {
             "content": {"body": "Here is the message content"},
             "event_id": "$0:domain",

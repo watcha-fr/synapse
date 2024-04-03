@@ -1,16 +1,23 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2021 The Matrix.org Foundation C.I.C.
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 import itertools
 import logging
@@ -20,7 +27,6 @@ from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Set,
 import attr
 
 from synapse.api.constants import (
-    EventContentFields,
     EventTypes,
     HistoryVisibility,
     JoinRules,
@@ -28,16 +34,18 @@ from synapse.api.constants import (
     RoomTypes,
 )
 from synapse.api.errors import (
-    AuthError,
     Codes,
     NotFoundError,
     StoreError,
     SynapseError,
+    UnstableSpecAuthError,
     UnsupportedRoomVersionError,
 )
 from synapse.api.ratelimiting import Ratelimiter
+from synapse.config.ratelimiting import RatelimitSettings
 from synapse.events import EventBase
-from synapse.types import JsonDict, Requester
+from synapse.types import JsonDict, Requester, StrCollection
+from synapse.types.state import StateFilter
 from synapse.util.caches.response_cache import ResponseCache
 
 if TYPE_CHECKING:
@@ -95,7 +103,9 @@ class RoomSummaryHandler:
         self._server_name = hs.hostname
         self._federation_client = hs.get_federation_client()
         self._ratelimiter = Ratelimiter(
-            store=self._store, clock=hs.get_clock(), rate_hz=5, burst_count=10
+            store=self._store,
+            clock=hs.get_clock(),
+            cfg=RatelimitSettings("<room summary>", per_second=5, burst_count=10),
         )
 
         # If a user tries to fetch the same page multiple times in quick succession,
@@ -175,10 +185,11 @@ class RoomSummaryHandler:
 
         # First of all, check that the room is accessible.
         if not await self._is_local_room_accessible(requested_room_id, requester):
-            raise AuthError(
+            raise UnstableSpecAuthError(
                 403,
                 "User %s not in room %s, and room previews are disabled"
                 % (requester, requested_room_id),
+                errcode=Codes.NOT_JOINED,
             )
 
         # If this is continuing a previous session, pull the persisted data.
@@ -452,7 +463,6 @@ class RoomSummaryHandler:
                 "type": e.type,
                 "state_key": e.state_key,
                 "content": e.content,
-                "room_id": e.room_id,
                 "sender": e.sender,
                 "origin_server_ts": e.origin_server_ts,
             }
@@ -522,8 +532,8 @@ class RoomSummaryHandler:
 
         It should return true if:
 
-        * The requester is joined or can join the room (per MSC3173).
-        * The origin server has any user that is joined or can join the room.
+        * The requesting user is joined or can join the room (per MSC3173); or
+        * The origin server has any user that is joined or can join the room; or
         * The history visibility is set to world readable.
 
         Args:
@@ -538,7 +548,16 @@ class RoomSummaryHandler:
         Returns:
              True if the room is accessible to the requesting user or server.
         """
-        state_ids = await self._storage_controllers.state.get_current_state_ids(room_id)
+        event_types = [
+            (EventTypes.JoinRules, ""),
+            (EventTypes.RoomHistoryVisibility, ""),
+        ]
+        if requester:
+            event_types.append((EventTypes.Member, requester))
+
+        state_ids = await self._storage_controllers.state.get_current_state_ids(
+            room_id, state_filter=StateFilter.from_types(event_types)
+        )
 
         # If there's no state for the room, it isn't known.
         if not state_ids:
@@ -565,9 +584,9 @@ class RoomSummaryHandler:
             join_rule = join_rules_event.content.get("join_rule")
             if (
                 join_rule == JoinRules.PUBLIC
-                or (room_version.msc2403_knocking and join_rule == JoinRules.KNOCK)
+                or (room_version.knock_join_rule and join_rule == JoinRules.KNOCK)
                 or (
-                    room_version.msc3787_knock_restricted_join_rule
+                    room_version.knock_restricted_join_rule
                     and join_rule == JoinRules.KNOCK_RESTRICTED
                 )
             ):
@@ -609,7 +628,7 @@ class RoomSummaryHandler:
         # If this is a request over federation, check if the host is in the room or
         # has a user who could join the room.
         elif origin:
-            if await self._event_auth_handler.check_host_in_room(
+            if await self._event_auth_handler.is_host_in_room(
                 room_id, origin
             ) or await self._store.is_host_invited(room_id, origin):
                 return True
@@ -624,9 +643,7 @@ class RoomSummaryHandler:
                     await self._event_auth_handler.get_rooms_that_allow_join(state_ids)
                 )
                 for space_id in allowed_rooms:
-                    if await self._event_auth_handler.check_host_in_room(
-                        space_id, origin
-                    ):
+                    if await self._event_auth_handler.is_host_in_room(space_id, origin):
                         return True
 
         logger.info(
@@ -703,36 +720,33 @@ class RoomSummaryHandler:
         # there should always be an entry
         assert stats is not None, "unable to retrieve stats for %s" % (room_id,)
 
-        current_state_ids = await self._storage_controllers.state.get_current_state_ids(
-            room_id
-        )
-        create_event = await self._store.get_event(
-            current_state_ids[(EventTypes.Create, "")]
-        )
-
-        entry = {
-            "room_id": stats["room_id"],
-            "name": stats["name"],
-            "topic": stats["topic"],
-            "canonical_alias": stats["canonical_alias"],
-            "num_joined_members": stats["joined_members"],
-            "avatar_url": stats["avatar"],
-            "join_rule": stats["join_rules"],
+        entry: JsonDict = {
+            "room_id": stats.room_id,
+            "name": stats.name,
+            "topic": stats.topic,
+            "canonical_alias": stats.canonical_alias,
+            "num_joined_members": stats.joined_members,
+            "avatar_url": stats.avatar,
+            "join_rule": stats.join_rules,
             "world_readable": (
-                stats["history_visibility"] == HistoryVisibility.WORLD_READABLE
+                stats.history_visibility == HistoryVisibility.WORLD_READABLE
             ),
-            "guest_can_join": stats["guest_access"] == "can_join",
-            "room_type": create_event.content.get(EventContentFields.ROOM_TYPE),
+            "guest_can_join": stats.guest_access == "can_join",
+            "room_type": stats.room_type,
         }
 
         if self._msc3266_enabled:
-            entry["im.nheko.summary.version"] = stats["version"]
-            entry["im.nheko.summary.encryption"] = stats["encryption"]
+            entry["im.nheko.summary.version"] = stats.version
+            entry["im.nheko.summary.encryption"] = stats.encryption
 
         # Federation requests need to provide additional information so the
         # requested server is able to filter the response appropriately.
         if for_federation:
+            current_state_ids = (
+                await self._storage_controllers.state.get_current_state_ids(room_id)
+            )
             room_version = await self._store.get_room_version(room_id)
+
             if await self._event_auth_handler.has_restricted_join_rules(
                 current_state_ids, room_version
             ):
@@ -876,7 +890,7 @@ class _RoomQueueEntry:
     # The room ID of this entry.
     room_id: str
     # The server to query if the room is not known locally.
-    via: Sequence[str]
+    via: StrCollection
     # The minimum number of hops necessary to get to this room (compared to the
     # originally requested room).
     depth: int = 0

@@ -1,32 +1,43 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2021 The Matrix.org C.I.C. Foundation
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 import email.utils
 import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from pkg_resources import parse_version
 
 import twisted
 from twisted.internet.defer import Deferred
-from twisted.internet.interfaces import IOpenSSLContextFactory, IReactorTCP
+from twisted.internet.endpoints import HostnameEndpoint
+from twisted.internet.interfaces import IOpenSSLContextFactory, IProtocolFactory
+from twisted.internet.ssl import optionsForClientTLS
 from twisted.mail.smtp import ESMTPSender, ESMTPSenderFactory
+from twisted.protocols.tls import TLSMemoryBIOFactory
 
 from synapse.logging.context import make_deferred_yieldable
+from synapse.types import ISynapseReactor
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -48,7 +59,7 @@ class _NoTLSESMTPSender(ESMTPSender):
 
 
 async def _sendmail(
-    reactor: IReactorTCP,
+    reactor: ISynapseReactor,
     smtphost: str,
     smtpport: int,
     from_addr: str,
@@ -59,6 +70,7 @@ async def _sendmail(
     require_auth: bool = False,
     require_tls: bool = False,
     enable_tls: bool = True,
+    force_tls: bool = False,
 ) -> None:
     """A simple wrapper around ESMTPSenderFactory, to allow substitution in tests
 
@@ -73,8 +85,9 @@ async def _sendmail(
         password: password to give when authenticating
         require_auth: if auth is not offered, fail the request
         require_tls: if TLS is not offered, fail the reqest
-        enable_tls: True to enable TLS. If this is False and require_tls is True,
+        enable_tls: True to enable STARTTLS. If this is False and require_tls is True,
            the request will fail.
+        force_tls: True to enable Implicit TLS.
     """
     msg = BytesIO(msg_bytes)
     d: "Deferred[object]" = Deferred()
@@ -93,6 +106,7 @@ async def _sendmail(
             **kwargs,
         )
 
+    factory: IProtocolFactory
     if _is_old_twisted:
         # before twisted 21.2, we have to override the ESMTPSender protocol to disable
         # TLS
@@ -105,13 +119,14 @@ async def _sendmail(
         # set to enable TLS.
         factory = build_sender_factory(hostname=smtphost if enable_tls else None)
 
-    reactor.connectTCP(
-        smtphost,
-        smtpport,
-        factory,
-        timeout=30,
-        bindAddress=None,
+    if force_tls:
+        factory = TLSMemoryBIOFactory(optionsForClientTLS(smtphost), True, factory)
+
+    endpoint = HostnameEndpoint(
+        reactor, smtphost, smtpport, timeout=30, bindAddress=None
     )
+
+    await make_deferred_yieldable(endpoint.connect(factory))
 
     await make_deferred_yieldable(d)
 
@@ -132,6 +147,7 @@ class SendEmailHandler:
         self._smtp_pass = passwd.encode("utf-8") if passwd is not None else None
         self._require_transport_security = hs.config.email.require_transport_security
         self._enable_tls = hs.config.email.enable_smtp_tls
+        self._force_tls = hs.config.email.force_tls
 
         self._sendmail = _sendmail
 
@@ -142,6 +158,7 @@ class SendEmailHandler:
         app_name: str,
         html: str,
         text: str,
+        additional_headers: Optional[Dict[str, str]] = None,
     ) -> None:
         """Send a multipart email with the given information.
 
@@ -151,6 +168,7 @@ class SendEmailHandler:
             app_name: The app name to include in the From header.
             html: The HTML content to include in the email.
             text: The plain text content to include in the email.
+            additional_headers: A map of additional headers to include.
         """
         try:
             from_string = self._from % {"app": app_name}
@@ -163,8 +181,8 @@ class SendEmailHandler:
         if raw_to == "":
             raise RuntimeError("Invalid 'to' address")
 
-        html_part = MIMEText(html, "html", "utf8")
-        text_part = MIMEText(text, "plain", "utf8")
+        html_part = MIMEText(html, "html", "utf-8")
+        text_part = MIMEText(text, "plain", "utf-8")
 
         multipart_msg = MIMEMultipart("alternative")
         multipart_msg["Subject"] = subject
@@ -172,6 +190,25 @@ class SendEmailHandler:
         multipart_msg["To"] = email_address
         multipart_msg["Date"] = email.utils.formatdate()
         multipart_msg["Message-ID"] = email.utils.make_msgid()
+
+        # Discourage automatic responses to Synapse's emails.
+        # Per RFC 3834, automatic responses should not be sent if the "Auto-Submitted"
+        # header is present with any value other than "no". See
+        #     https://www.rfc-editor.org/rfc/rfc3834.html#section-5.1
+        multipart_msg["Auto-Submitted"] = "auto-generated"
+        # Also include a Microsoft-Exchange specific header:
+        #    https://learn.microsoft.com/en-us/openspecs/exchange_server_protocols/ms-oxcmail/ced68690-498a-4567-9d14-5c01f974d8b1
+        # which suggests it can take the value "All" to "suppress all auto-replies",
+        # or a comma separated list of auto-reply classes to suppress.
+        # The following stack overflow question has a little more context:
+        #    https://stackoverflow.com/a/25324691/5252017
+        #    https://stackoverflow.com/a/61646381/5252017
+        multipart_msg["X-Auto-Response-Suppress"] = "All"
+
+        if additional_headers:
+            for header, value in additional_headers.items():
+                multipart_msg[header] = value
+
         multipart_msg.attach(text_part)
         multipart_msg.attach(html_part)
 
@@ -189,4 +226,5 @@ class SendEmailHandler:
             require_auth=self._smtp_user is not None,
             require_tls=self._require_transport_security,
             enable_tls=self._enable_tls,
+            force_tls=self._force_tls,
         )

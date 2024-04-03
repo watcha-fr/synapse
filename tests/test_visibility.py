@@ -1,16 +1,22 @@
-# Copyright 2018 New Vector Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This file is licensed under the Affero General Public License (AGPL) version 3.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
+#
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 import logging
 from typing import Optional
 from unittest.mock import patch
@@ -31,10 +37,12 @@ TEST_ROOM_ID = "!TEST:ROOM"
 
 class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
     def setUp(self) -> None:
-        super(FilterEventsForServerTestCase, self).setUp()
+        super().setUp()
         self.event_creation_handler = self.hs.get_event_creation_handler()
         self.event_builder_factory = self.hs.get_event_builder_factory()
         self._storage_controllers = self.hs.get_storage_controllers()
+        assert self._storage_controllers.persistence is not None
+        self._persistence = self._storage_controllers.persistence
 
         self.get_success(create_room(self.hs, TEST_ROOM_ID, "@someone:ROOM"))
 
@@ -49,24 +57,30 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
 
         # before we do that, we persist some other events to act as state.
         self._inject_visibility("@admin:hs", "joined")
-        for i in range(0, 10):
+        for i in range(10):
             self._inject_room_member("@resident%i:hs" % i)
 
         events_to_filter = []
 
-        for i in range(0, 10):
+        for i in range(10):
             user = "@user%i:%s" % (i, "test_server" if i == 5 else "other_server")
             evt = self._inject_room_member(user, extra_content={"a": "b"})
             events_to_filter.append(evt)
 
         filtered = self.get_success(
             filter_events_for_server(
-                self._storage_controllers, "test_server", events_to_filter
+                self._storage_controllers,
+                "test_server",
+                "hs",
+                events_to_filter,
+                redact=True,
+                filter_out_erased_senders=True,
+                filter_out_remote_partial_state_events=True,
             )
         )
 
         # the result should be 5 redacted events, and 5 unredacted events.
-        for i in range(0, 5):
+        for i in range(5):
             self.assertEqual(events_to_filter[i].event_id, filtered[i].event_id)
             self.assertNotIn("a", filtered[i].content)
 
@@ -83,7 +97,13 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             self.get_success(
                 filter_events_for_server(
-                    self._storage_controllers, "remote_hs", [outlier]
+                    self._storage_controllers,
+                    "remote_hs",
+                    "hs",
+                    [outlier],
+                    redact=True,
+                    filter_out_erased_senders=True,
+                    filter_out_remote_partial_state_events=True,
                 )
             ),
             [outlier],
@@ -94,7 +114,13 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
 
         filtered = self.get_success(
             filter_events_for_server(
-                self._storage_controllers, "remote_hs", [outlier, evt]
+                self._storage_controllers,
+                "remote_hs",
+                "local_hs",
+                [outlier, evt],
+                redact=True,
+                filter_out_erased_senders=True,
+                filter_out_remote_partial_state_events=True,
             )
         )
         self.assertEqual(len(filtered), 2, f"expected 2 results, got: {filtered}")
@@ -106,7 +132,13 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         # be redacted)
         filtered = self.get_success(
             filter_events_for_server(
-                self._storage_controllers, "other_server", [outlier, evt]
+                self._storage_controllers,
+                "other_server",
+                "local_hs",
+                [outlier, evt],
+                redact=True,
+                filter_out_erased_senders=True,
+                filter_out_remote_partial_state_events=True,
             )
         )
         self.assertEqual(filtered[0], outlier)
@@ -141,11 +173,17 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         # ... and the filtering happens.
         filtered = self.get_success(
             filter_events_for_server(
-                self._storage_controllers, "test_server", events_to_filter
+                self._storage_controllers,
+                "test_server",
+                "local_hs",
+                events_to_filter,
+                redact=True,
+                filter_out_erased_senders=True,
+                filter_out_remote_partial_state_events=True,
             )
         )
 
-        for i in range(0, len(events_to_filter)):
+        for i in range(len(events_to_filter)):
             self.assertEqual(
                 events_to_filter[i].event_id,
                 filtered[i].event_id,
@@ -175,12 +213,11 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             self.event_creation_handler.create_new_client_event(builder)
         )
-        self.get_success(
-            self._storage_controllers.persistence.persist_event(event, context)
-        )
+        context = self.get_success(unpersisted_context.persist(event))
+        self.get_success(self._persistence.persist_event(event, context))
         return event
 
     def _inject_room_member(
@@ -202,13 +239,12 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             self.event_creation_handler.create_new_client_event(builder)
         )
+        context = self.get_success(unpersisted_context.persist(event))
 
-        self.get_success(
-            self._storage_controllers.persistence.persist_event(event, context)
-        )
+        self.get_success(self._persistence.persist_event(event, context))
         return event
 
     def _inject_message(
@@ -226,13 +262,12 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             self.event_creation_handler.create_new_client_event(builder)
         )
+        context = self.get_success(unpersisted_context.persist(event))
 
-        self.get_success(
-            self._storage_controllers.persistence.persist_event(event, context)
-        )
+        self.get_success(self._persistence.persist_event(event, context))
         return event
 
     def _inject_outlier(self) -> EventBase:
@@ -250,7 +285,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         event = self.get_success(builder.build(prev_event_ids=[], auth_event_ids=[]))
         event.internal_metadata.outlier = True
         self.get_success(
-            self._storage_controllers.persistence.persist_event(
+            self._persistence.persist_event(
                 event, EventContext.for_outlier(self._storage_controllers)
             )
         )
@@ -258,7 +293,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
 
 
 class FilterEventsForClientTestCase(unittest.FederatingHomeserverTestCase):
-    def test_out_of_band_invite_rejection(self):
+    def test_out_of_band_invite_rejection(self) -> None:
         # this is where we have received an invite event over federation, and then
         # rejected it.
         invite_pdu = {
@@ -272,7 +307,7 @@ class FilterEventsForClientTestCase(unittest.FederatingHomeserverTestCase):
             "state_key": "@user:test",
             "content": {"membership": "invite"},
         }
-        self.add_hashes_and_signatures(invite_pdu)
+        self.add_hashes_and_signatures_from_other_server(invite_pdu)
         invite_event_id = make_event_from_dict(invite_pdu, RoomVersions.V9).event_id
 
         self.get_success(

@@ -1,23 +1,31 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
+# Copyright 2019, 2022 The Matrix.org Foundation C.I.C.
 # Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 import logging
 from abc import abstractmethod
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
+    AbstractSet,
     Any,
     Awaitable,
     Collection,
@@ -25,6 +33,7 @@ from typing import (
     List,
     Mapping,
     Optional,
+    Set,
     Tuple,
     Union,
     cast,
@@ -33,6 +42,7 @@ from typing import (
 import attr
 
 from synapse.api.constants import (
+    Direction,
     EventContentFields,
     EventTypes,
     JoinRules,
@@ -42,6 +52,7 @@ from synapse.api.errors import StoreError
 from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.config.homeserver import HomeServerConfig
 from synapse.events import EventBase
+from synapse.replication.tcp.streams.partial_state import UnPartialStatedRoomStream
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import (
     DatabasePool,
@@ -49,11 +60,17 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
+from synapse.storage.engines import PostgresEngine
 from synapse.storage.types import Cursor
-from synapse.storage.util.id_generators import IdGenerator
-from synapse.types import JsonDict, RetentionPolicy, ThirdPartyInstanceID
+from synapse.storage.util.id_generators import (
+    AbstractStreamIdGenerator,
+    IdGenerator,
+    MultiWriterIdGenerator,
+    StreamIdGenerator,
+)
+from synapse.types import JsonDict, RetentionPolicy, StrCollection, ThirdPartyInstanceID
 from synapse.util import json_encoder
-from synapse.util.caches.descriptors import cached
+from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.stringutils import MXC_REGEX
 
 if TYPE_CHECKING:
@@ -66,6 +83,31 @@ logger = logging.getLogger(__name__)
 class RatelimitOverride:
     messages_per_second: int
     burst_count: int
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class LargestRoomStats:
+    room_id: str
+    name: Optional[str]
+    canonical_alias: Optional[str]
+    joined_members: int
+    join_rules: Optional[str]
+    guest_access: Optional[str]
+    history_visibility: Optional[str]
+    state_events: int
+    avatar: Optional[str]
+    topic: Optional[str]
+    room_type: Optional[str]
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class RoomStats(LargestRoomStats):
+    joined_local_members: int
+    version: Optional[str]
+    creator: Optional[str]
+    encryption: Optional[str]
+    federatable: bool
+    public: bool
 
 
 class RoomSortOrder(Enum):
@@ -96,6 +138,12 @@ class RoomSortOrder(Enum):
     STATE_EVENTS = "state_events"
 
 
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class PartialStateResyncInfo:
+    joined_via: Optional[str]
+    servers_in_room: Set[str] = attr.ib(factory=set)
+
+
 class RoomWorkerStore(CacheInvalidationWorkerStore):
     def __init__(
         self,
@@ -106,6 +154,37 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         super().__init__(database, db_conn, hs)
 
         self.config: HomeServerConfig = hs.config
+
+        self._un_partial_stated_rooms_stream_id_gen: AbstractStreamIdGenerator
+
+        if isinstance(database.engine, PostgresEngine):
+            self._un_partial_stated_rooms_stream_id_gen = MultiWriterIdGenerator(
+                db_conn=db_conn,
+                db=database,
+                notifier=hs.get_replication_notifier(),
+                stream_name="un_partial_stated_room_stream",
+                instance_name=self._instance_name,
+                tables=[
+                    ("un_partial_stated_room_stream", "instance_name", "stream_id")
+                ],
+                sequence_name="un_partial_stated_room_stream_sequence",
+                # TODO(faster_joins, multiple writers) Support multiple writers.
+                writers=["master"],
+            )
+        else:
+            self._un_partial_stated_rooms_stream_id_gen = StreamIdGenerator(
+                db_conn,
+                hs.get_replication_notifier(),
+                "un_partial_stated_room_stream",
+                "stream_id",
+            )
+
+    def process_replication_position(
+        self, stream_name: str, instance_name: str, token: int
+    ) -> None:
+        if stream_name == UnPartialStatedRoomStream.NAME:
+            self._un_partial_stated_rooms_stream_id_gen.advance(instance_name, token)
+        return super().process_replication_position(stream_name, instance_name, token)
 
     async def store_room(
         self,
@@ -141,23 +220,33 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             logger.error("store_room with room_id=%s failed: %s", room_id, e)
             raise StoreError(500, "Problem creating room.")
 
-    async def get_room(self, room_id: str) -> Optional[Dict[str, Any]]:
+    async def get_room(self, room_id: str) -> Optional[Tuple[bool, bool]]:
         """Retrieve a room.
 
         Args:
             room_id: The ID of the room to retrieve.
         Returns:
-            A dict containing the room information, or None if the room is unknown.
-        """
-        return await self.db_pool.simple_select_one(
-            table="rooms",
-            keyvalues={"room_id": room_id},
-            retcols=("room_id", "is_public", "creator", "has_auth_chain_index"),
-            desc="get_room",
-            allow_none=True,
-        )
+            A tuple containing the room information:
+                * True if the room is public
+                * True if the room has an auth chain index
 
-    async def get_room_with_stats(self, room_id: str) -> Optional[Dict[str, Any]]:
+            or None if the room is unknown.
+        """
+        row = cast(
+            Optional[Tuple[Optional[Union[int, bool]], Optional[Union[int, bool]]]],
+            await self.db_pool.simple_select_one(
+                table="rooms",
+                keyvalues={"room_id": room_id},
+                retcols=("is_public", "has_auth_chain_index"),
+                desc="get_room",
+                allow_none=True,
+            ),
+        )
+        if row is None:
+            return row
+        return bool(row[0]), bool(row[1])
+
+    async def get_room_with_stats(self, room_id: str) -> Optional[RoomStats]:
         """Retrieve room with statistics.
 
         Args:
@@ -168,29 +257,42 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
         def get_room_with_stats_txn(
             txn: LoggingTransaction, room_id: str
-        ) -> Optional[Dict[str, Any]]:
+        ) -> Optional[RoomStats]:
             sql = """
                 SELECT room_id, state.name, state.canonical_alias, curr.joined_members,
                   curr.local_users_in_room AS joined_local_members, rooms.room_version AS version,
                   rooms.creator, state.encryption, state.is_federatable AS federatable,
                   rooms.is_public AS public, state.join_rules, state.guest_access,
                   state.history_visibility, curr.current_state_events AS state_events,
-                  state.avatar, state.topic
+                  state.avatar, state.topic, state.room_type
                 FROM rooms
                 LEFT JOIN room_stats_state state USING (room_id)
                 LEFT JOIN room_stats_current curr USING (room_id)
                 WHERE room_id = ?
                 """
             txn.execute(sql, [room_id])
-            # Catch error if sql returns empty result to return "None" instead of an error
-            try:
-                res = self.db_pool.cursor_to_dict(txn)[0]
-            except IndexError:
+            row = txn.fetchone()
+            if not row:
                 return None
-
-            res["federatable"] = bool(res["federatable"])
-            res["public"] = bool(res["public"])
-            return res
+            return RoomStats(
+                room_id=row[0],
+                name=row[1],
+                canonical_alias=row[2],
+                joined_members=row[3],
+                joined_local_members=row[4],
+                version=row[5],
+                creator=row[6],
+                encryption=row[7],
+                federatable=bool(row[8]),
+                public=bool(row[9]),
+                join_rules=row[10],
+                guest_access=row[11],
+                history_visibility=row[12],
+                state_events=row[13],
+                avatar=row[14],
+                topic=row[15],
+                room_type=row[16],
+            )
 
         return await self.db_pool.runInteraction(
             "get_room_with_stats", get_room_with_stats_txn, room_id
@@ -206,21 +308,30 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
     def _construct_room_type_where_clause(
         self, room_types: Union[List[Union[str, None]], None]
-    ) -> Tuple[Union[str, None], List[str]]:
-        if not room_types or not self.config.experimental.msc3827_enabled:
+    ) -> Tuple[Union[str, None], list]:
+        if not room_types:
             return None, []
-        else:
-            # We use None when we want get rooms without a type
-            is_null_clause = ""
-            if None in room_types:
-                is_null_clause = "OR room_type IS NULL"
-                room_types = [value for value in room_types if value is not None]
 
+        # Since None is used to represent a room without a type, care needs to
+        # be taken into account when constructing the where clause.
+        clauses = []
+        args: list = []
+
+        room_types_set = set(room_types)
+
+        # We use None to represent a room without a type.
+        if None in room_types_set:
+            clauses.append("room_type IS NULL")
+            room_types_set.remove(None)
+
+        # If there are other room types, generate the proper clause.
+        if room_types:
             list_clause, args = make_in_list_sql_clause(
-                self.database_engine, "room_type", room_types
+                self.database_engine, "room_type", room_types_set
             )
+            clauses.append(list_clause)
 
-            return f"({list_clause} {is_null_clause})", args
+        return f"({' OR '.join(clauses)})", args
 
     async def count_public_rooms(
         self,
@@ -240,14 +351,6 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         def _count_public_rooms_txn(txn: LoggingTransaction) -> int:
             query_args = []
 
-            room_type_clause, args = self._construct_room_type_where_clause(
-                search_filter.get(PublicRoomsFilterFields.ROOM_TYPES, None)
-                if search_filter
-                else None
-            )
-            room_type_clause = f" AND {room_type_clause}" if room_type_clause else ""
-            query_args += args
-
             if network_tuple:
                 if network_tuple.appservice_id:
                     published_sql = """
@@ -266,6 +369,14 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                     SELECT room_id FROM rooms WHERE is_public
                     UNION SELECT room_id from appservice_room_list
             """
+
+            room_type_clause, args = self._construct_room_type_where_clause(
+                search_filter.get(PublicRoomsFilterFields.ROOM_TYPES, None)
+                if search_filter
+                else None
+            )
+            room_type_clause = f" AND {room_type_clause}" if room_type_clause else ""
+            query_args += args
 
             sql = f"""
                 SELECT
@@ -312,7 +423,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         bounds: Optional[Tuple[int, str]],
         forwards: bool,
         ignore_non_federatable: bool = False,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[LargestRoomStats]:
         """Gets the largest public rooms (where largest is in terms of joined
         members, as tracked in the statistics table).
 
@@ -449,20 +560,34 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
         def _get_largest_public_rooms_txn(
             txn: LoggingTransaction,
-        ) -> List[Dict[str, Any]]:
+        ) -> List[LargestRoomStats]:
             txn.execute(sql, query_args)
 
-            results = self.db_pool.cursor_to_dict(txn)
+            results = [
+                LargestRoomStats(
+                    room_id=r[0],
+                    name=r[1],
+                    canonical_alias=r[3],
+                    joined_members=r[4],
+                    join_rules=r[8],
+                    guest_access=r[7],
+                    history_visibility=r[6],
+                    state_events=0,
+                    avatar=r[5],
+                    topic=r[2],
+                    room_type=r[9],
+                )
+                for r in txn
+            ]
 
             if not forwards:
                 results.reverse()
 
             return results
 
-        ret_val = await self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_largest_public_rooms", _get_largest_public_rooms_txn
         )
-        return ret_val
 
     @cached(max_entries=10000)
     async def is_room_blocked(self, room_id: str) -> Optional[bool]:
@@ -596,7 +721,8 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             SELECT state.room_id, state.name, state.canonical_alias, curr.joined_members,
               curr.local_users_in_room, rooms.room_version, rooms.creator,
               state.encryption, state.is_federatable, rooms.is_public, state.join_rules,
-              state.guest_access, state.history_visibility, curr.current_state_events
+              state.guest_access, state.history_visibility, curr.current_state_events,
+              state.room_type
             FROM room_stats_state state
             INNER JOIN room_stats_current curr USING (room_id)
             INNER JOIN rooms USING (room_id)
@@ -640,12 +766,15 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                         "version": room[5],
                         "creator": room[6],
                         "encryption": room[7],
-                        "federatable": room[8],
-                        "public": room[9],
+                        # room_stats_state.federatable is an integer on sqlite.
+                        "federatable": bool(room[8]),
+                        # rooms.is_public is an integer on sqlite.
+                        "public": bool(room[9]),
                         "join_rules": room[10],
                         "guest_access": room[11],
                         "history_visibility": room[12],
                         "state_events": room[13],
+                        "room_type": room[14],
                     }
                 )
 
@@ -682,10 +811,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         )
 
         if row:
-            return RatelimitOverride(
-                messages_per_second=row["messages_per_second"],
-                burst_count=row["burst_count"],
-            )
+            return RatelimitOverride(messages_per_second=row[0], burst_count=row[1])
         else:
             return None
 
@@ -771,7 +897,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
         def get_retention_policy_for_room_txn(
             txn: LoggingTransaction,
-        ) -> List[Dict[str, Optional[int]]]:
+        ) -> Optional[Tuple[Optional[int], Optional[int]]]:
             txn.execute(
                 """
                 SELECT min_lifetime, max_lifetime FROM room_retention
@@ -781,7 +907,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                 (room_id,),
             )
 
-            return self.db_pool.cursor_to_dict(txn)
+            return cast(Optional[Tuple[Optional[int], Optional[int]]], txn.fetchone())
 
         ret = await self.db_pool.runInteraction(
             "get_retention_policy_for_room",
@@ -796,8 +922,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                 max_lifetime=self.config.retention.retention_default_max_lifetime,
             )
 
-        min_lifetime = ret[0]["min_lifetime"]
-        max_lifetime = ret[0]["max_lifetime"]
+        min_lifetime, max_lifetime = ret
 
         # If one of the room's policy's attributes isn't defined, use the matching
         # attribute from the default policy.
@@ -876,11 +1001,11 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             JOIN event_json USING (room_id, event_id)
             WHERE room_id = ?
                 %(where_clause)s
-                AND contains_url = ? AND outlier = ?
+                AND contains_url = TRUE AND outlier = FALSE
             ORDER BY stream_ordering DESC
             LIMIT ?
         """
-        txn.execute(sql % {"where_clause": ""}, (room_id, True, False, 100))
+        txn.execute(sql % {"where_clause": ""}, (room_id, 100))
 
         local_media_mxcs = []
         remote_media_mxcs = []
@@ -892,7 +1017,11 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                 event_json = db_to_json(content_json)
                 content = event_json["content"]
                 content_url = content.get("url")
-                thumbnail_url = content.get("info", {}).get("thumbnail_url")
+                info = content.get("info")
+                if isinstance(info, dict):
+                    thumbnail_url = info.get("thumbnail_url")
+                else:
+                    thumbnail_url = None
 
                 for url in (content_url, thumbnail_url):
                     if not url:
@@ -912,7 +1041,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
             txn.execute(
                 sql % {"where_clause": "AND stream_ordering < ?"},
-                (room_id, next_token, True, False, 100),
+                (room_id, next_token, 100),
             )
 
         return local_media_mxcs, remote_media_mxcs
@@ -932,7 +1061,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                 If it is `None` media will be removed from quarantine
         """
         logger.info("Quarantining media: %s/%s", server_name, media_id)
-        is_local = server_name == self.config.server.server_name
+        is_local = self.hs.is_mine_server_name(server_name)
 
         def _quarantine_media_by_id_txn(txn: LoggingTransaction) -> int:
             local_mxcs = [media_id] if is_local else []
@@ -1022,9 +1151,9 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
         # set quarantine
         if quarantined_by is not None:
-            sql += "AND safe_from_quarantine = ?"
+            sql += "AND safe_from_quarantine = FALSE"
             txn.executemany(
-                sql, [(quarantined_by, media_id, False) for media_id in local_mxcs]
+                sql, [(quarantined_by, media_id) for media_id in local_mxcs]
             )
         # remove from quarantine
         else:
@@ -1098,14 +1227,13 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
             txn.execute(sql, args)
 
-            rows = self.db_pool.cursor_to_dict(txn)
-            rooms_dict = {}
-
-            for row in rows:
-                rooms_dict[row["room_id"]] = RetentionPolicy(
-                    min_lifetime=row["min_lifetime"],
-                    max_lifetime=row["max_lifetime"],
+            rooms_dict = {
+                room_id: RetentionPolicy(
+                    min_lifetime=min_lifetime,
+                    max_lifetime=max_lifetime,
                 )
+                for room_id, min_lifetime, max_lifetime in txn
+            }
 
             if include_null:
                 # If required, do a second query that retrieves all of the rooms we know
@@ -1114,13 +1242,11 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
                 txn.execute(sql)
 
-                rows = self.db_pool.cursor_to_dict(txn)
-
                 # If a room isn't already in the dict (i.e. it doesn't have a retention
                 # policy in its state), add it with a null policy.
-                for row in rows:
-                    if row["room_id"] not in rooms_dict:
-                        rooms_dict[row["room_id"]] = RetentionPolicy()
+                for (room_id,) in txn:
+                    if room_id not in rooms_dict:
+                        rooms_dict[room_id] = RetentionPolicy()
 
             return rooms_dict
 
@@ -1129,71 +1255,86 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             get_rooms_for_retention_period_in_range_txn,
         )
 
-    async def get_partial_state_rooms_and_servers(
+    async def get_partial_state_servers_at_join(
+        self, room_id: str
+    ) -> Optional[AbstractSet[str]]:
+        """Gets the set of servers in a partial state room at the time we joined it.
+
+        Returns:
+            The `servers_in_room` list from the `/send_join` response for partial state
+            rooms. May not be accurate or complete, as it comes from a remote
+            homeserver.
+            `None` for full state rooms.
+        """
+        servers_in_room = await self._get_partial_state_servers_at_join(room_id)
+
+        if len(servers_in_room) == 0:
+            return None
+
+        return servers_in_room
+
+    @cached(iterable=True)
+    async def _get_partial_state_servers_at_join(
+        self, room_id: str
+    ) -> AbstractSet[str]:
+        return frozenset(
+            await self.db_pool.simple_select_onecol(
+                "partial_state_rooms_servers",
+                keyvalues={"room_id": room_id},
+                retcol="server_name",
+                desc="get_partial_state_servers_at_join",
+            )
+        )
+
+    async def get_partial_state_room_resync_info(
         self,
-    ) -> Mapping[str, Collection[str]]:
-        """Get all rooms containing events with partial state, and the servers known
-        to be in the room.
+    ) -> Mapping[str, PartialStateResyncInfo]:
+        """Get all rooms containing events with partial state, and the information
+        needed to restart a "resync" of those rooms.
 
         Returns:
             A dictionary of rooms with partial state, with room IDs as keys and
             lists of servers in rooms as values.
         """
-        room_servers: Dict[str, List[str]] = {}
+        room_servers: Dict[str, PartialStateResyncInfo] = {}
 
-        rows = await self.db_pool.simple_select_list(
-            "partial_state_rooms_servers",
-            keyvalues=None,
-            retcols=("room_id", "server_name"),
-            desc="get_partial_state_rooms",
+        rows = cast(
+            List[Tuple[str, str]],
+            await self.db_pool.simple_select_list(
+                table="partial_state_rooms",
+                keyvalues={},
+                retcols=("room_id", "joined_via"),
+                desc="get_server_which_served_partial_join",
+            ),
         )
 
-        for row in rows:
-            room_id = row["room_id"]
-            server_name = row["server_name"]
-            room_servers.setdefault(room_id, []).append(server_name)
+        for room_id, joined_via in rows:
+            room_servers[room_id] = PartialStateResyncInfo(joined_via=joined_via)
+
+        rows = cast(
+            List[Tuple[str, str]],
+            await self.db_pool.simple_select_list(
+                "partial_state_rooms_servers",
+                keyvalues=None,
+                retcols=("room_id", "server_name"),
+                desc="get_partial_state_rooms",
+            ),
+        )
+
+        for room_id, server_name in rows:
+            entry = room_servers.get(room_id)
+            if entry is None:
+                # There is a foreign key constraint which enforces that every room_id in
+                # partial_state_rooms_servers appears in partial_state_rooms. So we
+                # expect `entry` to be non-null. (This reasoning fails if we've
+                # partial-joined between the two SELECTs, but this is unlikely to happen
+                # in practice.)
+                continue
+            entry.servers_in_room.add(server_name)
 
         return room_servers
 
-    async def clear_partial_state_room(self, room_id: str) -> bool:
-        """Clears the partial state flag for a room.
-
-        Args:
-            room_id: The room whose partial state flag is to be cleared.
-
-        Returns:
-            `True` if the partial state flag has been cleared successfully.
-
-            `False` if the partial state flag could not be cleared because the room
-            still contains events with partial state.
-        """
-        try:
-            await self.db_pool.runInteraction(
-                "clear_partial_state_room", self._clear_partial_state_room_txn, room_id
-            )
-            return True
-        except self.db_pool.engine.module.IntegrityError as e:
-            # Assume that any `IntegrityError`s are due to partial state events.
-            logger.info(
-                "Exception while clearing lazy partial-state-room %s, retrying: %s",
-                room_id,
-                e,
-            )
-            return False
-
-    @staticmethod
-    def _clear_partial_state_room_txn(txn: LoggingTransaction, room_id: str) -> None:
-        DatabasePool.simple_delete_txn(
-            txn,
-            table="partial_state_rooms_servers",
-            keyvalues={"room_id": room_id},
-        )
-        DatabasePool.simple_delete_one_txn(
-            txn,
-            table="partial_state_rooms",
-            keyvalues={"room_id": room_id},
-        )
-
+    @cached(max_entries=10000)
     async def is_partial_state_room(self, room_id: str) -> bool:
         """Checks if this room has partial state.
 
@@ -1211,6 +1352,337 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         )
 
         return entry is not None
+
+    @cachedList(cached_method_name="is_partial_state_room", list_name="room_ids")
+    async def is_partial_state_room_batched(
+        self, room_ids: StrCollection
+    ) -> Mapping[str, bool]:
+        """Checks if the given rooms have partial state.
+
+        Returns true for "partial-state" rooms, which means that the state
+        at events in the room, and `current_state_events`, may not yet be
+        complete.
+        """
+
+        rows = cast(
+            List[Tuple[str]],
+            await self.db_pool.simple_select_many_batch(
+                table="partial_state_rooms",
+                column="room_id",
+                iterable=room_ids,
+                retcols=("room_id",),
+                desc="is_partial_state_room_batched",
+            ),
+        )
+        partial_state_rooms = {row[0] for row in rows}
+        return {room_id: room_id in partial_state_rooms for room_id in room_ids}
+
+    async def get_join_event_id_and_device_lists_stream_id_for_partial_state(
+        self, room_id: str
+    ) -> Tuple[str, int]:
+        """Get the event ID of the initial join that started the partial
+        join, and the device list stream ID at the point we started the partial
+        join.
+        """
+
+        return cast(
+            Tuple[str, int],
+            await self.db_pool.simple_select_one(
+                table="partial_state_rooms",
+                keyvalues={"room_id": room_id},
+                retcols=("join_event_id", "device_lists_stream_id"),
+                desc="get_join_event_id_for_partial_state",
+            ),
+        )
+
+    def get_un_partial_stated_rooms_token(self, instance_name: str) -> int:
+        return self._un_partial_stated_rooms_stream_id_gen.get_current_token_for_writer(
+            instance_name
+        )
+
+    async def get_un_partial_stated_rooms_between(
+        self, last_id: int, current_id: int, room_ids: Collection[str]
+    ) -> Set[str]:
+        """Get all rooms that got un partial stated between `last_id` exclusive and
+        `current_id` inclusive.
+
+        Returns:
+            The list of room ids.
+        """
+
+        if last_id == current_id:
+            return set()
+
+        def _get_un_partial_stated_rooms_between_txn(
+            txn: LoggingTransaction,
+        ) -> Set[str]:
+            sql = """
+                SELECT DISTINCT room_id FROM un_partial_stated_room_stream
+                WHERE ? < stream_id AND stream_id <= ? AND
+            """
+
+            clause, args = make_in_list_sql_clause(
+                self.database_engine, "room_id", room_ids
+            )
+
+            txn.execute(sql + clause, [last_id, current_id] + args)
+
+            return {r[0] for r in txn}
+
+        return await self.db_pool.runInteraction(
+            "get_un_partial_stated_rooms_between",
+            _get_un_partial_stated_rooms_between_txn,
+        )
+
+    async def get_un_partial_stated_rooms_from_stream(
+        self, instance_name: str, last_id: int, current_id: int, limit: int
+    ) -> Tuple[List[Tuple[int, Tuple[str]]], int, bool]:
+        """Get updates for un partial stated rooms replication stream.
+
+        Args:
+            instance_name: The writer we want to fetch updates from. Unused
+                here since there is only ever one writer.
+            last_id: The token to fetch updates from. Exclusive.
+            current_id: The token to fetch updates up to. Inclusive.
+            limit: The requested limit for the number of rows to return. The
+                function may return more or fewer rows.
+
+        Returns:
+            A tuple consisting of: the updates, a token to use to fetch
+            subsequent updates, and whether we returned fewer rows than exists
+            between the requested tokens due to the limit.
+
+            The token returned can be used in a subsequent call to this
+            function to get further updatees.
+
+            The updates are a list of 2-tuples of stream ID and the row data
+        """
+
+        if last_id == current_id:
+            return [], current_id, False
+
+        def get_un_partial_stated_rooms_from_stream_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[List[Tuple[int, Tuple[str]]], int, bool]:
+            sql = """
+                SELECT stream_id, room_id
+                FROM un_partial_stated_room_stream
+                WHERE ? < stream_id AND stream_id <= ? AND instance_name = ?
+                ORDER BY stream_id ASC
+                LIMIT ?
+            """
+            txn.execute(sql, (last_id, current_id, instance_name, limit))
+            updates = [(row[0], (row[1],)) for row in txn]
+            limited = False
+            upto_token = current_id
+            if len(updates) >= limit:
+                upto_token = updates[-1][0]
+                limited = True
+
+            return updates, upto_token, limited
+
+        return await self.db_pool.runInteraction(
+            "get_un_partial_stated_rooms_from_stream",
+            get_un_partial_stated_rooms_from_stream_txn,
+        )
+
+    async def get_event_report(self, report_id: int) -> Optional[Dict[str, Any]]:
+        """Retrieve an event report
+
+        Args:
+            report_id: ID of reported event in database
+        Returns:
+            JSON dict of information from an event report or None if the
+            report does not exist.
+        """
+
+        def _get_event_report_txn(
+            txn: LoggingTransaction, report_id: int
+        ) -> Optional[Dict[str, Any]]:
+            sql = """
+                SELECT
+                    er.id,
+                    er.received_ts,
+                    er.room_id,
+                    er.event_id,
+                    er.user_id,
+                    er.content,
+                    events.sender,
+                    room_stats_state.canonical_alias,
+                    room_stats_state.name,
+                    event_json.json AS event_json
+                FROM event_reports AS er
+                LEFT JOIN events
+                    ON events.event_id = er.event_id
+                JOIN event_json
+                    ON event_json.event_id = er.event_id
+                JOIN room_stats_state
+                    ON room_stats_state.room_id = er.room_id
+                WHERE er.id = ?
+            """
+
+            txn.execute(sql, [report_id])
+            row = txn.fetchone()
+
+            if not row:
+                return None
+
+            event_report = {
+                "id": row[0],
+                "received_ts": row[1],
+                "room_id": row[2],
+                "event_id": row[3],
+                "user_id": row[4],
+                "score": db_to_json(row[5]).get("score"),
+                "reason": db_to_json(row[5]).get("reason"),
+                "sender": row[6],
+                "canonical_alias": row[7],
+                "name": row[8],
+                "event_json": db_to_json(row[9]),
+            }
+
+            return event_report
+
+        return await self.db_pool.runInteraction(
+            "get_event_report", _get_event_report_txn, report_id
+        )
+
+    async def get_event_reports_paginate(
+        self,
+        start: int,
+        limit: int,
+        direction: Direction = Direction.BACKWARDS,
+        user_id: Optional[str] = None,
+        room_id: Optional[str] = None,
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """Retrieve a paginated list of event reports
+
+        Args:
+            start: event offset to begin the query from
+            limit: number of rows to retrieve
+            direction: Whether to fetch the most recent first (backwards) or the
+                oldest first (forwards)
+            user_id: search for user_id. Ignored if user_id is None
+            room_id: search for room_id. Ignored if room_id is None
+        Returns:
+            Tuple of:
+                json list of event reports
+                total number of event reports matching the filter criteria
+        """
+
+        def _get_event_reports_paginate_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[List[Dict[str, Any]], int]:
+            filters = []
+            args: List[object] = []
+
+            if user_id:
+                filters.append("er.user_id LIKE ?")
+                args.extend(["%" + user_id + "%"])
+            if room_id:
+                filters.append("er.room_id LIKE ?")
+                args.extend(["%" + room_id + "%"])
+
+            if direction == Direction.BACKWARDS:
+                order = "DESC"
+            else:
+                order = "ASC"
+
+            where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
+
+            # We join on room_stats_state despite not using any columns from it
+            # because the join can influence the number of rows returned;
+            # e.g. a room that doesn't have state, maybe because it was deleted.
+            # The query returning the total count should be consistent with
+            # the query returning the results.
+            sql = """
+                SELECT COUNT(*) as total_event_reports
+                FROM event_reports AS er
+                JOIN room_stats_state ON room_stats_state.room_id = er.room_id
+                {}
+                """.format(
+                where_clause
+            )
+            txn.execute(sql, args)
+            count = cast(Tuple[int], txn.fetchone())[0]
+
+            sql = """
+                SELECT
+                    er.id,
+                    er.received_ts,
+                    er.room_id,
+                    er.event_id,
+                    er.user_id,
+                    er.content,
+                    events.sender,
+                    room_stats_state.canonical_alias,
+                    room_stats_state.name
+                FROM event_reports AS er
+                LEFT JOIN events
+                    ON events.event_id = er.event_id
+                JOIN room_stats_state
+                    ON room_stats_state.room_id = er.room_id
+                {where_clause}
+                ORDER BY er.received_ts {order}
+                LIMIT ?
+                OFFSET ?
+            """.format(
+                where_clause=where_clause,
+                order=order,
+            )
+
+            args += [limit, start]
+            txn.execute(sql, args)
+
+            event_reports = []
+            for row in txn:
+                try:
+                    s = db_to_json(row[5]).get("score")
+                    r = db_to_json(row[5]).get("reason")
+                except Exception:
+                    logger.error("Unable to parse json from event_reports: %s", row[0])
+                    continue
+                event_reports.append(
+                    {
+                        "id": row[0],
+                        "received_ts": row[1],
+                        "room_id": row[2],
+                        "event_id": row[3],
+                        "user_id": row[4],
+                        "score": s,
+                        "reason": r,
+                        "sender": row[6],
+                        "canonical_alias": row[7],
+                        "name": row[8],
+                    }
+                )
+
+            return event_reports, count
+
+        return await self.db_pool.runInteraction(
+            "get_event_reports_paginate", _get_event_reports_paginate_txn
+        )
+
+    async def delete_event_report(self, report_id: int) -> bool:
+        """Remove an event report from database.
+
+        Args:
+            report_id: Report to delete
+
+        Returns:
+            Whether the report was successfully deleted or not.
+        """
+        try:
+            await self.db_pool.simple_delete_one(
+                table="event_reports",
+                keyvalues={"id": report_id},
+                desc="delete_event_report",
+            )
+        except StoreError:
+            # Deletion failed because report does not exist
+            return False
+
+        return True
 
 
 class _BackgroundUpdates:
@@ -1300,24 +1772,24 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
                 (last_room, batch_size),
             )
 
-            rows = self.db_pool.cursor_to_dict(txn)
+            rows = txn.fetchall()
 
             if not rows:
                 return True
 
-            for row in rows:
-                if not row["json"]:
+            for room_id, event_id, json in rows:
+                if not json:
                     retention_policy = {}
                 else:
-                    ev = db_to_json(row["json"])
+                    ev = db_to_json(json)
                     retention_policy = ev["content"]
 
                 self.db_pool.simple_insert_txn(
                     txn=txn,
                     table="room_retention",
                     values={
-                        "room_id": row["room_id"],
-                        "event_id": row["event_id"],
+                        "room_id": room_id,
+                        "event_id": event_id,
                         "min_lifetime": retention_policy.get("min_lifetime"),
                         "max_lifetime": retention_policy.get("max_lifetime"),
                     },
@@ -1326,7 +1798,7 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
             logger.info("Inserted %d rows into room_retention", len(rows))
 
             self.db_pool.updates._background_update_progress_txn(
-                txn, "insert_room_retention", {"room_id": rows[-1]["room_id"]}
+                txn, "insert_room_retention", {"room_id": rows[-1][0]}
             )
 
             if batch_size > len(rows):
@@ -1595,6 +2067,9 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
             for room_id, event_json in room_id_to_create_event_results:
                 event_dict = db_to_json(event_json)
 
+                # The creator property might not exist in newer room versions, but
+                # for those versions the creator column should be properly populate
+                # during room creation.
                 creator = event_dict.get("content").get(EventContentFields.ROOM_CREATOR)
 
                 self.db_pool.simple_update_txn(
@@ -1703,6 +2178,8 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
 
         self._event_reports_id_gen = IdGenerator(db_conn, "event_reports", "id")
 
+        self._instance_name = hs.get_instance_name()
+
     async def upsert_room_on_join(
         self, room_id: str, room_version: RoomVersion, state_events: List[EventBase]
     ) -> None:
@@ -1727,12 +2204,16 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
             # invalid, and it would fail auth checks anyway.
             raise StoreError(400, "No create event in state")
 
-        room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
+        # Before MSC2175, the room creator was a separate field.
+        if not room_version.implicit_room_creator:
+            room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
 
-        if not isinstance(room_creator, str):
-            # If the create event does not have a creator then the room is
-            # invalid, and it would fail auth checks anyway.
-            raise StoreError(400, "No creator defined on the create event")
+            if not isinstance(room_creator, str):
+                # If the create event does not have a creator then the room is
+                # invalid, and it would fail auth checks anyway.
+                raise StoreError(400, "No creator defined on the create event")
+        else:
+            room_creator = create_event.sender
 
         await self.db_pool.simple_upsert(
             desc="upsert_room_on_join",
@@ -1744,45 +2225,100 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
                 "creator": room_creator,
                 "has_auth_chain_index": has_auth_chain_index,
             },
-            # rooms has a unique constraint on room_id, so no need to lock when doing an
-            # emulated upsert.
-            lock=False,
         )
 
     async def store_partial_state_room(
         self,
         room_id: str,
-        servers: Collection[str],
+        servers: AbstractSet[str],
+        device_lists_stream_id: int,
+        joined_via: str,
     ) -> None:
-        """Mark the given room as containing events with partial state
+        """Mark the given room as containing events with partial state.
+
+        We also store additional data that describes _when_ we first partial-joined this
+        room, which helps us to keep other homeservers in sync when we finally fully
+        join this room.
+
+        We do not include a `join_event_id` here---we need to wait for the join event
+        to be persisted first.
 
         Args:
             room_id: the ID of the room
-            servers: other servers known to be in the room
+            servers: other servers known to be in the room. must include `joined_via`.
+            device_lists_stream_id: the device_lists stream ID at the time when we first
+                joined the room.
+            joined_via: the server name we requested a partial join from.
         """
+        assert joined_via in servers
+
         await self.db_pool.runInteraction(
             "store_partial_state_room",
             self._store_partial_state_room_txn,
             room_id,
             servers,
+            device_lists_stream_id,
+            joined_via,
         )
 
-    @staticmethod
     def _store_partial_state_room_txn(
-        txn: LoggingTransaction, room_id: str, servers: Collection[str]
+        self,
+        txn: LoggingTransaction,
+        room_id: str,
+        servers: AbstractSet[str],
+        device_lists_stream_id: int,
+        joined_via: str,
     ) -> None:
         DatabasePool.simple_insert_txn(
             txn,
             table="partial_state_rooms",
             values={
                 "room_id": room_id,
+                "device_lists_stream_id": device_lists_stream_id,
+                # To be updated later once the join event is persisted.
+                "join_event_id": None,
+                "joined_via": joined_via,
             },
         )
         DatabasePool.simple_insert_many_txn(
             txn,
             table="partial_state_rooms_servers",
             keys=("room_id", "server_name"),
-            values=((room_id, s) for s in servers),
+            values=[(room_id, s) for s in servers],
+        )
+        self._invalidate_cache_and_stream(txn, self.is_partial_state_room, (room_id,))
+        self._invalidate_cache_and_stream(
+            txn, self._get_partial_state_servers_at_join, (room_id,)
+        )
+
+    async def write_partial_state_rooms_join_event_id(
+        self,
+        room_id: str,
+        join_event_id: str,
+    ) -> None:
+        """Record the join event which resulted from a partial join.
+
+        We do this separately to `store_partial_state_room` because we need to wait for
+        the join event to be persisted. Otherwise we violate a foreign key constraint.
+        """
+        await self.db_pool.runInteraction(
+            "write_partial_state_rooms_join_event_id",
+            self._write_partial_state_rooms_join_event_id,
+            room_id,
+            join_event_id,
+        )
+
+    def _write_partial_state_rooms_join_event_id(
+        self,
+        txn: LoggingTransaction,
+        room_id: str,
+        join_event_id: str,
+    ) -> None:
+        DatabasePool.simple_update_txn(
+            txn,
+            table="partial_state_rooms",
+            keyvalues={"room_id": room_id},
+            updatevalues={"join_event_id": join_event_id},
         )
 
     async def maybe_store_room_on_outlier_membership(
@@ -1811,9 +2347,6 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
                 "creator": "",
                 "has_auth_chain_index": has_auth_chain_index,
             },
-            # rooms has a unique constraint on room_id, so no need to lock when doing an
-            # emulated upsert.
-            lock=False,
         )
 
     async def set_room_is_public(self, room_id: str, is_public: bool) -> None:
@@ -1880,7 +2413,19 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         reason: Optional[str],
         content: JsonDict,
         received_ts: int,
-    ) -> None:
+    ) -> int:
+        """Add an event report
+
+        Args:
+            room_id: Room that contains the reported event.
+            event_id: The reported event.
+            user_id: User who reports the event.
+            reason: Description that the user specifies.
+            content: Report request body (score and reason).
+            received_ts: Time when the user submitted the report (milliseconds).
+        Returns:
+            Id of the event report.
+        """
         next_id = self._event_reports_id_gen.get_next()
         await self.db_pool.simple_insert(
             table="event_reports",
@@ -1895,176 +2440,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
             },
             desc="add_event_report",
         )
-
-    async def get_event_report(self, report_id: int) -> Optional[Dict[str, Any]]:
-        """Retrieve an event report
-
-        Args:
-            report_id: ID of reported event in database
-        Returns:
-            event_report: json list of information from event report
-        """
-
-        def _get_event_report_txn(
-            txn: LoggingTransaction, report_id: int
-        ) -> Optional[Dict[str, Any]]:
-
-            sql = """
-                SELECT
-                    er.id,
-                    er.received_ts,
-                    er.room_id,
-                    er.event_id,
-                    er.user_id,
-                    er.content,
-                    events.sender,
-                    room_stats_state.canonical_alias,
-                    room_stats_state.name,
-                    event_json.json AS event_json
-                FROM event_reports AS er
-                LEFT JOIN events
-                    ON events.event_id = er.event_id
-                JOIN event_json
-                    ON event_json.event_id = er.event_id
-                JOIN room_stats_state
-                    ON room_stats_state.room_id = er.room_id
-                WHERE er.id = ?
-            """
-
-            txn.execute(sql, [report_id])
-            row = txn.fetchone()
-
-            if not row:
-                return None
-
-            event_report = {
-                "id": row[0],
-                "received_ts": row[1],
-                "room_id": row[2],
-                "event_id": row[3],
-                "user_id": row[4],
-                "score": db_to_json(row[5]).get("score"),
-                "reason": db_to_json(row[5]).get("reason"),
-                "sender": row[6],
-                "canonical_alias": row[7],
-                "name": row[8],
-                "event_json": db_to_json(row[9]),
-            }
-
-            return event_report
-
-        return await self.db_pool.runInteraction(
-            "get_event_report", _get_event_report_txn, report_id
-        )
-
-    async def get_event_reports_paginate(
-        self,
-        start: int,
-        limit: int,
-        direction: str = "b",
-        user_id: Optional[str] = None,
-        room_id: Optional[str] = None,
-    ) -> Tuple[List[Dict[str, Any]], int]:
-        """Retrieve a paginated list of event reports
-
-        Args:
-            start: event offset to begin the query from
-            limit: number of rows to retrieve
-            direction: Whether to fetch the most recent first (`"b"`) or the
-                oldest first (`"f"`)
-            user_id: search for user_id. Ignored if user_id is None
-            room_id: search for room_id. Ignored if room_id is None
-        Returns:
-            event_reports: json list of event reports
-            count: total number of event reports matching the filter criteria
-        """
-
-        def _get_event_reports_paginate_txn(
-            txn: LoggingTransaction,
-        ) -> Tuple[List[Dict[str, Any]], int]:
-            filters = []
-            args: List[object] = []
-
-            if user_id:
-                filters.append("er.user_id LIKE ?")
-                args.extend(["%" + user_id + "%"])
-            if room_id:
-                filters.append("er.room_id LIKE ?")
-                args.extend(["%" + room_id + "%"])
-
-            if direction == "b":
-                order = "DESC"
-            else:
-                order = "ASC"
-
-            where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
-
-            sql = """
-                SELECT COUNT(*) as total_event_reports
-                FROM event_reports AS er
-                {}
-                """.format(
-                where_clause
-            )
-            txn.execute(sql, args)
-            count = cast(Tuple[int], txn.fetchone())[0]
-
-            sql = """
-                SELECT
-                    er.id,
-                    er.received_ts,
-                    er.room_id,
-                    er.event_id,
-                    er.user_id,
-                    er.content,
-                    events.sender,
-                    room_stats_state.canonical_alias,
-                    room_stats_state.name
-                FROM event_reports AS er
-                LEFT JOIN events
-                    ON events.event_id = er.event_id
-                JOIN room_stats_state
-                    ON room_stats_state.room_id = er.room_id
-                {where_clause}
-                ORDER BY er.received_ts {order}
-                LIMIT ?
-                OFFSET ?
-            """.format(
-                where_clause=where_clause,
-                order=order,
-            )
-
-            args += [limit, start]
-            txn.execute(sql, args)
-
-            event_reports = []
-            for row in txn:
-                try:
-                    s = db_to_json(row[5]).get("score")
-                    r = db_to_json(row[5]).get("reason")
-                except Exception:
-                    logger.error("Unable to parse json from event_reports: %s", row[0])
-                    continue
-                event_reports.append(
-                    {
-                        "id": row[0],
-                        "received_ts": row[1],
-                        "room_id": row[2],
-                        "event_id": row[3],
-                        "user_id": row[4],
-                        "score": s,
-                        "reason": r,
-                        "sender": row[6],
-                        "canonical_alias": row[7],
-                        "name": row[8],
-                    }
-                )
-
-            return event_reports, count
-
-        return await self.db_pool.runInteraction(
-            "get_event_reports_paginate", _get_event_reports_paginate_txn
-        )
+        return next_id
 
     async def block_room(self, room_id: str, user_id: str) -> None:
         """Marks the room as blocked.
@@ -2109,3 +2485,84 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
             self.is_room_blocked,
             (room_id,),
         )
+
+    async def clear_partial_state_room(self, room_id: str) -> Optional[int]:
+        """Clears the partial state flag for a room.
+
+        Args:
+            room_id: The room whose partial state flag is to be cleared.
+
+        Returns:
+            The corresponding stream id for the un-partial-stated rooms stream.
+
+            `None` if the partial state flag could not be cleared because the room
+            still contains events with partial state.
+        """
+        try:
+            async with self._un_partial_stated_rooms_stream_id_gen.get_next() as un_partial_state_room_stream_id:
+                await self.db_pool.runInteraction(
+                    "clear_partial_state_room",
+                    self._clear_partial_state_room_txn,
+                    room_id,
+                    un_partial_state_room_stream_id,
+                )
+                return un_partial_state_room_stream_id
+        except self.db_pool.engine.module.IntegrityError as e:
+            # Assume that any `IntegrityError`s are due to partial state events.
+            logger.info(
+                "Exception while clearing lazy partial-state-room %s, retrying: %s",
+                room_id,
+                e,
+            )
+            return None
+
+    def _clear_partial_state_room_txn(
+        self,
+        txn: LoggingTransaction,
+        room_id: str,
+        un_partial_state_room_stream_id: int,
+    ) -> None:
+        DatabasePool.simple_delete_txn(
+            txn,
+            table="partial_state_rooms_servers",
+            keyvalues={"room_id": room_id},
+        )
+        DatabasePool.simple_delete_one_txn(
+            txn,
+            table="partial_state_rooms",
+            keyvalues={"room_id": room_id},
+        )
+        self._invalidate_cache_and_stream(txn, self.is_partial_state_room, (room_id,))
+        self._invalidate_cache_and_stream(
+            txn, self._get_partial_state_servers_at_join, (room_id,)
+        )
+
+        DatabasePool.simple_insert_txn(
+            txn,
+            "un_partial_stated_room_stream",
+            {
+                "stream_id": un_partial_state_room_stream_id,
+                "instance_name": self._instance_name,
+                "room_id": room_id,
+            },
+        )
+
+        # We now delete anything from `device_lists_remote_pending` with a
+        # stream ID less than the minimum
+        # `partial_state_rooms.device_lists_stream_id`, as we no longer need them.
+        device_lists_stream_id = DatabasePool.simple_select_one_onecol_txn(
+            txn,
+            table="partial_state_rooms",
+            keyvalues={},
+            retcol="MIN(device_lists_stream_id)",
+            allow_none=True,
+        )
+        if device_lists_stream_id is None:
+            # There are no rooms being currently partially joined, so we delete everything.
+            txn.execute("DELETE FROM device_lists_remote_pending")
+        else:
+            sql = """
+                DELETE FROM device_lists_remote_pending
+                WHERE stream_id <= ?
+            """
+            txn.execute(sql, (device_lists_stream_id,))

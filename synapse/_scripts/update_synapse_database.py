@@ -1,21 +1,26 @@
-#!/usr/bin/env python
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 import argparse
 import logging
-import sys
 from typing import cast
 
 import yaml
@@ -39,7 +44,7 @@ class MockHomeserver(HomeServer):
     DATASTORE_CLASS = DataStore  # type: ignore [assignment]
 
     def __init__(self, config: HomeServerConfig):
-        super(MockHomeserver, self).__init__(
+        super().__init__(
             hostname=config.server.server_name,
             config=config,
             reactor=reactor,
@@ -48,10 +53,13 @@ class MockHomeserver(HomeServer):
 
 
 def run_background_updates(hs: HomeServer) -> None:
-    store = hs.get_datastores().main
+    main = hs.get_datastores().main
+    state = hs.get_datastores().state
 
     async def run_background_updates() -> None:
-        await store.db_pool.updates.run_background_updates(sleep=False)
+        await main.db_pool.updates.run_background_updates(sleep=False)
+        if state:
+            await state.db_pool.updates.run_background_updates(sleep=False)
         # Stop the reactor to exit the script once every background update is run.
         reactor.stop()
 
@@ -96,10 +104,6 @@ def main() -> None:
 
     # Load, process and sanity-check the config.
     hs_config = yaml.safe_load(args.database_config)
-
-    if "database" not in hs_config:
-        sys.stderr.write("The configuration file must have a 'database' section.\n")
-        sys.exit(4)
 
     config = HomeServerConfig()
     config.parse_config_dict(hs_config, "", "")

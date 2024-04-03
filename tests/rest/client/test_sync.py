@@ -1,20 +1,25 @@
-# Copyright 2018-2019 New Vector Ltd
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 import json
-from http import HTTPStatus
-from typing import List, Optional
+from typing import List
 
 from parameterized import parameterized
 
@@ -22,7 +27,6 @@ from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.constants import (
-    EduTypes,
     EventContentFields,
     EventTypes,
     ReceiptTypes,
@@ -38,11 +42,9 @@ from tests.federation.transport.test_knocking import (
     KnockingStrippedStateEventHelperMixin,
 )
 from tests.server import TimedOutException
-from tests.unittest import override_config
 
 
 class FilterTestCase(unittest.HomeserverTestCase):
-
     user_id = "@apple:test"
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
@@ -192,7 +194,6 @@ class SyncFilterTestCase(unittest.HomeserverTestCase):
 
 
 class SyncTypingTests(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
@@ -295,9 +296,7 @@ class SyncTypingTests(unittest.HomeserverTestCase):
             self.make_request("GET", sync_url % (access_token, next_batch))
 
 
-class SyncKnockTestCase(
-    unittest.HomeserverTestCase, KnockingStrippedStateEventHelperMixin
-):
+class SyncKnockTestCase(KnockingStrippedStateEventHelperMixin):
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
@@ -381,154 +380,6 @@ class SyncKnockTestCase(
         )
 
 
-class ReadReceiptsTestCase(unittest.HomeserverTestCase):
-    servlets = [
-        synapse.rest.admin.register_servlets,
-        login.register_servlets,
-        receipts.register_servlets,
-        room.register_servlets,
-        sync.register_servlets,
-    ]
-
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.url = "/sync?since=%s"
-        self.next_batch = "s0"
-
-        # Register the first user
-        self.user_id = self.register_user("kermit", "monkey")
-        self.tok = self.login("kermit", "monkey")
-
-        # Create the room
-        self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
-
-        # Register the second user
-        self.user2 = self.register_user("kermit2", "monkey")
-        self.tok2 = self.login("kermit2", "monkey")
-
-        # Join the second user
-        self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
-
-    @override_config({"experimental_features": {"msc2285_enabled": True}})
-    def test_private_read_receipts(self) -> None:
-        # Send a message as the first user
-        res = self.helper.send(self.room_id, body="hello", tok=self.tok)
-
-        # Send a private read receipt to tell the server the first user's message was read
-        channel = self.make_request(
-            "POST",
-            f"/rooms/{self.room_id}/receipt/org.matrix.msc2285.read.private/{res['event_id']}",
-            {},
-            access_token=self.tok2,
-        )
-        self.assertEqual(channel.code, 200)
-
-        # Test that the first user can't see the other user's private read receipt
-        self.assertIsNone(self._get_read_receipt())
-
-    @override_config({"experimental_features": {"msc2285_enabled": True}})
-    def test_public_receipt_can_override_private(self) -> None:
-        """
-        Sending a public read receipt to the same event which has a private read
-        receipt should cause that receipt to become public.
-        """
-        # Send a message as the first user
-        res = self.helper.send(self.room_id, body="hello", tok=self.tok)
-
-        # Send a private read receipt
-        channel = self.make_request(
-            "POST",
-            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ_PRIVATE}/{res['event_id']}",
-            {},
-            access_token=self.tok2,
-        )
-        self.assertEqual(channel.code, 200)
-        self.assertIsNone(self._get_read_receipt())
-
-        # Send a public read receipt
-        channel = self.make_request(
-            "POST",
-            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ}/{res['event_id']}",
-            {},
-            access_token=self.tok2,
-        )
-        self.assertEqual(channel.code, 200)
-
-        # Test that we did override the private read receipt
-        self.assertNotEqual(self._get_read_receipt(), None)
-
-    @override_config({"experimental_features": {"msc2285_enabled": True}})
-    def test_private_receipt_cannot_override_public(self) -> None:
-        """
-        Sending a private read receipt to the same event which has a public read
-        receipt should cause no change.
-        """
-        # Send a message as the first user
-        res = self.helper.send(self.room_id, body="hello", tok=self.tok)
-
-        # Send a public read receipt
-        channel = self.make_request(
-            "POST",
-            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ}/{res['event_id']}",
-            {},
-            access_token=self.tok2,
-        )
-        self.assertEqual(channel.code, 200)
-        self.assertNotEqual(self._get_read_receipt(), None)
-
-        # Send a private read receipt
-        channel = self.make_request(
-            "POST",
-            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ_PRIVATE}/{res['event_id']}",
-            {},
-            access_token=self.tok2,
-        )
-        self.assertEqual(channel.code, 200)
-
-        # Test that we didn't override the public read receipt
-        self.assertIsNone(self._get_read_receipt())
-
-    def test_read_receipt_with_empty_body_is_rejected(self) -> None:
-        # Send a message as the first user
-        res = self.helper.send(self.room_id, body="hello", tok=self.tok)
-
-        # Send a read receipt for this message with an empty body
-        channel = self.make_request(
-            "POST",
-            f"/rooms/{self.room_id}/receipt/m.read/{res['event_id']}",
-            access_token=self.tok2,
-        )
-        self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST)
-        self.assertEqual(channel.json_body["errcode"], "M_NOT_JSON", channel.json_body)
-
-    def _get_read_receipt(self) -> Optional[JsonDict]:
-        """Syncs and returns the read receipt."""
-
-        # Checks if event is a read receipt
-        def is_read_receipt(event: JsonDict) -> bool:
-            return event["type"] == EduTypes.RECEIPT
-
-        # Sync
-        channel = self.make_request(
-            "GET",
-            self.url % self.next_batch,
-            access_token=self.tok,
-        )
-        self.assertEqual(channel.code, 200)
-
-        # Store the next batch for the next request.
-        self.next_batch = channel.json_body["next_batch"]
-
-        if channel.json_body.get("rooms", None) is None:
-            return None
-
-        # Return the read receipt
-        ephemeral_events = channel.json_body["rooms"]["join"][self.room_id][
-            "ephemeral"
-        ]["events"]
-        receipt_event = filter(is_read_receipt, ephemeral_events)
-        return next(receipt_event, None)
-
-
 class UnreadMessagesTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,
@@ -543,7 +394,6 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         config = super().default_config()
         config["experimental_features"] = {
             "msc2654_enabled": True,
-            "msc2285_enabled": True,
         }
         return config
 
@@ -606,11 +456,10 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self._check_unread_count(1)
 
         # Send a read receipt to tell the server we've read the latest event.
-        body = json.dumps({ReceiptTypes.READ: res["event_id"]}).encode("utf8")
         channel = self.make_request(
             "POST",
             f"/rooms/{self.room_id}/read_markers",
-            body,
+            {ReceiptTypes.READ: res["event_id"]},
             access_token=self.tok,
         )
         self.assertEqual(channel.code, 200, channel.json_body)
@@ -625,7 +474,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         # Send a read receipt to tell the server we've read the latest event.
         channel = self.make_request(
             "POST",
-            f"/rooms/{self.room_id}/receipt/org.matrix.msc2285.read.private/{res['event_id']}",
+            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ_PRIVATE}/{res['event_id']}",
             {},
             access_token=self.tok,
         )
@@ -701,7 +550,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self._check_unread_count(5)
         res2 = self.helper.send(self.room_id, "hello", tok=self.tok2)
 
-        # Make sure both m.read and org.matrix.msc2285.read.private advance
+        # Make sure both m.read and m.read.private advance
         channel = self.make_request(
             "POST",
             f"/rooms/{self.room_id}/receipt/m.read/{res1['event_id']}",
@@ -713,16 +562,21 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "POST",
-            f"/rooms/{self.room_id}/receipt/org.matrix.msc2285.read.private/{res2['event_id']}",
+            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ_PRIVATE}/{res2['event_id']}",
             {},
             access_token=self.tok,
         )
         self.assertEqual(channel.code, 200, channel.json_body)
         self._check_unread_count(0)
 
-    # We test for both receipt types that influence notification counts
-    @parameterized.expand([ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE])
-    def test_read_receipts_only_go_down(self, receipt_type: ReceiptTypes) -> None:
+    # We test for all three receipt types that influence notification counts
+    @parameterized.expand(
+        [
+            ReceiptTypes.READ,
+            ReceiptTypes.READ_PRIVATE,
+        ]
+    )
+    def test_read_receipts_only_go_down(self, receipt_type: str) -> None:
         # Join the new user
         self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
 
@@ -733,18 +587,18 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         # Read last event
         channel = self.make_request(
             "POST",
-            f"/rooms/{self.room_id}/receipt/{receipt_type}/{res2['event_id']}",
+            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ_PRIVATE}/{res2['event_id']}",
             {},
             access_token=self.tok,
         )
         self.assertEqual(channel.code, 200, channel.json_body)
         self._check_unread_count(0)
 
-        # Make sure neither m.read nor org.matrix.msc2285.read.private make the
+        # Make sure neither m.read nor m.read.private make the
         # read receipt go up to an older event
         channel = self.make_request(
             "POST",
-            f"/rooms/{self.room_id}/receipt/org.matrix.msc2285.read.private/{res1['event_id']}",
+            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ_PRIVATE}/{res1['event_id']}",
             {},
             access_token=self.tok,
         )
@@ -794,7 +648,7 @@ class SyncCacheTestCase(unittest.HomeserverTestCase):
     def test_noop_sync_does_not_tightloop(self) -> None:
         """If the sync times out, we shouldn't cache the result
 
-        Essentially a regression test for #8518.
+        Essentially a regression test for https://github.com/matrix-org/synapse/issues/8518.
         """
         self.user_id = self.register_user("kermit", "monkey")
         self.tok = self.login("kermit", "monkey")
@@ -890,7 +744,6 @@ class DeviceListSyncTestCase(unittest.HomeserverTestCase):
 
 
 class ExcludeRoomTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
@@ -909,7 +762,9 @@ class ExcludeRoomTestCase(unittest.HomeserverTestCase):
 
         # We need to manually append the room ID, because we can't know the ID before
         # creating the room, and we can't set the config after starting the homeserver.
-        self.hs.get_sync_handler().rooms_to_exclude.append(self.excluded_room_id)
+        self.hs.get_sync_handler().rooms_to_exclude_globally.append(
+            self.excluded_room_id
+        )
 
     def test_join_leave(self) -> None:
         """Tests that rooms are correctly excluded from the 'join' and 'leave' sections of
@@ -949,3 +804,24 @@ class ExcludeRoomTestCase(unittest.HomeserverTestCase):
 
         self.assertNotIn(self.excluded_room_id, channel.json_body["rooms"]["invite"])
         self.assertIn(self.included_room_id, channel.json_body["rooms"]["invite"])
+
+    def test_incremental_sync(self) -> None:
+        """Tests that activity in the room is properly filtered out of incremental
+        syncs.
+        """
+        channel = self.make_request("GET", "/sync", access_token=self.tok)
+        self.assertEqual(channel.code, 200, channel.result)
+        next_batch = channel.json_body["next_batch"]
+
+        self.helper.send(self.excluded_room_id, tok=self.tok)
+        self.helper.send(self.included_room_id, tok=self.tok)
+
+        channel = self.make_request(
+            "GET",
+            f"/sync?since={next_batch}",
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self.assertNotIn(self.excluded_room_id, channel.json_body["rooms"]["join"])
+        self.assertIn(self.included_room_id, channel.json_body["rooms"]["join"])

@@ -1,16 +1,23 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2021 The Matrix.org Foundation C.I.C.
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 from unittest.mock import Mock
 
@@ -35,7 +42,7 @@ class ResponseCacheTestCase(TestCase):
                 (These have cache with a short timeout_ms=, shorter than will be tested through advancing the clock)
     """
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.reactor, self.clock = get_clock()
 
     def with_cache(self, name: str, ms: int = 0) -> ResponseCache:
@@ -49,7 +56,7 @@ class ResponseCacheTestCase(TestCase):
         await self.clock.sleep(1)
         return o
 
-    def test_cache_hit(self):
+    def test_cache_hit(self) -> None:
         cache = self.with_cache("keeping_cache", ms=9001)
 
         expected_result = "howdy"
@@ -74,7 +81,7 @@ class ResponseCacheTestCase(TestCase):
             "cache should still have the result",
         )
 
-    def test_cache_miss(self):
+    def test_cache_miss(self) -> None:
         cache = self.with_cache("trashing_cache", ms=0)
 
         expected_result = "howdy"
@@ -90,7 +97,7 @@ class ResponseCacheTestCase(TestCase):
         )
         self.assertCountEqual([], cache.keys(), "cache should not have the result now")
 
-    def test_cache_expire(self):
+    def test_cache_expire(self) -> None:
         cache = self.with_cache("short_cache", ms=1000)
 
         expected_result = "howdy"
@@ -115,7 +122,7 @@ class ResponseCacheTestCase(TestCase):
         self.reactor.pump((2,))
         self.assertCountEqual([], cache.keys(), "cache should not have the result now")
 
-    def test_cache_wait_hit(self):
+    def test_cache_wait_hit(self) -> None:
         cache = self.with_cache("neutral_cache")
 
         expected_result = "howdy"
@@ -131,7 +138,7 @@ class ResponseCacheTestCase(TestCase):
 
         self.assertEqual(expected_result, self.successResultOf(wrap_d))
 
-    def test_cache_wait_expire(self):
+    def test_cache_wait_expire(self) -> None:
         cache = self.with_cache("medium_cache", ms=3000)
 
         expected_result = "howdy"
@@ -162,7 +169,7 @@ class ResponseCacheTestCase(TestCase):
         self.assertCountEqual([], cache.keys(), "cache should not have the result now")
 
     @parameterized.expand([(True,), (False,)])
-    def test_cache_context_nocache(self, should_cache: bool):
+    def test_cache_context_nocache(self, should_cache: bool) -> None:
         """If the callback clears the should_cache bit, the result should not be cached"""
         cache = self.with_cache("medium_cache", ms=3000)
 
@@ -170,7 +177,7 @@ class ResponseCacheTestCase(TestCase):
 
         call_count = 0
 
-        async def non_caching(o: str, cache_context: ResponseCacheContext[int]):
+        async def non_caching(o: str, cache_context: ResponseCacheContext[int]) -> str:
             nonlocal call_count
             call_count += 1
             await self.clock.sleep(1)

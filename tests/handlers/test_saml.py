@@ -1,34 +1,43 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 #  Copyright 2020 The Matrix.org Foundation C.I.C.
+# Copyright (C) 2023 New Vector, Ltd
 #
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#      http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
-from typing import Any, Dict, Optional
-from unittest.mock import Mock
+from typing import Any, Dict, Optional, Set, Tuple
+from unittest.mock import AsyncMock, Mock
 
 import attr
 
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.errors import RedirectException
+from synapse.module_api import ModuleApi
 from synapse.server import HomeServer
+from synapse.types import JsonDict
 from synapse.util import Clock
 
-from tests.test_utils import simple_async_mock
 from tests.unittest import HomeserverTestCase, override_config
 
 # Check if we have the dependencies to run the tests.
 try:
     import saml2.config
+    import saml2.response
     from saml2.sigver import SigverError
 
     has_saml2 = True
@@ -56,31 +65,39 @@ class FakeAuthnResponse:
 
 
 class TestMappingProvider:
-    def __init__(self, config, module):
+    def __init__(self, config: None, module: ModuleApi):
         pass
 
     @staticmethod
-    def parse_config(config):
-        return
+    def parse_config(config: JsonDict) -> None:
+        return None
 
     @staticmethod
-    def get_saml_attributes(config):
+    def get_saml_attributes(config: None) -> Tuple[Set[str], Set[str]]:
         return {"uid"}, {"displayName"}
 
-    def get_remote_user_id(self, saml_response, client_redirect_url):
+    def get_remote_user_id(
+        self, saml_response: "saml2.response.AuthnResponse", client_redirect_url: str
+    ) -> str:
         return saml_response.ava["uid"]
 
     def saml_response_to_user_attributes(
-        self, saml_response, failures, client_redirect_url
-    ):
+        self,
+        saml_response: "saml2.response.AuthnResponse",
+        failures: int,
+        client_redirect_url: str,
+    ) -> dict:
         localpart = saml_response.ava["username"] + (str(failures) if failures else "")
         return {"mxid_localpart": localpart, "displayname": None}
 
 
 class TestRedirectMappingProvider(TestMappingProvider):
     def saml_response_to_user_attributes(
-        self, saml_response, failures, client_redirect_url
-    ):
+        self,
+        saml_response: "saml2.response.AuthnResponse",
+        failures: int,
+        client_redirect_url: str,
+    ) -> dict:
         raise RedirectException(b"https://custom-saml-redirect/")
 
 
@@ -123,7 +140,7 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = simple_async_mock()
+        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[method-assign]
 
         # send a mocked-up SAML response to the callback
         saml_response = FakeAuthnResponse({"uid": "test_user", "username": "test_user"})
@@ -153,7 +170,7 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = simple_async_mock()
+        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[method-assign]
 
         # Map a user via SSO.
         saml_response = FakeAuthnResponse(
@@ -195,11 +212,11 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = simple_async_mock()
+        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[method-assign]
 
         # mock out the error renderer too
         sso_handler = self.hs.get_sso_handler()
-        sso_handler.render_error = Mock(return_value=None)
+        sso_handler.render_error = Mock(return_value=None)  # type: ignore[method-assign]
 
         saml_response = FakeAuthnResponse({"uid": "test", "username": "föö"})
         request = _mock_request()
@@ -216,9 +233,9 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler and error renderer
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = simple_async_mock()
+        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[method-assign]
         sso_handler = self.hs.get_sso_handler()
-        sso_handler.render_error = Mock(return_value=None)
+        sso_handler.render_error = Mock(return_value=None)  # type: ignore[method-assign]
 
         # register a user to occupy the first-choice MXID
         store = self.hs.get_datastores().main
@@ -301,7 +318,7 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = simple_async_mock()
+        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[method-assign]
 
         # The response doesn't have the proper userGroup or department.
         saml_response = FakeAuthnResponse({"uid": "test_user", "username": "test_user"})
@@ -347,7 +364,7 @@ class SamlHandlerTestCase(HomeserverTestCase):
         )
 
 
-def _mock_request():
+def _mock_request() -> Mock:
     """Returns a mock which will stand in as a SynapseRequest"""
     mock = Mock(
         spec=[

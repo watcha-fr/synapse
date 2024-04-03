@@ -1,16 +1,23 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2016 OpenMarket Ltd
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 import logging
 import urllib.parse
@@ -19,6 +26,7 @@ from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, TypeVar
 import bleach
 import jinja2
 from markupsafe import Markup
+from prometheus_client import Counter
 
 from synapse.api.constants import EventTypes, Membership, RoomTypes
 from synapse.api.errors import StoreError
@@ -37,8 +45,8 @@ from synapse.push.push_types import (
     TemplateVars,
 )
 from synapse.storage.databases.main.event_push_actions import EmailPushAction
-from synapse.storage.state import StateFilter
 from synapse.types import StateMap, UserID
+from synapse.types.state import StateFilter
 from synapse.util.async_helpers import concurrently_execute
 from synapse.visibility import filter_events_for_client
 
@@ -60,6 +68,12 @@ from synapse.util.watcha import ActionStatus, build_log_message
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
+
+emails_sent_counter = Counter(
+    "synapse_emails_sent_total",
+    "Emails sent by type",
+    ["type"],
+)
 
 
 CONTEXT_BEFORE = 1
@@ -237,6 +251,8 @@ class Mailer:
 
     # +watcha
 
+    emails_sent_counter.labels("password_reset")
+
     async def send_password_reset_mail(
         self, email_address: str, token: str, client_secret: str, sid: str
     ) -> None:
@@ -260,12 +276,16 @@ class Mailer:
 
         template_vars: TemplateVars = {"link": link}
 
+        emails_sent_counter.labels("password_reset").inc()
+
         await self.send_email(
             email_address,
             self.email_subjects.password_reset
-            % {"server_name": self.hs.config.server.server_name},
+            % {"server_name": self.hs.config.server.server_name, "app": self.app_name},
             template_vars,
         )
+
+    emails_sent_counter.labels("registration")
 
     async def send_registration_mail(
         self, email_address: str, token: str, client_secret: str, sid: str
@@ -290,12 +310,16 @@ class Mailer:
 
         template_vars: TemplateVars = {"link": link}
 
+        emails_sent_counter.labels("registration").inc()
+
         await self.send_email(
             email_address,
             self.email_subjects.email_validation
             % {"server_name": self.hs.config.server.server_name, "app": self.app_name},
             template_vars,
         )
+
+    emails_sent_counter.labels("add_threepid")
 
     async def send_add_threepid_mail(
         self, email_address: str, token: str, client_secret: str, sid: str
@@ -321,12 +345,16 @@ class Mailer:
 
         template_vars: TemplateVars = {"link": link}
 
+        emails_sent_counter.labels("add_threepid").inc()
+
         await self.send_email(
             email_address,
             self.email_subjects.email_validation
             % {"server_name": self.hs.config.server.server_name, "app": self.app_name},
             template_vars,
         )
+
+    emails_sent_counter.labels("notification")
 
     async def send_notification_mail(
         self,
@@ -361,7 +389,7 @@ class Mailer:
 
         try:
             user_display_name = await self.store.get_profile_displayname(
-                UserID.from_string(user_id).localpart
+                UserID.from_string(user_id)
             )
             if user_display_name is None:
                 user_display_name = user_id
@@ -412,20 +440,28 @@ class Mailer:
                 notifs_by_room, state_by_room, notif_events, reason
             )
 
+        unsubscribe_link = self._make_unsubscribe_link(user_id, app_id, email_address)
+
         template_vars: TemplateVars = {
             "user_display_name": user_display_name,
-            "unsubscribe_link": self._make_unsubscribe_link(
-                user_id, app_id, email_address
-            ),
+            "unsubscribe_link": unsubscribe_link,
             "summary_text": summary_text,
             "rooms": rooms,
             "reason": reason,
         }
 
-        await self.send_email(email_address, summary_text, template_vars)
+        emails_sent_counter.labels("notification").inc()
+
+        await self.send_email(
+            email_address, summary_text, template_vars, unsubscribe_link
+        )
 
     async def send_email(
-        self, email_address: str, subject: str, extra_template_vars: TemplateVars
+        self,
+        email_address: str,
+        subject: str,
+        extra_template_vars: TemplateVars,
+        unsubscribe_link: Optional[str] = None,
     ) -> None:
         """Send an email with the given information and template text"""
         template_vars: TemplateVars = {
@@ -444,6 +480,23 @@ class Mailer:
             app_name=self.app_name,
             html=html_text,
             text=plain_text,
+            # Include the List-Unsubscribe header which some clients render in the UI.
+            # Per RFC 2369, this can be a URL or mailto URL. See
+            #     https://www.rfc-editor.org/rfc/rfc2369.html#section-3.2
+            #
+            # It is preferred to use email, but Synapse doesn't support incoming email.
+            #
+            # Also include the List-Unsubscribe-Post header from RFC 8058. See
+            #     https://www.rfc-editor.org/rfc/rfc8058.html#section-3.1
+            #
+            # Note that many email clients will not render the unsubscribe link
+            # unless DKIM, etc. is properly setup.
+            additional_headers={
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                "List-Unsubscribe": f"<{unsubscribe_link}>",
+            }
+            if unsubscribe_link
+            else None,
         )
 
     async def _get_room_vars(

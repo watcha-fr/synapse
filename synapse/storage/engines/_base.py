@@ -1,16 +1,23 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 import abc
 from enum import IntEnum
 from typing import TYPE_CHECKING, Any, Generic, Mapping, Optional, TypeVar
@@ -32,23 +39,16 @@ class IncorrectDatabaseSetup(RuntimeError):
 
 
 ConnectionType = TypeVar("ConnectionType", bound=Connection)
+CursorType = TypeVar("CursorType", bound=Cursor)
 
 
-class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
+class BaseDatabaseEngine(Generic[ConnectionType, CursorType], metaclass=abc.ABCMeta):
     def __init__(self, module: DBAPI2Module, config: Mapping[str, Any]):
         self.module = module
 
     @property
     @abc.abstractmethod
     def single_threaded(self) -> bool:
-        ...
-
-    @property
-    @abc.abstractmethod
-    def can_native_upsert(self) -> bool:
-        """
-        Do we support native UPSERTs?
-        """
         ...
 
     @property
@@ -72,7 +72,7 @@ class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
         ...
 
     @abc.abstractmethod
-    def check_new_database(self, txn: Cursor) -> None:
+    def check_new_database(self, txn: CursorType) -> None:
         """Gets called when setting up a brand new database. This allows us to
         apply stricter checks on new databases versus existing database.
         """
@@ -107,6 +107,12 @@ class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
         """Gets a string giving the server version. For example: '3.22.0'"""
         ...
 
+    @property
+    @abc.abstractmethod
+    def row_id_name(self) -> str:
+        """Gets the literal name representing a row id for this engine."""
+        ...
+
     @abc.abstractmethod
     def in_transaction(self, conn: ConnectionType) -> bool:
         """Whether the connection is currently in a transaction."""
@@ -132,3 +138,25 @@ class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
         Note: This has no effect on SQLite3, as transactions are SERIALIZABLE by default.
         """
         ...
+
+    @staticmethod
+    @abc.abstractmethod
+    def executescript(cursor: CursorType, script: str) -> None:
+        """Execute a chunk of SQL containing multiple semicolon-delimited statements.
+
+        This is not provided by DBAPI2, and so needs engine-specific support.
+
+        Any ongoing transaction is committed before executing the script in its own
+        transaction. The script transaction is left open and it is the responsibility of
+        the caller to commit it.
+        """
+        ...
+
+    @classmethod
+    def execute_script_file(cls, cursor: CursorType, filepath: str) -> None:
+        """Execute a file containing multiple semicolon-delimited SQL statements.
+
+        This is not provided by DBAPI2, and so needs engine-specific support.
+        """
+        with open(filepath) as f:
+            cls.executescript(cursor, f.read())

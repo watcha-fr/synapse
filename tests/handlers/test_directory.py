@@ -1,39 +1,46 @@
-# Copyright 2014-2016 OpenMarket Ltd
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2021 Matrix.org Foundation C.I.C.
+# Copyright 2014-2016 OpenMarket Ltd
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 from typing import Any, Awaitable, Callable, Dict
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.api.errors
 import synapse.rest.admin
 from synapse.api.constants import EventTypes
+from synapse.events import EventBase
 from synapse.rest.client import directory, login, room
 from synapse.server import HomeServer
 from synapse.types import JsonDict, RoomAlias, create_requester
 from synapse.util import Clock
 
 from tests import unittest
-from tests.test_utils import make_awaitable
 
 
 class DirectoryTestCase(unittest.HomeserverTestCase):
     """Tests the directory service."""
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-        self.mock_federation = Mock()
+        self.mock_federation = AsyncMock()
         self.mock_registry = Mock()
 
         self.query_handlers: Dict[str, Callable[[dict], Awaitable[JsonDict]]] = {}
@@ -72,9 +79,10 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual({"room_id": "!8765qwer:test", "servers": ["test"]}, result)
 
     def test_get_remote_association(self) -> None:
-        self.mock_federation.make_query.return_value = make_awaitable(
-            {"room_id": "!8765qwer:test", "servers": ["test", "remote"]}
-        )
+        self.mock_federation.make_query.return_value = {
+            "room_id": "!8765qwer:test",
+            "servers": ["test", "remote"],
+        }
 
         result = self.get_success(self.handler.get_association(self.remote_room))
 
@@ -201,7 +209,7 @@ class TestDeleteAlias(unittest.HomeserverTestCase):
         self.test_user_tok = self.login("user", "pass")
         self.helper.join(room=self.room_id, user=self.test_user, tok=self.test_user_tok)
 
-    def _create_alias(self, user) -> None:
+    def _create_alias(self, user: str) -> None:
         # Create a new alias to this room.
         self.get_success(
             self.store.create_room_alias_association(
@@ -324,7 +332,7 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
         )
         return room_alias
 
-    def _set_canonical_alias(self, content) -> None:
+    def _set_canonical_alias(self, content: JsonDict) -> None:
         """Configure the canonical alias state on the room."""
         self.helper.send_state(
             self.room_id,
@@ -333,13 +341,15 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
             tok=self.admin_user_tok,
         )
 
-    def _get_canonical_alias(self):
+    def _get_canonical_alias(self) -> EventBase:
         """Get the canonical alias state of the room."""
-        return self.get_success(
+        result = self.get_success(
             self._storage_controllers.state.get_current_state_event(
                 self.room_id, EventTypes.CanonicalAlias, ""
             )
         )
+        assert result is not None
+        return result
 
     def test_remove_alias(self) -> None:
         """Removing an alias that is the canonical alias should remove it there too."""
@@ -349,8 +359,8 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
         )
 
         data = self._get_canonical_alias()
-        self.assertEqual(data["content"]["alias"], self.test_alias)
-        self.assertEqual(data["content"]["alt_aliases"], [self.test_alias])
+        self.assertEqual(data.content["alias"], self.test_alias)
+        self.assertEqual(data.content["alt_aliases"], [self.test_alias])
 
         # Finally, delete the alias.
         self.get_success(
@@ -360,8 +370,8 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
         )
 
         data = self._get_canonical_alias()
-        self.assertNotIn("alias", data["content"])
-        self.assertNotIn("alt_aliases", data["content"])
+        self.assertNotIn("alias", data.content)
+        self.assertNotIn("alt_aliases", data.content)
 
     def test_remove_other_alias(self) -> None:
         """Removing an alias listed as in alt_aliases should remove it there too."""
@@ -378,9 +388,9 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
         )
 
         data = self._get_canonical_alias()
-        self.assertEqual(data["content"]["alias"], self.test_alias)
+        self.assertEqual(data.content["alias"], self.test_alias)
         self.assertEqual(
-            data["content"]["alt_aliases"], [self.test_alias, other_test_alias]
+            data.content["alt_aliases"], [self.test_alias, other_test_alias]
         )
 
         # Delete the second alias.
@@ -391,8 +401,8 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
         )
 
         data = self._get_canonical_alias()
-        self.assertEqual(data["content"]["alias"], self.test_alias)
-        self.assertEqual(data["content"]["alt_aliases"], [self.test_alias])
+        self.assertEqual(data.content["alias"], self.test_alias)
+        self.assertEqual(data.content["alt_aliases"], [self.test_alias])
 
 
 class TestCreateAliasACL(unittest.HomeserverTestCase):
@@ -481,30 +491,34 @@ class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
 
         return config
 
-    def prepare(
-        self, reactor: MemoryReactor, clock: Clock, hs: HomeServer
-    ) -> HomeServer:
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.allowed_user_id = self.register_user(self.allowed_localpart, "pass")
         self.allowed_access_token = self.login(self.allowed_localpart, "pass")
 
         self.denied_user_id = self.register_user("denied", "pass")
         self.denied_access_token = self.login("denied", "pass")
 
-        return hs
+        self.store = hs.get_datastores().main
 
     def test_denied_without_publication_permission(self) -> None:
         """
-        Try to create a room, register an alias for it, and publish it,
+        Try to create a room, register a valid alias for it, and publish it,
         as a user without permission to publish rooms.
-        (This is used as both a standalone test & as a helper function.)
+        The room should be created but not published.
         """
-        self.helper.create_room_as(
+        room_id = self.helper.create_room_as(
             self.denied_user_id,
             tok=self.denied_access_token,
             extra_content=self.data,
             is_public=True,
-            expect_code=403,
+            expect_code=200,
         )
+        res = self.get_success(self.store.get_room(room_id))
+        assert res is not None
+        is_public, _ = res
+
+        # room creation completes but room is not published to directory
+        self.assertEqual(is_public, False)
 
     def test_allowed_when_creating_private_room(self) -> None:
         """
@@ -522,9 +536,8 @@ class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
 
     def test_allowed_with_publication_permission(self) -> None:
         """
-        Try to create a room, register an alias for it, and publish it,
+        Try to create a room, register a valid alias for it, and publish it,
         as a user WITH permission to publish rooms.
-        (This is used as both a standalone test & as a helper function.)
         """
         self.helper.create_room_as(
             self.allowed_user_id,
@@ -536,38 +549,26 @@ class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
 
     def test_denied_publication_with_invalid_alias(self) -> None:
         """
-        Try to create a room, register an alias for it, and publish it,
+        Try to create a room, register an invalid alias for it, and publish it,
         as a user WITH permission to publish rooms.
         """
-        self.helper.create_room_as(
+        room_id = self.helper.create_room_as(
             self.allowed_user_id,
             tok=self.allowed_access_token,
             extra_content={"room_alias_name": "foo"},
             is_public=True,
-            expect_code=403,
+            expect_code=200,
         )
 
-    def test_can_create_as_private_room_after_rejection(self) -> None:
-        """
-        After failing to publish a room with an alias as a user without publish permission,
-        retry as the same user, but without publishing the room.
+        # the room is created with the requested alias, but the room is not published
+        res = self.get_success(self.store.get_room(room_id))
+        assert res is not None
+        is_public, _ = res
 
-        This should pass, but used to fail because the alias was registered by the first
-        request, even though the room creation was denied.
-        """
-        self.test_denied_without_publication_permission()
-        self.test_allowed_when_creating_private_room()
+        self.assertFalse(is_public)
 
-    def test_can_create_with_permission_after_rejection(self) -> None:
-        """
-        After failing to publish a room with an alias as a user without publish permission,
-        retry as someone with permission, using the same alias.
-
-        This also used to fail because of the alias having been registered by the first
-        request, leaving it unavailable for any other user's new rooms.
-        """
-        self.test_denied_without_publication_permission()
-        self.test_allowed_with_publication_permission()
+        aliases = self.get_success(self.store.get_aliases_for_room(room_id))
+        self.assertEqual(aliases[0], "#foo:test")
 
 
 class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
@@ -575,9 +576,7 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
 
     servlets = [directory.register_servlets, room.register_servlets]
 
-    def prepare(
-        self, reactor: MemoryReactor, clock: Clock, hs: HomeServer
-    ) -> HomeServer:
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         room_id = self.helper.create_room_as(self.user_id)
 
         channel = self.make_request(
@@ -587,8 +586,6 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
 
         self.room_list_handler = hs.get_room_list_handler()
         self.directory_handler = hs.get_directory_handler()
-
-        return hs
 
     def test_disabling_room_list(self) -> None:
         self.room_list_handler.enable_room_list_search = True

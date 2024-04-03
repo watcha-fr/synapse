@@ -1,24 +1,29 @@
-# Copyright 2015-2016 OpenMarket Ltd
-# Copyright 2017-2018 New Vector Ltd
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2015-2016 OpenMarket Ltd
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 # This file can't be called email.py because if it is, we cannot:
 import email.utils
 import logging
 import os
-from enum import Enum
 from typing import Any
 
 import attr
@@ -54,8 +59,8 @@ LEGACY_TEMPLATE_DIR_WARNING = """
 This server's configuration file is using the deprecated 'template_dir' setting in the
 'email' section. Support for this setting has been deprecated and will be removed in a
 future version of Synapse. Server admins should instead use the new
-'custom_templates_directory' setting documented here:
-https://matrix-org.github.io/synapse/latest/templates.html
+'custom_template_directory' setting documented here:
+https://element-hq.github.io/synapse/latest/templates.html
 ---------------------------------------------------------------------------------------"""
 
 
@@ -88,14 +93,19 @@ class EmailConfig(Config):
         if email_config is None:
             email_config = {}
 
+        self.force_tls = email_config.get("force_tls", False)
         self.email_smtp_host = email_config.get("smtp_host", "localhost")
-        self.email_smtp_port = email_config.get("smtp_port", 25)
+        self.email_smtp_port = email_config.get(
+            "smtp_port", 465 if self.force_tls else 25
+        )
         self.email_smtp_user = email_config.get("smtp_user", None)
         self.email_smtp_pass = email_config.get("smtp_pass", None)
         self.require_transport_security = email_config.get(
             "require_transport_security", False
         )
         self.enable_smtp_tls = email_config.get("enable_tls", True)
+        if self.force_tls and not self.enable_smtp_tls:
+            raise ConfigError("email.force_tls requires email.enable_tls to be true")
         if self.require_transport_security and not self.enable_smtp_tls:
             raise ConfigError(
                 "email.require_transport_security requires email.enable_tls to be true"
@@ -133,41 +143,22 @@ class EmailConfig(Config):
 
         self.email_enable_notifs = email_config.get("enable_notifs", False)
 
-        self.threepid_behaviour_email = (
-            # Have Synapse handle the email sending if account_threepid_delegates.email
-            # is not defined
-            # msisdn is currently always remote while Synapse does not support any method of
-            # sending SMS messages
-            ThreepidBehaviour.REMOTE
-            if self.root.registration.account_threepid_delegate_email
-            else ThreepidBehaviour.LOCAL
-        )
-
         if config.get("trust_identity_server_for_password_resets"):
             raise ConfigError(
                 'The config option "trust_identity_server_for_password_resets" '
-                'has been replaced by "account_threepid_delegate". '
-                "Please consult the configuration manual at docs/usage/configuration/config_documentation.md for "
-                "details and update your config file."
+                "is no longer supported. Please remove it from the config file."
             )
 
-        self.local_threepid_handling_disabled_due_to_email_config = False
-        if (
-            self.threepid_behaviour_email == ThreepidBehaviour.LOCAL
-            and email_config == {}
-        ):
-            # We cannot warn the user this has happened here
-            # Instead do so when a user attempts to reset their password
-            self.local_threepid_handling_disabled_due_to_email_config = True
-
-            self.threepid_behaviour_email = ThreepidBehaviour.OFF
+        # If we have email config settings, assume that we can verify ownership of
+        # email addresses.
+        self.can_verify_email = email_config != {}
 
         # Get lifetime of a validation token in milliseconds
         self.email_validation_token_lifetime = self.parse_duration(
             email_config.get("validation_token_lifetime", "1h")
         )
 
-        if self.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+        if self.can_verify_email:
             missing = []
             if not self.email_notif_from:
                 missing.append("email.notif_from")
@@ -323,6 +314,11 @@ class EmailConfig(Config):
             self.email_riot_base_url = email_config.get(
                 "client_base_url", email_config.get("riot_base_url", None)
             )
+            # The amount of time we always wait before ever emailing about a notification
+            # (to give the user a chance to respond to other push or notice the window)
+            self.notif_delay_before_mail_ms = Config.parse_duration(
+                email_config.get("notif_delay_before_mail", "10m")
+            )
 
         # watcha+ even not email_enable_notifs
         self.email_riot_base_url = email_config.get(
@@ -376,18 +372,3 @@ class EmailConfig(Config):
                     "Config option email.invite_client_location must be a http or https URL",
                     path=("email", "invite_client_location"),
                 )
-
-
-class ThreepidBehaviour(Enum):
-    """
-    Enum to define the behaviour of Synapse with regards to when it contacts an identity
-    server for 3pid registration and password resets
-
-    REMOTE = use an external server to send tokens
-    LOCAL = send tokens ourselves
-    OFF = disable registration via 3pid and password resets
-    """
-
-    REMOTE = "remote"
-    LOCAL = "local"
-    OFF = "off"

@@ -1,16 +1,23 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 
 # NOTE
@@ -84,14 +91,13 @@ the function becomes the operation name for the span.
        return something_usual_and_useful
 
 
-Operation names can be explicitly set for a function by passing the
-operation name to ``trace``
+Operation names can be explicitly set for a function by using ``trace_with_opname``:
 
 .. code-block:: python
 
-   from synapse.logging.opentracing import trace
+   from synapse.logging.opentracing import trace_with_opname
 
-   @trace(opname="a_better_operation_name")
+   @trace_with_opname("a_better_operation_name")
    def interesting_badly_named_function(*args, **kwargs):
        # Does all kinds of cool and expected things
        return something_usual_and_useful
@@ -172,8 +178,10 @@ from functools import wraps
 from typing import (
     TYPE_CHECKING,
     Any,
+    Awaitable,
     Callable,
     Collection,
+    ContextManager,
     Dict,
     Generator,
     Iterable,
@@ -183,10 +191,12 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    cast,
+    overload,
 )
 
 import attr
-from typing_extensions import ParamSpec
+from typing_extensions import Concatenate, ParamSpec
 
 from twisted.internet import defer
 from twisted.web.http import Request
@@ -200,6 +210,9 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 # Helper class
+
+# Matches the number suffix in an instance name like "matrix.org client_reader-8"
+STRIP_INSTANCE_NUMBER_SUFFIX_REGEX = re.compile(r"[_-]?\d+$")
 
 
 class _DummyTagNames:
@@ -287,11 +300,20 @@ logger = logging.getLogger(__name__)
 
 
 class SynapseTags:
-    # The message ID of any to_device message processed
-    TO_DEVICE_MESSAGE_ID = "to_device.message_id"
+    # The message ID of any to_device EDU processed
+    TO_DEVICE_EDU_ID = "to_device.edu_id"
+
+    # Details about to-device messages
+    TO_DEVICE_TYPE = "to_device.type"
+    TO_DEVICE_SENDER = "to_device.sender"
+    TO_DEVICE_RECIPIENT = "to_device.recipient"
+    TO_DEVICE_RECIPIENT_DEVICE = "to_device.recipient_device"
+    TO_DEVICE_MSGID = "to_device.msgid"  # client-generated ID
 
     # Whether the sync response has new data to be returned to the client.
     SYNC_RESULT = "sync.new_data"
+
+    INSTANCE_NAME = "instance_name"
 
     # incoming HTTP request ID  (as written in the logs)
     REQUEST_ID = "request_id"
@@ -307,6 +329,24 @@ class SynapseTags:
 
     # The name of the external cache
     CACHE_NAME = "cache.name"
+
+    # Boolean. Present on /v2/send_join requests, omitted from all others.
+    # True iff partial state was requested and we provided (or intended to provide)
+    # partial state in the response.
+    SEND_JOIN_RESPONSE_IS_PARTIAL_STATE = "send_join.partial_state_response"
+
+    # Used to tag function arguments
+    #
+    # Tag a named arg. The name of the argument should be appended to this prefix.
+    FUNC_ARG_PREFIX = "ARG."
+    # Tag extra variadic number of positional arguments (`def foo(first, second, *extras)`)
+    FUNC_ARGS = "args"
+    # Tag keyword args
+    FUNC_KWARGS = "kwargs"
+
+    # Some intermediate result that's interesting to the function. The label for
+    # the result should be appended to this prefix.
+    RESULT_PREFIX = "RESULT."
 
 
 class SynapseBaggage:
@@ -329,6 +369,7 @@ class _Sentinel(enum.Enum):
 
 P = ParamSpec("P")
 R = TypeVar("R")
+T = TypeVar("T")
 
 
 def only_if_tracing(func: Callable[P, R]) -> Callable[P, Optional[R]]:
@@ -344,22 +385,43 @@ def only_if_tracing(func: Callable[P, R]) -> Callable[P, Optional[R]]:
     return _only_if_tracing_inner
 
 
-def ensure_active_span(message: str, ret=None):
+@overload
+def ensure_active_span(
+    message: str,
+) -> Callable[[Callable[P, R]], Callable[P, Optional[R]]]:
+    ...
+
+
+@overload
+def ensure_active_span(
+    message: str, ret: T
+) -> Callable[[Callable[P, R]], Callable[P, Union[T, R]]]:
+    ...
+
+
+def ensure_active_span(
+    message: str, ret: Optional[T] = None
+) -> Callable[[Callable[P, R]], Callable[P, Union[Optional[T], R]]]:
     """Executes the operation only if opentracing is enabled and there is an active span.
     If there is no active span it logs message at the error level.
 
     Args:
         message: Message which fills in "There was no active span when trying to %s"
             in the error log if there is no active span and opentracing is enabled.
-        ret (object): return value if opentracing is None or there is no active span.
+        ret: return value if opentracing is None or there is no active span.
 
-    Returns (object): The result of the func or ret if opentracing is disabled or there
+    Returns:
+        The result of the func, falling back to ret if opentracing is disabled or there
         was no active span.
     """
 
-    def ensure_active_span_inner_1(func):
+    def ensure_active_span_inner_1(
+        func: Callable[P, R]
+    ) -> Callable[P, Union[Optional[T], R]]:
         @wraps(func)
-        def ensure_active_span_inner_2(*args, **kwargs):
+        def ensure_active_span_inner_2(
+            *args: P.args, **kwargs: P.kwargs
+        ) -> Union[Optional[T], R]:
             if not opentracing:
                 return ret
 
@@ -391,7 +453,7 @@ def init_tracer(hs: "HomeServer") -> None:
         opentracing = None  # type: ignore[assignment]
         return
 
-    if not opentracing or not JaegerConfig:
+    if opentracing is None or JaegerConfig is None:
         raise ConfigError(
             "The server has been configured to use opentracing but opentracing is not "
             "installed."
@@ -404,9 +466,25 @@ def init_tracer(hs: "HomeServer") -> None:
 
     from jaeger_client.metrics.prometheus import PrometheusMetricsFactory
 
+    # Instance names are opaque strings but by stripping off the number suffix,
+    # we can get something that looks like a "worker type", e.g.
+    # "client_reader-1" -> "client_reader" so we don't spread the traces across
+    # so many services.
+    instance_name_by_type = re.sub(
+        STRIP_INSTANCE_NUMBER_SUFFIX_REGEX, "", hs.get_instance_name()
+    )
+
+    jaeger_config = hs.config.tracing.jaeger_config
+    tags = jaeger_config.setdefault("tags", {})
+
+    # tag the Synapse instance name so that it's an easy jumping
+    # off point into the logs. Can also be used to filter for an
+    # instance that is under load.
+    tags[SynapseTags.INSTANCE_NAME] = hs.get_instance_name()
+
     config = JaegerConfig(
-        config=hs.config.tracing.jaeger_config,
-        service_name=f"{hs.config.server.server_name} {hs.get_instance_name()}",
+        config=jaeger_config,
+        service_name=f"{hs.config.server.server_name} {instance_name_by_type}",
         scope_manager=LogContextScopeManager(),
         metrics_factory=PrometheusMetricsFactory(),
     )
@@ -454,6 +532,7 @@ def whitelisted_homeserver(destination: str) -> bool:
 
 # Start spans and scopes
 
+
 # Could use kwargs but I want these to be explicit
 def start_active_span(
     operation_name: str,
@@ -465,7 +544,7 @@ def start_active_span(
     finish_on_close: bool = True,
     *,
     tracer: Optional["opentracing.Tracer"] = None,
-):
+) -> "opentracing.Scope":
     """Starts an active opentracing span.
 
     Records the start time for the span, and sets it as the "active span" in the
@@ -503,7 +582,7 @@ def start_active_span_follows_from(
     *,
     inherit_force_tracing: bool = False,
     tracer: Optional["opentracing.Tracer"] = None,
-):
+) -> "opentracing.Scope":
     """Starts an active opentracing span, with additional references to previous spans
 
     Args:
@@ -671,7 +750,7 @@ def inject_header_dict(
         destination: address of entity receiving the span context. Must be given unless
             check_destination is False. The context will only be injected if the
             destination matches the opentracing whitelist
-        check_destination (bool): If false, destination will be ignored and the context
+        check_destination: If false, destination will be ignored and the context
             will always be injected.
 
     Note:
@@ -718,7 +797,9 @@ def inject_response_headers(response_headers: Headers) -> None:
         response_headers.addRawHeader("Synapse-Trace-Id", f"{trace_id:x}")
 
 
-@ensure_active_span("get the active span context as a dict", ret={})
+@ensure_active_span(
+    "get the active span context as a dict", ret=cast(Dict[str, str], {})
+)
 def get_active_span_text_map(destination: Optional[str] = None) -> Dict[str, str]:
     """
     Gets a span context as a dict. This can be used instead of manually
@@ -728,7 +809,7 @@ def get_active_span_text_map(destination: Optional[str] = None) -> Dict[str, str
         destination: the name of the remote server.
 
     Returns:
-        dict: the active span's context if opentracing is enabled, otherwise empty.
+        the active span's context if opentracing is enabled, otherwise empty.
     """
 
     if destination and not whitelisted_homeserver(destination):
@@ -798,92 +879,174 @@ def extract_text_map(carrier: Dict[str, str]) -> Optional["opentracing.SpanConte
 # Tracing decorators
 
 
-def trace(func=None, opname: Optional[str] = None):
+def _custom_sync_async_decorator(
+    func: Callable[P, R],
+    wrapping_logic: Callable[Concatenate[Callable[P, R], P], ContextManager[None]],
+) -> Callable[P, R]:
+    """
+    Decorates a function that is sync or async (coroutines), or that returns a Twisted
+    `Deferred`. The custom business logic of the decorator goes in `wrapping_logic`.
+
+    Example usage:
+    ```py
+    # Decorator to time the function and log it out
+    def duration(func: Callable[P, R]) -> Callable[P, R]:
+        @contextlib.contextmanager
+        def _wrapping_logic(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> Generator[None, None, None]:
+            start_ts = time.time()
+            try:
+                yield
+            finally:
+                end_ts = time.time()
+                duration = end_ts - start_ts
+                logger.info("%s took %s seconds", func.__name__, duration)
+        return _custom_sync_async_decorator(func, _wrapping_logic)
+    ```
+
+    Args:
+        func: The function to be decorated
+        wrapping_logic: The business logic of your custom decorator.
+            This should be a ContextManager so you are able to run your logic
+            before/after the function as desired.
+    """
+
+    if inspect.iscoroutinefunction(func):
+        # For this branch, we handle async functions like `async def func() -> RInner`.
+        # In this branch, R = Awaitable[RInner], for some other type RInner
+        @wraps(func)
+        async def _wrapper(
+            *args: P.args, **kwargs: P.kwargs
+        ) -> Any:  # Return type is RInner
+            # type-ignore: func() returns R, but mypy doesn't know that R is
+            # Awaitable here.
+            with wrapping_logic(func, *args, **kwargs):  # type: ignore[arg-type]
+                return await func(*args, **kwargs)
+
+    else:
+        # The other case here handles sync functions including those decorated with
+        # `@defer.inlineCallbacks` or that return a `Deferred` or other `Awaitable`.
+        @wraps(func)
+        def _wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
+            scope = wrapping_logic(func, *args, **kwargs)
+            scope.__enter__()
+
+            try:
+                result = func(*args, **kwargs)
+
+                if isinstance(result, defer.Deferred):
+
+                    def call_back(result: R) -> R:
+                        scope.__exit__(None, None, None)
+                        return result
+
+                    def err_back(result: R) -> R:
+                        # TODO: Pass the error details into `scope.__exit__(...)` for
+                        #       consistency with the other paths.
+                        scope.__exit__(None, None, None)
+                        return result
+
+                    result.addCallbacks(call_back, err_back)
+
+                elif inspect.isawaitable(result):
+
+                    async def wrap_awaitable() -> Any:
+                        try:
+                            assert isinstance(result, Awaitable)
+                            awaited_result = await result
+                            scope.__exit__(None, None, None)
+                            return awaited_result
+                        except Exception as e:
+                            scope.__exit__(type(e), None, e.__traceback__)
+                            raise
+
+                    # The original method returned an awaitable, eg. a coroutine, so we
+                    # create another awaitable wrapping it that calls
+                    # `scope.__exit__(...)`.
+                    return wrap_awaitable()
+                else:
+                    # Just a simple sync function so we can just exit the scope and
+                    # return the result without any fuss.
+                    scope.__exit__(None, None, None)
+
+                return result
+
+            except Exception as e:
+                scope.__exit__(type(e), None, e.__traceback__)
+                raise
+
+    return _wrapper  # type: ignore[return-value]
+
+
+def trace_with_opname(
+    opname: str,
+    *,
+    tracer: Optional["opentracing.Tracer"] = None,
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    """
+    Decorator to trace a function with a custom opname.
+    See the module's doc string for usage examples.
+    """
+
+    @contextlib.contextmanager
+    def _wrapping_logic(
+        func: Callable[P, R], *args: P.args, **kwargs: P.kwargs
+    ) -> Generator[None, None, None]:
+        with start_active_span(opname, tracer=tracer):
+            yield
+
+    def _decorator(func: Callable[P, R]) -> Callable[P, R]:
+        if not opentracing:
+            return func
+
+        return _custom_sync_async_decorator(func, _wrapping_logic)
+
+    return _decorator
+
+
+def trace(func: Callable[P, R]) -> Callable[P, R]:
     """
     Decorator to trace a function.
-    Sets the operation name to that of the function's or that given
-    as operation_name. See the module's doc string for usage
-    examples.
+    Sets the operation name to that of the function's name.
+    See the module's doc string for usage examples.
     """
 
-    def decorator(func):
-        if opentracing is None:
-            return func  # type: ignore[unreachable]
-
-        _opname = opname if opname else func.__name__
-
-        if inspect.iscoroutinefunction(func):
-
-            @wraps(func)
-            async def _trace_inner(*args, **kwargs):
-                with start_active_span(_opname):
-                    return await func(*args, **kwargs)
-
-        else:
-            # The other case here handles both sync functions and those
-            # decorated with inlineDeferred.
-            @wraps(func)
-            def _trace_inner(*args, **kwargs):
-                scope = start_active_span(_opname)
-                scope.__enter__()
-
-                try:
-                    result = func(*args, **kwargs)
-                    if isinstance(result, defer.Deferred):
-
-                        def call_back(result: R) -> R:
-                            scope.__exit__(None, None, None)
-                            return result
-
-                        def err_back(result: R) -> R:
-                            scope.__exit__(None, None, None)
-                            return result
-
-                        result.addCallbacks(call_back, err_back)
-
-                    else:
-                        if inspect.isawaitable(result):
-                            logger.error(
-                                "@trace may not have wrapped %s correctly! "
-                                "The function is not async but returned a %s.",
-                                func.__qualname__,
-                                type(result).__name__,
-                            )
-
-                        scope.__exit__(None, None, None)
-
-                    return result
-
-                except Exception as e:
-                    scope.__exit__(type(e), None, e.__traceback__)
-                    raise
-
-        return _trace_inner
-
-    if func:
-        return decorator(func)
-    else:
-        return decorator
+    return trace_with_opname(func.__name__)(func)
 
 
 def tag_args(func: Callable[P, R]) -> Callable[P, R]:
     """
-    Tags all of the args to the active span.
+    Decorator to tag all of the args to the active span.
+
+    Args:
+        func: `func` is assumed to be a method taking a `self` parameter, or a
+            `classmethod` taking a `cls` parameter. In either case, a tag is not
+            created for this parameter.
     """
 
     if not opentracing:
         return func
 
-    @wraps(func)
-    def _tag_args_inner(*args: P.args, **kwargs: P.kwargs) -> R:
-        argspec = inspect.getfullargspec(func)
-        for i, arg in enumerate(argspec.args[1:]):
-            set_tag("ARG_" + arg, args[i])  # type: ignore[index]
-        set_tag("args", args[len(argspec.args) :])  # type: ignore[index]
-        set_tag("kwargs", kwargs)
-        return func(*args, **kwargs)
+    # getfullargspec is somewhat expensive, so ensure it is only called a single
+    # time (the function signature shouldn't change anyway).
+    argspec = inspect.getfullargspec(func)
 
-    return _tag_args_inner
+    @contextlib.contextmanager
+    def _wrapping_logic(
+        _func: Callable[P, R], *args: P.args, **kwargs: P.kwargs
+    ) -> Generator[None, None, None]:
+        # We use `[1:]` to skip the `self` object reference and `start=1` to
+        # make the index line up with `argspec.args`.
+        #
+        # FIXME: We could update this to handle any type of function by ignoring the
+        #   first argument only if it's named `self` or `cls`. This isn't fool-proof
+        #   but handles the idiomatic cases.
+        for i, arg in enumerate(args[1:], start=1):
+            set_tag(SynapseTags.FUNC_ARG_PREFIX + argspec.args[i], str(arg))
+        set_tag(SynapseTags.FUNC_ARGS, str(args[len(argspec.args) :]))
+        set_tag(SynapseTags.FUNC_KWARGS, str(kwargs))
+        yield
+
+    return _custom_sync_async_decorator(func, _wrapping_logic)
 
 
 @contextlib.contextmanager
@@ -909,7 +1072,7 @@ def trace_servlet(
         tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
         tags.HTTP_METHOD: request.get_method(),
         tags.HTTP_URL: request.get_redacted_uri(),
-        tags.PEER_HOST_IPV6: request.getClientAddress().host,
+        tags.PEER_HOST_IPV6: request.get_client_ip_if_available(),
     }
 
     request_name = request.request_metrics.name
@@ -930,11 +1093,13 @@ def trace_servlet(
             # with JsonResource).
             scope.span.set_operation_name(request.request_metrics.name)
 
-            # set the tags *after* the servlet completes, in case it decided to
-            # prioritise the span (tags will get dropped on unprioritised spans)
+            # Mypy seems to think that start_context.tag below can be Optional[str], but
+            # that doesn't appear to be correct and works in practice.
             request_tags[
                 SynapseTags.REQUEST_TAG
-            ] = request.request_metrics.start_context.tag
+            ] = request.request_metrics.start_context.tag  # type: ignore[assignment]
 
+            # set the tags *after* the servlet completes, in case it decided to
+            # prioritise the span (tags will get dropped on unprioritised spans)
             for k, v in request_tags.items():
                 scope.span.set_tag(k, v)

@@ -1,34 +1,42 @@
-# Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2019-2021 The Matrix.org Foundation C.I.C.
+# Copyright 2014-2016 OpenMarket Ltd
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 import logging
-from typing import TYPE_CHECKING, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union, cast
 
+import attr
+
+from synapse.api.constants import Direction
 from synapse.config.homeserver import HomeServerConfig
+from synapse.storage._base import make_in_list_sql_clause
 from synapse.storage.database import (
     DatabasePool,
     LoggingDatabaseConnection,
     LoggingTransaction,
 )
 from synapse.storage.databases.main.stats import UserSortOrder
-from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
+from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.types import Cursor
-from synapse.storage.util.id_generators import MultiWriterIdGenerator, StreamIdGenerator
-from synapse.types import JsonDict, get_domain_from_id
-from synapse.util.caches.stream_change_cache import StreamChangeCache
+from synapse.types import get_domain_from_id
 
 from .account_data import AccountDataStore
 from .appservice import ApplicationServiceStore, ApplicationServiceTransactionStore
@@ -44,7 +52,8 @@ from .event_federation import EventFederationStore
 from .event_push_actions import EventPushActionsStore
 from .events_bg_updates import EventsBackgroundUpdatesStore
 from .events_forward_extremities import EventForwardExtremitiesStore
-from .filtering import FilteringStore
+from .experimental_features import ExperimentalFeaturesStore
+from .filtering import FilteringWorkerStore
 from .keys import KeyStore
 from .lock import LockStore
 from .media_repository import MediaRepositoryStore
@@ -61,7 +70,6 @@ from .registration import RegistrationStore
 from .rejections import RejectionsStore
 from .relations import RelationsStore
 from .room import RoomStore
-from .room_batch import RoomBatchStore
 from .roommember import RoomMemberStore
 from .search import SearchStore
 from .session import SessionStore
@@ -70,6 +78,7 @@ from .state import StateStore
 from .stats import StatsStore
 from .stream import StreamWorkerStore
 from .tags import TagsStore
+from .task_scheduler import TaskSchedulerWorkerStore
 from .transactions import TransactionWorkerStore
 from .ui_auth import UIAuthStore
 from .user_directory import UserDirectoryStore
@@ -87,11 +96,31 @@ from .watcha_partner import PartnerStore
 logger = logging.getLogger(__name__)
 
 
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class UserPaginateResponse:
+    """This is very similar to UserInfo, but not quite the same."""
+
+    name: str
+    user_type: Optional[str]
+    is_guest: bool
+    admin: bool
+    deactivated: bool
+    shadow_banned: bool
+    displayname: Optional[str]
+    avatar_url: Optional[str]
+    creation_ts: Optional[int]
+    approved: bool
+    erased: bool
+    last_seen_ts: int
+    locked: bool
+
+
 class DataStore(
     EventsBackgroundUpdatesStore,
+    ExperimentalFeaturesStore,
+    DeviceStore,
     RoomMemberStore,
     RoomStore,
-    RoomBatchStore,
     RegistrationStore,
     ProfileStore,
     PresenceStore,
@@ -105,7 +134,7 @@ class DataStore(
     EventFederationStore,
     MediaRepositoryStore,
     RejectionsStore,
-    FilteringStore,
+    FilteringWorkerStore,
     PusherStore,
     PushRuleStore,
     ApplicationServiceTransactionStore,
@@ -120,7 +149,6 @@ class DataStore(
     StreamWorkerStore,
     OpenIdStore,
     ClientIpWorkerStore,
-    DeviceStore,
     DeviceInboxStore,
     UserDirectoryStore,
     UserErasureStore,
@@ -138,6 +166,7 @@ class DataStore(
     PartnerStore,
     NextcloudStore,
     # +watcha
+    TaskSchedulerWorkerStore,
 ):
     def __init__(
         self,
@@ -149,85 +178,7 @@ class DataStore(
         self._clock = hs.get_clock()
         self.database_engine = database.engine
 
-        self._device_list_id_gen = StreamIdGenerator(
-            db_conn,
-            "device_lists_stream",
-            "stream_id",
-            extra_tables=[
-                ("user_signature_stream", "stream_id"),
-                ("device_lists_outbound_pokes", "stream_id"),
-                ("device_lists_changes_in_room", "stream_id"),
-            ],
-        )
-
-        self._cache_id_gen: Optional[MultiWriterIdGenerator]
-        if isinstance(self.database_engine, PostgresEngine):
-            # We set the `writers` to an empty list here as we don't care about
-            # missing updates over restarts, as we'll not have anything in our
-            # caches to invalidate. (This reduces the amount of writes to the DB
-            # that happen).
-            self._cache_id_gen = MultiWriterIdGenerator(
-                db_conn,
-                database,
-                stream_name="caches",
-                instance_name=hs.get_instance_name(),
-                tables=[
-                    (
-                        "cache_invalidation_stream_by_instance",
-                        "instance_name",
-                        "stream_id",
-                    )
-                ],
-                sequence_name="cache_invalidation_stream_seq",
-                writers=[],
-            )
-
-        else:
-            self._cache_id_gen = None
-
         super().__init__(database, db_conn, hs)
-
-        events_max = self._stream_id_gen.get_current_token()
-        curr_state_delta_prefill, min_curr_state_delta_id = self.db_pool.get_cache_dict(
-            db_conn,
-            "current_state_delta_stream",
-            entity_column="room_id",
-            stream_column="stream_id",
-            max_value=events_max,  # As we share the stream id with events token
-            limit=1000,
-        )
-        self._curr_state_delta_stream_cache = StreamChangeCache(
-            "_curr_state_delta_stream_cache",
-            min_curr_state_delta_id,
-            prefilled_cache=curr_state_delta_prefill,
-        )
-
-        self._stream_order_on_start = self.get_room_max_stream_ordering()
-        self._min_stream_order_on_start = self.get_room_min_stream_ordering()
-
-    def get_device_stream_token(self) -> int:
-        # TODO: shouldn't this be moved to `DeviceWorkerStore`?
-        return self._device_list_id_gen.get_current_token()
-
-    async def get_users(self) -> List[JsonDict]:
-        """Function to retrieve a list of users in users table.
-
-        Returns:
-            A list of dictionaries representing users.
-        """
-        return await self.db_pool.simple_select_list(
-            table="users",
-            keyvalues={},
-            retcols=[
-                "name",
-                "password_hash",
-                "is_guest",
-                "admin",
-                "user_type",
-                "deactivated",
-            ],
-            desc="get_users",
-        )
 
     async def get_users_paginate(
         self,
@@ -236,10 +187,14 @@ class DataStore(
         user_id: Optional[str] = None,
         name: Optional[str] = None,
         guests: bool = True,
-        deactivated: bool = False,
-        order_by: str = UserSortOrder.USER_ID.value,
-        direction: str = "f",
-    ) -> Tuple[List[JsonDict], int]:
+        deactivated: Optional[bool] = None,
+        admins: Optional[bool] = None,
+        order_by: str = UserSortOrder.NAME.value,
+        direction: Direction = Direction.FORWARDS,
+        approved: bool = True,
+        not_user_types: Optional[List[str]] = None,
+        locked: bool = False,
+    ) -> Tuple[List[UserPaginateResponse], int]:
         """Function to retrieve a paginated list of users from
         users list. This will return a json list of users and the
         total number of users matching the filter criteria.
@@ -251,22 +206,28 @@ class DataStore(
             name: search for local part of user_id or display name
             guests: whether to in include guest users
             deactivated: whether to include deactivated users
+            admins: Optional flag to filter admins. If true, only admins are queried.
+                    if false, admins are excluded from the query. When it is
+                    none (the default), both admins and none-admins are queried.
             order_by: the sort order of the returned list
             direction: sort ascending or descending
+            approved: whether to include approved users
+            not_user_types: list of user types to exclude
+            locked: whether to include locked users
         Returns:
             A tuple of a list of mappings from user to information and a count of total users.
         """
 
         def get_users_paginate_txn(
             txn: LoggingTransaction,
-        ) -> Tuple[List[JsonDict], int]:
+        ) -> Tuple[List[UserPaginateResponse], int]:
             filters = []
-            args = [self.hs.config.server.server_name]
+            args: list = []
 
             # Set ordering
             order_by_column = UserSortOrder(order_by).value
 
-            if direction == "b":
+            if direction == Direction.BACKWARDS:
                 order = "DESC"
             else:
                 order = "ASC"
@@ -282,14 +243,70 @@ class DataStore(
             if not guests:
                 filters.append("is_guest = 0")
 
-            if not deactivated:
-                filters.append("deactivated = 0")
+            if deactivated is not None:
+                if deactivated:
+                    filters.append("deactivated = 1")
+                else:
+                    filters.append("deactivated = 0")
+
+            if not locked:
+                filters.append("locked IS FALSE")
+
+            if admins is not None:
+                if admins:
+                    filters.append("admin = 1")
+                else:
+                    filters.append("admin = 0")
+
+            if not approved:
+                # We ignore NULL values for the approved flag because these should only
+                # be already existing users that we consider as already approved.
+                filters.append("approved IS FALSE")
+
+            if not_user_types:
+                if len(not_user_types) == 1 and not_user_types[0] == "":
+                    # Only exclude NULL type users
+                    filters.append("user_type IS NOT NULL")
+                else:
+                    not_user_types_has_empty = False
+                    not_user_types_without_empty = []
+
+                    for not_user_type in not_user_types:
+                        if not_user_type == "":
+                            not_user_types_has_empty = True
+                        else:
+                            not_user_types_without_empty.append(not_user_type)
+
+                    not_user_type_clause, not_user_type_args = make_in_list_sql_clause(
+                        self.database_engine,
+                        "u.user_type",
+                        not_user_types_without_empty,
+                    )
+
+                    if not_user_types_has_empty:
+                        # NULL values should be excluded.
+                        # They evaluate to false > nothing to do here.
+                        filters.append("NOT %s" % (not_user_type_clause))
+                    else:
+                        # NULL values should *not* be excluded.
+                        # Add a special predicate to the query.
+                        filters.append(
+                            "(NOT %s OR %s IS NULL)"
+                            % (not_user_type_clause, "u.user_type")
+                        )
+
+                    args.extend(not_user_type_args)
 
             where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
 
             sql_base = f"""
                 FROM users as u
-                LEFT JOIN profiles AS p ON u.name = '@' || p.user_id || ':' || ?
+                LEFT JOIN profiles AS p ON u.name = p.full_user_id
+                LEFT JOIN erased_users AS eu ON u.name = eu.user_id
+                LEFT JOIN (
+                    SELECT user_id, MAX(last_seen) AS last_seen_ts
+                    FROM user_ips GROUP BY user_id
+                ) ls ON u.name = ls.user_id
                 {where_clause}
                 """
             sql = "SELECT COUNT(*) as total_users " + sql_base
@@ -298,21 +315,44 @@ class DataStore(
 
             sql = f"""
                 SELECT name, user_type, is_guest, admin, deactivated, shadow_banned,
-                displayname, avatar_url, creation_ts * 1000 as creation_ts
+                displayname, avatar_url, creation_ts * 1000 as creation_ts, approved,
+                eu.user_id is not null as erased, last_seen_ts, locked
                 {sql_base}
                 ORDER BY {order_by_column} {order}, u.name ASC
                 LIMIT ? OFFSET ?
             """
             args += [limit, start]
             txn.execute(sql, args)
-            users = self.db_pool.cursor_to_dict(txn)
+            users = [
+                UserPaginateResponse(
+                    name=row[0],
+                    user_type=row[1],
+                    is_guest=bool(row[2]),
+                    admin=bool(row[3]),
+                    deactivated=bool(row[4]),
+                    shadow_banned=bool(row[5]),
+                    displayname=row[6],
+                    avatar_url=row[7],
+                    creation_ts=row[8],
+                    approved=bool(row[9]),
+                    erased=bool(row[10]),
+                    last_seen_ts=row[11],
+                    locked=bool(row[12]),
+                )
+                for row in txn
+            ]
+
             return users, count
 
         return await self.db_pool.runInteraction(
             "get_users_paginate_txn", get_users_paginate_txn
         )
 
-    async def search_users(self, term: str) -> Optional[List[JsonDict]]:
+    async def search_users(
+        self, term: str
+    ) -> List[
+        Tuple[str, Optional[str], Union[int, bool], Union[int, bool], Optional[str]]
+    ]:
         """Function to search users list for one or more users with
         the matched term.
 
@@ -320,15 +360,37 @@ class DataStore(
             term: search term
 
         Returns:
-            A list of dictionaries or None.
+            A list of tuples of name, password_hash, is_guest, admin, user_type or None.
         """
-        return await self.db_pool.simple_search_list(
-            table="users",
-            term=term,
-            col="name",
-            retcols=["name", "password_hash", "is_guest", "admin", "user_type"],
-            desc="search_users",
-        )
+
+        def search_users(
+            txn: LoggingTransaction,
+        ) -> List[
+            Tuple[str, Optional[str], Union[int, bool], Union[int, bool], Optional[str]]
+        ]:
+            search_term = "%%" + term + "%%"
+
+            sql = """
+            SELECT name, password_hash, is_guest, admin, user_type
+            FROM users
+            WHERE name LIKE ?
+            """
+            txn.execute(sql, (search_term,))
+
+            return cast(
+                List[
+                    Tuple[
+                        str,
+                        Optional[str],
+                        Union[int, bool],
+                        Union[int, bool],
+                        Optional[str],
+                    ]
+                ],
+                txn.fetchall(),
+            )
+
+        return await self.db_pool.runInteraction("search_users", search_users)
 
 
 def check_database_before_upgrade(

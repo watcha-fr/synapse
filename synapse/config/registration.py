@@ -1,24 +1,43 @@
-# Copyright 2015, 2016 OpenMarket Ltd
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2021 The Matrix.org Foundation C.I.C.
+# Copyright 2015, 2016 OpenMarket Ltd
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 import argparse
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 from synapse.api.constants import RoomCreationPreset
-from synapse.config._base import Config, ConfigError
+from synapse.config._base import Config, ConfigError, read_file
 from synapse.types import JsonDict, RoomAlias, UserID
 from synapse.util.stringutils import random_string_with_symbols, strtobool
+
+NO_EMAIL_DELEGATE_ERROR = """\
+Delegation of email verification to an identity server is no longer supported. To
+continue to allow users to add email addresses to their accounts, and use them for
+password resets, configure Synapse with an SMTP server via the `email` setting, and
+remove `account_threepid_delegates.email`.
+"""
+
+CONFLICTING_SHARED_SECRET_OPTS_ERROR = """\
+You have configured both `registration_shared_secret` and
+`registration_shared_secret_path`. These are mutually incompatible.
+"""
 
 
 class RegistrationConfig(Config):
@@ -46,12 +65,22 @@ class RegistrationConfig(Config):
         self.enable_registration_token_3pid_bypass = config.get(
             "enable_registration_token_3pid_bypass", False
         )
+
+        # read the shared secret, either inline or from an external file
         self.registration_shared_secret = config.get("registration_shared_secret")
+        registration_shared_secret_path = config.get("registration_shared_secret_path")
+        if registration_shared_secret_path:
+            if self.registration_shared_secret:
+                raise ConfigError(CONFLICTING_SHARED_SECRET_OPTS_ERROR)
+            self.registration_shared_secret = read_file(
+                registration_shared_secret_path, ("registration_shared_secret_path",)
+            ).strip()
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
 
         account_threepid_delegates = config.get("account_threepid_delegates") or {}
-        self.account_threepid_delegate_email = account_threepid_delegates.get("email")
+        if "email" in account_threepid_delegates:
+            raise ConfigError(NO_EMAIL_DELEGATE_ERROR)
         self.account_threepid_delegate_msisdn = account_threepid_delegates.get("msisdn")
         self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
@@ -111,7 +140,16 @@ class RegistrationConfig(Config):
 
         self.enable_set_displayname = config.get("enable_set_displayname", True)
         self.enable_set_avatar_url = config.get("enable_set_avatar_url", True)
-        self.enable_3pid_changes = config.get("enable_3pid_changes", True)
+
+        # The default value of enable_3pid_changes is True, unless msc3861 is enabled.
+        msc3861_enabled = (
+            (config.get("experimental_features") or {})
+            .get("msc3861", {})
+            .get("enabled", False)
+        )
+        self.enable_3pid_changes = config.get(
+            "enable_3pid_changes", not msc3861_enabled
+        )
 
         self.disable_msisdn_registration = config.get(
             "disable_msisdn_registration", False
@@ -199,6 +237,14 @@ class RegistrationConfig(Config):
 
         self.inhibit_user_in_use_error = config.get("inhibit_user_in_use_error", False)
 
+        # List of user IDs not to send out device list updates for when they
+        # register new devices. This is useful to handle bot accounts.
+        #
+        # Note: This will still send out device list updates if the device is
+        # later updated, e.g. end to end keys are added.
+        dont_notify_new_devices_for = config.get("dont_notify_new_devices_for", [])
+        self.dont_notify_new_devices_for = frozenset(dont_notify_new_devices_for)
+
     def generate_config_section(
         self, generate_secrets: bool = False, **kwargs: Any
     ) -> str:
@@ -209,6 +255,21 @@ class RegistrationConfig(Config):
             return registration_shared_secret
         else:
             return ""
+
+    def generate_files(self, config: Dict[str, Any], config_dir_path: str) -> None:
+        # if 'registration_shared_secret_path' is specified, and the target file
+        # does not exist, generate it.
+        registration_shared_secret_path = config.get("registration_shared_secret_path")
+        if registration_shared_secret_path and not self.path_exists(
+            registration_shared_secret_path
+        ):
+            print(
+                "Generating registration shared secret file "
+                + registration_shared_secret_path
+            )
+            secret = random_string_with_symbols(50)
+            with open(registration_shared_secret_path, "w") as f:
+                f.write(f"{secret}\n")
 
     @staticmethod
     def add_arguments(parser: argparse.ArgumentParser) -> None:

@@ -1,18 +1,25 @@
-# Copyright 2014 - 2016 OpenMarket Ltd
-# Copyright 2017 Vector Creations Ltd
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2019 - 2020 The Matrix.org Foundation C.I.C.
+# Copyright 2017 Vector Creations Ltd
+# Copyright 2014 - 2016 OpenMarket Ltd
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 import logging
 import time
 import unicodedata
@@ -38,6 +45,7 @@ from typing import (
 import attr
 import bcrypt
 import unpaddedbase64
+from prometheus_client import Counter
 
 from twisted.internet.defer import CancelledError
 from twisted.web.server import Request
@@ -48,9 +56,9 @@ from synapse.api.errors import (
     Codes,
     InteractiveAuthIncompleteError,
     LoginError,
+    NotFoundError,
     StoreError,
     SynapseError,
-    UserDeactivatedError,
 )
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.handlers.ui_auth import (
@@ -63,11 +71,14 @@ from synapse.http.server import finish_request, respond_with_html
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.storage.roommember import ProfileInfo
+from synapse.storage.databases.main.registration import (
+    LoginTokenExpired,
+    LoginTokenLookupResult,
+    LoginTokenReused,
+)
 from synapse.types import JsonDict, Requester, UserID
 from synapse.util import stringutils as stringutils
 from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
-from synapse.util.macaroons import LoginTokenAttributes
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import base62_encode
 from synapse.util.threepids import canonicalise_email
@@ -80,6 +91,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 INVALID_USERNAME_OR_PASSWORD = "Invalid username or password"
+
+invalid_login_token_counter = Counter(
+    "synapse_user_login_invalid_login_tokens",
+    "Counts the number of rejected m.login.token on /login",
+    ["reason"],
+)
 
 
 def convert_client_dict_legacy_fields_to_identifier(
@@ -190,7 +207,7 @@ class AuthHandler:
         for auth_checker_class in INTERACTIVE_AUTH_CHECKERS:
             inst = auth_checker_class(hs)
             if inst.is_enabled():
-                self.checkers[inst.AUTH_TYPE] = inst  # type: ignore
+                self.checkers[inst.AUTH_TYPE] = inst
 
         self.bcrypt_rounds = hs.config.registration.bcrypt_rounds
 
@@ -201,26 +218,25 @@ class AuthHandler:
         self._password_enabled_for_login = hs.config.auth.password_enabled_for_login
         self._password_enabled_for_reauth = hs.config.auth.password_enabled_for_reauth
         self._password_localdb_enabled = hs.config.auth.password_localdb_enabled
-        self._third_party_rules = hs.get_third_party_event_rules()
+        self._third_party_rules = hs.get_module_api_callbacks().third_party_event_rules
+        self._account_validity_handler = hs.get_account_validity_handler()
 
         # Ratelimiter for failed auth during UIA. Uses same ratelimit config
         # as per `rc_login.failed_attempts`.
         self._failed_uia_attempts_ratelimiter = Ratelimiter(
             store=self.store,
             clock=self.clock,
-            rate_hz=self.hs.config.ratelimiting.rc_login_failed_attempts.per_second,
-            burst_count=self.hs.config.ratelimiting.rc_login_failed_attempts.burst_count,
+            cfg=self.hs.config.ratelimiting.rc_login_failed_attempts,
         )
 
         # The number of seconds to keep a UI auth session active.
         self._ui_auth_session_timeout = hs.config.auth.ui_auth_session_timeout
 
-        # Ratelimitier for failed /login attempts
+        # Ratelimiter for failed /login attempts
         self._failed_login_attempts_ratelimiter = Ratelimiter(
             store=self.store,
             clock=hs.get_clock(),
-            rate_hz=self.hs.config.ratelimiting.rc_login_failed_attempts.per_second,
-            burst_count=self.hs.config.ratelimiting.rc_login_failed_attempts.burst_count,
+            cfg=self.hs.config.ratelimiting.rc_login_failed_attempts,
         )
 
         self._clock = self.hs.get_clock()
@@ -264,6 +280,8 @@ class AuthHandler:
         # response.
         self._extra_attributes: Dict[str, SsoLoginExtraAttributes] = {}
 
+        self.msc3861_oauth_delegation_enabled = hs.config.experimental.msc3861.enabled
+
     async def validate_user_via_ui_auth(
         self,
         requester: Requester,
@@ -280,7 +298,7 @@ class AuthHandler:
         that it isn't stolen by re-authenticating them.
 
         Args:
-            requester: The user, as given by the access token
+            requester: The user making the request, according to the access token.
 
             request: The request sent by the client.
 
@@ -312,8 +330,12 @@ class AuthHandler:
 
             LimitExceededError if the ratelimiter's failed request count for this
                 user is too high to proceed
-
         """
+        if self.msc3861_oauth_delegation_enabled:
+            raise SynapseError(
+                HTTPStatus.INTERNAL_SERVER_ERROR, "UIA shouldn't be used with MSC3861"
+            )
+
         if not requester.access_token_id:
             raise ValueError("Cannot validate a user without an access token")
         if can_skip_ui_auth and self._ui_auth_session_timeout:
@@ -576,7 +598,7 @@ class AuthHandler:
             except LoginError as e:
                 # this step failed. Merge the error dict into the response
                 # so that the client can have another go.
-                errordict = e.error_dict()
+                errordict = e.error_dict(self.hs.config)
 
         creds = await self.store.get_completed_ui_auth_stages(session.session_id)
         for f in flows:
@@ -815,7 +837,6 @@ class AuthHandler:
         now_ms = self._clock.time_msec()
 
         if existing_token.expiry_ts is not None and existing_token.expiry_ts < now_ms:
-
             raise SynapseError(
                 HTTPStatus.FORBIDDEN,
                 "The supplied refresh token has expired",
@@ -894,6 +915,25 @@ class AuthHandler:
             return False
 
         return True
+
+    async def create_login_token_for_user_id(
+        self,
+        user_id: str,
+        duration_ms: int = (2 * 60 * 1000),
+        auth_provider_id: Optional[str] = None,
+        auth_provider_session_id: Optional[str] = None,
+    ) -> str:
+        login_token = self.generate_login_token()
+        now = self._clock.time_msec()
+        expiry_ts = now + duration_ms
+        await self.store.add_login_token_to_user(
+            user_id=user_id,
+            token=login_token,
+            expiry_ts=expiry_ts,
+            auth_provider_id=auth_provider_id,
+            auth_provider_session_id=auth_provider_session_id,
+        )
+        return login_token
 
     async def create_refresh_token_for_user_id(
         self,
@@ -1020,6 +1060,17 @@ class AuthHandler:
         if res is not None:
             return res[0]
         return None
+
+    async def is_user_approved(self, user_id: str) -> bool:
+        """Checks if a user is approved and therefore can be allowed to log in.
+
+        Args:
+            user_id: the user to check the approval status of.
+
+        Returns:
+            A boolean that is True if the user is approved, False otherwise.
+        """
+        return await self.store.is_user_approved(user_id)
 
     async def _find_user_id_and_pwd_hash(
         self, user_id: str
@@ -1390,17 +1441,23 @@ class AuthHandler:
             return None
         (user_id, password_hash) = lookupres
 
-        # If the password hash is None, the account has likely been deactivated
-        if not password_hash:
-            deactivated = await self.store.get_user_deactivated_status(user_id)
-            if deactivated:
-                raise UserDeactivatedError("This account has been deactivated")
-
         result = await self.validate_hash(password, password_hash)
         if not result:
             logger.warning("Failed password login for user %s", user_id)
             return None
         return user_id
+
+    def generate_login_token(self) -> str:
+        """Generates an opaque string, for use as an short-term login token"""
+
+        # we use the following format for access tokens:
+        #    syl_<random string>_<base62 crc check>
+
+        random_string = stringutils.random_string(20)
+        base = f"syl_{random_string}"
+
+        crc = base62_encode(crc32(base.encode("ascii")), minwidth=6)
+        return f"{base}_{crc}"
 
     def generate_access_token(self, for_user: UserID) -> str:
         """Generates an opaque string, for use as an access token"""
@@ -1428,16 +1485,17 @@ class AuthHandler:
         crc = base62_encode(crc32(base.encode("ascii")), minwidth=6)
         return f"{base}_{crc}"
 
-    async def validate_short_term_login_token(
-        self, login_token: str
-    ) -> LoginTokenAttributes:
+    async def consume_login_token(self, login_token: str) -> LoginTokenLookupResult:
         try:
-            res = self.macaroon_gen.verify_short_term_login_token(login_token)
-        except Exception:
-            raise AuthError(403, "Invalid login token", errcode=Codes.FORBIDDEN)
+            return await self.store.consume_login_token(login_token)
+        except LoginTokenExpired:
+            invalid_login_token_counter.labels("expired").inc()
+        except LoginTokenReused:
+            invalid_login_token_counter.labels("reused").inc()
+        except NotFoundError:
+            invalid_login_token_counter.labels("not found").inc()
 
-        await self.auth_blocking.check_auth_blocking(res.user_id)
-        return res
+        raise AuthError(403, "Invalid login token", errcode=Codes.FORBIDDEN)
 
     async def delete_access_token(self, access_token: str) -> None:
         """Invalidate a single access token
@@ -1446,20 +1504,27 @@ class AuthHandler:
             access_token: access token to be deleted
 
         """
-        user_info = await self.auth.get_user_by_access_token(access_token)
+        token = await self.store.get_user_by_access_token(access_token)
+        if not token:
+            # At this point, the token should already have been fetched once by
+            # the caller, so this should not happen, unless of a race condition
+            # between two delete requests
+            raise SynapseError(HTTPStatus.UNAUTHORIZED, "Unrecognised access token")
         await self.store.delete_access_token(access_token)
 
         # see if any modules want to know about this
         await self.password_auth_provider.on_logged_out(
-            user_id=user_info.user_id,
-            device_id=user_info.device_id,
+            user_id=token.user_id,
+            device_id=token.device_id,
             access_token=access_token,
         )
 
         # delete pushers associated with this access token
-        if user_info.token_id is not None:
-            await self.hs.get_pusherpool().remove_pushers_by_access_token(
-                user_info.user_id, (user_info.token_id,)
+        # XXX(quenting): This is only needed until the 'set_device_id_for_pushers'
+        # background update completes.
+        if token.token_id is not None:
+            await self.hs.get_pusherpool().remove_pushers_by_access_tokens(
+                token.user_id, (token.token_id,)
             )
 
     async def delete_access_tokens_for_user(
@@ -1488,13 +1553,26 @@ class AuthHandler:
             )
 
         # delete pushers associated with the access tokens
-        await self.hs.get_pusherpool().remove_pushers_by_access_token(
+        # XXX(quenting): This is only needed until the 'set_device_id_for_pushers'
+        # background update completes.
+        await self.hs.get_pusherpool().remove_pushers_by_access_tokens(
             user_id, (token_id for _, token_id, _ in tokens_and_devices)
         )
 
     async def add_threepid(
         self, user_id: str, medium: str, address: str, validated_at: int
     ) -> None:
+        """
+        Adds an association between a user's Matrix ID and a third-party ID (email,
+        phone number).
+
+        Args:
+            user_id: The ID of the user to associate.
+            medium: The medium of the third-party ID (email, msisdn).
+            address: The address of the third-party ID (i.e. an email address).
+            validated_at: The timestamp in ms of when the validation that the user owns
+                this third-party ID occurred.
+        """
         # check if medium has a valid value
         if medium not in ["email", "msisdn"]:
             raise SynapseError(
@@ -1519,43 +1597,44 @@ class AuthHandler:
             user_id, medium, address, validated_at, self.hs.get_clock().time_msec()
         )
 
+        # Inform Synapse modules that a 3PID association has been created.
+        await self._third_party_rules.on_add_user_third_party_identifier(
+            user_id, medium, address
+        )
+
+        # Deprecated method for informing Synapse modules that a 3PID association
+        # has successfully been created.
         await self._third_party_rules.on_threepid_bind(user_id, medium, address)
 
-    async def delete_threepid(
-        self, user_id: str, medium: str, address: str, id_server: Optional[str] = None
-    ) -> bool:
-        """Attempts to unbind the 3pid on the identity servers and deletes it
-        from the local database.
+    async def delete_local_threepid(
+        self, user_id: str, medium: str, address: str
+    ) -> None:
+        """Deletes an association between a third-party ID and a user ID from the local
+        database. This method does not unbind the association from any identity servers.
+
+        If `medium` is 'email' and a pusher is associated with this third-party ID, the
+        pusher will also be deleted.
 
         Args:
             user_id: ID of user to remove the 3pid from.
             medium: The medium of the 3pid being removed: "email" or "msisdn".
             address: The 3pid address to remove.
-            id_server: Use the given identity server when unbinding
-                any threepids. If None then will attempt to unbind using the
-                identity server specified when binding (if known).
-
-        Returns:
-            Returns True if successfully unbound the 3pid on
-            the identity server, False if identity server doesn't support the
-            unbind API.
         """
-
         # 'Canonicalise' email addresses as per above
         if medium == "email":
             address = canonicalise_email(address)
 
-        identity_handler = self.hs.get_identity_handler()
-        result = await identity_handler.try_unbind_threepid(
-            user_id, {"medium": medium, "address": address, "id_server": id_server}
+        await self.store.user_delete_threepid(user_id, medium, address)
+
+        # Inform Synapse modules that a 3PID association has been deleted.
+        await self._third_party_rules.on_remove_user_third_party_identifier(
+            user_id, medium, address
         )
 
-        await self.store.user_delete_threepid(user_id, medium, address)
         if medium == "email":
             await self.store.delete_pusher_by_app_id_pushkey_user_id(
                 app_id="m.email", pushkey=address, user_id=user_id
             )
-        return result
 
     async def hash(self, password: str) -> str:
         """Computes a secure hash of password.
@@ -1686,47 +1765,19 @@ class AuthHandler:
                 registered.
             auth_provider_session_id: The session ID from the SSO IdP received during login.
         """
-        # If the account has been deactivated, do not proceed with the login
-        # flow.
+        # If the account has been deactivated, do not proceed with the login.
+        #
+        # This gets checked again when the token is submitted but this lets us
+        # provide an HTML error page to the user (instead of issuing a token and
+        # having it error later).
         deactivated = await self.store.get_user_deactivated_status(registered_user_id)
         if deactivated:
             respond_with_html(request, 403, self._sso_account_deactivated_template)
             return
 
-        profile = await self.store.get_profileinfo(
-            UserID.from_string(registered_user_id).localpart
+        user_profile_data = await self.store.get_profileinfo(
+            UserID.from_string(registered_user_id)
         )
-
-        self._complete_sso_login(
-            registered_user_id,
-            auth_provider_id,
-            request,
-            client_redirect_url,
-            extra_attributes,
-            new_user=new_user,
-            user_profile_data=profile,
-            auth_provider_session_id=auth_provider_session_id,
-        )
-
-    def _complete_sso_login(
-        self,
-        registered_user_id: str,
-        auth_provider_id: str,
-        request: Request,
-        client_redirect_url: str,
-        extra_attributes: Optional[JsonDict] = None,
-        new_user: bool = False,
-        user_profile_data: Optional[ProfileInfo] = None,
-        auth_provider_session_id: Optional[str] = None,
-    ) -> None:
-        """
-        The synchronous portion of complete_sso_login.
-
-        This exists purely for backwards compatibility of synapse.module_api.ModuleApi.
-        """
-
-        if user_profile_data is None:
-            user_profile_data = ProfileInfo(None, None)
 
         # Store any extra attributes which will be passed in the login response.
         # Note that this is per-user so it may overwrite a previous value, this
@@ -1738,7 +1789,7 @@ class AuthHandler:
             )
 
         # Create a login token
-        login_token = self.macaroon_gen.generate_short_term_login_token(
+        login_token = await self.create_login_token_for_user_id(
             registered_user_id,
             auth_provider_id=auth_provider_id,
             auth_provider_session_id=auth_provider_session_id,
@@ -1749,6 +1800,13 @@ class AuthHandler:
         # redirect the users once they have clicked on the confirmation link.
         redirect_url = self.add_query_param_to_url(
             client_redirect_url, "loginToken", login_token
+        )
+
+        # Run post-login module callback handlers
+        await self._account_validity_handler.on_user_login(
+            user_id=registered_user_id,
+            auth_provider_type=LoginType.SSO,
+            auth_provider_id=auth_provider_id,
         )
 
         # if the client is whitelisted, we can redirect straight to it
@@ -2020,7 +2078,7 @@ class PasswordAuthProvider:
         self.is_3pid_allowed_callbacks: List[IS_3PID_ALLOWED_CALLBACK] = []
 
         # Mapping from login type to login parameters
-        self._supported_login_types: Dict[str, Iterable[str]] = {}
+        self._supported_login_types: Dict[str, Tuple[str, ...]] = {}
 
         # Mapping from login type to auth checker callbacks
         self.auth_checker_callbacks: Dict[str, List[CHECK_AUTH_CALLBACK]] = {}
@@ -2249,7 +2307,6 @@ class PasswordAuthProvider:
     async def on_logged_out(
         self, user_id: str, device_id: Optional[str], access_token: str
     ) -> None:
-
         # call all of the on_logged_out callbacks
         for callback in self.on_logged_out_callbacks:
             try:

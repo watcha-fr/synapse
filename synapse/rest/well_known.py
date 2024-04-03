@@ -1,16 +1,22 @@
-# Copyright 2018 New Vector Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This file is licensed under the Affero General Public License (AGPL) version 3.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
+#
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 import logging
 from typing import TYPE_CHECKING, Optional
 
@@ -18,6 +24,7 @@ from twisted.web.resource import Resource
 from twisted.web.server import Request
 
 from synapse.http.server import set_cors_headers
+from synapse.http.site import SynapseRequest
 from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.stringutils import parse_server_name
@@ -43,6 +50,16 @@ class WellKnownBuilder:
                 "base_url": self._config.registration.default_identity_server
             }
 
+        # We use the MSC3861 values as they are used by multiple MSCs
+        if self._config.experimental.msc3861.enabled:
+            result["org.matrix.msc2965.authentication"] = {
+                "issuer": self._config.experimental.msc3861.issuer
+            }
+            if self._config.experimental.msc3861.account_management_url is not None:
+                result["org.matrix.msc2965.authentication"][
+                    "account"
+                ] = self._config.experimental.msc3861.account_management_url
+
         if self._config.server.extra_well_known_client_content:
             for (
                 key,
@@ -63,7 +80,7 @@ class ClientWellKnownResource(Resource):
         Resource.__init__(self)
         self._well_known_builder = WellKnownBuilder(hs)
 
-    def render_GET(self, request: Request) -> bytes:
+    def render_GET(self, request: SynapseRequest) -> bytes:
         set_cors_headers(request)
         r = self._well_known_builder.get_well_known()
         if not r:

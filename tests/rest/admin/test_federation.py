@@ -1,17 +1,23 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2021 The Matrix.org Foundation C.I.C.
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-from http import HTTPStatus
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 from typing import List, Optional
 
 from parameterized import parameterized
@@ -64,7 +70,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             access_token=other_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_invalid_parameter(self) -> None:
@@ -77,7 +83,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # negative from
@@ -87,7 +93,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # unkown order_by
@@ -97,7 +103,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # invalid search order
@@ -107,7 +113,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # invalid destination
@@ -117,7 +123,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
         # invalid destination
@@ -127,7 +133,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     def test_limit(self) -> None:
@@ -142,7 +148,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_destinations)
         self.assertEqual(len(channel.json_body["destinations"]), 5)
         self.assertEqual(channel.json_body["next_token"], "5")
@@ -160,7 +166,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_destinations)
         self.assertEqual(len(channel.json_body["destinations"]), 15)
         self.assertNotIn("next_token", channel.json_body)
@@ -178,7 +184,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_destinations)
         self.assertEqual(channel.json_body["next_token"], "15")
         self.assertEqual(len(channel.json_body["destinations"]), 10)
@@ -198,7 +204,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_destinations)
         self.assertEqual(len(channel.json_body["destinations"]), number_destinations)
         self.assertNotIn("next_token", channel.json_body)
@@ -211,7 +217,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_destinations)
         self.assertEqual(len(channel.json_body["destinations"]), number_destinations)
         self.assertNotIn("next_token", channel.json_body)
@@ -224,7 +230,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_destinations)
         self.assertEqual(len(channel.json_body["destinations"]), 19)
         self.assertEqual(channel.json_body["next_token"], "19")
@@ -238,7 +244,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_destinations)
         self.assertEqual(len(channel.json_body["destinations"]), 1)
         self.assertNotIn("next_token", channel.json_body)
@@ -255,7 +261,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(number_destinations, len(channel.json_body["destinations"]))
         self.assertEqual(number_destinations, channel.json_body["total"])
 
@@ -290,7 +296,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
                 url,
                 access_token=self.admin_user_tok,
             )
-            self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+            self.assertEqual(200, channel.code, msg=channel.json_body)
             self.assertEqual(channel.json_body["total"], len(expected_destination_list))
 
             returned_order = [
@@ -376,7 +382,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
                 url.encode("ascii"),
                 access_token=self.admin_user_tok,
             )
-            self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+            self.assertEqual(200, channel.code, msg=channel.json_body)
 
             # Check that destinations were returned
             self.assertTrue("destinations" in channel.json_body)
@@ -418,7 +424,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("sub0.example.com", channel.json_body["destination"])
 
         # Check that all fields are available
@@ -435,7 +441,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("sub0.example.com", channel.json_body["destination"])
         self.assertEqual(0, channel.json_body["retry_last_ts"])
         self.assertEqual(0, channel.json_body["retry_interval"])
@@ -452,7 +458,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         retry_timings = self.get_success(
             self.store.get_destination_retry_timings("sub0.example.com")
@@ -469,7 +475,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(
             "The retry timing does not need to be reset for this destination.",
             channel.json_body["error"],
@@ -511,7 +517,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
         Args:
             number_destinations: Number of destinations to be created
         """
-        for i in range(0, number_destinations):
+        for i in range(number_destinations):
             dest = f"sub{i}.example.com"
             self._create_destination(dest, 50, 50, 50, 100)
 
@@ -561,7 +567,7 @@ class DestinationMembershipTestCase(unittest.HomeserverTestCase):
             access_token=other_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_invalid_parameter(self) -> None:
@@ -574,7 +580,7 @@ class DestinationMembershipTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # negative from
@@ -584,7 +590,7 @@ class DestinationMembershipTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # invalid search order
@@ -594,7 +600,7 @@ class DestinationMembershipTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # invalid destination
@@ -604,7 +610,7 @@ class DestinationMembershipTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     def test_limit(self) -> None:
@@ -619,7 +625,7 @@ class DestinationMembershipTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_rooms)
         self.assertEqual(len(channel.json_body["rooms"]), 3)
         self.assertEqual(channel.json_body["next_token"], "3")
@@ -637,7 +643,7 @@ class DestinationMembershipTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_rooms)
         self.assertEqual(len(channel.json_body["rooms"]), 5)
         self.assertNotIn("next_token", channel.json_body)
@@ -655,7 +661,7 @@ class DestinationMembershipTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_rooms)
         self.assertEqual(channel.json_body["next_token"], "8")
         self.assertEqual(len(channel.json_body["rooms"]), 5)
@@ -673,7 +679,7 @@ class DestinationMembershipTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel_asc.code, msg=channel_asc.json_body)
+        self.assertEqual(200, channel_asc.code, msg=channel_asc.json_body)
         self.assertEqual(channel_asc.json_body["total"], number_rooms)
         self.assertEqual(number_rooms, len(channel_asc.json_body["rooms"]))
         self._check_fields(channel_asc.json_body["rooms"])
@@ -685,13 +691,13 @@ class DestinationMembershipTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel_desc.code, msg=channel_desc.json_body)
+        self.assertEqual(200, channel_desc.code, msg=channel_desc.json_body)
         self.assertEqual(channel_desc.json_body["total"], number_rooms)
         self.assertEqual(number_rooms, len(channel_desc.json_body["rooms"]))
         self._check_fields(channel_desc.json_body["rooms"])
 
         # test that both lists have different directions
-        for i in range(0, number_rooms):
+        for i in range(number_rooms):
             self.assertEqual(
                 channel_asc.json_body["rooms"][i]["room_id"],
                 channel_desc.json_body["rooms"][number_rooms - 1 - i]["room_id"],
@@ -711,7 +717,7 @@ class DestinationMembershipTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_rooms)
         self.assertEqual(len(channel.json_body["rooms"]), number_rooms)
         self.assertNotIn("next_token", channel.json_body)
@@ -724,7 +730,7 @@ class DestinationMembershipTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_rooms)
         self.assertEqual(len(channel.json_body["rooms"]), number_rooms)
         self.assertNotIn("next_token", channel.json_body)
@@ -737,7 +743,7 @@ class DestinationMembershipTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_rooms)
         self.assertEqual(len(channel.json_body["rooms"]), 4)
         self.assertEqual(channel.json_body["next_token"], "4")
@@ -751,7 +757,7 @@ class DestinationMembershipTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_rooms)
         self.assertEqual(len(channel.json_body["rooms"]), 1)
         self.assertNotIn("next_token", channel.json_body)
@@ -767,7 +773,7 @@ class DestinationMembershipTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_rooms)
         self.assertEqual(number_rooms, len(channel.json_body["rooms"]))
         self._check_fields(channel.json_body["rooms"])
@@ -778,7 +784,7 @@ class DestinationMembershipTestCase(unittest.HomeserverTestCase):
         Args:
             number_rooms: Number of rooms to be created
         """
-        for _ in range(0, number_rooms):
+        for _ in range(number_rooms):
             room_id = self.helper.create_room_as(
                 self.admin_user, tok=self.admin_user_tok
             )

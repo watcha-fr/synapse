@@ -1,16 +1,23 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2016 OpenMarket Ltd
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 import os.path
 import re
@@ -25,14 +32,14 @@ from tests import unittest
 
 
 class ConfigGenerationTestCase(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.dir = tempfile.mkdtemp()
         self.file = os.path.join(self.dir, "homeserver.yaml")
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         shutil.rmtree(self.dir)
 
-    def test_generate_config_generates_files(self):
+    def test_generate_config_generates_files(self) -> None:
         with redirect_stdout(StringIO()):
             HomeServerConfig.load_or_generate_config(
                 "",
@@ -56,7 +63,7 @@ class ConfigGenerationTestCase(unittest.TestCase):
             os.path.join(os.getcwd(), "homeserver.log"),
         )
 
-    def assert_log_filename_is(self, log_config_file, expected):
+    def assert_log_filename_is(self, log_config_file: str, expected: str) -> None:
         with open(log_config_file) as f:
             config = f.read()
             # find the 'filename' line

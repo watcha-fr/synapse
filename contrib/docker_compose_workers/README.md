@@ -68,7 +68,12 @@ redis:
   enabled: true
   host: redis
   port: 6379
-  # password: <secret_password>  
+  # dbid:  <redis_logical_db_id>
+  # password: <secret_password>
+  # use_tls: True
+  # certificate_file: <path_to_certificate>
+  # private_key_file: <path_to_private_key>
+  # ca_file: <path_to_ca_certificate>
 ```
 
 This assumes that your Redis service is called `redis` in your Docker Compose file.
@@ -94,20 +99,6 @@ worker_replication_host: synapse
 worker_replication_http_port: 9093
 ```
 
-### Add Workers to `instance_map`
-
-Locate the `instance_map` section of your `homeserver.yaml` and populate it with your workers:
-
-```yaml
-instance_map:
-  synapse-generic-worker-1:        # The worker_name setting in your worker configuration file
-    host: synapse-generic-worker-1 # The name of the worker service in your Docker Compose file
-    port: 8034                     # The port assigned to the replication listener in your worker config file
-  synapse-federation-sender-1:
-    host: synapse-federation-sender-1
-    port: 8034
-```
-
 ### Configure Federation Senders
 
 This section is applicable if you are using Federation senders (synapse.app.federation_sender). Locate the `send_federation` and `federation_sender_instances` settings in your `homeserver.yaml` and configure them:
@@ -122,4 +113,4 @@ federation_sender_instances:
 
 ## Other Worker types
 
-Using the concepts shown here it is possible to create other worker types in Docker Compose. See the [Workers](https://matrix-org.github.io/synapse/latest/workers.html#available-worker-applications) documentation for a list of available workers.
+Using the concepts shown here it is possible to create other worker types in Docker Compose. See the [Workers](https://element-hq.github.io/synapse/latest/workers.html#available-worker-applications) documentation for a list of available workers.

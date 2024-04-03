@@ -1,18 +1,26 @@
-# Copyright 2018 New Vector Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This file is licensed under the Affero General Public License (AGPL) version 3.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
+#
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 from typing import Optional
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
+
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.api.errors import Codes, ResourceLimitError
@@ -23,10 +31,10 @@ from synapse.rest import admin
 from synapse.rest.client import knock, login, room
 from synapse.server import HomeServer
 from synapse.types import UserID, create_requester
+from synapse.util import Clock
 
 import tests.unittest
 import tests.utils
-from tests.test_utils import make_awaitable
 
 
 class SyncTestCase(tests.unittest.HomeserverTestCase):
@@ -39,7 +47,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs: HomeServer):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.sync_handler = self.hs.get_sync_handler()
         self.store = self.hs.get_datastores().main
 
@@ -47,7 +55,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         # modify its config instead of the hs'
         self.auth_blocking = self.hs.get_auth_blocking()
 
-    def test_wait_for_sync_for_user_auth_blocking(self):
+    def test_wait_for_sync_for_user_auth_blocking(self) -> None:
         user_id1 = "@user1:test"
         user_id2 = "@user2:test"
         sync_config = generate_sync_config(user_id1)
@@ -82,7 +90,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         )
         self.assertEqual(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
-    def test_unknown_room_version(self):
+    def test_unknown_room_version(self) -> None:
         """
         A room with an unknown room version should not break sync (and should be excluded).
         """
@@ -159,6 +167,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
 
         # Blow away caches (supported room versions can only change due to a restart).
         self.store.get_rooms_for_user_with_stream_ordering.invalidate_all()
+        self.store.get_rooms_for_user.invalidate_all()
         self.store._get_event_cache.clear()
         self.store._event_ref.clear()
 
@@ -185,7 +194,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         self.assertNotIn(invite_room, [r.room_id for r in result.invited])
         self.assertNotIn(knock_room, [r.room_id for r in result.knocked])
 
-    def test_ban_wins_race_with_join(self):
+    def test_ban_wins_race_with_join(self) -> None:
         """Rooms shouldn't appear under "joined" if a join loses a race to a ban.
 
         A complicated edge case. Imagine the following scenario:
@@ -249,8 +258,8 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         mocked_get_prev_events = patch.object(
             self.hs.get_datastores().main,
             "get_prev_events_for_room",
-            new_callable=MagicMock,
-            return_value=make_awaitable([last_room_creation_event_id]),
+            new_callable=AsyncMock,
+            return_value=[last_room_creation_event_id],
         )
         with mocked_get_prev_events:
             self.helper.join(room_id, eve, tok=eve_token)

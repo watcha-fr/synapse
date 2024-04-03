@@ -1,18 +1,24 @@
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2021 The Matrix.org Foundation C.I.C.
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-from http import HTTPStatus
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
+from typing import Optional
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -36,41 +42,42 @@ class UsernameAvailableTestCase(unittest.HomeserverTestCase):
         self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
-        async def check_username(username: str) -> bool:
-            if username == "allowed":
-                return True
+        async def check_username(
+            localpart: str,
+            guest_access_token: Optional[str] = None,
+            assigned_user_id: Optional[str] = None,
+            inhibit_user_in_use_error: bool = False,
+        ) -> None:
+            if localpart == "allowed":
+                return
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "User ID already taken.",
                 errcode=Codes.USER_IN_USE,
             )
 
         handler = self.hs.get_registration_handler()
-        handler.check_username = check_username
+        handler.check_username = check_username  # type: ignore[method-assign]
 
     def test_username_available(self) -> None:
         """
-        The endpoint should return a HTTPStatus.OK response if the username does not exist
+        The endpoint should return a 200 response if the username does not exist
         """
 
         url = "%s?username=%s" % (self.url, "allowed")
         channel = self.make_request("GET", url, access_token=self.admin_user_tok)
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertTrue(channel.json_body["available"])
 
     def test_username_unavailable(self) -> None:
         """
-        The endpoint should return a HTTPStatus.OK response if the username does not exist
+        The endpoint should return a 200 response if the username does not exist
         """
 
         url = "%s?username=%s" % (self.url, "disallowed")
         channel = self.make_request("GET", url, access_token=self.admin_user_tok)
 
-        self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["errcode"], "M_USER_IN_USE")
         self.assertEqual(channel.json_body["error"], "User ID already taken.")

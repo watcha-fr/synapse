@@ -1,17 +1,22 @@
-# Copyright 2019 New Vector Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This file is licensed under the Affero General Public License (AGPL) version 3.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-import json
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
+#
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 from http import HTTPStatus
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -29,7 +34,6 @@ from tests.unittest import override_config
 
 
 class DirectoryTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         admin.register_servlets_for_client_rest_resource,
         directory.register_servlets,
@@ -97,8 +101,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
 
         # We use deliberately a localpart under the length threshold so
         # that we can make sure that the check is done on the whole alias.
-        data = {"room_alias_name": random_string(256 - len(self.hs.hostname))}
-        request_data = json.dumps(data)
+        request_data = {"room_alias_name": random_string(256 - len(self.hs.hostname))}
         channel = self.make_request(
             "POST", url, request_data, access_token=self.user_tok
         )
@@ -110,8 +113,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         # Check with an alias of allowed length. There should already be
         # a test that ensures it works in test_register.py, but let's be
         # as cautious as possible here.
-        data = {"room_alias_name": random_string(5)}
-        request_data = json.dumps(data)
+        request_data = {"room_alias_name": random_string(5)}
         channel = self.make_request(
             "POST", url, request_data, access_token=self.user_tok
         )
@@ -144,8 +146,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
 
         # Add an alias for the room, as the appservice
         alias = RoomAlias(f"asns-{random_string(5)}", self.hs.hostname).to_string()
-        data = {"room_id": self.room_id}
-        request_data = json.dumps(data)
+        request_data = {"room_id": self.room_id}
 
         channel = self.make_request(
             "PUT",
@@ -193,8 +194,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
             self.hs.hostname,
         )
 
-        data = {"aliases": [self.random_alias(alias_length)]}
-        request_data = json.dumps(data)
+        request_data = {"aliases": [self.random_alias(alias_length)]}
 
         channel = self.make_request(
             "PUT", url, request_data, access_token=self.user_tok
@@ -206,8 +206,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
     ) -> str:
         alias = self.random_alias(alias_length)
         url = "/_matrix/client/r0/directory/room/%s" % alias
-        data = {"room_id": self.room_id}
-        request_data = json.dumps(data)
+        request_data = {"room_id": self.room_id}
 
         channel = self.make_request(
             "PUT", url, request_data, access_token=self.user_tok

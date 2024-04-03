@@ -1,17 +1,24 @@
-# Copyright 2014-2016 OpenMarket Ltd
+#
+# This file is licensed under the Affero General Public License (AGPL) version 3.
+#
 # Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2014-2016 OpenMarket Ltd
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 """ Thread-local-alike tracking of log contexts within synapse
 
@@ -117,8 +124,7 @@ class ContextResourceUsage:
         """Create a new ContextResourceUsage
 
         Args:
-            copy_from (ContextResourceUsage|None): if not None, an object to
-                copy stats from
+            copy_from: if not None, an object to copy stats from
         """
         if copy_from is None:
             self.reset()
@@ -162,7 +168,7 @@ class ContextResourceUsage:
         """Add another ContextResourceUsage's stats to this one's.
 
         Args:
-            other (ContextResourceUsage): the other resource usage object
+            other: the other resource usage object
         """
         self.ru_utime += other.ru_utime
         self.ru_stime += other.ru_stime
@@ -342,7 +348,7 @@ class LoggingContext:
         called directly.
 
         Returns:
-            LoggingContext: the current logging context
+            The current logging context
         """
         warnings.warn(
             "synapse.logging.context.LoggingContext.current_context() is deprecated "
@@ -362,7 +368,8 @@ class LoggingContext:
         called directly.
 
         Args:
-            context(LoggingContext): The context to activate.
+            context: The context to activate.
+
         Returns:
             The context that was previously active
         """
@@ -474,8 +481,7 @@ class LoggingContext:
         """Get resources used by this logcontext so far.
 
         Returns:
-            ContextResourceUsage: a *copy* of the object tracking resource
-                usage so far
+            A *copy* of the object tracking resource usage so far
         """
         # we always return a copy, for consistency
         res = self._resource_usage.copy()
@@ -586,7 +592,7 @@ class LoggingContextFilter(logging.Filter):
             True to include the record in the log output.
         """
         context = current_context()
-        record.request = self._default_request  # type: ignore
+        record.request = self._default_request
 
         # context should never be None, but if it somehow ends up being, then
         # we end up in a death spiral of infinite loops, so let's check, for
@@ -594,21 +600,21 @@ class LoggingContextFilter(logging.Filter):
         if context is not None:
             # Logging is interested in the request ID. Note that for backwards
             # compatibility this is stored as the "request" on the record.
-            record.request = str(context)  # type: ignore
+            record.request = str(context)
 
             # Add some data from the HTTP request.
             request = context.request
             if request is None:
                 return True
 
-            record.ip_address = request.ip_address  # type: ignore
-            record.site_tag = request.site_tag  # type: ignore
-            record.requester = request.requester  # type: ignore
-            record.authenticated_entity = request.authenticated_entity  # type: ignore
-            record.method = request.method  # type: ignore
-            record.url = request.url  # type: ignore
-            record.protocol = request.protocol  # type: ignore
-            record.user_agent = request.user_agent  # type: ignore
+            record.ip_address = request.ip_address
+            record.site_tag = request.site_tag
+            record.requester = request.requester
+            record.authenticated_entity = request.authenticated_entity
+            record.method = request.method
+            record.url = request.url
+            record.protocol = request.protocol
+            record.user_agent = request.user_agent
 
         return True
 
@@ -663,7 +669,8 @@ def current_context() -> LoggingContextOrSentinel:
 def set_current_context(context: LoggingContextOrSentinel) -> LoggingContextOrSentinel:
     """Set the current logging context in thread local storage
     Args:
-        context(LoggingContext): The context to activate.
+        context: The context to activate.
+
     Returns:
         The context that was previously active
     """
@@ -700,7 +707,7 @@ def nested_logging_context(suffix: str) -> LoggingContext:
         suffix: suffix to add to the parent context's 'name'.
 
     Returns:
-        LoggingContext: new logging context.
+        A new logging context.
     """
     curr_context = current_context()
     if not curr_context:
@@ -728,7 +735,7 @@ async def _unwrap_awaitable(awaitable: Awaitable[R]) -> R:
 
 
 @overload
-def preserve_fn(  # type: ignore[misc]
+def preserve_fn(
     f: Callable[P, Awaitable[R]],
 ) -> Callable[P, "defer.Deferred[R]"]:
     # The `type: ignore[misc]` above suppresses
@@ -756,7 +763,7 @@ def preserve_fn(
 
 
 @overload
-def run_in_background(  # type: ignore[misc]
+def run_in_background(
     f: Callable[P, Awaitable[R]], *args: P.args, **kwargs: P.kwargs
 ) -> "defer.Deferred[R]":
     # The `type: ignore[misc]` above suppresses
@@ -809,23 +816,24 @@ def run_in_background(  # type: ignore[misc]
 
     # `res` may be a coroutine, `Deferred`, some other kind of awaitable, or a plain
     # value. Convert it to a `Deferred`.
+    d: "defer.Deferred[R]"
     if isinstance(res, typing.Coroutine):
         # Wrap the coroutine in a `Deferred`.
-        res = defer.ensureDeferred(res)
+        d = defer.ensureDeferred(res)
     elif isinstance(res, defer.Deferred):
-        pass
+        d = res
     elif isinstance(res, Awaitable):
         # `res` is probably some kind of completed awaitable, such as a `DoneAwaitable`
         # or `Future` from `make_awaitable`.
-        res = defer.ensureDeferred(_unwrap_awaitable(res))
+        d = defer.ensureDeferred(_unwrap_awaitable(res))
     else:
         # `res` is a plain value. Wrap it in a `Deferred`.
-        res = defer.succeed(res)
+        d = defer.succeed(res)
 
-    if res.called and not res.paused:
+    if d.called and not d.paused:
         # The function should have maintained the logcontext, so we can
         # optimise out the messing about
-        return res
+        return d
 
     # The function may have reset the context before returning, so
     # we need to restore it now.
@@ -843,8 +851,8 @@ def run_in_background(  # type: ignore[misc]
     # which is supposed to have a single entry and exit point. But
     # by spawning off another deferred, we are effectively
     # adding a new exit point.)
-    res.addBoth(_set_context_cb, ctx)
-    return res
+    d.addBoth(_set_context_cb, ctx)
+    return d
 
 
 T = TypeVar("T")
@@ -877,7 +885,7 @@ def make_deferred_yieldable(deferred: "defer.Deferred[T]") -> "defer.Deferred[T]
 ResultT = TypeVar("ResultT")
 
 
-def _set_context_cb(result: ResultT, context: LoggingContext) -> ResultT:
+def _set_context_cb(result: ResultT, context: LoggingContextOrSentinel) -> ResultT:
     """A callback function which just sets the logging context"""
     set_current_context(context)
     return result
@@ -898,20 +906,19 @@ def defer_to_thread(
     on it.
 
     Args:
-        reactor (twisted.internet.base.ReactorBase): The reactor in whose main thread
-            the Deferred will be invoked, and whose threadpool we should use for the
-            function.
+        reactor: The reactor in whose main thread the Deferred will be invoked,
+            and whose threadpool we should use for the function.
 
             Normally this will be hs.get_reactor().
 
-        f (callable): The function to call.
+        f: The function to call.
 
         args: positional arguments to pass to f.
 
         kwargs: keyword arguments to pass to f.
 
     Returns:
-        Deferred: A Deferred which fires a callback with the result of `f`, or an
+        A Deferred which fires a callback with the result of `f`, or an
             errback if `f` throws an exception.
     """
     return defer_to_threadpool(reactor, reactor.getThreadPool(), f, *args, **kwargs)
@@ -939,20 +946,20 @@ def defer_to_threadpool(
     on it.
 
     Args:
-        reactor (twisted.internet.base.ReactorBase): The reactor in whose main thread
-            the Deferred will be invoked. Normally this will be hs.get_reactor().
+        reactor: The reactor in whose main thread the Deferred will be invoked.
+            Normally this will be hs.get_reactor().
 
-        threadpool (twisted.python.threadpool.ThreadPool): The threadpool to use for
-            running `f`. Normally this will be hs.get_reactor().getThreadPool().
+        threadpool: The threadpool to use for running `f`. Normally this will be
+            hs.get_reactor().getThreadPool().
 
-        f (callable): The function to call.
+        f: The function to call.
 
         args: positional arguments to pass to f.
 
         kwargs: keyword arguments to pass to f.
 
     Returns:
-        Deferred: A Deferred which fires a callback with the result of `f`, or an
+        A Deferred which fires a callback with the result of `f`, or an
             errback if `f` throws an exception.
     """
     curr_context = current_context()

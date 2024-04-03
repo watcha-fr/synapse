@@ -1,16 +1,22 @@
-# Copyright 2019 New Vector Ltd
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This file is licensed under the Affero General Public License (AGPL) version 3.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# Copyright (C) 2023 New Vector, Ltd
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# See the GNU Affero General Public License for more details:
+# <https://www.gnu.org/licenses/agpl-3.0.html>.
+#
+# Originally licensed under the Apache License, Version 2.0:
+# <http://www.apache.org/licenses/LICENSE-2.0>.
+#
+# [This file includes modifications made by New Vector Limited]
+#
+#
 
 import re
 from http import HTTPStatus
@@ -19,7 +25,7 @@ from typing import Iterable, Pattern
 from synapse.api.auth import Auth
 from synapse.api.errors import AuthError
 from synapse.http.site import SynapseRequest
-from synapse.types import UserID
+from synapse.types import Requester
 
 
 def admin_patterns(path_regex: str, version: str = "v1") -> Iterable[Pattern]:
@@ -48,19 +54,19 @@ async def assert_requester_is_admin(auth: Auth, request: SynapseRequest) -> None
         AuthError if the requester is not a server admin
     """
     requester = await auth.get_user_by_req(request)
-    await assert_user_is_admin(auth, requester.user)
+    await assert_user_is_admin(auth, requester)
 
 
-async def assert_user_is_admin(auth: Auth, user_id: UserID) -> None:
+async def assert_user_is_admin(auth: Auth, requester: Requester) -> None:
     """Verify that the given user is an admin user
 
     Args:
         auth: Auth singleton
-        user_id: user to check
+        requester: The user making the request, according to the access token.
 
     Raises:
         AuthError if the user is not a server admin
     """
-    is_admin = await auth.is_server_admin(user_id)
+    is_admin = await auth.is_server_admin(requester)
     if not is_admin:
         raise AuthError(HTTPStatus.FORBIDDEN, "You are not a server admin")
