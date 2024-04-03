@@ -1179,7 +1179,7 @@ class UserInfo:
     is_shadow_banned: bool
     approved: bool
     locked: bool
-
+    is_partner: bool # watcha+
 
 class UserProfile(TypedDict):
     user_id: str

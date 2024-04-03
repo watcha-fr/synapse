@@ -656,14 +656,6 @@ class UserDirectoryStoreTestCase(HomeserverTestCase):
     test_search_user_dir_stop_words.skip = skip_reason
     # +watcha
 
-
-# watcha+
-USER = "@user:test"
-USER_X = "@user_x:test"
-USER_Y = "@user_y:test"
-PARTNER = "@partner:test"
-
-
 class UserDirectoryStoreTestCaseWithIcu(UserDirectoryStoreTestCase):
     use_icu = True
 
@@ -736,7 +728,15 @@ class UserDirectoryICUTestCase(HomeserverTestCase):
             ["lazy", "fox", "jumped", "over", "the", "dog"],
         )
 
-        class WatchaUserDirectoryStoreTestCase(HomeserverTestCase):
+
+# watcha+
+USER = "@user:test"
+USER_X = "@user_x:test"
+USER_Y = "@user_y:test"
+PARTNER = "@partner:test"
+
+
+class WatchaUserDirectoryStoreTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.registration_handler = self.hs.get_registration_handler()
         self.store = hs.get_datastores().main
@@ -852,4 +852,3 @@ class UserDirectoryICUTestCase(HomeserverTestCase):
 
 
 # +watcha
-

@@ -1487,6 +1487,8 @@ class UserAttributeDict(TypedDict):
     display_name: Optional[str]
     picture: Optional[str]  # may be omitted by older `OidcMappingProviders`
     emails: List[str]
+    is_admin: Optional[bool]  # watcha+
+    nextcloud_username: Optional[str]  # watcha+
 
 
 C = TypeVar("C")
