@@ -40,6 +40,8 @@ from .base import BaseAuth
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
+from synapse.util.watcha import build_log_message  # watcha+
+
 logger = logging.getLogger(__name__)
 
 
@@ -63,6 +65,7 @@ class InternalAuth(BaseAuth):
         allow_guest: bool = False,
         allow_expired: bool = False,
         allow_locked: bool = False,
+        allow_partner: bool = True,  # watcha+
     ) -> Requester:
         """Get a registered user's ID.
 
@@ -83,9 +86,16 @@ class InternalAuth(BaseAuth):
         """
         parent_span = active_span()
         with start_active_span("get_user_by_req"):
+            """watcha!
             requester = await self._wrapped_get_user_by_req(
-                request, allow_guest, allow_expired, allow_locked
+                request, allow_guest, allow_expired
             )
+            !watcha"""
+            # watcha+
+            requester = await self._wrapped_get_user_by_req(
+                request, allow_guest, allow_expired, allow_partner
+            )
+            # +watcha
 
             if parent_span:
                 if requester.authenticated_entity in self._force_tracing_for_users:
@@ -113,6 +123,7 @@ class InternalAuth(BaseAuth):
         allow_guest: bool,
         allow_expired: bool,
         allow_locked: bool,
+        allow_partner: bool,  # watcha+
     ) -> Requester:
         """Helper for get_user_by_req
 
@@ -164,6 +175,20 @@ class InternalAuth(BaseAuth):
                     errcode=Codes.GUEST_ACCESS_FORBIDDEN,
                 )
 
+            # watcha+
+            if requester.is_partner and not allow_partner:
+                raise AuthError(
+                    403,
+                    build_log_message(
+                        log_vars={
+                            "user_id": user_info.user_id,
+                            "is_partner": is_partner,
+                            "allow_partner": allow_partner,
+                        }
+                    ),
+                )
+            # +watcha
+            
             request.requester = requester
             return requester
         except KeyError:
@@ -215,6 +240,7 @@ class InternalAuth(BaseAuth):
                 shadow_banned=user_info.shadow_banned,
                 device_id=user_info.device_id,
                 authenticated_entity=user_info.token_owner,
+                is_partner=user_info.is_partner, # watcha+
             )
 
             return requester

@@ -225,6 +225,7 @@ class MSC3861DelegatedAuth(BaseAuth):
         allow_guest: bool = False,
         allow_expired: bool = False,
         allow_locked: bool = False,
+        allow_partner: bool = True,  # watcha+
     ) -> Requester:
         access_token = self.get_access_token_from_request(request)
 
