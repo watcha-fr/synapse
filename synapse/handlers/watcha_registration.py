@@ -25,7 +25,7 @@ class RegistrationHandler:
         self.nextcloud_client = hs.get_nextcloud_client()
         self.secrets = Secrets()
 
-        if hs.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+        if hs.config.email.can_verify_email:
             self.mailer = Mailer(
                 hs=hs,
                 app_name=hs.config.email.email_app_name,
