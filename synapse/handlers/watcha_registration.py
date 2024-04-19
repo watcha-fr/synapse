@@ -3,7 +3,6 @@ import uuid
 from typing import Optional, TYPE_CHECKING
 
 from synapse.api.errors import HttpResponseException
-from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.push.mailer import Mailer
 from synapse.util.watcha import ActionStatus, Secrets, build_log_message
 
