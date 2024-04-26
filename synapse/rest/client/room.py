@@ -322,10 +322,34 @@ class RoomStateEventRestServlet(RestServlet):
                 )
                 # watcha+
             elif event_type == EventTypes.Name:
+                event_dict: JsonDict = {
+                    "type": event_type,
+                    "content": content,
+                    "room_id": room_id,
+                    "sender": requester.user.to_string(),
+                }
+
+                if state_key is not None:
+                    event_dict["state_key"] = state_key
+
+                if origin_server_ts is not None:
+                    event_dict["origin_server_ts"] = origin_server_ts
                 event_id = await self.nextcloud_handler.handle_room_name_event(
                     requester, event_dict, txn_id=txn_id
                 )
             elif event_type == EventTypes.NextcloudCalendar:
+                event_dict: JsonDict = {
+                    "type": event_type,
+                    "content": content,
+                    "room_id": room_id,
+                    "sender": requester.user.to_string(),
+                }
+
+                if state_key is not None:
+                    event_dict["state_key"] = state_key
+
+                if origin_server_ts is not None:
+                    event_dict["origin_server_ts"] = origin_server_ts
                 event_id = await self.nextcloud_handler.update_calendar_share(
                     requester, event_dict, txn_id=txn_id
                 )
