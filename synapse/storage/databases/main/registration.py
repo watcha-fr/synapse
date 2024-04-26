@@ -253,7 +253,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 name,
                 is_guest,
                 admin,
-                is_partner,
+                is_partner, # watcha+
                 consent_version,
                 consent_ts,
                 consent_server_notice_sent,
@@ -273,7 +273,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 consent_ts=consent_ts,
                 creation_ts=creation_ts,
                 is_admin=bool(admin),
-                is_partner=bool(is_partner),
+                is_partner=bool(is_partner), # watcha+
                 is_deactivated=bool(deactivated),
                 is_guest=bool(is_guest),
                 is_shadow_banned=bool(shadow_banned),
@@ -643,7 +643,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 user_id,
                 is_guest,
                 shadow_banned,
-                is_partner,
+                is_partner, # watcha+
                 token_id,
                 device_id,
                 valid_until_ms,
@@ -655,7 +655,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 user_id=user_id,
                 is_guest=is_guest,
                 shadow_banned=shadow_banned,
-                is_partner=is_partner,
+                is_partner=is_partner, # watcha+
                 token_id=token_id,
                 device_id=device_id,
                 valid_until_ms=valid_until_ms,
