@@ -93,7 +93,7 @@ class InternalAuth(BaseAuth):
             !watcha"""
             # watcha+
             requester = await self._wrapped_get_user_by_req(
-                request, allow_guest, allow_expired, allow_partner
+                request, allow_guest, allow_expired, allow_locked, allow_partner
             )
             # +watcha
 
