@@ -84,8 +84,8 @@ class NextcloudHandler:
     # file sharing
     # ============
 
-    async def update_share(self, room_id: str, user_id: str, event_content: dict):
-        await self.auth.check_user_in_room(room_id, user_id)
+    async def update_share(self, room_id: str, requester: Requester, event_content: dict):
+        await self.auth.check_user_in_room(room_id, requester)
 
         nextcloud_url = event_content["nextcloudShare"]
 
@@ -100,10 +100,10 @@ class NextcloudHandler:
                     ),
                 )
             nextcloud_folder_path = url_query["dir"][0]
-            await self.bind(user_id, room_id, nextcloud_folder_path)
+            await self.bind(requester.user.to_string(), room_id, nextcloud_folder_path)
 
         else:
-            await self.unbind(user_id, room_id)
+            await self.unbind(requester.user.to_string(), room_id)
 
     async def bind(self, requester_id: str, room_id: str, path: str):
         """Bind a Nextcloud folder with a room in three steps :

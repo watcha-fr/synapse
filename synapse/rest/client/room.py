@@ -361,7 +361,7 @@ class RoomStateEventRestServlet(RestServlet):
                     and "nextcloudShare" in content
                 ):
                     user_id = requester.user.to_string()
-                    await self.nextcloud_handler.update_share(room_id, user_id, content)
+                    await self.nextcloud_handler.update_share(room_id, requester, content)
                 # +watcha
                 event_dict: JsonDict = {
                     "type": event_type,
