@@ -45,7 +45,7 @@ class NextcloudHandler:
         self, requester: Requester, room_id: str, user_id: str, membership: str
     ):
         if (
-            await self.administration_handler.get_user_role(user_id) == "partner"
+            await self.administration_handler.get_user_role(requester) == "partner"
             and not self.config.watcha.external_authentication_for_partners
         ):
             return

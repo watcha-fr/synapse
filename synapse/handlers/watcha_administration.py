@@ -2,6 +2,7 @@ import logging
 
 from synapse.api.errors import SynapseError
 from synapse.types import UserID
+from synapse.types import Requester
 from synapse.util.watcha import build_log_message
 
 logger = logging.getLogger(__name__)
@@ -58,14 +59,15 @@ class AdministrationHandler:
 
         return target_role
 
-    async def get_user_role(self, user_id):
+    async def get_user_role(self, requester: Requester):
         """Retrieve user role [administrator|collaborator|partner]
 
         Returns:
             The user role.
         """
+        user_id = requester.user.to_string()
         is_partner = await self.auth_handler.is_partner(user_id)
-        is_admin = await self.auth.is_server_admin(UserID.from_string(user_id))
+        is_admin = await self.auth.is_server_admin(requester)
 
         if is_partner and is_admin:
             raise SynapseError(
