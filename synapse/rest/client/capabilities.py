@@ -58,7 +58,7 @@ class CapabilitiesRestServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         user = await self.store.get_user_by_id(requester.user.to_string())
         change_password = (
-            bool(user["password_hash"]) and self.auth_handler.can_change_password()
+            user.password_hash and self.auth_handler.can_change_password()
         )
         # +watcha
 

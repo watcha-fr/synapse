@@ -97,6 +97,7 @@ class TokenLookupResult:
     token_owner: str = attr.ib()
     token_used: bool = False
     is_partner: bool = False  # watcha+
+    password_hash: bool = False
 
     # Make the token owner default to the user ID, which is the common case.
     @token_owner.default
@@ -238,7 +239,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                     consent_server_notice_sent, appservice_id, creation_ts, user_type,
                     deactivated, COALESCE(shadow_banned, FALSE) AS shadow_banned,
                     COALESCE(approved, TRUE) AS approved,
-                    COALESCE(locked, FALSE) AS locked
+                    COALESCE(locked, FALSE) AS locked, password_hash,
                 FROM users
                 WHERE name = ?
                 """,
@@ -264,6 +265,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 shadow_banned,
                 approved,
                 locked,
+                password_hash,
             ) = row
 
             return UserInfo(
@@ -281,6 +283,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 user_type=user_type,
                 approved=bool(approved),
                 locked=bool(locked),
+                password_hash=bool(password_hash),
             )
 
         return await self.db_pool.runInteraction(
