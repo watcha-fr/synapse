@@ -235,11 +235,11 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             txn.execute(
                 """
                 SELECT
-                    name, is_guest, admin, is_partner, consent_version, consent_ts,
+                    name, is_guest, admin, is_partner, password_hash, consent_version, consent_ts,
                     consent_server_notice_sent, appservice_id, creation_ts, user_type,
                     deactivated, COALESCE(shadow_banned, FALSE) AS shadow_banned,
                     COALESCE(approved, TRUE) AS approved,
-                    COALESCE(locked, FALSE) AS locked, password_hash,
+                    COALESCE(locked, FALSE) AS locked,
                 FROM users
                 WHERE name = ?
                 """,
@@ -255,6 +255,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 is_guest,
                 admin,
                 is_partner, # watcha+
+                password_hash,
                 consent_version,
                 consent_ts,
                 consent_server_notice_sent,
@@ -265,7 +266,6 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 shadow_banned,
                 approved,
                 locked,
-                password_hash,
             ) = row
 
             return UserInfo(
@@ -276,6 +276,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 creation_ts=creation_ts,
                 is_admin=bool(admin),
                 is_partner=bool(is_partner), # watcha+
+                password_hash=bool(password_hash),
                 is_deactivated=bool(deactivated),
                 is_guest=bool(is_guest),
                 is_shadow_banned=bool(shadow_banned),
@@ -283,7 +284,6 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 user_type=user_type,
                 approved=bool(approved),
                 locked=bool(locked),
-                password_hash=bool(password_hash),
             )
 
         return await self.db_pool.runInteraction(
