@@ -1098,10 +1098,13 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         if membership_action == "invite" and all(
             key in content for key in ("medium", "address")
         ):
+            missing_keys = [key for key in ("id_server", "id_access_token") if key not in content]
             if not all(key in content for key in ("id_server", "id_access_token")):
+                missing_keys_str = ", ".join(missing_keys)
+                error_message = f"`{missing_keys_str}` {'is' if len(missing_keys) == 1 else 'are'} required when doing 3pid invite"
                 raise SynapseError(
                     HTTPStatus.BAD_REQUEST,
-                    "`id_server` and `id_access_token` are required when doing 3pid invite",
+                    error_message,
                     Codes.MISSING_PARAM,
                 )
 
