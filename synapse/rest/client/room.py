@@ -1101,7 +1101,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             missing_keys = [key for key in ("id_server", "id_access_token") if key not in content]
             if not all(key in content for key in ("id_server", "id_access_token")):
                 missing_keys_str = ", ".join(missing_keys)
-                error_message = f"`{missing_keys_str}` {'is' if len(missing_keys) == 1 else 'are'} required when doing 3pid invite"
+                error_message = f"`{missing_keys_str}` {'is' if len(missing_keys) == 1 else 'are'} required when doing 3pid invite. Content: {content}"
                 raise SynapseError(
                     HTTPStatus.BAD_REQUEST,
                     error_message,
