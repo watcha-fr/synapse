@@ -1180,7 +1180,7 @@ class UserInfo:
     approved: bool
     locked: bool
     is_partner: bool # watcha+
-    password_hash: bool
+    password_hash: bool # watcha+
 
 class UserProfile(TypedDict):
     user_id: str

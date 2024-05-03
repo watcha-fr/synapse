@@ -1569,7 +1569,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         id_server: str,
         requester: Requester,
         txn_id: Optional[str],
-        id_access_token: str,
+        id_access_token: Optional[str] = None, # watcha+
         prev_event_ids: Optional[List[str]] = None,
         depth: Optional[int] = None,
     ) -> Tuple[str, int]:

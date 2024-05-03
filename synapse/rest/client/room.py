@@ -1099,14 +1099,15 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             key in content for key in ("medium", "address")
         ):
             missing_keys = [key for key in ("id_server", "id_access_token") if key not in content]
-            if not all(key in content for key in ("id_server", "id_access_token")):
-                missing_keys_str = ", ".join(missing_keys)
-                error_message = f"`{missing_keys_str}` {'is' if len(missing_keys) == 1 else 'are'} required when doing 3pid invite. Content: {content}"
-                raise SynapseError(
-                    HTTPStatus.BAD_REQUEST,
-                    error_message,
-                    Codes.MISSING_PARAM,
-                )
+            if not requester.is_partner or (requester.is_partner and "id_server" in missing_keys): # watcha+
+                if not all(key in content for key in ("id_server", "id_access_token")):
+                    missing_keys_str = ", ".join(missing_keys)
+                    error_message = f"`{missing_keys_str}` {'is' if len(missing_keys) == 1 else 'are'} required when doing 3pid invite. Content: {content}"
+                    raise SynapseError(
+                        HTTPStatus.BAD_REQUEST,
+                        error_message,
+                        Codes.MISSING_PARAM,
+                    )
 
             try:
                 await self.room_member_handler.do_3pid_invite(
@@ -1117,7 +1118,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                     content["id_server"],
                     requester,
                     txn_id,
-                    content["id_access_token"],
+                    content.get("id_access_token"), # watcha+
                 )
             except ShadowBanError:
                 # Pretend the request succeeded.

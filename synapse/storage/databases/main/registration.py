@@ -97,7 +97,7 @@ class TokenLookupResult:
     token_owner: str = attr.ib()
     token_used: bool = False
     is_partner: bool = False  # watcha+
-    password_hash: bool = False
+    password_hash: bool = False # watcha+
 
     # Make the token owner default to the user ID, which is the common case.
     @token_owner.default
@@ -255,7 +255,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 is_guest,
                 admin,
                 is_partner, # watcha+
-                password_hash,
+                password_hash, # watcha+
                 consent_version,
                 consent_ts,
                 consent_server_notice_sent,
@@ -276,7 +276,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 creation_ts=creation_ts,
                 is_admin=bool(admin),
                 is_partner=bool(is_partner), # watcha+
-                password_hash=bool(password_hash),
+                password_hash=bool(password_hash), # watcha+
                 is_deactivated=bool(deactivated),
                 is_guest=bool(is_guest),
                 is_shadow_banned=bool(shadow_banned),
