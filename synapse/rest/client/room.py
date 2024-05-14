@@ -1095,6 +1095,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
 
         content = parse_json_object_from_request(request, allow_empty_body=True)
 
+        '''watcha!
         if membership_action == "invite" and all(
             key in content for key in ("medium", "address")
         ):
@@ -1124,6 +1125,26 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 # Pretend the request succeeded.
                 pass
             return 200, {}
+        !watcha'''
+
+        #watcha+
+        if membership_action == "invite" and self._has_3pid_invite_keys(content):
+            try:
+                await self.room_member_handler.do_3pid_invite(
+                    room_id,
+                    requester.user,
+                    content["medium"],
+                    content["address"],
+                    content["id_server"],
+                    requester,
+                    txn_id,
+                    content.get("id_access_token"),
+                )
+            except ShadowBanError:
+                # Pretend the request succeeded.
+                pass
+            return 200, {}
+        #+watcha
 
         target = requester.user
         if membership_action in ["invite", "ban", "unban", "kick"]:
@@ -1155,6 +1176,14 @@ class RoomMembershipRestServlet(TransactionRestServlet):
 
         return 200, return_value
 
+    #watcha+
+    def _has_3pid_invite_keys(self, content: JsonDict) -> bool:
+        for key in {"id_server", "medium", "address"}:
+            if key not in content:
+                return False
+        return True
+    #+watcha
+    
     async def on_POST(
         self,
         request: SynapseRequest,
