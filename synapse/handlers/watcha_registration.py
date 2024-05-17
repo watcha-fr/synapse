@@ -133,7 +133,7 @@ class RegistrationHandler:
             )
 
         if self.hs.config.userdirectory.user_directory_search_all_users:
-            profile = await self.store.get_profileinfo(UserID.from_string(localpart))
+            profile = await self.store.get_profileinfo(UserID.from_string(user_id))
             await self.user_directory_handler.handle_local_profile_change(
                 user_id, profile
             )
