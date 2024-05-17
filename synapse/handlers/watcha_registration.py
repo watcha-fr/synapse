@@ -5,6 +5,7 @@ from typing import Optional, TYPE_CHECKING
 from synapse.api.errors import HttpResponseException
 from synapse.push.mailer import Mailer
 from synapse.util.watcha import ActionStatus, Secrets, build_log_message
+from synapse.types import UserID
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -132,7 +133,7 @@ class RegistrationHandler:
             )
 
         if self.hs.config.userdirectory.user_directory_search_all_users:
-            profile = await self.store.get_profileinfo(localpart)
+            profile = await self.store.get_profileinfo(UserID.from_string(localpart))
             await self.user_directory_handler.handle_local_profile_change(
                 user_id, profile
             )
