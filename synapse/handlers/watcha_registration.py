@@ -3,9 +3,12 @@ import uuid
 from typing import Optional, TYPE_CHECKING
 
 from synapse.api.errors import HttpResponseException
+""" watcha!
+from synapse.config.emailconfig import ThreepidBehaviour
+!watcha"""
 from synapse.push.mailer import Mailer
 from synapse.util.watcha import ActionStatus, Secrets, build_log_message
-from synapse.types import UserID
+from synapse.types import UserID # watcha+
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -25,7 +28,10 @@ class RegistrationHandler:
         self.nextcloud_client = hs.get_nextcloud_client()
         self.secrets = Secrets()
 
-        if hs.config.email.can_verify_email:
+        """ watcha!
+        if hs.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+        !watcha"""
+        if hs.config.email.can_verify_email: # watcha+
             self.mailer = Mailer(
                 hs=hs,
                 app_name=hs.config.email.email_app_name,
@@ -133,7 +139,10 @@ class RegistrationHandler:
             )
 
         if self.hs.config.userdirectory.user_directory_search_all_users:
-            profile = await self.store.get_profileinfo(UserID.from_string(user_id))
+            """watcha!
+            profile = await self.store.get_profileinfo(localpart)
+            !watcha"""
+            profile = await self.store.get_profileinfo(UserID.from_string(user_id)) # watcha+
             await self.user_directory_handler.handle_local_profile_change(
                 user_id, profile
             )

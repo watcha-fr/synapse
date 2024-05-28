@@ -44,10 +44,18 @@ class NextcloudHandler:
     async def handle_room_member_event(
         self, requester: Requester, room_id: str, user_id: str, membership: str
     ):
+        """ watcha!
+        if (
+            await self.administration_handler.get_user_role(user_id) == "partner"
+            and not self.config.watcha.external_authentication_for_partners
+        ):
+        !watcha """
+        # watcha+
         if (
             await self.administration_handler.get_user_role(requester) == "partner"
             and not self.config.watcha.external_authentication_for_partners
         ):
+        # +watcha
             return
 
         if await self.store.get_share_id(room_id):
@@ -84,8 +92,14 @@ class NextcloudHandler:
     # file sharing
     # ============
 
+    """watcha!
+    async def update_share(self, room_id: str, user_id: str, event_content: dict):
+        await self.auth.check_user_in_room(room_id, user_id)
+    !watcha"""
+    # watcha+
     async def update_share(self, room_id: str, requester: Requester, event_content: dict):
         await self.auth.check_user_in_room(room_id, requester)
+    # +watcha
 
         nextcloud_url = event_content["nextcloudShare"]
 
@@ -100,10 +114,16 @@ class NextcloudHandler:
                     ),
                 )
             nextcloud_folder_path = url_query["dir"][0]
-            await self.bind(requester.user.to_string(), room_id, nextcloud_folder_path)
+            """watcha!
+            await self.bind(user_id, room_id, nextcloud_folder_path)
+            !watcha"""
+            await self.bind(requester.user.to_string(), room_id, nextcloud_folder_path) # watcha+
 
         else:
-            await self.unbind(requester.user.to_string(), room_id)
+            """watcha!
+            await self.unbind(user_id, room_id)
+            !watcha"""
+            await self.unbind(requester.user.to_string(), room_id) # watcha+
 
     async def bind(self, requester_id: str, room_id: str, path: str):
         """Bind a Nextcloud folder with a room in three steps :

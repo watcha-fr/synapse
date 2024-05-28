@@ -8,6 +8,9 @@ from synapse.api.errors import (
     NextcloudError,
     SynapseError,
 )
+""" watcha!
+from synapse.config.emailconfig import ThreepidBehaviour
+!watcha"""
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.push.mailer import Mailer
 from synapse.rest.admin._base import assert_requester_is_admin, assert_user_is_admin
