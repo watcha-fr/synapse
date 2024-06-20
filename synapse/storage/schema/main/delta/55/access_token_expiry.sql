@@ -34,4 +34,11 @@
 
 -- when this access token can be used until, in ms since the epoch. NULL means the token
 -- never expires.
-ALTER TABLE access_tokens ADD COLUMN valid_until_ms BIGINT;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+    WHERE table_name='access_tokens'AND column_name='valid_until_ms') THEN
+    ALTER TABLE access_tokens ADD COLUMN valid_until_ms BIGINT;
+    END IF;
+ END $$;
