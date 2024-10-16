@@ -769,6 +769,11 @@ class RoomCreationHandler:
 
         invite_3pid_list = config.get("invite_3pid", [])
         invite_list = config.get("invite", [])
+        
+        # watcha+
+        for invite_3pid in invite_3pid_list:
+            logger.debug("Sending %s in new room", EventTypes.Member)
+        # +watcha
 
         # validate each entry for correctness
         for invite_3pid in invite_3pid_list:
