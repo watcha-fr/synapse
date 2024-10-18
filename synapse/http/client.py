@@ -462,7 +462,7 @@ class BaseHttpClient:
         """
 
         # TODO: Do we ever want to log message contents?
-        logger.debug("post_urlencoded_get_json args: %s", args)
+        logger.info("post_urlencoded_get_json args: %s", args)
 
         query_bytes = encode_query_args(args)
 
