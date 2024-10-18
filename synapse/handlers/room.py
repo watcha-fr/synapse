@@ -772,7 +772,7 @@ class RoomCreationHandler:
         
         # watcha+
         for invite_3pid in invite_3pid_list:
-            logger.debug("invite_3pid : %s", invite_3pid)
+            logger.info("invite_3pid : %s", invite_3pid)
         # +watcha
 
         # validate each entry for correctness
