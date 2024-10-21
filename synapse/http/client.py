@@ -793,6 +793,13 @@ class BaseHttpClient:
         if 200 <= response.code < 300:
             return response
         else:
+            logger.error(
+                "HTTP Response Error %s: %s\nBody: %s",
+                response.code,
+                response.phrase.decode("ascii", errors="replace"),
+                body.decode("utf-8", errors="replace")  # Si le corps est du texte
+            )
+
             raise HttpResponseException(
                 response.code, response.phrase.decode("ascii", errors="replace"), body
             )
