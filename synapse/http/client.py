@@ -774,7 +774,7 @@ class BaseHttpClient:
         """
         json_str = encode_canonical_json(post_json)
 
-        logger.debug("HTTP POST %s -> %s", json_str, uri)
+        logger.info("HTTP POST %s -> %s : Header %s", json_str, uri, headers)
 
         actual_headers = {
             b"Content-Type": [b"application/json"],
