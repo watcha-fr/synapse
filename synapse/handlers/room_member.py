@@ -1636,10 +1636,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 email_address=email_address,
                 is_partner=True,
             )
-        _, stream_id = await self.update_membership(
+        event_id, stream_id = await self.update_membership(
             requester, UserID.from_string(invitee), room_id, "invite", txn_id=txn_id
         )
-        return stream_id
+        return event_id, stream_id
         # +watcha
 
         invitee = await self.identity_handler.lookup_3pid(
