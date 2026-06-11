@@ -20,9 +20,11 @@
 #
 
 import logging
-from typing import Any, List, Set, Tuple, cast
+from typing import Any, Collection, List, Set, Tuple, cast
 
+from synapse.api.constants import EventTypes  # watcha+
 from synapse.api.errors import SynapseError
+from synapse.storage._base import db_to_json  # watcha+
 from synapse.storage.database import LoggingTransaction
 from synapse.storage.databases.main import CacheInvalidationWorkerStore
 from synapse.storage.databases.main.state import StateGroupWorkerStore
@@ -56,13 +58,61 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
 
         parsed_token = await RoomStreamToken.parse(self, token)
 
+        # watcha+
+        # Fetch the events currently pinned in the room so that the purge keeps
+        # them even when they are older than the retention max_lifetime.
+        pinned_event_ids = await self._get_pinned_event_ids(room_id)
+        # watcha+
+
         return await self.db_pool.runInteraction(
             "purge_history",
             self._purge_history_txn,
             room_id,
             parsed_token,
             delete_local_events,
+            pinned_event_ids,  # watcha+
         )
+
+    # watcha+
+    async def _get_pinned_event_ids(self, room_id: str) -> List[str]:
+        """Return the list of event IDs currently pinned in the room.
+
+        Read from the current ``m.room.pinned_events`` state event. Returns an
+        empty list when the room has no pinned messages or the content is
+        malformed.
+        """
+
+        def _get_pinned_event_ids_txn(txn: LoggingTransaction) -> List[str]:
+            txn.execute(
+                "SELECT ej.json FROM current_state_events AS cse"
+                " INNER JOIN event_json AS ej USING (event_id)"
+                " WHERE cse.room_id = ? AND cse.type = ? AND cse.state_key = ''",
+                (room_id, EventTypes.Pinned),
+            )
+            row = txn.fetchone()
+            if not row:
+                return []
+
+            try:
+                content = db_to_json(row[0]).get("content", {})
+            except Exception:
+                logger.warning(
+                    "[purge] could not parse m.room.pinned_events for room %s",
+                    room_id,
+                )
+                return []
+
+            pinned = content.get("pinned", [])
+            if not isinstance(pinned, list):
+                return []
+
+            return [event_id for event_id in pinned if isinstance(event_id, str)]
+
+        return await self.db_pool.runInteraction(
+            "get_pinned_event_ids", _get_pinned_event_ids_txn
+        )
+
+    # watcha+
 
     def _purge_history_txn(
         self,
@@ -70,6 +120,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         room_id: str,
         token: RoomStreamToken,
         delete_local_events: bool,
+        pinned_event_ids: Collection[str] = (),  # watcha+
     ) -> Set[int]:
         # Tables that should be pruned:
         #     event_auth
@@ -110,6 +161,22 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             ")"
         )
 
+        # watcha+
+        # Build the set of pinned events that must survive the purge. The table
+        # is always created (possibly empty): an empty `NOT IN` subquery is a
+        # no-op, so the regular purge behaviour is preserved when nothing is
+        # pinned.
+        txn.execute("DROP TABLE IF EXISTS pinned_events_to_keep")
+        txn.execute(
+            "CREATE TEMPORARY TABLE pinned_events_to_keep (event_id TEXT NOT NULL)"
+        )
+        if pinned_event_ids:
+            txn.execute_batch(
+                "INSERT INTO pinned_events_to_keep (event_id) VALUES (?)",
+                [(event_id,) for event_id in pinned_event_ids],
+            )
+        # watcha+
+
         # First ensure that we're not about to delete all the forward extremeties
         txn.execute(
             "SELECT e.event_id, e.depth FROM events as e "
@@ -148,11 +215,19 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
 
         # Note that we insert events that are outliers and aren't going to be
         # deleted, as nothing will happen to them.
+        #
+        # watcha+
+        # Pinned messages are excluded from the candidate set entirely (via the
+        # final NOT IN clause), so they are neither deleted nor turned into
+        # outliers: they stay regular timeline events. The subquery adds no
+        # bound parameter, so `should_delete_params` is left untouched.
+        # watcha+
         txn.execute(
             "INSERT INTO events_to_purge"
             " SELECT event_id, %s"
             " FROM events AS e LEFT JOIN state_events USING (event_id)"
             " WHERE (NOT outlier OR (%s)) AND e.room_id = ? AND topological_ordering < ?"
+            " AND e.event_id NOT IN (SELECT event_id FROM pinned_events_to_keep)"  # watcha+
             % (should_delete_expr, should_delete_expr),
             should_delete_params,
         )

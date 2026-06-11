@@ -90,6 +90,51 @@ class RetentionTestCase(unittest.HomeserverTestCase):
 
         self._test_retention_event_purged(room_id, one_day_ms * 1.5)
 
+    def test_retention_pinned_event_not_purged(self) -> None:
+        """watcha+ : a pinned message must survive the retention purge even when
+        it is older than the room's max_lifetime.
+        """
+        room_id = self.helper.create_room_as(self.user_id, tok=self.token)
+
+        # Set the room's retention period to 2 days.
+        self.helper.send_state(
+            room_id=room_id,
+            event_type=EventTypes.Retention,
+            body={"max_lifetime": one_day_ms * 2},
+            tok=self.token,
+        )
+
+        increment = one_day_ms * 1.5
+
+        # Send the message we are going to pin. Without the pin it would be
+        # purged once it gets older than max_lifetime.
+        resp = self.helper.send(room_id=room_id, body="pinned", tok=self.token)
+        pinned_event_id = resp.get("event_id")
+        assert pinned_event_id is not None
+
+        # Pin it.
+        self.helper.send_state(
+            room_id=room_id,
+            event_type=EventTypes.Pinned,
+            body={"pinned": [pinned_event_id]},
+            tok=self.token,
+        )
+
+        # Advance the time, then send a more recent event so the pinned message
+        # is no longer the room's latest event (the purge never deletes that).
+        self.reactor.advance(increment / 1000)
+        self.helper.send(room_id=room_id, body="recent", tok=self.token)
+
+        # Advance again: the pinned event is now older than max_lifetime and
+        # would be purged if it weren't pinned.
+        self.reactor.advance(increment / 1000)
+
+        # The pinned event must still be retrievable.
+        pinned_event = self.get_event(pinned_event_id)
+        self.assertEqual(
+            pinned_event.get("content", {}).get("body"), "pinned", pinned_event
+        )
+
     def test_retention_event_purged_with_state_event_outside_allowed(self) -> None:
         """Tests that the server configuration can override the policy for a room when
         running the purge jobs.
