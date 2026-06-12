@@ -35,6 +35,10 @@ from synapse.logging.context import (
 from synapse.metrics import InFlightGauge
 from synapse.util import Clock
 
+# Initialisé à 0, mis à jour par la route de ping
+
+last_sygnal_ping_time = 0 # watcha+
+
 logger = logging.getLogger(__name__)
 
 block_counter = Counter("synapse_util_metrics_block_count", "", ["block_name"])

@@ -154,6 +154,7 @@ class UserAttributes:
     # mypy thinks these are incompatible for some reason.
     emails: StrCollection = attr.Factory(list)  # type: ignore[assignment]
     is_admin: Optional[bool] = False  # watcha+
+    is_partner: Optional[bool] = False  #DLA : ComUE
     nextcloud_username: Optional[str] = None  # watcha+
 
 
@@ -236,6 +237,9 @@ class SsoHandler:
         self._identity_providers: Dict[str, SsoIdentityProvider] = {}
 
         self._consent_at_registration = hs.config.consent.user_consent_at_registration
+
+        self.nextcloud_client = hs.get_nextcloud_client() #DLA:ComUE
+        self.config = hs.config #DLA:ComUE
 
     def register_identity_provider(self, p: SsoIdentityProvider) -> None:
         p_id = p.idp_id
@@ -733,11 +737,33 @@ class SsoHandler:
 
         # Since the localpart is provided via a potentially untrusted module,
         # ensure the MXID is valid before registering.
+        
         if not attributes.localpart or contains_invalid_mxid_characters(
             attributes.localpart
         ):
             raise MappingException("localpart is invalid: %s" % (attributes.localpart,))
 
+        #DLA:ComUE+
+        mail_domaian_available = ["universite-lyon.fr", "access-check.renater.fr"]
+        if attributes.is_partner and any(domain in attributes.emails for domain in mail_domaian_available):
+            attributes.is_partner = False
+        group = ["partner"] if attributes.is_partner else []
+
+        register_nc_user = (
+            self.config.watcha.managed_idp
+            and self.config.watcha.nextcloud_integration
+            and (
+                not attributes.is_partner
+                or self.config.watcha.external_authentication_for_partners
+            )
+        )
+
+        if register_nc_user:
+            await self.nextcloud_client.add_user(
+                attributes.localpart, attributes.display_name, attributes.emails[0], attributes.is_admin, group
+            )
+        #+DLA:ComUE
+        
         logger.debug("Mapped SSO user to local part %s", attributes.localpart)
         registered_user_id = await self._registration_handler.register_user(
             localpart=attributes.localpart,
@@ -746,6 +772,7 @@ class SsoHandler:
             user_agent_ips=[(user_agent, ip_address)],
             auth_provider_id=auth_provider_id,
             admin=attributes.is_admin,  # watcha+
+            make_partner=attributes.is_partner, #DLA : ComUE
         )
 
         """watcha!

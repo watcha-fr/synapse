@@ -42,8 +42,8 @@ class AdministrationStore(SQLBaseStore):
                 """
                 SELECT DISTINCT room_id
                 FROM events
-                WHERE type = "m.room.create"
-                    AND received_ts >= (SELECT (strftime('%s','now') || substr(strftime('%f', 'now'),4)) - (3600 * 24 * 7 * 1000));
+                WHERE type = 'm.room.create'
+                    AND received_ts >= (EXTRACT(EPOCH FROM now()) * 1000 - (3600 * 24 * 7 * 1000));
             """
             )
 
@@ -63,9 +63,8 @@ class AdministrationStore(SQLBaseStore):
                 """
                 SELECT DISTINCT room_id
                 FROM events
-                WHERE type = "m.room.message"
-                    AND received_ts >= (
-                        SELECT (strftime('%s','now') || substr(strftime('%f', 'now'),4)) - (3600 * 24 * 7 * 1000));
+                WHERE type = 'm.room.message'
+                    AND received_ts >= (EXTRACT(EPOCH FROM now()) * 1000 - (3600 * 24 * 7 * 1000));
             """
             )
 
@@ -313,30 +312,38 @@ class AdministrationStore(SQLBaseStore):
 
             SQL_USER_LIST = """
                 SELECT
-                    users.name
-                    , user_email.address
-                    , profiles.displayname
-                    , users.is_partner
-                    , users.admin
-                    , users_last_seen.last_seen
-                    , users.creation_ts * 1000
+                    users.name,
+                    user_email.address,
+                    profiles.displayname,
+                    users.is_partner,
+                    users.admin,
+                    users_last_seen.last_seen,
+                    users.creation_ts * 1000 AS creation_ts
                 FROM users
-                    LEFT JOIN
-                        (SELECT
-                            t.user_id
-                            , t.address
-                        FROM user_threepids AS t
-                        WHERE t.medium = 'email') AS user_email
-                        ON users.name = user_email.user_id
-                    LEFT JOIN
-                        (SELECT
-                            user_ips.user_id
-                            , max(user_ips.last_seen) as last_seen
-                        FROM user_ips
-                        GROUP BY user_ips.user_id) as users_last_seen ON users_last_seen.user_id = users.name
-                    LEFT JOIN profiles ON users.name LIKE "@"||profiles.user_id||":%"
+                LEFT JOIN (
+                    SELECT
+                        t.user_id,
+                        t.address
+                    FROM user_threepids AS t
+                    WHERE t.medium = 'email'
+                ) AS user_email ON users.name = user_email.user_id
+                LEFT JOIN (
+                    SELECT
+                        user_ips.user_id,
+                        MAX(user_ips.last_seen) AS last_seen
+                    FROM user_ips
+                    GROUP BY user_ips.user_id
+                ) AS users_last_seen ON users_last_seen.user_id = users.name
+                LEFT JOIN profiles ON users.name LIKE '@' || profiles.user_id || ':%'
                 WHERE users.deactivated = 0
-                GROUP BY users.name
+                GROUP BY 
+                    users.name, 
+                    user_email.address, 
+                    profiles.displayname, 
+                    users.is_partner, 
+                    users.admin, 
+                    users_last_seen.last_seen, 
+                    users.creation_ts
             """
 
             txn.execute(SQL_USER_LIST)
@@ -367,8 +374,8 @@ class AdministrationStore(SQLBaseStore):
                     , state_key
                     , membership
                 FROM current_state_events
-                WHERE type = "m.room.member"
-                    AND (membership = "join" OR membership = "invite");
+                WHERE type = 'm.room.member'
+                    AND (membership = 'join' OR membership = 'invite');
             """
             )
 

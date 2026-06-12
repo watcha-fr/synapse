@@ -293,7 +293,8 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
                             CASE
                                 WHEN
                                     LOWER(user_agent) LIKE '%%riot%%' OR
-                                    LOWER(user_agent) LIKE '%%element%%'
+                                    LOWER(user_agent) LIKE '%%element%%' OR
+                                    LOWER(user_agent) LIKE '%%watcha%%'
                                     THEN CASE
                                         WHEN
                                             LOWER(user_agent) LIKE '%%electron%%'
@@ -454,3 +455,19 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
         await self.db_pool.runInteraction(
             "generate_user_daily_visits", _generate_user_daily_visits
         )
+
+    # watcha+
+    async def count_jitsi_calls(self) -> int:
+        def _count_jitsi_calls(txn: LoggingTransaction) -> int:
+            sql = """
+                SELECT COUNT(*) 
+                FROM events
+                WHERE type = 'im.vector.modular.widgets' AND contains_url = 't'
+            """
+            txn.execute(sql)
+            row = cast(Tuple[int], txn.fetchone())
+            return row[0]
+
+        return await self.db_pool.runInteraction("count_jitsi_calls", _count_jitsi_calls)
+    # +watcha
+

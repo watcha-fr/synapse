@@ -66,6 +66,8 @@ from synapse.types import UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import random_string
+from synapse.util.watcha_upload_names import UPLOAD_NAMES # watcha+
+
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -333,7 +335,10 @@ class MediaRepository:
         media_id = random_string(24)
 
         file_info = FileInfo(server_name=None, file_id=media_id)
-
+        # watcha+
+        if upload_name:
+            UPLOAD_NAMES[media_id] = upload_name
+        # +watcha
         fname = await self.media_storage.store_file(content, file_info)
 
         logger.info("Stored local media in file %r", fname)

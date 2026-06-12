@@ -26,6 +26,7 @@ class RegistrationHandler:
         self.store = hs.get_datastores().main
         self.keycloak_client = hs.get_keycloak_client()
         self.nextcloud_client = hs.get_nextcloud_client()
+        self.pusher_pool = hs.get_pusherpool() # watcha+
         self.secrets = Secrets()
 
         """ watcha!
@@ -48,6 +49,8 @@ class RegistrationHandler:
         default_display_name: Optional[str] = None,
         keycloak_username: Optional[str] = None,
         keycloak_as_broker: Optional[bool] = False,
+        localpart_id: Optional[str] = None,
+        register_kc_user: Optional[bool] = False, #DLA : Villeurbanne-Synchronisation
     ):
         """Registers a new user on the server.
 
@@ -62,6 +65,11 @@ class RegistrationHandler:
             user_id: the mxid of the new user
         """
 
+        """DLA : ComUE
+        mail_domaian_available = ["universite-lyon.fr", "access-check.renater.fr"] #DLA : ComUE
+        if is_partner and any(domain in email_address for domain in mail_domaian_available): #DLA : ComUE
+            is_partner = False #DLA : ComUE
+        DLA : ComUE"""
         password = self.secrets.gen_password()
         password_hash = await self.auth_handler.hash(password)
 
@@ -88,6 +96,7 @@ class RegistrationHandler:
                 response = await self.keycloak_client.add_user(
                     password_hash,
                     email_address,
+                    is_partner, #DLA : ComUE
                     is_admin,
                     keycloak_username,
                     keycloak_as_broker,
@@ -103,6 +112,9 @@ class RegistrationHandler:
                     localpart = kc_user["id"]
                 else:
                     raise
+            local_password_hash = None
+        elif localpart_id:
+            localpart=localpart_id
             local_password_hash = None
         else:
             localpart = str(uuid.uuid4())

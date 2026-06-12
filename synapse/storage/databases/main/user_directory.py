@@ -1124,6 +1124,47 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 + ordering_arguments
                 + (limit + 1,)
             )
+            # watcha+
+            sql = """
+                SELECT DISTINCT
+                    ud.user_id,
+                    ud.display_name,
+                    ud.avatar_url,
+                    tpid.address AS email
+                FROM user_directory AS ud
+                LEFT JOIN (
+                    SELECT
+                        user_id,
+                        address
+                    FROM user_threepids
+                    WHERE medium = 'email'
+                    GROUP BY user_id, address
+                ) AS tpid
+                    ON ud.user_id = tpid.user_id
+                LEFT JOIN (
+                    SELECT
+                        name,
+                        is_partner
+                    FROM users
+                ) AS users
+                    ON ud.user_id = users.name
+                LEFT JOIN partners_invitations AS pi
+                    ON ud.user_id = pi.user_id
+                WHERE
+                    (
+                        ud.display_name ILIKE ?
+                        OR tpid.address ILIKE ?
+                        OR ud.user_id ILIKE ?
+                    )
+                    AND (
+                        users.is_partner = 0
+                        OR pi.invited_by = ?
+                    )
+                LIMIT ?;
+            """
+            search_term = f"%{search_term}%"
+            args = (search_term,) * 3 + (user_id,) + (limit + 1,)
+            # +watcha
         elif isinstance(self.database_engine, Sqlite3Engine):
             search_query = _parse_query_sqlite(search_term)
 
@@ -1223,7 +1264,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         return {
             "limited": limited,
             "results": [
-                {"user_id": r[0], "display_name": r[1], "avatar_url": r[2]}
+                {"user_id": r[0], "display_name": r[1], "avatar_url": r[2], "email": r[3]} # watcha+
                 for r in results[0:limit]
             ],
         }

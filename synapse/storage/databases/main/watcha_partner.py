@@ -18,3 +18,13 @@ class PartnerStore(SQLBaseStore):
             },
             desc="add_partner_invitation",
         )
+        
+    async def is_partner(self, user_id: str) -> bool:
+            is_partner = await self.db_pool.simple_select_one_onecol(
+                "users",
+                keyvalues={"name": user_id},
+                retcol="is_partner",
+                allow_none=True,
+                desc="is_partner",
+            )
+            return bool(is_partner)

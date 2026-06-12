@@ -924,11 +924,27 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             ),
         )
 
+    # watcha+
+    async def count_partner_users(self) -> int:
+        """Counts partner users registered on the homeserver."""
+
+        def _count_users(txn: LoggingTransaction) -> int:
+            txn.execute("SELECT COUNT(*) FROM users where is_partner = 1")
+            row = txn.fetchone()
+            assert row is not None
+            return row[0]
+
+        return await self.db_pool.runInteraction("count_partner", _count_users)
+    # +watcha
+
     async def count_all_users(self) -> int:
         """Counts all users registered on the homeserver."""
 
         def _count_users(txn: LoggingTransaction) -> int:
+            txn.execute("SELECT COUNT(*) FROM users WHERE deactivated <> 1")# +watcha
+            """!watcha
             txn.execute("SELECT COUNT(*) FROM users")
+            """
             row = txn.fetchone()
             assert row is not None
             return row[0]

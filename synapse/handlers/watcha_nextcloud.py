@@ -398,7 +398,7 @@ class NextcloudHandler:
         room_id = event_dict["room_id"]
         content = event_dict["content"]
 
-        await self.auth.check_user_in_room(room_id, user_id)
+        await self.auth.check_user_in_room(room_id, requester)
 
         if not content:
             state_key = event_dict["state_key"]
