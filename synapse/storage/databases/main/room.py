@@ -72,6 +72,7 @@ from synapse.types import JsonDict, RetentionPolicy, StrCollection, ThirdPartyIn
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.stringutils import MXC_REGEX
+from synapse.util.watcha_retention import load_retention_config  # watcha+
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -930,6 +931,19 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         if not self.config.retention.retention_enabled:
             return RetentionPolicy()
 
+        # watcha+
+        # A default retention duration set from the admin console takes
+        # precedence over the static homeserver.yaml default policy.
+        watcha_default_max_lifetime = load_retention_config(
+            self.config.watcha.retention_config_path
+        )["default_max_lifetime"]
+        default_max_lifetime = (
+            watcha_default_max_lifetime
+            if watcha_default_max_lifetime is not None
+            else self.config.retention.retention_default_max_lifetime
+        )
+        # +watcha
+
         def get_retention_policy_for_room_txn(
             txn: LoggingTransaction,
         ) -> Optional[Tuple[Optional[int], Optional[int]]]:
@@ -954,7 +968,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         if not ret:
             return RetentionPolicy(
                 min_lifetime=self.config.retention.retention_default_min_lifetime,
-                max_lifetime=self.config.retention.retention_default_max_lifetime,
+                max_lifetime=default_max_lifetime,  # watcha : admin-console default
             )
 
         min_lifetime, max_lifetime = ret
@@ -967,7 +981,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             min_lifetime = self.config.retention.retention_default_min_lifetime
 
         if max_lifetime is None:
-            max_lifetime = self.config.retention.retention_default_max_lifetime
+            max_lifetime = default_max_lifetime  # watcha : admin-console default
 
         return RetentionPolicy(
             min_lifetime=min_lifetime,

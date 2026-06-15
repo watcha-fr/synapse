@@ -25,6 +25,7 @@ class WatchaConfig(Config):
         self.nextcloud_url = None
         self.external_authentication_for_partners = False
         self.user_audit_log_path = None
+        self.retention_config_path = None  # watcha+
 
     def read_config(self, config, **kwargs):
         data_dir_path = kwargs.get("data_dir_path") or os.getcwd()
@@ -38,6 +39,15 @@ class WatchaConfig(Config):
             (watcha_config or {}).get("user_audit_log_path")
             or os.path.join(data_dir_path, "watcha_user_audit_log.json")
         )
+
+        # watcha+
+        # Path of the JSON file holding the server-wide "message depth" settings
+        # (default retention duration + whether room admins may override it),
+        # editable at runtime from the admin console. Defaults to the data dir.
+        self.retention_config_path = (watcha_config or {}).get(
+            "retention_config_path"
+        ) or os.path.join(data_dir_path, "watcha_retention_config.json")
+        # +watcha
 
         if watcha_config is None:
             return
@@ -148,4 +158,11 @@ class WatchaConfig(Config):
           # Optional, defaults to "watcha_user_audit_log.json" in the data directory.
           #
           #user_audit_log_path: "/path/to/watcha_user_audit_log.json"
+
+          # Path of the JSON file holding the server-wide "message depth"
+          # settings (default retention duration and whether room admins may
+          # override it per room), editable from the admin console.
+          # Optional, defaults to "watcha_retention_config.json" in the data directory.
+          #
+          #retention_config_path: "/etc/opt/matrix-synapse/watcha_retention_config.json"
         """

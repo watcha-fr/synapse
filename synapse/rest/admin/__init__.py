@@ -92,6 +92,9 @@ from synapse.rest.admin.statistics import (
     UserMediaStatisticsRestServlet,
 )
 from synapse.rest.admin.username_available import UsernameAvailableRestServlet
+from synapse.rest.admin.watcha_retention_config import (  # watcha+
+    WatchaRetentionConfigAdminServlet,
+)
 from synapse.rest.admin.users import (
     AccountDataRestServlet,
     AccountValidityRenewServlet,
@@ -329,6 +332,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ExperimentalFeaturesRestServlet(hs).register(http_server)
     WatchaFileTypeFilterAdminServlet(hs).register(http_server)  # watcha+
     WatchaUserAuditLogAdminServlet(hs).register(http_server)  # watcha+
+    WatchaRetentionConfigAdminServlet(hs).register(http_server)  # watcha+
 
 
 def register_servlets_for_client_rest_resource(
