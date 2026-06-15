@@ -114,6 +114,7 @@ from synapse.rest.admin.users import (
     WhoisRestServlet,
 )
 from synapse.rest.admin.watcha_file_type_filter import WatchaFileTypeFilterAdminServlet  # watcha+
+from synapse.rest.admin.watcha_user_audit_log import WatchaUserAuditLogAdminServlet  # watcha+
 from synapse.types import JsonDict, RoomStreamToken, TaskStatus
 from synapse.util import SYNAPSE_VERSION
 
@@ -327,6 +328,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     BackgroundUpdateStartJobRestServlet(hs).register(http_server)
     ExperimentalFeaturesRestServlet(hs).register(http_server)
     WatchaFileTypeFilterAdminServlet(hs).register(http_server)  # watcha+
+    WatchaUserAuditLogAdminServlet(hs).register(http_server)  # watcha+
 
 
 def register_servlets_for_client_rest_resource(

@@ -8,6 +8,7 @@ from synapse.config.emailconfig import ThreepidBehaviour
 !watcha"""
 from synapse.push.mailer import Mailer
 from synapse.util.watcha import ActionStatus, Secrets, build_log_message
+from synapse.util.watcha_user_log import UserAuditAction, append_user_audit_log # watcha+
 from synapse.types import UserID # watcha+
 
 if TYPE_CHECKING:
@@ -168,5 +169,12 @@ class RegistrationHandler:
             )
 
         logger.info(build_log_message(status=ActionStatus.SUCCESS))
+
+        append_user_audit_log(
+            self.config.watcha.user_audit_log_path,
+            user_id=user_id,
+            display_name=default_display_name,
+            action=UserAuditAction.CREATE,
+        )
 
         return user_id

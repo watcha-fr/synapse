@@ -1,3 +1,4 @@
+import os
 import re
 from urllib.parse import urljoin
 
@@ -23,9 +24,20 @@ class WatchaConfig(Config):
         self.nextcloud_service_account_password = None
         self.nextcloud_url = None
         self.external_authentication_for_partners = False
+        self.user_audit_log_path = None
 
     def read_config(self, config, **kwargs):
+        data_dir_path = kwargs.get("data_dir_path") or os.getcwd()
+
         watcha_config = config.get("watcha")
+
+        # Path of the JSON file in which user lifecycle actions (CREATE, DELETE,
+        # DEACTIVATE, REACTIVATE) are recorded. Enabled by default so the audit
+        # log is produced out of the box.
+        self.user_audit_log_path = (
+            (watcha_config or {}).get("user_audit_log_path")
+            or os.path.join(data_dir_path, "watcha_user_audit_log.json")
+        )
 
         if watcha_config is None:
             return
@@ -130,4 +142,10 @@ class WatchaConfig(Config):
           # Note: The value is ignored when managed_idp is false
           #
           #external_authentication_for_partners: true
+
+          # Path of the JSON file in which user lifecycle actions (CREATE,
+          # DELETE, DEACTIVATE, REACTIVATE) are recorded.
+          # Optional, defaults to "watcha_user_audit_log.json" in the data directory.
+          #
+          #user_audit_log_path: "/path/to/watcha_user_audit_log.json"
         """
