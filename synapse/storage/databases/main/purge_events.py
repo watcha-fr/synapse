@@ -22,9 +22,7 @@
 import logging
 from typing import Any, Collection, List, Set, Tuple, cast
 
-from synapse.api.constants import EventTypes  # watcha+
 from synapse.api.errors import SynapseError
-from synapse.storage._base import db_to_json  # watcha+
 from synapse.storage.database import LoggingTransaction
 from synapse.storage.databases.main import CacheInvalidationWorkerStore
 from synapse.storage.databases.main.state import StateGroupWorkerStore
@@ -61,7 +59,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         # watcha+
         # Fetch the events currently pinned in the room so that the purge keeps
         # them even when they are older than the retention max_lifetime.
-        pinned_event_ids = await self._get_pinned_event_ids(room_id)
+        pinned_event_ids = await self.get_pinned_event_ids(room_id)
         # watcha+
 
         return await self.db_pool.runInteraction(
@@ -72,47 +70,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             delete_local_events,
             pinned_event_ids,  # watcha+
         )
-
-    # watcha+
-    async def _get_pinned_event_ids(self, room_id: str) -> List[str]:
-        """Return the list of event IDs currently pinned in the room.
-
-        Read from the current ``m.room.pinned_events`` state event. Returns an
-        empty list when the room has no pinned messages or the content is
-        malformed.
-        """
-
-        def _get_pinned_event_ids_txn(txn: LoggingTransaction) -> List[str]:
-            txn.execute(
-                "SELECT ej.json FROM current_state_events AS cse"
-                " INNER JOIN event_json AS ej USING (event_id)"
-                " WHERE cse.room_id = ? AND cse.type = ? AND cse.state_key = ''",
-                (room_id, EventTypes.Pinned),
-            )
-            row = txn.fetchone()
-            if not row:
-                return []
-
-            try:
-                content = db_to_json(row[0]).get("content", {})
-            except Exception:
-                logger.warning(
-                    "[purge] could not parse m.room.pinned_events for room %s",
-                    room_id,
-                )
-                return []
-
-            pinned = content.get("pinned", [])
-            if not isinstance(pinned, list):
-                return []
-
-            return [event_id for event_id in pinned if isinstance(event_id, str)]
-
-        return await self.db_pool.runInteraction(
-            "get_pinned_event_ids", _get_pinned_event_ids_txn
-        )
-
-    # watcha+
 
     def _purge_history_txn(
         self,

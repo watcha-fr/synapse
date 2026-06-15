@@ -216,6 +216,55 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         # That event should be the second, not outdated event.
         self.assertEqual(filtered_events[0].event_id, valid_event_id, filtered_events)
 
+    @override_config({"retention": {"purge_jobs": [{"interval": "5d"}]}})
+    def test_visibility_pinned_event_not_filtered(self) -> None:
+        """watcha+ : filter_events_for_client must keep pinned messages visible to
+        clients even once they are older than the room's max_lifetime.
+
+        The read filter in synapse.visibility is a second enforcement point,
+        distinct from the purge job, so protecting pinned events from the purge
+        is not enough on its own. We use a very long purge interval so no purge
+        runs and only the read filter is exercised.
+        """
+        store = self.hs.get_datastores().main
+        storage_controllers = self.hs.get_storage_controllers()
+        room_id = self.helper.create_room_as(self.user_id, tok=self.token)
+
+        # Send two events: one we will pin, one we won't.
+        resp = self.helper.send(room_id=room_id, body="pinned", tok=self.token)
+        pinned_event_id = resp.get("event_id")
+        assert isinstance(pinned_event_id, str)
+
+        resp = self.helper.send(room_id=room_id, body="not pinned", tok=self.token)
+        unpinned_event_id = resp.get("event_id")
+        assert isinstance(unpinned_event_id, str)
+
+        # Pin the first one.
+        self.helper.send_state(
+            room_id=room_id,
+            event_type=EventTypes.Pinned,
+            body={"pinned": [pinned_event_id]},
+            tok=self.token,
+        )
+
+        # Advance past the default max_lifetime (3 days) so both events are
+        # outdated as far as the read filter is concerned.
+        self.reactor.advance(one_day_ms * 4 / 1000)
+
+        events = self.get_success(
+            store.get_events_as_list([pinned_event_id, unpinned_event_id])
+        )
+        self.assertEqual(2, len(events), "events retrieved from database")
+
+        filtered_events = self.get_success(
+            filter_events_for_client(storage_controllers, self.user_id, events)
+        )
+
+        # Only the pinned event should survive the read filter.
+        filtered_ids = [e.event_id for e in filtered_events]
+        self.assertIn(pinned_event_id, filtered_ids, filtered_events)
+        self.assertNotIn(unpinned_event_id, filtered_ids, filtered_events)
+
     def _test_retention_event_purged(self, room_id: str, increment: float) -> None:
         """Run the following test scenario to test the message retention policy support:
 

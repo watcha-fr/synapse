@@ -127,11 +127,18 @@ async def filter_events_for_client(
     if filter_send_to_client:
         room_ids = {e.room_id for e in events}
         retention_policies: Dict[str, RetentionPolicy] = {}
+        pinned_event_ids: Set[str] = set()  # watcha+
 
         for room_id in room_ids:
             retention_policies[
                 room_id
             ] = await storage.main.get_retention_policy_for_room(room_id)
+            # watcha+
+            # Pinned messages must stay visible to clients even once they are
+            # older than the room's retention max_lifetime (event IDs are
+            # globally unique so a flat set across rooms is enough).
+            pinned_event_ids |= await storage.main.get_pinned_event_ids(room_id)
+            # watcha+
 
     def allowed(event: EventBase) -> Optional[EventBase]:
         return _check_client_allowed_to_see_event(
@@ -141,6 +148,7 @@ async def filter_events_for_client(
             filter_send_to_client=filter_send_to_client,
             sender_ignored=event.sender in ignore_list,
             always_include_ids=always_include_ids,
+            pinned_event_ids=pinned_event_ids,  # watcha+
             retention_policy=retention_policies[room_id],
             state=event_id_to_state.get(event.event_id),
             is_peeking=is_peeking,
@@ -292,6 +300,7 @@ def _check_client_allowed_to_see_event(
     retention_policy: RetentionPolicy,
     state: Optional[StateMap[EventBase]],
     sender_erased: bool,
+    pinned_event_ids: Collection[str] = (),  # watcha+
 ) -> Optional[EventBase]:
     """Check with the given user is allowed to see the given event
 
@@ -308,6 +317,8 @@ def _check_client_allowed_to_see_event(
         retention_policy: The retention policy of the room
         state: The state at the event, unless its an outlier
         sender_erased: Whether the event sender has been marked as "erased"
+        pinned_event_ids: Event IDs pinned in the room, exempt from the
+            retention read filter so they stay visible (watcha)
 
     Returns:
         None if the user cannot see this event at all
@@ -323,7 +334,13 @@ def _check_client_allowed_to_see_event(
     # on those checks.
     if filter_send_to_client:
         if (
-            _check_filter_send_to_client(event, clock, retention_policy, sender_ignored)
+            _check_filter_send_to_client(
+                event,
+                clock,
+                retention_policy,
+                sender_ignored,
+                pinned_event_ids,  # watcha+
+            )
             == _CheckFilter.DENIED
         ):
             filtered_event_logger.debug(
@@ -491,6 +508,7 @@ def _check_filter_send_to_client(
     clock: Clock,
     retention_policy: RetentionPolicy,
     sender_ignored: bool,
+    pinned_event_ids: Collection[str] = (),  # watcha+
 ) -> _CheckFilter:
     """Apply checks for sending events to client
 
@@ -515,6 +533,15 @@ def _check_filter_send_to_client(
     # event, as MSC1763 states that retention is only considered for non-state
     # events.
     if not event.is_state():
+        # watcha+
+        # Never hide pinned messages from clients, even when they are older
+        # than the room's retention max_lifetime. They are also excluded from
+        # the retention purge (see PurgeEventsStore._purge_history_txn), so they
+        # remain both stored and visible.
+        if event.event_id in pinned_event_ids:
+            return _CheckFilter.MAYBE_ALLOWED
+        # watcha+
+
         max_lifetime = retention_policy.max_lifetime
 
         if max_lifetime is not None:
