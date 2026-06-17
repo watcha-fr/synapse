@@ -40,6 +40,12 @@ current_dau_gauge = Gauge(
 )
 
 # watcha+
+# Nombre d'utilisateurs actifs sur les 5 dernières minutes
+active_users_5m_gauge = Gauge(
+    "synapse_active_users_5m",
+    "Nombre d'utilisateurs actifs sur les 5 dernières minutes"
+)
+
 # Nombre total d'utilisateurs
 total_users_gauge = Gauge(
     "synapse_total_users",
@@ -119,6 +125,7 @@ class CommonUsageMetrics:
 
     daily_active_users: int
     # watcha+
+    active_users_5m: int
     total_users: int
     partner_users: int
     rooms_public: int
@@ -167,6 +174,7 @@ class CommonUsageMetricsManager:
         """
         dau_count = await self._store.count_daily_users()
         # watcha+
+        active_users_5m = await self._store.count_users_active_last_5min()
         total_users = await self._store.count_all_users()
         partner_users = await self._store.count_partner_users()
 
@@ -187,6 +195,7 @@ class CommonUsageMetricsManager:
         return CommonUsageMetrics(
             daily_active_users=dau_count,
             # watcha+
+            active_users_5m=active_users_5m,
             total_users=total_users,
             partner_users=partner_users,
             rooms_public=public_rooms,
@@ -208,6 +217,7 @@ class CommonUsageMetricsManager:
 
         current_dau_gauge.set(float(metrics.daily_active_users))
         # watcha+
+        active_users_5m_gauge.set(float(metrics.active_users_5m))
         total_users_gauge.set(float(metrics.total_users))
         partner_users_gauge.set(float(metrics.partner_users))
         rooms_public_gauge.set(float(metrics.rooms_public))

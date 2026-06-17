@@ -225,6 +225,15 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             "count_daily_users", self._count_users, yesterday
         )
 
+    # watcha+
+    async def count_users_active_last_5min(self) -> int:
+        """Counts the number of users seen in the last 5 minutes."""
+        five_minutes_ago = int(self._clock.time_msec()) - (1000 * 60 * 5)
+        return await self.db_pool.runInteraction(
+            "count_users_active_last_5min", self._count_users, five_minutes_ago
+        )
+    # +watcha
+
     async def count_monthly_users(self) -> int:
         """
         Counts the number of users who used this homeserver in the last 30 days.
