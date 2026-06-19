@@ -132,13 +132,13 @@ active_users_5m_by_city_gauge = Gauge(
 )
 rooms_by_city_gauge = Gauge(
     "synapse_rooms_by_city",
-    "Nombre de salons par ville",
-    ["ville"],
+    "Nombre de salons par ville et par type (public/private/dm)",
+    ["ville", "type"],
 )
 spaces_by_city_gauge = Gauge(
     "synapse_spaces_by_city",
-    "Nombre d'espaces par ville",
-    ["ville"],
+    "Nombre d'espaces par ville et par type (public/private)",
+    ["ville", "type"],
 )
 # +watcha
 
@@ -273,22 +273,31 @@ class CommonUsageMetricsManager:
 
         users = await self._store.count_users_by_city(self._domain_to_city)
         active = await self._store.count_active_users_5m_by_city(self._domain_to_city)
+        dm_rooms = set(await self._store._get_dm_rooms())
         rooms, spaces = await self._store.count_rooms_and_spaces_by_city(
-            self._domain_to_city
+            self._domain_to_city, dm_rooms
         )
 
-        # On (ré)expose toutes les villes connues à 0 avant de poser les valeurs,
-        # pour éviter les libellés fantômes quand un compte retombe à 0.
-        user_labels = self._cities + [CITY_OTHER]
-        room_labels = self._cities + [CITY_OTHER, CITY_INTER]
+        # On (ré)expose toutes les villes/types connus à 0 avant de poser les
+        # valeurs, pour éviter les libellés fantômes quand un compte retombe à 0.
+        user_villes = self._cities + [CITY_OTHER]
+        room_villes = self._cities + [CITY_OTHER, CITY_INTER]
 
-        def _apply(gauge, counts, labels):
+        def _apply_users(gauge, counts):
             gauge.clear()
-            for ville in labels:
+            for ville in user_villes:
                 gauge.labels(ville=ville).set(float(counts.get(ville, 0)))
 
-        _apply(total_users_by_city_gauge, users, user_labels)
-        _apply(active_users_5m_by_city_gauge, active, user_labels)
-        _apply(rooms_by_city_gauge, rooms, room_labels)
-        _apply(spaces_by_city_gauge, spaces, room_labels)
+        def _apply_typed(gauge, counts, types):
+            gauge.clear()
+            for ville in room_villes:
+                for rtype in types:
+                    gauge.labels(ville=ville, type=rtype).set(
+                        float(counts.get((ville, rtype), 0))
+                    )
+
+        _apply_users(total_users_by_city_gauge, users)
+        _apply_users(active_users_5m_by_city_gauge, active)
+        _apply_typed(rooms_by_city_gauge, rooms, ("public", "private", "dm"))
+        _apply_typed(spaces_by_city_gauge, spaces, ("public", "private"))
     # +watcha

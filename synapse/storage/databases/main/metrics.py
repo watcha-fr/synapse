@@ -298,21 +298,23 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
         )
 
     async def count_rooms_and_spaces_by_city(
-        self, domain_to_city: Dict[str, str]
-    ) -> Tuple[Dict[str, int], Dict[str, int]]:
-        """Classe chaque salon/espace par ville selon ses membres joints :
-        - tous les membres mappés d'une même ville => cette ville ;
-        - membres couvrant >= 2 villes => `inter-villes` ;
-        - aucun membre mappé => `autre/externe`.
-        Les membres sans email mappé sont ignorés dans le calcul.
-        Retourne (salons_par_ville, espaces_par_ville)."""
+        self, domain_to_city: Dict[str, str], dm_rooms: Set[str]
+    ) -> Tuple[Dict[Tuple[str, str], int], Dict[Tuple[str, str], int]]:
+        """Classe chaque salon/espace par ville ET par type selon ses membres
+        joints :
+        - ville : tous les membres mappés d'une même ville => cette ville ;
+          >= 2 villes => `inter-villes` ; aucun membre mappé => `autre/externe`
+          (membres sans email mappé ignorés) ;
+        - type salon : `dm` si DM, sinon `public`/`private` (rooms.is_public) ;
+        - type espace : `public`/`private`.
+        Retourne (salons, espaces), chacun indexé par clé (ville, type)."""
 
         def _count(
             txn: LoggingTransaction,
-        ) -> Tuple[Dict[str, int], Dict[str, int]]:
+        ) -> Tuple[Dict[Tuple[str, str], int], Dict[Tuple[str, str], int]]:
             txn.execute(
                 """
-                SELECT r.room_id, rss.room_type, t.address
+                SELECT r.room_id, r.is_public, rss.room_type, t.address
                 FROM rooms r
                 LEFT JOIN room_stats_state rss ON rss.room_id = r.room_id
                 LEFT JOIN local_current_membership m
@@ -323,23 +325,36 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             )
             cities: Dict[str, Set[str]] = defaultdict(set)
             is_space: Dict[str, bool] = {}
-            for room_id, room_type, address in txn:
+            is_public: Dict[str, bool] = {}
+            for room_id, public, room_type, address in txn:
                 is_space[room_id] = room_type == "m.space"
+                is_public[room_id] = bool(public)
                 city = domain_to_city.get(_domain_of(address))
                 if city is not None:
                     cities[room_id].add(city)
 
-            rooms_by_city: Dict[str, int] = defaultdict(int)
-            spaces_by_city: Dict[str, int] = defaultdict(int)
+            rooms_by_city: Dict[Tuple[str, str], int] = defaultdict(int)
+            spaces_by_city: Dict[Tuple[str, str], int] = defaultdict(int)
             for room_id, is_sp in is_space.items():
                 room_cities = cities.get(room_id, set())
                 if not room_cities:
-                    label = CITY_OTHER
+                    ville = CITY_OTHER
                 elif len(room_cities) == 1:
-                    label = next(iter(room_cities))
+                    ville = next(iter(room_cities))
                 else:
-                    label = CITY_INTER
-                (spaces_by_city if is_sp else rooms_by_city)[label] += 1
+                    ville = CITY_INTER
+
+                if is_sp:
+                    rtype = "public" if is_public[room_id] else "private"
+                    spaces_by_city[(ville, rtype)] += 1
+                else:
+                    if room_id in dm_rooms:
+                        rtype = "dm"
+                    elif is_public[room_id]:
+                        rtype = "public"
+                    else:
+                        rtype = "private"
+                    rooms_by_city[(ville, rtype)] += 1
 
             return dict(rooms_by_city), dict(spaces_by_city)
 
