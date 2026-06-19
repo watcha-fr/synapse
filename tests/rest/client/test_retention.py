@@ -135,6 +135,50 @@ class RetentionTestCase(unittest.HomeserverTestCase):
             pinned_event.get("content", {}).get("body"), "pinned", pinned_event
         )
 
+    def test_retention_clamped_to_admin_default(self) -> None:
+        """watcha+ : the admin-console default duration is the ceiling. A room
+        whose policy exceeds it gets its effective max_lifetime clamped down.
+        """
+        import json
+        import os
+        import tempfile
+
+        # Set an admin-console default of 1 day.
+        fd, config_path = tempfile.mkstemp(suffix=".json")
+        os.close(fd)
+        self.addCleanup(lambda: os.path.exists(config_path) and os.unlink(config_path))
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(
+                {"default_max_lifetime": one_day_ms, "allow_room_override": True}, f
+            )
+        self.hs.config.watcha.retention_config_path = config_path
+        self.store.get_retention_policy_for_room.invalidate_all()
+
+        room_id = self.helper.create_room_as(self.user_id, tok=self.token)
+
+        # The room asks for 2 days, above the 1-day admin ceiling.
+        self.helper.send_state(
+            room_id=room_id,
+            event_type=EventTypes.Retention,
+            body={"max_lifetime": one_day_ms * 2},
+            tok=self.token,
+        )
+        self.store.get_retention_policy_for_room.invalidate_all()
+
+        policy = self.get_success(self.store.get_retention_policy_for_room(room_id))
+        self.assertEqual(policy.max_lifetime, one_day_ms)
+
+        # A room asking for less than the ceiling keeps its own (shorter) value.
+        self.helper.send_state(
+            room_id=room_id,
+            event_type=EventTypes.Retention,
+            body={"max_lifetime": one_hour_ms},
+            tok=self.token,
+        )
+        self.store.get_retention_policy_for_room.invalidate_all()
+        policy = self.get_success(self.store.get_retention_policy_for_room(room_id))
+        self.assertEqual(policy.max_lifetime, one_hour_ms)
+
     def test_retention_event_purged_with_state_event_outside_allowed(self) -> None:
         """Tests that the server configuration can override the policy for a room when
         running the purge jobs.

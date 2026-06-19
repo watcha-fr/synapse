@@ -983,6 +983,19 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         if max_lifetime is None:
             max_lifetime = default_max_lifetime  # watcha : admin-console default
 
+        # watcha+
+        # The admin-console default duration is also the ceiling: a room admin
+        # may not keep messages longer than the server-wide default. Clamp any
+        # per-room value that exceeds it (enforced here so it holds even if the
+        # m.room.retention state event was set directly via the API).
+        if (
+            watcha_default_max_lifetime is not None
+            and max_lifetime is not None
+            and max_lifetime > watcha_default_max_lifetime
+        ):
+            max_lifetime = watcha_default_max_lifetime
+        # +watcha
+
         return RetentionPolicy(
             min_lifetime=min_lifetime,
             max_lifetime=max_lifetime,

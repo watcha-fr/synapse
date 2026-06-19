@@ -32,6 +32,7 @@ class WatchaRetentionConfigAdminServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
+        self.store = hs.get_datastores().main
         self._retention_config_path = hs.config.watcha.retention_config_path
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
@@ -69,6 +70,11 @@ class WatchaRetentionConfigAdminServlet(RestServlet):
             default_max_lifetime,
             allow_room_override,
         )
+        # The default duration also acts as the per-room ceiling and is applied
+        # in get_retention_policy_for_room, which is cached: invalidate it so the
+        # new value takes effect without a restart.
+        self.store.get_retention_policy_for_room.invalidate_all()  # type: ignore[attr-defined]
+
         logger.info(
             "[watcha] retention config updated: default_max_lifetime=%s "
             "allow_room_override=%s",
