@@ -117,6 +117,29 @@ sygnal_up_gauge = Gauge(
     "synapse_sygnal_up",
     "Sygnal ping status (1 if recent ping, 0 if not)"
 )
+
+# Indicateurs "par ville" (filtre dashboard SITIV). Exposés uniquement si la
+# config `watcha.cities_by_domain` est renseignée (instance sitiv).
+total_users_by_city_gauge = Gauge(
+    "synapse_total_users_by_city",
+    "Nombre total d'utilisateurs par ville",
+    ["ville"],
+)
+active_users_5m_by_city_gauge = Gauge(
+    "synapse_active_users_5m_by_city",
+    "Nombre d'utilisateurs actifs sur 5 min par ville",
+    ["ville"],
+)
+rooms_by_city_gauge = Gauge(
+    "synapse_rooms_by_city",
+    "Nombre de salons par ville",
+    ["ville"],
+)
+spaces_by_city_gauge = Gauge(
+    "synapse_spaces_by_city",
+    "Nombre d'espaces par ville",
+    ["ville"],
+)
 # +watcha
 
 @attr.s(auto_attribs=True)
@@ -146,6 +169,11 @@ class CommonUsageMetricsManager:
     def __init__(self, hs: "HomeServer") -> None:
         self._store = hs.get_datastores().main
         self._clock = hs.get_clock()
+        # watcha+
+        # Mapping domaine -> ville (vide hors sitiv => métriques by_city désactivées).
+        self._domain_to_city = hs.config.watcha.domain_to_city
+        self._cities = list(hs.config.watcha.cities_by_domain.keys())
+        # +watcha
 
     async def get_metrics(self) -> CommonUsageMetrics:
         """Get the CommonUsageMetrics object. If no collection has happened yet, do it
@@ -230,4 +258,37 @@ class CommonUsageMetricsManager:
         android_users_gauge.set(float(metrics.android_users))
         web_users_gauge.set(float(metrics.web_users))
         sygnal_up_gauge.set(float(metrics.up_sygnal))
+
+        await self._update_city_gauges()
         # +watcha
+
+    # watcha+
+    async def _update_city_gauges(self) -> None:
+        """Met à jour les gauges `*_by_city`. No-op si aucun mapping ville
+        n'est configuré (cas mdl/vdl)."""
+        if not self._domain_to_city:
+            return
+
+        from synapse.storage.databases.main.metrics import CITY_OTHER, CITY_INTER
+
+        users = await self._store.count_users_by_city(self._domain_to_city)
+        active = await self._store.count_active_users_5m_by_city(self._domain_to_city)
+        rooms, spaces = await self._store.count_rooms_and_spaces_by_city(
+            self._domain_to_city
+        )
+
+        # On (ré)expose toutes les villes connues à 0 avant de poser les valeurs,
+        # pour éviter les libellés fantômes quand un compte retombe à 0.
+        user_labels = self._cities + [CITY_OTHER]
+        room_labels = self._cities + [CITY_OTHER, CITY_INTER]
+
+        def _apply(gauge, counts, labels):
+            gauge.clear()
+            for ville in labels:
+                gauge.labels(ville=ville).set(float(counts.get(ville, 0)))
+
+        _apply(total_users_by_city_gauge, users, user_labels)
+        _apply(active_users_5m_by_city_gauge, active, user_labels)
+        _apply(rooms_by_city_gauge, rooms, room_labels)
+        _apply(spaces_by_city_gauge, spaces, room_labels)
+    # +watcha

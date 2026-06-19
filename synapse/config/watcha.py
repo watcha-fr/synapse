@@ -25,6 +25,13 @@ class WatchaConfig(Config):
         self.nextcloud_url = None
         self.external_authentication_for_partners = False
         self.user_audit_log_path = None
+        # watcha+
+        # Mapping ville -> domaines email pour le filtre "par ville" du dashboard.
+        # Présent uniquement sur l'instance sitiv ; absent => pas de label `ville`.
+        self.cities_by_domain = {}
+        # Dict inversé domaine (minuscule) -> ville, construit depuis cities_by_domain.
+        self.domain_to_city = {}
+        # +watcha
 
     def read_config(self, config, **kwargs):
         data_dir_path = kwargs.get("data_dir_path") or os.getcwd()
@@ -100,6 +107,19 @@ class WatchaConfig(Config):
                 nextcloud_url = urljoin(client_base_url, "nextcloud")
             self.nextcloud_url = nextcloud_url
 
+        # watcha+
+        cities_by_domain = watcha_config.get("cities_by_domain")
+        if isinstance(cities_by_domain, dict):
+            self.cities_by_domain = cities_by_domain
+            domain_to_city = {}
+            for city, domains in cities_by_domain.items():
+                if isinstance(domains, str):
+                    domains = [domains]
+                for domain in domains or []:
+                    domain_to_city[domain.lower()] = city
+            self.domain_to_city = domain_to_city
+        # +watcha
+
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
         # Specific configuration for Watcha
@@ -148,4 +168,16 @@ class WatchaConfig(Config):
           # Optional, defaults to "watcha_user_audit_log.json" in the data directory.
           #
           #user_audit_log_path: "/path/to/watcha_user_audit_log.json"
+
+          # watcha+
+          # Mapping ville -> domaines email pour le filtre "par ville" du dashboard
+          # Grafana. À renseigner uniquement sur l'instance concernée (ex. sitiv) :
+          # si absent, aucune métrique `*_by_city` n'est exposée.
+          # Optional, defaults to none.
+          #
+          #cities_by_domain:
+          #  Corbas:        ["ville-corbas.fr"]
+          #  Saint-Chamond: ["saint-chamond.fr"]
+          #  Vénissieux:    ["ville-venissieux.fr"]
+          # +watcha
         """

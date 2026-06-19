@@ -21,7 +21,8 @@
 import calendar
 import logging
 import time
-from typing import TYPE_CHECKING, Dict, List, Tuple, cast
+from collections import defaultdict  # watcha+
+from typing import TYPE_CHECKING, Dict, List, Set, Tuple, cast
 
 from synapse.metrics import GaugeBucketCollector
 from synapse.metrics.background_process_metrics import wrap_as_background_process
@@ -39,6 +40,19 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+# watcha+
+# Catégories spéciales du filtre "par ville" (dashboard Grafana SITIV).
+CITY_OTHER = "autre/externe"  # email hors mapping (ou sans email)
+CITY_INTER = "inter-villes"  # salon/espace dont les membres couvrent >= 2 villes
+
+
+def _domain_of(address: str) -> str:
+    """Extrait le domaine (minuscule) d'une adresse email, "" si invalide."""
+    if address and "@" in address:
+        return address.rsplit("@", 1)[-1].lower()
+    return ""
+# +watcha
 
 # Collect metrics on the number of forward extremities that exist.
 _extremities_collecter = GaugeBucketCollector(
@@ -231,6 +245,106 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
         five_minutes_ago = int(self._clock.time_msec()) - (1000 * 60 * 5)
         return await self.db_pool.runInteraction(
             "count_users_active_last_5min", self._count_users, five_minutes_ago
+        )
+
+    async def count_users_by_city(
+        self, domain_to_city: Dict[str, str]
+    ) -> Dict[str, int]:
+        """Compte les utilisateurs (non désactivés) regroupés par ville, déduite
+        du domaine de leur email. Domaine hors mapping => `autre/externe`."""
+
+        def _count(txn: LoggingTransaction) -> Dict[str, int]:
+            txn.execute(
+                """
+                SELECT t.user_id, t.address
+                FROM user_threepids t
+                JOIN users u ON u.name = t.user_id
+                WHERE t.medium = 'email' AND u.deactivated <> 1
+                """
+            )
+            by_city: Dict[str, Set[str]] = defaultdict(set)
+            for user_id, address in txn:
+                city = domain_to_city.get(_domain_of(address), CITY_OTHER)
+                by_city[city].add(user_id)
+            return {city: len(users) for city, users in by_city.items()}
+
+        return await self.db_pool.runInteraction("count_users_by_city", _count)
+
+    async def count_active_users_5m_by_city(
+        self, domain_to_city: Dict[str, str]
+    ) -> Dict[str, int]:
+        """Comme count_users_by_city mais restreint aux utilisateurs vus sur les
+        5 dernières minutes (user_ips.last_seen)."""
+        five_minutes_ago = int(self._clock.time_msec()) - (1000 * 60 * 5)
+
+        def _count(txn: LoggingTransaction) -> Dict[str, int]:
+            txn.execute(
+                """
+                SELECT DISTINCT t.user_id, t.address
+                FROM user_threepids t
+                JOIN user_ips i ON i.user_id = t.user_id
+                WHERE t.medium = 'email' AND i.last_seen > ?
+                """,
+                (five_minutes_ago,),
+            )
+            by_city: Dict[str, Set[str]] = defaultdict(set)
+            for user_id, address in txn:
+                city = domain_to_city.get(_domain_of(address), CITY_OTHER)
+                by_city[city].add(user_id)
+            return {city: len(users) for city, users in by_city.items()}
+
+        return await self.db_pool.runInteraction(
+            "count_active_users_5m_by_city", _count
+        )
+
+    async def count_rooms_and_spaces_by_city(
+        self, domain_to_city: Dict[str, str]
+    ) -> Tuple[Dict[str, int], Dict[str, int]]:
+        """Classe chaque salon/espace par ville selon ses membres joints :
+        - tous les membres mappés d'une même ville => cette ville ;
+        - membres couvrant >= 2 villes => `inter-villes` ;
+        - aucun membre mappé => `autre/externe`.
+        Les membres sans email mappé sont ignorés dans le calcul.
+        Retourne (salons_par_ville, espaces_par_ville)."""
+
+        def _count(
+            txn: LoggingTransaction,
+        ) -> Tuple[Dict[str, int], Dict[str, int]]:
+            txn.execute(
+                """
+                SELECT r.room_id, rss.room_type, t.address
+                FROM rooms r
+                LEFT JOIN room_stats_state rss ON rss.room_id = r.room_id
+                LEFT JOIN local_current_membership m
+                    ON m.room_id = r.room_id AND m.membership = 'join'
+                LEFT JOIN user_threepids t
+                    ON t.user_id = m.user_id AND t.medium = 'email'
+                """
+            )
+            cities: Dict[str, Set[str]] = defaultdict(set)
+            is_space: Dict[str, bool] = {}
+            for room_id, room_type, address in txn:
+                is_space[room_id] = room_type == "m.space"
+                city = domain_to_city.get(_domain_of(address))
+                if city is not None:
+                    cities[room_id].add(city)
+
+            rooms_by_city: Dict[str, int] = defaultdict(int)
+            spaces_by_city: Dict[str, int] = defaultdict(int)
+            for room_id, is_sp in is_space.items():
+                room_cities = cities.get(room_id, set())
+                if not room_cities:
+                    label = CITY_OTHER
+                elif len(room_cities) == 1:
+                    label = next(iter(room_cities))
+                else:
+                    label = CITY_INTER
+                (spaces_by_city if is_sp else rooms_by_city)[label] += 1
+
+            return dict(rooms_by_city), dict(spaces_by_city)
+
+        return await self.db_pool.runInteraction(
+            "count_rooms_and_spaces_by_city", _count
         )
     # +watcha
 
