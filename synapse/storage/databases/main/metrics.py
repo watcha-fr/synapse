@@ -52,6 +52,32 @@ def _domain_of(address: str) -> str:
     if address and "@" in address:
         return address.rsplit("@", 1)[-1].lower()
     return ""
+
+
+def _city_counts_from_rows(rows, domain_to_city: Dict[str, str]) -> Dict[str, int]:
+    """À partir de lignes (user_id, address) — une par email, address pouvant être
+    NULL —, ventile CHAQUE utilisateur par ville. Un utilisateur dont aucun email
+    n'est rattaché à une ville (domaine hors mapping OU sans email) tombe dans
+    `autre/externe`. Ainsi somme des villes + `autre/externe` = total des users
+    fournis. Un user multi-domaines est compté dans chacune de ses villes."""
+    user_cities: Dict[str, Set[str]] = defaultdict(set)
+    all_users: Set[str] = set()
+    for user_id, address in rows:
+        all_users.add(user_id)
+        if address:
+            city = domain_to_city.get(_domain_of(address))
+            if city is not None:
+                user_cities[user_id].add(city)
+
+    by_city: Dict[str, Set[str]] = defaultdict(set)
+    for user_id in all_users:
+        cities = user_cities.get(user_id)
+        if cities:
+            for city in cities:
+                by_city[city].add(user_id)
+        else:
+            by_city[CITY_OTHER].add(user_id)
+    return {city: len(users) for city, users in by_city.items()}
 # +watcha
 
 # Collect metrics on the number of forward extremities that exist.
@@ -250,23 +276,21 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
     async def count_users_by_city(
         self, domain_to_city: Dict[str, str]
     ) -> Dict[str, int]:
-        """Compte les utilisateurs (non désactivés) regroupés par ville, déduite
-        du domaine de leur email. Domaine hors mapping => `autre/externe`."""
+        """Compte TOUS les utilisateurs non désactivés, ventilés par ville (déduite
+        du domaine de leur email). LEFT JOIN : un user sans email ou au domaine hors
+        mapping tombe dans `autre/externe` => somme villes + `autre/externe` = total."""
 
         def _count(txn: LoggingTransaction) -> Dict[str, int]:
             txn.execute(
                 """
-                SELECT t.user_id, t.address
-                FROM user_threepids t
-                JOIN users u ON u.name = t.user_id
-                WHERE t.medium = 'email' AND u.deactivated <> 1
+                SELECT u.name, t.address
+                FROM users u
+                LEFT JOIN user_threepids t
+                    ON t.user_id = u.name AND t.medium = 'email'
+                WHERE u.deactivated <> 1
                 """
             )
-            by_city: Dict[str, Set[str]] = defaultdict(set)
-            for user_id, address in txn:
-                city = domain_to_city.get(_domain_of(address), CITY_OTHER)
-                by_city[city].add(user_id)
-            return {city: len(users) for city, users in by_city.items()}
+            return _city_counts_from_rows(txn, domain_to_city)
 
         return await self.db_pool.runInteraction("count_users_by_city", _count)
 
@@ -274,24 +298,23 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
         self, domain_to_city: Dict[str, str]
     ) -> Dict[str, int]:
         """Comme count_users_by_city mais restreint aux utilisateurs vus sur les
-        5 dernières minutes (user_ips.last_seen)."""
+        5 dernières minutes (user_ips.last_seen). LEFT JOIN => `autre/externe`
+        inclut aussi les actifs sans email rattaché."""
         five_minutes_ago = int(self._clock.time_msec()) - (1000 * 60 * 5)
 
         def _count(txn: LoggingTransaction) -> Dict[str, int]:
             txn.execute(
                 """
-                SELECT DISTINCT t.user_id, t.address
-                FROM user_threepids t
-                JOIN user_ips i ON i.user_id = t.user_id
-                WHERE t.medium = 'email' AND i.last_seen > ?
+                SELECT a.user_id, t.address
+                FROM (
+                    SELECT DISTINCT user_id FROM user_ips WHERE last_seen > ?
+                ) a
+                LEFT JOIN user_threepids t
+                    ON t.user_id = a.user_id AND t.medium = 'email'
                 """,
                 (five_minutes_ago,),
             )
-            by_city: Dict[str, Set[str]] = defaultdict(set)
-            for user_id, address in txn:
-                city = domain_to_city.get(_domain_of(address), CITY_OTHER)
-                by_city[city].add(user_id)
-            return {city: len(users) for city, users in by_city.items()}
+            return _city_counts_from_rows(txn, domain_to_city)
 
         return await self.db_pool.runInteraction(
             "count_active_users_5m_by_city", _count
