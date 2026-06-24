@@ -22,7 +22,7 @@ def load_blocked_extensions():
 
 def save_blocked_extensions(exts):
     with open(BLOCKED_EXT_FILE, "w") as f:
-        f.writelines(str(exts).replace("'","\""))
+        json.dump(exts, f, indent=2)
 
 
 class WatchaFileTypeFilterAdminServlet(RestServlet):
