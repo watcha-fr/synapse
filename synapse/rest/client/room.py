@@ -90,6 +90,8 @@ from synapse.util.stringutils import parse_and_validate_server_name
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
+from synapse.util.watcha import build_log_message  # watcha+
+
 logger = logging.getLogger(__name__)
 
 
@@ -185,7 +187,10 @@ class RoomCreateRestServlet(TransactionRestServlet):
         )
 
     async def on_POST(self, request: SynapseRequest) -> tuple[int, JsonDict]:
+        """watcha!
         requester = await self.auth.get_user_by_req(request)
+        !watcha"""
+        requester = await self.auth.get_user_by_req(request, allow_partner=False)  # watcha+
         return await self._do(request, requester)
 
     async def _do(
@@ -213,6 +218,7 @@ class RoomStateEventRestServlet(RestServlet):
         self.message_handler = hs.get_message_handler()
         self.delayed_events_handler = hs.get_delayed_events_handler()
         self.auth = hs.get_auth()
+        self.nextcloud_handler = hs.get_nextcloud_handler()  # watcha+
         self.clock = hs.get_clock()
         self._event_serializer = hs.get_event_client_serializer()
         self._max_event_delay_ms = hs.config.server.max_event_delay_ms
@@ -309,7 +315,19 @@ class RoomStateEventRestServlet(RestServlet):
         state_key: str,
         txn_id: str | None = None,
     ) -> tuple[int, JsonDict]:
+        """watcha!
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        !watcha"""
+        # watcha+
+        allow_partner = event_type not in (
+            EventTypes.Tombstone,
+            EventTypes.SpaceChild,
+            EventTypes.SpaceParent,
+        )
+        requester = await self.auth.get_user_by_req(
+            request, allow_guest=True, allow_partner=allow_partner
+        )
+        # +watcha
 
         if txn_id:
             set_tag("txn_id", txn_id)
@@ -374,7 +392,46 @@ class RoomStateEventRestServlet(RestServlet):
                     content=content,
                     origin_server_ts=origin_server_ts,
                 )
+            # watcha+
+            elif event_type == EventTypes.Name:
+                name_event_dict: JsonDict = {
+                    "type": event_type,
+                    "content": content,
+                    "room_id": room_id,
+                    "sender": requester.user.to_string(),
+                }
+                if state_key is not None:
+                    name_event_dict["state_key"] = state_key
+                if origin_server_ts is not None:
+                    name_event_dict["origin_server_ts"] = origin_server_ts
+                event_id = await self.nextcloud_handler.handle_room_name_event(
+                    requester, name_event_dict, txn_id=txn_id
+                )
+            elif event_type == EventTypes.NextcloudCalendar:
+                calendar_event_dict: JsonDict = {
+                    "type": event_type,
+                    "content": content,
+                    "room_id": room_id,
+                    "sender": requester.user.to_string(),
+                }
+                if state_key is not None:
+                    calendar_event_dict["state_key"] = state_key
+                if origin_server_ts is not None:
+                    calendar_event_dict["origin_server_ts"] = origin_server_ts
+                event_id = await self.nextcloud_handler.update_calendar_share(
+                    requester, calendar_event_dict, txn_id=txn_id
+                )
+            # +watcha
             else:
+                # watcha+
+                if (
+                    event_type == EventTypes.VectorSetting
+                    and "nextcloudShare" in content
+                ):
+                    await self.nextcloud_handler.update_share(
+                        room_id, requester, content
+                    )
+                # +watcha
                 event_dict: JsonDict = {
                     "type": event_type,
                     "content": content,
@@ -640,7 +697,14 @@ class PublicRoomListRestServlet(RestServlet):
         server = parse_string(request, "server")
 
         try:
+            """watcha!
             await self.auth.get_user_by_req(request, allow_guest=True)
+            !watcha"""
+            # watcha+
+            await self.auth.get_user_by_req(
+                request, allow_guest=True, allow_partner=False
+            )
+            # +watcha
         except InvalidClientCredentialsError as e:
             # Option to allow servers to require auth when accessing
             # /publicRooms via CS API. This is especially helpful in private
@@ -686,7 +750,10 @@ class PublicRoomListRestServlet(RestServlet):
         return 200, data
 
     async def on_POST(self, request: SynapseRequest) -> tuple[int, JsonDict]:
+        """watcha!
         await self.auth.get_user_by_req(request, allow_guest=True)
+        !watcha"""
+        await self.auth.get_user_by_req(request, allow_guest=True, allow_partner=False)  # watcha+
 
         server = parse_string(request, "server")
         content = parse_json_object_from_request(request)
@@ -1227,6 +1294,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
         self.config = hs.config
+        self.store = hs.get_datastores().main  # watcha+
 
     def register(self, http_server: HttpServer) -> None:
         # /rooms/$roomid/[join|invite|leave|ban|unban|kick]
@@ -1250,8 +1318,17 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         }:
             raise AuthError(403, "Guest access not allowed")
 
+        # watcha+
+        if requester.is_partner and membership_action not in {
+            Membership.JOIN,
+            Membership.LEAVE,
+        }:
+            raise AuthError(403, "Partner access not allowed")
+        # +watcha
+
         request_body = parse_json_object_from_request(request, allow_empty_body=True)
 
+        '''watcha!
         if membership_action == "invite" and all(
             key in request_body for key in ("medium", "address")
         ):
@@ -1277,6 +1354,26 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 # Pretend the request succeeded.
                 pass
             return 200, {}
+        !watcha'''
+
+        # watcha+ : 3pid invite sans id_access_token obligatoire (flux partner Watcha)
+        if membership_action == "invite" and self._has_3pid_invite_keys(request_body):
+            try:
+                await self.room_member_handler.do_3pid_invite(
+                    room_id,
+                    requester.user,
+                    request_body["medium"],
+                    request_body["address"],
+                    request_body["id_server"],
+                    requester,
+                    txn_id,
+                    request_body.get("id_access_token"),
+                )
+            except ShadowBanError:
+                # Pretend the request succeeded.
+                pass
+            return 200, {}
+        # +watcha
 
         target = requester.user
         if membership_action in ["invite", "ban", "unban", "kick"]:
@@ -1314,6 +1411,15 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             return_value["room_id"] = room_id
 
         return 200, return_value
+
+    # watcha+
+    def _has_3pid_invite_keys(self, content: JsonDict) -> bool:
+        for key in {"id_server", "medium", "address"}:
+            if key not in content:
+                return False
+        return True
+
+    # +watcha
 
     async def on_POST(
         self,

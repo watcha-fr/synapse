@@ -66,6 +66,7 @@ class ProfileRestServlet(RestServlet):
         self.hs = hs
         self.profile_handler = hs.get_profile_handler()
         self.auth = hs.get_auth()
+        self.account_activity_handler = hs.get_account_validity_handler()  # watcha+
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
@@ -85,6 +86,14 @@ class ProfileRestServlet(RestServlet):
         await self.profile_handler.check_profile_query_allowed(user, requester_user)
 
         ret = await self.profile_handler.get_profile(user_id)
+
+        # watcha+
+        addresses = await self.account_activity_handler._get_email_addresses_for_user(
+            user_id
+        )
+        if addresses:
+            ret["email"] = addresses[0]
+        # +watcha
 
         return 200, ret
 

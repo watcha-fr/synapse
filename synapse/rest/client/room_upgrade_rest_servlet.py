@@ -74,7 +74,10 @@ class RoomUpgradeRestServlet(RestServlet):
     async def on_POST(
         self, request: SynapseRequest, room_id: str
     ) -> tuple[int, JsonDict]:
+        """watcha!
         requester = await self._auth.get_user_by_req(request)
+        !watcha"""
+        requester = await self._auth.get_user_by_req(request, allow_partner=False)  # watcha+
 
         content = parse_json_object_from_request(request)
         assert_params_in_dict(content, ("new_version",))

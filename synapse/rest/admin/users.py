@@ -52,6 +52,10 @@ from synapse.rest.client._base import client_patterns
 from synapse.storage.databases.main.registration import ExternalIDReuseException
 from synapse.storage.databases.main.stats import UserSortOrder
 from synapse.types import JsonDict, JsonMapping, TaskStatus, UserID
+from synapse.util.watcha_user_log import (  # watcha+
+    UserAuditAction,
+    append_user_audit_log,
+)
 from synapse.types.rest import RequestBodyModel
 
 if TYPE_CHECKING:
@@ -235,6 +239,7 @@ class UserRestServletV2Get(RestServlet):
         self.pusher_pool = hs.get_pusherpool()
         self._msc3866_enabled = hs.config.experimental.msc3866.enabled
         self._all_user_types = hs.config.user_types.all_user_types
+        self._user_audit_log_path = hs.config.watcha.user_audit_log_path  # watcha+
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
@@ -451,11 +456,14 @@ class UserRestServletV2(UserRestServletV2Get):
                         target_user.to_string()
                     )
 
+            audit_action: UserAuditAction | None = None  # watcha+
             if "locked" in body:
                 if lock and not user["locked"]:
                     await self.store.set_user_locked_status(user_id, True)
+                    audit_action = UserAuditAction.DEACTIVATE  # watcha+
                 elif not lock and user["locked"]:
                     await self.store.set_user_locked_status(user_id, False)
+                    audit_action = UserAuditAction.REACTIVATE  # watcha+
 
             if "user_type" in body:
                 await self.store.set_user_type(target_user, user_type)
@@ -465,6 +473,17 @@ class UserRestServletV2(UserRestServletV2Get):
 
             user = await self.admin_handler.get_user(target_user)
             assert user is not None
+
+            # watcha+
+            if audit_action is not None:
+                append_user_audit_log(
+                    self._user_audit_log_path,
+                    user_id=user_id,
+                    display_name=user.get("displayname"),
+                    action=audit_action,
+                    avatar_src=user.get("avatar_url"),
+                )
+            # +watcha
 
             return HTTPStatus.OK, user
 
@@ -531,6 +550,16 @@ class UserRestServletV2(UserRestServletV2Get):
 
             user_info_dict = await self.admin_handler.get_user(target_user)
             assert user_info_dict is not None
+
+            # watcha+
+            append_user_audit_log(
+                self._user_audit_log_path,
+                user_id=user_id,
+                display_name=user_info_dict.get("displayname"),
+                action=UserAuditAction.CREATE,
+                avatar_src=user_info_dict.get("avatar_url"),
+            )
+            # +watcha
 
             return HTTPStatus.CREATED, user_info_dict
 
@@ -629,6 +658,7 @@ class UserRegisterServlet(RestServlet):
 
             password_hash = await self.auth_handler.hash(password)
 
+        is_partner = body.get("is_partner", False)  # watcha+
         admin = body.get("admin", None)
         user_type = body.get("user_type", None)
         displayname = body.get("displayname", None)
@@ -710,6 +740,7 @@ class UserRegisterServlet(RestServlet):
             default_display_name=displayname,
             by_admin=True,
             approved=True,
+            make_partner=is_partner,  # watcha+
         )
 
         result = await register._create_registration_details(
@@ -757,6 +788,7 @@ class DeactivateAccountRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.is_mine = hs.is_mine
         self.store = hs.get_datastores().main
+        self._user_audit_log_path = hs.config.watcha.user_audit_log_path  # watcha+
 
     async def on_POST(
         self, request: SynapseRequest, target_user_id: str
@@ -781,9 +813,27 @@ class DeactivateAccountRestServlet(RestServlet):
                 Codes.BAD_JSON,
             )
 
+        # watcha+
+        # Capture the profile before deactivation, since erasing wipes it.
+        profile = await self.store.get_profileinfo(
+            UserID.from_string(target_user_id)
+        )
+        # +watcha
+
         result = await self._deactivate_account_handler.deactivate_account(
             target_user_id, erase, requester, by_admin=True
         )
+
+        # watcha+
+        append_user_audit_log(
+            self._user_audit_log_path,
+            user_id=target_user_id,
+            display_name=profile.display_name,
+            action=UserAuditAction.DELETE,
+            avatar_src=profile.avatar_url,
+        )
+        # +watcha
+
         if result:
             id_server_unbind_result = "success"
         else:
