@@ -97,6 +97,8 @@ class TokenLookupResult:
     valid_until_ms: int | None = None
     token_owner: str = attr.ib()
     token_used: bool = False
+    is_partner: bool = False  # watcha+
+    password_hash: bool = False  # watcha+
 
     # Make the token owner default to the user ID, which is the common case.
     @token_owner.default
@@ -240,6 +242,7 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
         admin: bool = False,
         user_type: str | None = None,
         shadow_banned: bool = False,
+        make_partner: bool = False,  # watcha+
         approved: bool = False,
     ) -> None:
         """Attempts to register an account.
@@ -278,6 +281,7 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
             admin,
             user_type,
             shadow_banned,
+            make_partner,  # watcha+
             approved,
         )
 
@@ -293,6 +297,7 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
         admin: bool,
         user_type: str | None,
         shadow_banned: bool,
+        make_partner: bool,  # watcha+
         approved: bool,
     ) -> None:
         user_id_obj = UserID.from_string(user_id)
@@ -342,6 +347,7 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
                         "admin": 1 if admin else 0,
                         "user_type": user_type,
                         "shadow_banned": shadow_banned,
+                        "is_partner": 1 if make_partner and not admin else 0,  # watcha+
                         "approved": user_approved,
                     },
                 )
@@ -385,10 +391,11 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
             # We could technically use simple_select_one here, but it would not perform
             # the COALESCEs (unless hacked into the column names), which could yield
             # confusing results.
+            # watcha+
             txn.execute(
                 """
                 SELECT
-                    name, is_guest, admin, consent_version, consent_ts,
+                    name, is_guest, admin, is_partner, password_hash, consent_version, consent_ts,
                     consent_server_notice_sent, appservice_id, creation_ts, user_type,
                     deactivated, COALESCE(shadow_banned, FALSE) AS shadow_banned,
                     COALESCE(approved, TRUE) AS approved,
@@ -399,6 +406,7 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
                 """,
                 (user_id,),
             )
+            # +watcha
 
             row = txn.fetchone()
             if not row:
@@ -408,6 +416,8 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
                 name,
                 is_guest,
                 admin,
+                is_partner,  # watcha+
+                password_hash,  # watcha+
                 consent_version,
                 consent_ts,
                 consent_server_notice_sent,
@@ -436,6 +446,8 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
                 approved=bool(approved),
                 locked=bool(locked),
                 suspended=bool(suspended),
+                is_partner=bool(is_partner),  # watcha+
+                password_hash=bool(password_hash),  # watcha+
             )
 
         return await self.db_pool.runInteraction(
@@ -766,10 +778,12 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
     def _query_for_auth(
         self, txn: LoggingTransaction, token: str
     ) -> TokenLookupResult | None:
+        # watcha+ : ajout de la colonne users.is_partner au SELECT
         sql = """
             SELECT users.name as user_id,
                 users.is_guest,
                 users.shadow_banned,
+                users.is_partner,
                 access_tokens.id as token_id,
                 access_tokens.device_id,
                 access_tokens.valid_until_ms,
@@ -779,6 +793,7 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
             INNER JOIN access_tokens on users.name = COALESCE(puppets_user_id, access_tokens.user_id)
             WHERE token = ?
         """
+        # +watcha
 
         txn.execute(sql, (token,))
         row = txn.fetchone()
@@ -788,6 +803,7 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
                 user_id,
                 is_guest,
                 shadow_banned,
+                is_partner,  # watcha+
                 token_id,
                 device_id,
                 valid_until_ms,
@@ -799,6 +815,7 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
                 user_id=user_id,
                 is_guest=is_guest,
                 shadow_banned=shadow_banned,
+                is_partner=is_partner,  # watcha+
                 token_id=token_id,
                 device_id=device_id,
                 valid_until_ms=valid_until_ms,
@@ -872,9 +889,18 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
 
         return await self.db_pool.runInteraction("get_users_by_id_case_insensitive", f)
 
-    async def record_user_external_id(
-        self, auth_provider: str, external_id: str, user_id: str
-    ) -> None:
+    # watcha!
+    # async def record_user_external_id(
+    #     self, auth_provider: str, external_id: str, user_id: str
+    # ) -> None:
+    # !watcha
+    async def record_user_external_id(  # watcha+
+        self,  # watcha+
+        auth_provider: str,  # watcha+
+        external_id: str,  # watcha+
+        user_id: str,  # watcha+
+        nextcloud_username: str = None,  # watcha+
+    ) -> None:  # watcha+
         """Record a mapping from an external user id to a mxid
 
         See notes in _record_user_external_id_txn about what constitutes valid data.
@@ -895,6 +921,7 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
                 auth_provider,
                 external_id,
                 user_id,
+                nextcloud_username,  # watcha+
             )
         except self.database_engine.module.IntegrityError:
             raise ExternalIDReuseException()
@@ -905,6 +932,7 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
         auth_provider: str,
         external_id: str,
         user_id: str,
+        nextcloud_username: str,  # watcha+
     ) -> None:
         """
         Record a mapping from an external user id to a mxid.
@@ -935,7 +963,10 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
             table="user_external_ids",
             keyvalues={"auth_provider": auth_provider, "external_id": external_id},
             values={},
-            insertion_values={"user_id": user_id},
+            insertion_values={
+                "user_id": user_id,
+                "nextcloud_username": nextcloud_username,  # watcha+
+            },
         )
 
         if not was_inserted:
@@ -979,6 +1010,7 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
         self,
         record_external_ids: list[tuple[str, str]],
         user_id: str,
+        nextcloud_username: str = None,  # watcha+
     ) -> None:
         """Replace mappings from external user ids to a mxid in a single transaction.
         All mappings are deleted and the new ones are created.
@@ -1013,6 +1045,7 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
                     auth_provider,
                     external_id,
                     user_id,
+                    nextcloud_username,  # watcha+
                 )
 
         try:
@@ -1063,11 +1096,27 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
             ),
         )
 
+    # watcha+
+    async def count_partner_users(self) -> int:
+        """Counts partner users registered on the homeserver."""
+
+        def _count_users(txn: LoggingTransaction) -> int:
+            txn.execute("SELECT COUNT(*) FROM users where is_partner = 1")
+            row = txn.fetchone()
+            assert row is not None
+            return row[0]
+
+        return await self.db_pool.runInteraction("count_partner", _count_users)
+    # +watcha
+
     async def count_all_users(self) -> int:
         """Counts all users registered on the homeserver."""
 
         def _count_users(txn: LoggingTransaction) -> int:
+            txn.execute("SELECT COUNT(*) FROM users WHERE deactivated <> 1")  # watcha+
+            """!watcha
             txn.execute("SELECT COUNT(*) FROM users")
+            !watcha"""
             row = txn.fetchone()
             assert row is not None
             return row[0]
@@ -2352,6 +2401,19 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
         )
         self._invalidate_cache_and_stream(txn, self.get_user_locked_status, (user_id,))
         self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
+
+    # watcha+
+    async def is_partner(self, user_id):
+        is_partner = await self.db_pool.simple_select_one_onecol(
+            "users",
+            keyvalues={"name": user_id},
+            retcol="is_partner",
+            allow_none=True,
+            desc="is_partner",
+        )
+        return bool(is_partner)
+
+    # +watcha
 
     async def update_user_approval_status(
         self, user_id: UserID, approved: bool

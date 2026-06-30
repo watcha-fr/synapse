@@ -561,6 +561,41 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             "count_public_rooms", _count_public_rooms_txn
         )
 
+    # watcha+
+    async def count_space(self) -> int:
+        """Retrieve the total number of space."""
+
+        def f(txn: LoggingTransaction) -> int:
+            sql = "SELECT count(*)  FROM room_stats_state where room_type='m.space'"
+            txn.execute(sql)
+            row = cast(tuple[int], txn.fetchone())
+            return row[0]
+
+        return await self.db_pool.runInteraction("count_space", f)
+
+    async def count_space_public(self) -> int:
+        """Retrieve the total number of space."""
+
+        def f(txn: LoggingTransaction) -> int:
+            sql = "SELECT count(*) FROM rooms WHERE is_public and room_id in (select room_id from room_stats_state where room_type='m.space')"
+            txn.execute(sql)
+            row = cast(tuple[int], txn.fetchone())
+            return row[0]
+
+        return await self.db_pool.runInteraction("count_space_public", f)
+
+    async def count_space_private(self) -> int:
+        """Retrieve the total number of space."""
+
+        def f(txn: LoggingTransaction) -> int:
+            sql = "SELECT count(*) FROM rooms WHERE not is_public and room_id in (select room_id from room_stats_state where room_type='m.space')"
+            txn.execute(sql)
+            row = cast(tuple[int], txn.fetchone())
+            return row[0]
+
+        return await self.db_pool.runInteraction("count_space_private", f)
+    # +watcha
+
     async def get_room_count(self) -> int:
         """Retrieve the total number of rooms."""
 
