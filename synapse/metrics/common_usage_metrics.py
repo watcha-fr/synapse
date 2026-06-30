@@ -21,14 +21,19 @@
 from typing import TYPE_CHECKING
 
 import attr
+import logging  # watcha+
+import time  # watcha+
 
 from synapse.metrics import SERVER_NAME_LABEL
+from synapse.util import metrics  # watcha+
 from synapse.util.duration import Duration
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 from prometheus_client import Gauge
+
+logger = logging.getLogger(__name__)  # watcha+
 
 # Gauge to expose daily active users metrics
 current_dau_gauge = Gauge(
@@ -37,12 +42,67 @@ current_dau_gauge = Gauge(
     labelnames=[SERVER_NAME_LABEL],
 )
 
+# watcha+
+total_users_gauge = Gauge(
+    "synapse_total_users", "Nombre total d'utilisateurs", labelnames=[SERVER_NAME_LABEL]
+)
+partner_users_gauge = Gauge(
+    "synapse_partner_users", "Nombre d'utilisateurs externe", labelnames=[SERVER_NAME_LABEL]
+)
+rooms_public_gauge = Gauge(
+    "synapse_rooms_public", "Nombre de salons publics", labelnames=[SERVER_NAME_LABEL]
+)
+rooms_private_gauge = Gauge(
+    "synapse_rooms_private", "Nombre de salons privés", labelnames=[SERVER_NAME_LABEL]
+)
+rooms_dm_gauge = Gauge(
+    "synapse_rooms_dm", "Nombre de salons messages privés", labelnames=[SERVER_NAME_LABEL]
+)
+spaces_public_gauge = Gauge(
+    "synapse_spaces_public", "Nombre d'espace publics", labelnames=[SERVER_NAME_LABEL]
+)
+spaces_private_gauge = Gauge(
+    "synapse_spaces_private", "Nombre d'espace privés", labelnames=[SERVER_NAME_LABEL]
+)
+jitsi_calls_gauge = Gauge(
+    "synapse_jitsi_calls", "Nombre d'appels Jitsi", labelnames=[SERVER_NAME_LABEL]
+)
+ios_users_gauge = Gauge(
+    "synapse_ios_users", "Nombre d'utilisateurs iOS", labelnames=[SERVER_NAME_LABEL]
+)
+android_users_gauge = Gauge(
+    "synapse_android_users", "Nombre d'utilisateurs Android", labelnames=[SERVER_NAME_LABEL]
+)
+web_users_gauge = Gauge(
+    "synapse_web_users", "Nombre d'utilisateurs Web", labelnames=[SERVER_NAME_LABEL]
+)
+sygnal_up_gauge = Gauge(
+    "synapse_sygnal_up",
+    "Sygnal ping status (1 if recent ping, 0 if not)",
+    labelnames=[SERVER_NAME_LABEL],
+)
+# +watcha
+
 
 @attr.s(auto_attribs=True)
 class CommonUsageMetrics:
     """Usage metrics shared between the phone home stats and the prometheus exporter."""
 
     daily_active_users: int
+    # watcha+
+    total_users: int
+    partner_users: int
+    rooms_public: int
+    rooms_private: int
+    rooms_dm: int
+    spaces_public: int
+    spaces_private: int
+    jitsi_calls: int
+    ios_users: int
+    android_users: int
+    web_users: int
+    up_sygnal: int
+    # +watcha
 
 
 class CommonUsageMetricsManager:
@@ -81,9 +141,40 @@ class CommonUsageMetricsManager:
         use if it doesn't exist yet, or update it.
         """
         dau_count = await self._store.count_daily_users()
+        # watcha+
+        total_users = await self._store.count_all_users()
+        partner_users = await self._store.count_partner_users()
+
+        rooms = await self._store.get_room_count()
+        public_rooms = await self._store.count_public_rooms(None, False, None)
+        private_rooms = rooms - public_rooms
+        dm_rooms = await self._store._get_dm_rooms()
+        public_spaces = await self._store.count_space_public()
+        private_spaces = await self._store.count_space_private()
+        r30v2_results = await self._store.count_r30v2_users()
+        user_ios = r30v2_results.get("ios", 0)
+        user_android = r30v2_results.get("android", 0)
+        user_web = r30v2_results.get("web", 0)
+        calls_jitsi = await self._store.count_jitsi_calls()
+        sygnal_up = 1 if time.time() - metrics.last_sygnal_ping_time <= 600 else 0
+        # +watcha
 
         return CommonUsageMetrics(
             daily_active_users=dau_count,
+            # watcha+
+            total_users=total_users,
+            partner_users=partner_users,
+            rooms_public=public_rooms,
+            rooms_private=private_rooms,
+            rooms_dm=len(dm_rooms),
+            spaces_public=public_spaces,
+            spaces_private=private_spaces,
+            jitsi_calls=calls_jitsi,
+            ios_users=user_ios,
+            android_users=user_android,
+            web_users=user_web,
+            up_sygnal=sygnal_up,
+            # +watcha
         )
 
     async def _update_gauges(self) -> None:
@@ -93,3 +184,18 @@ class CommonUsageMetricsManager:
         current_dau_gauge.labels(
             **{SERVER_NAME_LABEL: self.server_name},
         ).set(float(metrics.daily_active_users))
+        # watcha+
+        labels = {SERVER_NAME_LABEL: self.server_name}
+        total_users_gauge.labels(**labels).set(float(metrics.total_users))
+        partner_users_gauge.labels(**labels).set(float(metrics.partner_users))
+        rooms_public_gauge.labels(**labels).set(float(metrics.rooms_public))
+        rooms_private_gauge.labels(**labels).set(float(metrics.rooms_private))
+        rooms_dm_gauge.labels(**labels).set(float(metrics.rooms_dm))
+        spaces_public_gauge.labels(**labels).set(float(metrics.spaces_public))
+        spaces_private_gauge.labels(**labels).set(float(metrics.spaces_private))
+        jitsi_calls_gauge.labels(**labels).set(float(metrics.jitsi_calls))
+        ios_users_gauge.labels(**labels).set(float(metrics.ios_users))
+        android_users_gauge.labels(**labels).set(float(metrics.android_users))
+        web_users_gauge.labels(**labels).set(float(metrics.web_users))
+        sygnal_up_gauge.labels(**labels).set(float(metrics.up_sygnal))
+        # +watcha
