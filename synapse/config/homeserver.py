@@ -65,6 +65,7 @@ from .user_directory import UserDirectoryConfig
 from .user_types import UserTypesConfig
 from .voip import VoipConfig
 from .workers import WorkerConfig
+from .watcha import WatchaConfig  # watcha+
 
 
 class HomeServerConfig(RootConfig):
@@ -117,6 +118,7 @@ class HomeServerConfig(RootConfig):
         BackgroundUpdateConfig,
         AutoAcceptInvitesConfig,
         UserTypesConfig,
+        WatchaConfig,  # watcha+
         # This must be last, as it checks for conflicts with other config options.
         MasConfig,
     ]

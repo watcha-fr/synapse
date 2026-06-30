@@ -58,6 +58,7 @@ from synapse.config import (  # noqa: F401
     user_types,
     voip,
     workers,
+    watcha,  # watcha+
 )
 from synapse.types import StrSequence
 
@@ -120,6 +121,7 @@ class RootConfig:
     background_updates: background_updates.BackgroundUpdateConfig
     auto_accept_invites: auto_accept_invites.AutoAcceptInvitesConfig
     user_types: user_types.UserTypesConfig
+    watcha: watcha.WatchaConfig  # watcha+
     mas: mas.MasConfig
     matrix_rtc: matrixrtc.MatrixRtcConfig
 

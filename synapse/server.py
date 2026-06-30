@@ -186,6 +186,15 @@ from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import random_string
 from synapse.util.task_scheduler import TaskScheduler
 
+# watcha+
+from synapse.handlers.watcha_administration import AdministrationHandler as WatchaAdministrationHandler
+from synapse.handlers.watcha_registration import RegistrationHandler as WatchaRegistrationHandler
+from synapse.handlers.watcha_nextcloud import NextcloudHandler
+from synapse.http.watcha_keycloak_client import KeycloakClient
+from synapse.http.watcha_nextcloud_client import NextcloudClient
+
+# +watcha
+
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
@@ -1244,6 +1253,29 @@ class HomeServer(metaclass=abc.ABCMeta):
             self.config.ratelimiting.rc_message,
             self.config.ratelimiting.rc_admin_redaction,
         )
+
+    # watcha+
+    @cache_in_self
+    def get_keycloak_client(self) -> KeycloakClient:
+        return KeycloakClient(self)
+
+    @cache_in_self
+    def get_nextcloud_client(self) -> NextcloudClient:
+        return NextcloudClient(self)
+
+    @cache_in_self
+    def get_watcha_administration_handler(self) -> WatchaAdministrationHandler:
+        return WatchaAdministrationHandler(self)
+
+    @cache_in_self
+    def get_watcha_registration_handler(self) -> WatchaRegistrationHandler:
+        return WatchaRegistrationHandler(self)
+
+    @cache_in_self
+    def get_nextcloud_handler(self) -> NextcloudHandler:
+        return NextcloudHandler(self)
+
+    # +watcha
 
     @cache_in_self
     def get_common_usage_metrics_manager(self) -> CommonUsageMetricsManager:

@@ -113,6 +113,8 @@ from synapse.storage.databases.main.transactions import TransactionWorkerStore
 from synapse.storage.databases.main.ui_auth import UIAuthWorkerStore
 from synapse.storage.databases.main.user_directory import UserDirectoryStore
 from synapse.storage.databases.main.user_erasure_store import UserErasureWorkerStore
+from synapse.storage.databases.main.watcha_partner import PartnerStore  # watcha+
+from synapse.storage.databases.main.watcha_nextcloud import NextcloudStore  # watcha+
 from synapse.types import ISynapseReactor
 from synapse.util.httpresourcetree import create_resource_tree
 
@@ -169,6 +171,8 @@ class GenericWorkerStore(
     ExperimentalFeaturesStore,
     SlidingSyncStore,
     DelayedEventsStore,
+    PartnerStore,  # watcha+
+    NextcloudStore,  # watcha+
 ):
     # Properties that multiple storage classes define. Tell mypy what the
     # expected type is.

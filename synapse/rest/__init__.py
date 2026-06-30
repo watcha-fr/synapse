@@ -69,7 +69,9 @@ from synapse.rest.client import (
     user_directory,
     versions,
     voip,
+    watcha as legacy_watcha,  # watcha+
 )
+from synapse.rest import watcha  # watcha+
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +128,10 @@ CLIENT_SERVLET_FUNCTIONS: tuple[RegisterServletsFunc, ...] = (
     rendezvous.register_servlets,
     auth_metadata.register_servlets,
     thread_subscriptions.register_servlets,
+    # watcha+
+    legacy_watcha.register_servlets,
+    watcha.register_servlets,
+    # +watcha
 )
 
 SERVLET_GROUPS: dict[str, Iterable[RegisterServletsFunc]] = {
