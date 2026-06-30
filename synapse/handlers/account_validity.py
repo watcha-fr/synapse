@@ -33,6 +33,8 @@ from synapse.util.duration import Duration
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
+from synapse.util.watcha import build_log_message  # watcha+
+
 logger = logging.getLogger(__name__)
 
 

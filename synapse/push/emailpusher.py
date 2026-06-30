@@ -43,6 +43,7 @@ logger = logging.getLogger(__name__)
 THROTTLE_MAX_MS = 24 * 60 * 60 * 1000  # 24h
 # THROTTLE_MULTIPLIER = 6              # 10 mins, 1 hour, 6 hours, 24 hours
 THROTTLE_MULTIPLIER = 144  # 10 mins, 24 hours - i.e. jump straight to 1 day
+THROTTLE_MULTIPLIER = 6  # watcha+
 
 # If no event triggers a notification for this long after the previous,
 # the throttle is released.
