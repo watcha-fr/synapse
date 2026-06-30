@@ -48,6 +48,9 @@ from synapse.logging.context import (
 from synapse.metrics import SERVER_NAME_LABEL, InFlightGauge
 from synapse.util.clock import Clock
 
+# Initialisé à 0, mis à jour par la route de ping
+last_sygnal_ping_time = 0  # watcha+
+
 logger = logging.getLogger(__name__)
 
 # Metrics to see the number of and how much time is spend in various blocks of code.

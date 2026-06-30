@@ -1122,11 +1122,17 @@ class RoomCreationHandler:
         invite_3pid_list = config.get("invite_3pid", [])
         invite_list = config.get("invite", [])
 
+        # watcha+
+        for invite_3pid in invite_3pid_list:
+            logger.info("invite_3pid : %s", invite_3pid)
+        # +watcha
+
         # validate each entry for correctness
         for invite_3pid in invite_3pid_list:
             if not all(
                 key in invite_3pid
-                for key in ("medium", "address", "id_server", "id_access_token")
+                # watcha! for key in ("medium", "address", "id_server", "id_access_token")
+                for key in ("medium", "address", "id_server")  # watcha+
             ):
                 raise SynapseError(
                     HTTPStatus.BAD_REQUEST,
@@ -1365,7 +1371,10 @@ class RoomCreationHandler:
 
         for invite_3pid in invite_3pid_list:
             id_server = invite_3pid["id_server"]
+            '''watcha!
             id_access_token = invite_3pid["id_access_token"]
+            !watcha'''
+            id_access_token = invite_3pid.get("id_access_token")  # watcha+
             address = invite_3pid["address"]
             medium = invite_3pid["medium"]
             # Note that do_3pid_invite can raise a  ShadowBanError, but this was
