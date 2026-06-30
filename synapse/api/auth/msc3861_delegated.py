@@ -381,6 +381,7 @@ class MSC3861DelegatedAuth(BaseAuth):
         allow_guest: bool = False,
         allow_expired: bool = False,
         allow_locked: bool = False,
+        allow_partner: bool = True,  # watcha+
     ) -> Requester:
         """Get a registered user's ID.
 

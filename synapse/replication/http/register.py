@@ -69,6 +69,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
         address: str | None,
         shadow_banned: bool,
         approved: bool,
+        make_partner: bool,  # watcha+
     ) -> JsonDict:
         """
         Args:
@@ -100,6 +101,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             "address": address,
             "shadow_banned": shadow_banned,
             "approved": approved,
+            "make_partner": make_partner,  # watcha+
         }
 
     async def _handle_request(  # type: ignore[override]
@@ -125,6 +127,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             address=content["address"],
             shadow_banned=content["shadow_banned"],
             approved=content.get("approved", approved_default),
+            make_partner=content.get("make_partner", False),  # watcha+
         )
 
         return 200, {}

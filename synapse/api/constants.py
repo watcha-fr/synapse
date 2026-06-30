@@ -154,6 +154,9 @@ class EventTypes:
     Sticker: Final = "m.sticker"
     LiveLocationShareStart: Final = "m.beacon_info"
 
+    VectorSetting: Final = "im.vector.web.settings"  # watcha+
+    NextcloudCalendar: Final = "watcha.room.nextcloud_calendar"  # watcha+
+
     CallInvite: Final = "m.call.invite"
 
     PollStart: Final = "m.poll.start"

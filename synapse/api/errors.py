@@ -129,6 +129,13 @@ class Codes(str, Enum):
     # MSC2677
     DUPLICATE_ANNOTATION = "M_DUPLICATE_ANNOTATION"
 
+    # watcha+
+    PARTNER_ACCESS_FORBIDDEN = "WATCHA_PARTNER_ACCESS_FORBIDDEN"
+    NEXTCLOUD_CAN_NOT_ADD_MEMBERS_TO_GROUP = "W_NEXTCLOUD_CAN_NOT_ADD_MEMBERS_TO_GROUP"
+    NEXTCLOUD_CAN_NOT_CREATE_GROUP = "W_NEXTCLOUD_CAN_NOT_CREATE_GROUP"
+    NEXTCLOUD_CAN_NOT_SHARE = "W_NEXTCLOUD_CAN_NOT_SHARE"
+    # +watcha
+
     # MSC3575 we are telling the client they need to expire their sliding sync
     # connection.
     UNKNOWN_POS = "M_UNKNOWN_POS"
@@ -255,6 +262,25 @@ class InvalidAPICallError(SynapseError):
 
     def __init__(self, msg: str):
         super().__init__(HTTPStatus.BAD_REQUEST, msg, Codes.BAD_JSON)
+
+
+# watcha+
+class NextcloudError(CodeMessageException):
+    """A base exception type for Nextcloud errors which have an error code and error
+    message (corresponding to status code and status message from Nextcloud API documentation).
+    """
+
+    def __init__(self, code: int, msg: str):
+        """Constructs a Nextcloud error.
+
+        Args:
+            code: The integer error code (corresponding to status code in response body)
+            msg: The human-readable error message.
+        """
+        super().__init__(code, msg)
+
+
+# +watcha
 
 
 class InvalidProxyCredentialsError(SynapseError):
