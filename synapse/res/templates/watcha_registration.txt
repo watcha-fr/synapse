@@ -1,0 +1,45 @@
+Hi,
+
+{{ sender_name | default("A collaborator", true)  }} invites you to join the Watcha collaborative suite.
+
+
+
+Connection settings:
+
+      Identifier:
+
+            {{ identifier }}
+
+      Password {% if not is_partner %}temporary {% endif %}:
+
+            {{ password }}
+
+      Workspace:
+
+            {{ workspace }}
+
+
+
+Connect from your browser, by accessing the platform:
+
+      {{ login_url }}
+
+
+
+Connect from your mobile:
+
+      Download the Android application on Google Play:
+
+            {% if is_partner -%}
+            https://play.google.com/store/apps/details?id=im.vector.app
+            {% else -%}
+            https://play.google.com/store/apps/details?id=im.watcha.app
+            {%- endif %}
+
+      Download the iOS application on the Apple Store:
+
+            {% if is_partner -%}
+            https://apps.apple.com/fr/app/element-messenger/id1083446067
+            {% else -%}
+            https://itunes.apple.com/us/app/watcha/id1383732254
+            {%- endif %}
