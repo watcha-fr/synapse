@@ -74,6 +74,8 @@ if TYPE_CHECKING:
     from synapse.module_api import ModuleApi
     from synapse.server import HomeServer
 
+from synapse.util.watcha import build_log_message  # watcha+
+
 logger = logging.getLogger(__name__)
 
 # we want the cookie to be returned to us even when the request is the POSTed
@@ -1645,6 +1647,9 @@ class UserAttributeDict(TypedDict):
     display_name: str | None
     picture: str | None  # may be omitted by older `OidcMappingProviders`
     emails: list[str]
+    is_partner: bool | None  # DLA : ComUE
+    is_admin: bool | None  # watcha+
+    nextcloud_username: str | None  # watcha+
 
 
 class OidcMappingProvider(Generic[C]):
@@ -1733,6 +1738,7 @@ class JinjaOidcMappingConfig:
     localpart_template: Template | None
     display_name_template: Template | None
     email_template: Template | None
+    nextcloud_username_template: Template | None  # watcha+
     extra_attributes: dict[str, Template]
     confirm_localpart: bool = False
 
@@ -1777,6 +1783,11 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         localpart_template = parse_template_config("localpart_template")
         display_name_template = parse_template_config("display_name_template")
         email_template = parse_template_config("email_template")
+        # watcha+
+        nextcloud_username_template = parse_template_config(
+            "nextcloud_username_template"
+        )
+        # +watcha
 
         extra_attributes = {}  # type Dict[str, Template]
         if "extra_attributes" in config:
@@ -1804,6 +1815,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             email_template=email_template,
             extra_attributes=extra_attributes,
             confirm_localpart=confirm_localpart,
+            nextcloud_username_template=nextcloud_username_template,  # watcha+
         )
 
     def get_remote_user_id(self, userinfo: UserInfo) -> str:
@@ -1840,6 +1852,34 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
 
         picture = self._config.picture_template.render(user=userinfo).strip()
 
+        # watcha+
+        is_admin: bool | None = userinfo.get("is_admin")
+        if not isinstance(is_admin, bool) and is_admin is not None:
+            raise MappingException(
+                build_log_message(
+                    log_vars={
+                        "is_admin": is_admin,
+                    },
+                )
+            )
+
+        nextcloud_username = render_template_field(
+            self._config.nextcloud_username_template
+        )
+        # DLA : ComUE
+        is_partner: bool | None = userinfo.get("is_partner")
+        if not isinstance(is_partner, bool) and is_partner is not None:
+            raise MappingException(
+                build_log_message(
+                    log_vars={
+                        "is_partner": is_partner,
+                    },
+                )
+            )
+        # DLA : ComUE
+        # +watcha
+
+        """watcha!
         return UserAttributeDict(
             localpart=localpart,
             display_name=display_name,
@@ -1847,6 +1887,19 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             picture=picture,
             confirm_localpart=self._config.confirm_localpart,
         )
+        !watcha"""
+        # watcha+
+        return UserAttributeDict(
+            localpart=localpart,
+            display_name=display_name,
+            emails=emails,
+            picture=picture,
+            confirm_localpart=self._config.confirm_localpart,
+            is_partner=is_partner,  # DLA : ComUE
+            is_admin=is_admin,
+            nextcloud_username=nextcloud_username,
+        )
+        # +watcha
 
     async def get_extra_attributes(self, userinfo: UserInfo, token: Token) -> JsonDict:
         extras: dict[str, str] = {}

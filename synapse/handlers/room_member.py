@@ -32,6 +32,7 @@ from synapse.api.constants import (
     EventTypes,
     GuestAccess,
     Membership,
+    JoinRules,  # watcha+
 )
 from synapse.api.errors import (
     AuthError,
@@ -109,6 +110,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.account_data_handler = hs.get_account_data_handler()
         self.event_auth_handler = hs.get_event_auth_handler()
         self._worker_lock_handler = hs.get_worker_locks_handler()
+        self.auth_handler = hs.get_auth_handler()  # watcha+
+        self.nextcloud_handler = hs.get_nextcloud_handler()  # watcha+
 
         self._membership_types_to_include_profile_data_in = {
             Membership.JOIN,
@@ -634,6 +637,59 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         Raises:
             ShadowBanError if a shadow-banned requester attempts to send an invite.
         """
+        # watcha+
+        async def raise_for_not_invited_partner_to_join_public_room():
+            user_id = requester.user.to_string()
+            is_partner = await self.auth_handler.is_partner(user_id)
+            if not is_partner:
+                return
+
+            filtered_room_state = (
+                await self._storage_controllers.state.get_current_state(
+                    room_id,
+                    StateFilter.from_types(
+                        [
+                            (EventTypes.Member, user_id),
+                            (EventTypes.JoinRules, ""),
+                        ]
+                    ),
+                )
+            )
+
+            member_event = filtered_room_state.get((EventTypes.Member, user_id))
+            if member_event:
+                membership = member_event.content.get("membership", "")
+                if membership == Membership.INVITE:
+                    return
+
+            join_rules = filtered_room_state.get((EventTypes.JoinRules, ""))
+            if join_rules:
+                is_public = join_rules.content.get("join_rule") == JoinRules.PUBLIC
+                if not is_public:
+                    return
+
+            logger.info(f"[watcha] Partner access not allowed ({user_id})")
+            raise AuthError(
+                403,
+                "Partner access not allowed",
+                errcode=Codes.PARTNER_ACCESS_FORBIDDEN,
+            )
+
+        if action == Membership.JOIN:
+            await raise_for_not_invited_partner_to_join_public_room()
+
+        effective_membership_state = action
+        if action == "kick":
+            effective_membership_state = Membership.LEAVE
+        if effective_membership_state in (
+            Membership.LEAVE,
+            Membership.BAN,
+        ):
+            await self.nextcloud_handler.handle_room_member_event(
+                requester, room_id, target.to_string(), effective_membership_state
+            )
+        # +watcha
+
         if ratelimit:
             if action == Membership.JOIN:
                 # Only rate-limit if the user isn't already joined to the room, otherwise
@@ -693,6 +749,12 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                             delay_id=delay_id,
                         )
 
+        # watcha+
+        if effective_membership_state == Membership.JOIN:
+            await self.nextcloud_handler.handle_room_member_event(
+                requester, room_id, target.to_string(), effective_membership_state
+            )
+        # +watcha
         return result
 
     async def update_membership_locked(
@@ -1715,6 +1777,21 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 403, "Looking up third-party identifiers is denied from this server"
             )
 
+        # watcha+ bypass identity server flow
+        email_address = address.strip()
+        invitee = await self.store.get_user_id_by_threepid("email", email_address)
+        if not invitee:
+            invitee = await self.hs.get_watcha_registration_handler().register(
+                sender_id=requester.user.to_string(),
+                email_address=email_address,
+                is_partner=True,
+            )
+        event_id, stream_id = await self.update_membership(
+            requester, UserID.from_string(invitee), room_id, "invite", txn_id=txn_id
+        )
+        return event_id, stream_id
+        # +watcha
+
         invitee = await self.identity_handler.lookup_3pid(
             id_server, medium, address, id_access_token
         )
@@ -1771,7 +1848,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         room_id: str,
         user: UserID,
         txn_id: str | None,
-        id_access_token: str,
+        id_access_token: str | None = None,  # watcha+
         prev_event_ids: list[str] | None = None,
         depth: int | None = None,
     ) -> tuple[EventBase, int]:

@@ -60,6 +60,8 @@ from synapse.util.stringutils import random_string
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
+from synapse.util.watcha import build_log_message  # watcha+
+
 logger = logging.getLogger(__name__)
 
 
@@ -155,6 +157,9 @@ class UserAttributes:
     picture: str | None = None
     # mypy thinks these are incompatible for some reason.
     emails: StrCollection = attr.Factory(list)
+    is_admin: bool | None = False  # watcha+
+    is_partner: bool | None = False  # DLA : ComUE
+    nextcloud_username: str | None = None  # watcha+
 
 
 @attr.s(slots=True, auto_attribs=True)
@@ -238,6 +243,9 @@ class SsoHandler:
         self._identity_providers: dict[str, SsoIdentityProvider] = {}
 
         self._consent_at_registration = hs.config.consent.user_consent_at_registration
+
+        self.nextcloud_client = hs.get_nextcloud_client()  # DLA:ComUE
+        self.config = hs.config  # DLA:ComUE
 
     def register_identity_provider(self, p: SsoIdentityProvider) -> None:
         p_id = p.idp_id
@@ -480,9 +488,20 @@ class SsoHandler:
                 user_id = await grandfather_existing_users()
                 if user_id:
                     # Future logins should also match this user ID.
+                    """watcha!
                     await self._store.record_user_external_id(
                         auth_provider_id, remote_user_id, user_id
                     )
+                    !watcha"""
+                    # watcha+
+                    attributes = await sso_to_matrix_id_mapper(0)
+                    await self._store.record_user_external_id(
+                        auth_provider_id,
+                        remote_user_id,
+                        user_id,
+                        attributes.nextcloud_username,
+                    )
+                    # +watcha
 
             if not user_id and not registration_enabled:
                 logger.info(
@@ -737,6 +756,33 @@ class SsoHandler:
         ):
             raise MappingException("localpart is invalid: %s" % (attributes.localpart,))
 
+        # DLA:ComUE+
+        mail_domaian_available = ["universite-lyon.fr", "access-check.renater.fr"]
+        if attributes.is_partner and any(
+            domain in attributes.emails for domain in mail_domaian_available
+        ):
+            attributes.is_partner = False
+        group = ["partner"] if attributes.is_partner else []
+
+        register_nc_user = (
+            self.config.watcha.managed_idp
+            and self.config.watcha.nextcloud_integration
+            and (
+                not attributes.is_partner
+                or self.config.watcha.external_authentication_for_partners
+            )
+        )
+
+        if register_nc_user:
+            await self.nextcloud_client.add_user(
+                attributes.localpart,
+                attributes.display_name,
+                attributes.emails[0],
+                attributes.is_admin,
+                group,
+            )
+        # +DLA:ComUE
+
         logger.debug("Mapped SSO user to local part %s", attributes.localpart)
         registered_user_id = await self._registration_handler.register_user(
             localpart=attributes.localpart,
@@ -744,11 +790,23 @@ class SsoHandler:
             bind_emails=attributes.emails,
             user_agent_ips=[(user_agent, ip_address)],
             auth_provider_id=auth_provider_id,
+            admin=attributes.is_admin,  # watcha+
+            make_partner=attributes.is_partner,  # DLA : ComUE
         )
 
+        """watcha!
         await self._store.record_user_external_id(
             auth_provider_id, remote_user_id, registered_user_id
         )
+        !watcha"""
+        # watcha+
+        await self._store.record_user_external_id(
+            auth_provider_id,
+            remote_user_id,
+            registered_user_id,
+            attributes.nextcloud_username,
+        )
+        # +watcha
 
         # Set avatar, if available
         if attributes.picture:
