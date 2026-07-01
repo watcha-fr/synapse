@@ -791,7 +791,7 @@ class RoomsCreateTestCase(RoomBase):
         self.assertEqual(HTTPStatus.OK, channel.code, channel.result)
         self.assertTrue("room_id" in channel.json_body)
         assert channel.resource_usage is not None
-        self.assertEqual(35, channel.resource_usage.db_txn_count); return  # watcha+ compteur upstream : nos modifs de create_room ajoutent des txn (valeur à confirmer via trial)
+        self.assertEqual(40, channel.resource_usage.db_txn_count); return  # watcha+ +5 txn vs upstream (35) dus aux modifs create_room
         self.assertEqual(35, channel.resource_usage.db_txn_count)
 
     def test_post_room_initial_state(self) -> None:
@@ -805,7 +805,7 @@ class RoomsCreateTestCase(RoomBase):
         self.assertEqual(HTTPStatus.OK, channel.code, channel.result)
         self.assertTrue("room_id" in channel.json_body)
         assert channel.resource_usage is not None
-        self.assertEqual(37, channel.resource_usage.db_txn_count); return  # watcha+ compteur upstream : nos modifs de create_room ajoutent des txn (valeur à confirmer via trial)
+        self.assertEqual(42, channel.resource_usage.db_txn_count); return  # watcha+ +5 txn vs upstream (37) dus aux modifs create_room
         self.assertEqual(37, channel.resource_usage.db_txn_count)
 
     def test_post_room_topic(self) -> None:
