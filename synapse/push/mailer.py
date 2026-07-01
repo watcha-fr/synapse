@@ -57,9 +57,8 @@ if TYPE_CHECKING:
 # watcha+
 import re
 from base64 import b64encode
+from importlib.resources import files as importlib_files
 from pathlib import Path
-
-import pkg_resources
 
 from synapse.types import get_localpart_from_id
 from synapse.util.watcha import ActionStatus, build_log_message
@@ -170,7 +169,7 @@ class Mailer:
             )
             return b64_image
         path = Path(
-            pkg_resources.resource_filename("synapse", "res/templates"), image_name
+            str(importlib_files("synapse").joinpath("res/templates")), image_name
         )
         data = path.read_bytes()
         b64_image = b64encode(data).decode()
