@@ -20,7 +20,7 @@ import time
 from synapse.util import metrics
 import json
 import os
-from synapse.util import json_encoder
+from synapse.util.json import json_encoder
 from synapse.api.constants import EventTypes, Membership
 from typing import Tuple, Dict, Any, List
 from http import HTTPStatus
