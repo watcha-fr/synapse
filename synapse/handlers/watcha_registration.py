@@ -33,6 +33,7 @@ class RegistrationHandler:
         """ watcha!
         if hs.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
         !watcha"""
+        self.mailer = None # watcha+ : évite un AttributeError si l'email n'est pas configuré
         if hs.config.email.can_verify_email: # watcha+
             self.mailer = Mailer(
                 hs=hs,
@@ -160,7 +161,7 @@ class RegistrationHandler:
                 user_id, profile
             )
 
-        if send_registration_mail:
+        if send_registration_mail and self.mailer is not None: # watcha+ : mailer None si email non configuré
             await self.mailer.send_watcha_registration_mail(
                 sender_id=sender_id,
                 email_address=email_address,

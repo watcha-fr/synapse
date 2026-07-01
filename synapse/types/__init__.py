@@ -1584,8 +1584,10 @@ class UserInfo:
     approved: bool
     locked: bool
     suspended: bool
-    is_partner: bool  # watcha+
-    password_hash: bool  # watcha+
+    # watcha+ : défauts pour ne pas casser les constructions UserInfo() upstream
+    # (ex. tests) qui ignorent ces champs ; get_user_by_id les passe explicitement.
+    is_partner: bool = False  # watcha+
+    password_hash: bool = False  # watcha+
 
 
 class UserProfile(TypedDict):

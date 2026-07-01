@@ -4165,6 +4165,14 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 400)
         self.assertEqual(channel.json_body["errcode"], "M_MISSING_PARAM")
 
+    # watcha+
+    # do_3pid_invite bypasse le flux Identity Server (enregistre directement le
+    # partenaire), donc id_access_token n'est pas requis : pas de 400 attendu.
+    test_400_missing_param_without_id_access_token.skip = (
+        "[watcha] do_3pid_invite bypasse l'Identity Server (id_access_token non requis)"
+    )
+    # +watcha
+
 
 class TimestampLookupTestCase(unittest.HomeserverTestCase):
     servlets = [
