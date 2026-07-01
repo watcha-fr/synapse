@@ -37,14 +37,19 @@ class AdministrationStore(SQLBaseStore):
             A list of room_id
         """
 
+        # watcha : seuil calculé en Python (EXTRACT(EPOCH FROM now()) est Postgres-only
+        # et casse sur SQLite) — équivalent et portable.
+        week_ago_ms = self.clock.time_msec() - (3600 * 24 * 7 * 1000)
+
         def _get_new_rooms_txn(txn):
             txn.execute(
                 """
                 SELECT DISTINCT room_id
                 FROM events
                 WHERE type = 'm.room.create'
-                    AND received_ts >= (EXTRACT(EPOCH FROM now()) * 1000 - (3600 * 24 * 7 * 1000));
-            """
+                    AND received_ts >= ?
+            """,
+                (week_ago_ms,),
             )
 
             return [rooms[0] for rooms in txn.fetchall()]
@@ -58,14 +63,19 @@ class AdministrationStore(SQLBaseStore):
             A list of room_id
         """
 
+        # watcha : seuil calculé en Python (EXTRACT(EPOCH FROM now()) est Postgres-only
+        # et casse sur SQLite) — équivalent et portable.
+        week_ago_ms = self.clock.time_msec() - (3600 * 24 * 7 * 1000)
+
         def _get_active_rooms_txn(txn):
             txn.execute(
                 """
                 SELECT DISTINCT room_id
                 FROM events
                 WHERE type = 'm.room.message'
-                    AND received_ts >= (EXTRACT(EPOCH FROM now()) * 1000 - (3600 * 24 * 7 * 1000));
-            """
+                    AND received_ts >= ?
+            """,
+                (week_ago_ms,),
             )
 
             return [rooms[0] for rooms in txn.fetchall()]

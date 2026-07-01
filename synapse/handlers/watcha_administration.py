@@ -63,18 +63,23 @@ class AdministrationHandler:
     async def get_user_role(self, user_id):
     !watcha"""
 
-    async def get_user_role(self, requester: Requester): # watcha+
+    # watcha+
+    # Accepte un user_id (str) OU un Requester : watcha_user_list/update_user_role
+    # résolvent le rôle par utilisateur (str), le flux Nextcloud passe un Requester.
+    # store.is_server_admin(str) est équivalent en 1.153 à auth.is_server_admin(requester)
+    # (ce dernier appelle justement store.is_server_admin(requester.user.to_string())).
+    async def get_user_role(self, user): # watcha+
         """Retrieve user role [administrator|collaborator|partner]
 
         Returns:
             The user role.
         """
-        user_id = requester.user.to_string() # watcha+
+        user_id = user.user.to_string() if isinstance(user, Requester) else user # watcha+
         is_partner = await self.auth_handler.is_partner(user_id)
         """ watcha!
         is_admin = await self.auth.is_server_admin(UserID.from_string(user_id))
         !watcha"""
-        is_admin = await self.auth.is_server_admin(requester) # watcha+
+        is_admin = await self.store.is_server_admin(user_id) # watcha+
 
         if is_partner and is_admin:
             raise SynapseError(
