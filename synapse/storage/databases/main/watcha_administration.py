@@ -3,6 +3,7 @@ import inspect
 import json
 import logging
 import subprocess
+import time
 from collections import defaultdict
 from datetime import datetime
 
@@ -38,8 +39,9 @@ class AdministrationStore(SQLBaseStore):
         """
 
         # watcha : seuil calculé en Python (EXTRACT(EPOCH FROM now()) est Postgres-only
-        # et casse sur SQLite) — équivalent et portable.
-        week_ago_ms = self.clock.time_msec() - (3600 * 24 * 7 * 1000)
+        # et casse sur SQLite). On utilise l'horloge murale réelle (time.time()),
+        # équivalent exact de now() côté Postgres, portable et prod-fidèle.
+        week_ago_ms = int(time.time() * 1000) - (3600 * 24 * 7 * 1000)
 
         def _get_new_rooms_txn(txn):
             txn.execute(
@@ -64,8 +66,9 @@ class AdministrationStore(SQLBaseStore):
         """
 
         # watcha : seuil calculé en Python (EXTRACT(EPOCH FROM now()) est Postgres-only
-        # et casse sur SQLite) — équivalent et portable.
-        week_ago_ms = self.clock.time_msec() - (3600 * 24 * 7 * 1000)
+        # et casse sur SQLite). On utilise l'horloge murale réelle (time.time()),
+        # équivalent exact de now() côté Postgres, portable et prod-fidèle.
+        week_ago_ms = int(time.time() * 1000) - (3600 * 24 * 7 * 1000)
 
         def _get_active_rooms_txn(txn):
             txn.execute(
@@ -462,12 +465,18 @@ class AdministrationStore(SQLBaseStore):
         ]
 
     async def _update_user(self, user_id, **updatevalues):
-        return await self.db_pool.simple_update(
-            table="users",
-            keyvalues={"name": user_id},
-            updatevalues=updatevalues,
-            desc=_caller_name(),
-        )
+        # watcha : mise à jour + invalidation des caches impactés. is_server_admin
+        # est @cached : sans invalidation, le rôle admin resterait périmé après un
+        # changement de rôle (cf. set_server_admin upstream).
+        def _update_user_txn(txn):
+            count = self.db_pool.simple_update_txn(
+                txn, "users", {"name": user_id}, updatevalues
+            )
+            self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
+            self._invalidate_cache_and_stream(txn, self.is_server_admin, (user_id,))
+            return count
+
+        return await self.db_pool.runInteraction(_caller_name(), _update_user_txn)
 
     async def update_user_role(self, user_id, role):
         if role == "collaborator":
