@@ -106,7 +106,8 @@ class AdministrationTestCase(unittest.HomeserverTestCase):
             self.get_success(self.store.update_user_role(user_id, element["role"]))
             is_partner = self.get_success(self.store.is_partner(user_id))
             is_admin = self.get_success(
-                self.store.is_server_admin(UserID.from_string(user_id))
+                # watcha : is_server_admin attend un str depuis Synapse 1.153 (avant UserID)
+                self.store.is_server_admin(user_id)
             )
             self.assertEquals(is_partner, element["values"]["is_partner"])
             self.assertEquals(is_admin, element["values"]["is_admin"])

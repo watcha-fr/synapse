@@ -637,6 +637,15 @@ class UserDirectoryStoreTestCase(HomeserverTestCase):
     test_search_user_dir.skip = skip_reason
     test_search_user_dir_all_users.skip = skip_reason
     test_search_user_dir_stop_words.skip = skip_reason
+    # Tests de comportement de recherche ajoutés en amont (1.153) : la SQL
+    # custom Watcha (jointure email, matching différent) ne suit pas ces
+    # sémantiques upstream. Le comportement Watcha est couvert par
+    # WatchaUserDirectoryStoreTestCase.
+    test_search_user_limit_correct.skip = skip_reason
+    test_search_user_dir_start_of_user_id.skip = skip_reason
+    test_search_user_dir_ascii_case_insensitivity.skip = skip_reason
+    test_search_user_dir_unicode_case_insensitivity.skip = skip_reason
+    test_search_user_dir_unicode_normalization.skip = skip_reason
     # +watcha
 
 
@@ -696,6 +705,12 @@ class UserDirectoryICUTestCase(HomeserverTestCase):
         self.assertEqual(_parse_words_with_icu("user-1"), ["user-1"])
         self.assertEqual(_parse_words_with_icu("user-ab"), ["user-ab"])
         self.assertEqual(_parse_words_with_icu("user.--1"), ["user", "-1"])
+
+    # watcha+ : la SQL custom Watcha ne suit pas la sémantique ICU upstream
+    test_icu_word_boundary.skip = (
+        "[watcha] not compatible with custom search_user_dir SQL"
+    )
+    # +watcha
 
 
 # watcha+

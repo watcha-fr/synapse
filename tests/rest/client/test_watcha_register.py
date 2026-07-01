@@ -1,7 +1,6 @@
 import os
+from importlib.resources import files as importlib_files
 from unittest.mock import AsyncMock
-
-import pkg_resources
 
 from synapse.rest import admin
 from synapse.rest.client import login, room, watcha
@@ -28,7 +27,7 @@ class RegisterTestCase(unittest.HomeserverTestCase):
         config["email"] = {
             "enable_notifs": False,
             "template_dir": os.path.abspath(
-                pkg_resources.resource_filename("synapse", "res/templates")
+                str(importlib_files("synapse").joinpath("res/templates"))
             ),
             "smtp_host": "127.0.0.1",
             "smtp_port": 20,
