@@ -69,6 +69,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+from json import loads  # watcha+
+
 
 # synapse server name: used to populate public_baseurl in some tests
 SYNAPSE_SERVER_PUBLIC_HOSTNAME = "synapse"
@@ -498,6 +500,22 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         # test that the login fails with the correct error code
         self.assertEqual(channel.code, 400)
         self.assertEqual(channel.json_body["errcode"], "M_INVALID_PARAM")
+
+    # watcha+
+    def test_login_as_partner(self):
+        self.register_user("partner", "pass", is_partner=True)
+
+        params = {
+            "type": "m.login.password",
+            "identifier": {"type": "m.id.user", "user": "partner"},
+            "password": "pass",
+        }
+        channel = self.make_request(b"POST", LOGIN_URL, params)
+
+        self.assertEqual(channel.code, 200)
+        self.assertTrue(loads(channel.result["body"])["is_partner"])
+
+    # +watcha
 
     @override_config(
         {

@@ -782,6 +782,7 @@ class HomeserverTestCase(TestCase):
         password: str,
         admin: bool | None = False,
         displayname: str | None = None,
+        is_partner: bool | None = False,  # watcha+
     ) -> str:
         """
         Register a user. Requires the Admin API be registered.
@@ -820,6 +821,7 @@ class HomeserverTestCase(TestCase):
             "admin": admin,
             "mac": want_mac_digest,
             "inhibit_login": True,
+            "is_partner": False if admin else is_partner,  # watcha+
         }
         channel = self.make_request("POST", "/_synapse/admin/v1/register", body)
         self.assertEqual(channel.code, 200, channel.json_body)

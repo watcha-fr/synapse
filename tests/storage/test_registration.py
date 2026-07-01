@@ -57,6 +57,8 @@ class RegistrationStoreTestCase(HomeserverTestCase):
                 is_shadow_banned=False,
                 approved=True,
                 suspended=False,
+                is_partner=False,  # watcha+
+                password_hash=True,  # watcha+ (user enregistré avec un pwhash → get_user_by_id renvoie bool=True)
             ),
             (self.get_success(self.store.get_user_by_id(self.user_id))),
         )
