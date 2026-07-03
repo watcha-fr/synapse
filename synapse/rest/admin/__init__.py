@@ -130,6 +130,9 @@ from synapse.rest.admin.users import (
     WhoisRestServlet,
 )
 from synapse.rest.admin.watcha_file_type_filter import WatchaFileTypeFilterAdminServlet  # watcha+
+from synapse.rest.admin.watcha_retention_config import (  # watcha+
+    WatchaRetentionConfigAdminServlet,
+)
 from synapse.rest.admin.watcha_user_audit_log import WatchaUserAuditLogAdminServlet  # watcha+
 from synapse.types import JsonDict, RoomStreamToken, TaskStatus
 from synapse.util import SYNAPSE_VERSION
@@ -356,6 +359,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ExperimentalFeaturesRestServlet(hs).register(http_server)
     WatchaFileTypeFilterAdminServlet(hs).register(http_server)  # watcha+
     WatchaUserAuditLogAdminServlet(hs).register(http_server)  # watcha+
+    WatchaRetentionConfigAdminServlet(hs).register(http_server)  # watcha+
     SuspendAccountRestServlet(hs).register(http_server)
     ScheduledTasksRestServlet(hs).register(http_server)
     AdminRoomHierarchy(hs).register(http_server)

@@ -26,6 +26,7 @@ from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
 from synapse.types import JsonDict
+from synapse.util.watcha_retention import load_retention_config  # watcha+
 
 from ._base import client_patterns
 
@@ -62,6 +63,12 @@ class CapabilitiesRestServlet(RestServlet):
         )
         # +watcha
 
+        # watcha+
+        retention_config = load_retention_config(
+            self.config.watcha.retention_config_path
+        )
+        # +watcha
+
         response: JsonDict = {
             "capabilities": {
                 "m.room_versions": {
@@ -88,6 +95,15 @@ class CapabilitiesRestServlet(RestServlet):
                 "watcha": {
                     "external_authentication_for_partners": {
                         "enabled": self.config.watcha.external_authentication_for_partners
+                    },
+                    "room_retention": {
+                        # Whether room admins are allowed to set the per-room
+                        # retention duration from the room settings.
+                        "allow_admin_set": retention_config["allow_room_override"],
+                        # Server-wide default retention duration, in ms (or null).
+                        "default_max_lifetime": retention_config[
+                            "default_max_lifetime"
+                        ],
                     },
                 },
                 # +watcha

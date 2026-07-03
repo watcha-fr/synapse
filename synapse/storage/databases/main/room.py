@@ -70,6 +70,7 @@ from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.duration import Duration
 from synapse.util.json import json_encoder
 from synapse.util.stringutils import MXC_REGEX
+from synapse.util.watcha_retention import load_retention_config  # watcha+
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -1110,6 +1111,19 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         if not self.config.retention.retention_enabled:
             return RetentionPolicy()
 
+        # watcha+
+        # A default retention duration set from the admin console takes
+        # precedence over the static homeserver.yaml default policy.
+        watcha_default_max_lifetime = load_retention_config(
+            self.config.watcha.retention_config_path
+        )["default_max_lifetime"]
+        default_max_lifetime = (
+            watcha_default_max_lifetime
+            if watcha_default_max_lifetime is not None
+            else self.config.retention.retention_default_max_lifetime
+        )
+        # +watcha
+
         def get_retention_policy_for_room_txn(
             txn: LoggingTransaction,
         ) -> tuple[int | None, int | None] | None:
@@ -1134,7 +1148,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         if not ret:
             return RetentionPolicy(
                 min_lifetime=self.config.retention.retention_default_min_lifetime,
-                max_lifetime=self.config.retention.retention_default_max_lifetime,
+                max_lifetime=default_max_lifetime,  # watcha : admin-console default
             )
 
         min_lifetime, max_lifetime = ret
@@ -1147,7 +1161,20 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             min_lifetime = self.config.retention.retention_default_min_lifetime
 
         if max_lifetime is None:
-            max_lifetime = self.config.retention.retention_default_max_lifetime
+            max_lifetime = default_max_lifetime  # watcha : admin-console default
+
+        # watcha+
+        # The admin-console default duration is also the ceiling: a room admin
+        # may not keep messages longer than the server-wide default. Clamp any
+        # per-room value that exceeds it (enforced here so it holds even if the
+        # m.room.retention state event was set directly via the API).
+        if (
+            watcha_default_max_lifetime is not None
+            and max_lifetime is not None
+            and max_lifetime > watcha_default_max_lifetime
+        ):
+            max_lifetime = watcha_default_max_lifetime
+        # +watcha
 
         return RetentionPolicy(
             min_lifetime=min_lifetime,
