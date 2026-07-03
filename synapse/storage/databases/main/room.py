@@ -1181,6 +1181,48 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             max_lifetime=max_lifetime,
         )
 
+    # watcha+
+    async def get_pinned_event_ids(self, room_id: str) -> set[str]:
+        """Return the set of event IDs currently pinned in the room.
+
+        Read from the current ``m.room.pinned_events`` state event. Returns an
+        empty set when the room has no pinned messages or the content is
+        malformed. Shared by the retention purge (to keep pinned events in the
+        database) and by the client read filter in ``visibility.py`` (to keep
+        pinned events visible even once they are older than ``max_lifetime``).
+        """
+
+        def get_pinned_event_ids_txn(txn: LoggingTransaction) -> set[str]:
+            txn.execute(
+                "SELECT ej.json FROM current_state_events AS cse"
+                " INNER JOIN event_json AS ej USING (event_id)"
+                " WHERE cse.room_id = ? AND cse.type = ? AND cse.state_key = ''",
+                (room_id, EventTypes.Pinned),
+            )
+            row = txn.fetchone()
+            if not row:
+                return set()
+
+            try:
+                content = db_to_json(row[0]).get("content", {})
+            except Exception:
+                logger.warning(
+                    "could not parse m.room.pinned_events for room %s", room_id
+                )
+                return set()
+
+            pinned = content.get("pinned", [])
+            if not isinstance(pinned, list):
+                return set()
+
+            return {event_id for event_id in pinned if isinstance(event_id, str)}
+
+        return await self.db_pool.runInteraction(
+            "get_pinned_event_ids", get_pinned_event_ids_txn
+        )
+
+    # +watcha
+
     async def get_media_mxcs_in_room(self, room_id: str) -> tuple[list[str], list[str]]:
         """Retrieves all the local and remote media MXC URIs in a given room
 
