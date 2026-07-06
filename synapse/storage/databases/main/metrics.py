@@ -21,7 +21,8 @@
 import calendar
 import logging
 import time
-from typing import TYPE_CHECKING, cast
+from collections import defaultdict  # watcha+
+from typing import TYPE_CHECKING, Dict, Set, Tuple, cast  # watcha: +Dict,Set,Tuple
 
 from synapse.metrics import SERVER_NAME_LABEL, GaugeBucketCollector
 from synapse.metrics.background_process_metrics import wrap_as_background_process
@@ -40,6 +41,45 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+# watcha+
+# Catégories spéciales du filtre "par ville" (dashboard Grafana SITIV).
+CITY_OTHER = "autre/externe"  # email hors mapping (ou sans email)
+CITY_INTER = "inter-villes"  # salon/espace dont les membres couvrent >= 2 villes
+
+
+def _domain_of(address: str) -> str:
+    """Extrait le domaine (minuscule) d'une adresse email, "" si invalide."""
+    if address and "@" in address:
+        return address.rsplit("@", 1)[-1].lower()
+    return ""
+
+
+def _city_counts_from_rows(rows, domain_to_city: Dict[str, str]) -> Dict[str, int]:
+    """À partir de lignes (user_id, address) — une par email, address pouvant être
+    NULL —, ventile CHAQUE utilisateur par ville. Un utilisateur dont aucun email
+    n'est rattaché à une ville (domaine hors mapping OU sans email) tombe dans
+    `autre/externe`. Ainsi somme des villes + `autre/externe` = total des users
+    fournis. Un user multi-domaines est compté dans chacune de ses villes."""
+    user_cities: Dict[str, Set[str]] = defaultdict(set)
+    all_users: Set[str] = set()
+    for user_id, address in rows:
+        all_users.add(user_id)
+        if address:
+            city = domain_to_city.get(_domain_of(address))
+            if city is not None:
+                user_cities[user_id].add(city)
+
+    by_city: Dict[str, Set[str]] = defaultdict(set)
+    for user_id in all_users:
+        cities = user_cities.get(user_id)
+        if cities:
+            for city in cities:
+                by_city[city].add(user_id)
+        else:
+            by_city[CITY_OTHER].add(user_id)
+    return {city: len(users) for city, users in by_city.items()}
+# +watcha
 
 # Collect metrics on the number of forward extremities that exist.
 _extremities_collecter = GaugeBucketCollector(
@@ -229,6 +269,127 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
         return await self.db_pool.runInteraction(
             "count_daily_users", self._count_users, yesterday
         )
+
+    # watcha+
+    async def count_users_active_last_5min(self) -> int:
+        """Counts the number of users seen in the last 5 minutes."""
+        five_minutes_ago = int(self.clock.time_msec()) - (1000 * 60 * 5)
+        return await self.db_pool.runInteraction(
+            "count_users_active_last_5min", self._count_users, five_minutes_ago
+        )
+
+    async def count_users_by_city(
+        self, domain_to_city: Dict[str, str]
+    ) -> Dict[str, int]:
+        """Compte TOUS les utilisateurs non désactivés, ventilés par ville (déduite
+        du domaine de leur email). LEFT JOIN : un user sans email ou au domaine hors
+        mapping tombe dans `autre/externe` => somme villes + `autre/externe` = total."""
+
+        def _count(txn: LoggingTransaction) -> Dict[str, int]:
+            txn.execute(
+                """
+                SELECT u.name, t.address
+                FROM users u
+                LEFT JOIN user_threepids t
+                    ON t.user_id = u.name AND t.medium = 'email'
+                WHERE u.deactivated <> 1
+                """
+            )
+            return _city_counts_from_rows(txn, domain_to_city)
+
+        return await self.db_pool.runInteraction("count_users_by_city", _count)
+
+    async def count_active_users_5m_by_city(
+        self, domain_to_city: Dict[str, str]
+    ) -> Dict[str, int]:
+        """Comme count_users_by_city mais restreint aux utilisateurs vus sur les
+        5 dernières minutes (user_ips.last_seen). LEFT JOIN => `autre/externe`
+        inclut aussi les actifs sans email rattaché."""
+        five_minutes_ago = int(self.clock.time_msec()) - (1000 * 60 * 5)
+
+        def _count(txn: LoggingTransaction) -> Dict[str, int]:
+            txn.execute(
+                """
+                SELECT a.user_id, t.address
+                FROM (
+                    SELECT DISTINCT user_id FROM user_ips WHERE last_seen > ?
+                ) a
+                LEFT JOIN user_threepids t
+                    ON t.user_id = a.user_id AND t.medium = 'email'
+                """,
+                (five_minutes_ago,),
+            )
+            return _city_counts_from_rows(txn, domain_to_city)
+
+        return await self.db_pool.runInteraction(
+            "count_active_users_5m_by_city", _count
+        )
+
+    async def count_rooms_and_spaces_by_city(
+        self, domain_to_city: Dict[str, str], dm_rooms: Set[str]
+    ) -> Tuple[Dict[Tuple[str, str], int], Dict[Tuple[str, str], int]]:
+        """Classe chaque salon/espace par ville ET par type selon ses membres
+        joints :
+        - ville : tous les membres mappés d'une même ville => cette ville ;
+          >= 2 villes => `inter-villes` ; aucun membre mappé => `autre/externe`
+          (membres sans email mappé ignorés) ;
+        - type salon : `dm` si DM, sinon `public`/`private` (rooms.is_public) ;
+        - type espace : `public`/`private`.
+        Retourne (salons, espaces), chacun indexé par clé (ville, type)."""
+
+        def _count(
+            txn: LoggingTransaction,
+        ) -> Tuple[Dict[Tuple[str, str], int], Dict[Tuple[str, str], int]]:
+            txn.execute(
+                """
+                SELECT r.room_id, r.is_public, rss.room_type, t.address
+                FROM rooms r
+                LEFT JOIN room_stats_state rss ON rss.room_id = r.room_id
+                LEFT JOIN local_current_membership m
+                    ON m.room_id = r.room_id AND m.membership = 'join'
+                LEFT JOIN user_threepids t
+                    ON t.user_id = m.user_id AND t.medium = 'email'
+                """
+            )
+            cities: Dict[str, Set[str]] = defaultdict(set)
+            is_space: Dict[str, bool] = {}
+            is_public: Dict[str, bool] = {}
+            for room_id, public, room_type, address in txn:
+                is_space[room_id] = room_type == "m.space"
+                is_public[room_id] = bool(public)
+                city = domain_to_city.get(_domain_of(address))
+                if city is not None:
+                    cities[room_id].add(city)
+
+            rooms_by_city: Dict[Tuple[str, str], int] = defaultdict(int)
+            spaces_by_city: Dict[Tuple[str, str], int] = defaultdict(int)
+            for room_id, is_sp in is_space.items():
+                room_cities = cities.get(room_id, set())
+                if not room_cities:
+                    ville = CITY_OTHER
+                elif len(room_cities) == 1:
+                    ville = next(iter(room_cities))
+                else:
+                    ville = CITY_INTER
+
+                if is_sp:
+                    rtype = "public" if is_public[room_id] else "private"
+                    spaces_by_city[(ville, rtype)] += 1
+                else:
+                    if room_id in dm_rooms:
+                        rtype = "dm"
+                    elif is_public[room_id]:
+                        rtype = "public"
+                    else:
+                        rtype = "private"
+                    rooms_by_city[(ville, rtype)] += 1
+
+            return dict(rooms_by_city), dict(spaces_by_city)
+
+        return await self.db_pool.runInteraction(
+            "count_rooms_and_spaces_by_city", _count
+        )
+    # +watcha
 
     async def count_monthly_users(self) -> int:
         """
