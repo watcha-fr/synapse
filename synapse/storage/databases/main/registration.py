@@ -802,7 +802,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 "auth_provider": auth_provider,
                 "external_id": external_id,
                 "user_id": user_id,
-                "nextcloud_username": nextcloud_username,  # watcha+
+                "nextcloud_username": nextcloud_username or external_id,  # watcha+
             },
         )
 
