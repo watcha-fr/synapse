@@ -244,8 +244,13 @@ class SsoHandler:
 
         self._consent_at_registration = hs.config.consent.user_consent_at_registration
 
-        self.nextcloud_client = hs.get_nextcloud_client()  # DLA:ComUE
         self.config = hs.config  # DLA:ComUE
+        # watcha+
+        # Kept as the homeserver rather than the handler: the Nextcloud handler is
+        # built on top of the event creation handler, so resolving it here would
+        # risk a construction cycle. Resolved lazily at the call site instead.
+        self._hs = hs
+        # +watcha
 
     def register_identity_provider(self, p: SsoIdentityProvider) -> None:
         p_id = p.idp_id
@@ -763,50 +768,65 @@ class SsoHandler:
         ):
             attributes.is_partner = False
         group = ["partner"] if attributes.is_partner else []
-
-        register_nc_user = (
-            self.config.watcha.managed_idp
-            and self.config.watcha.nextcloud_integration
-            and (
-                not attributes.is_partner
-                or self.config.watcha.external_authentication_for_partners
-            )
-        )
-
-        if register_nc_user:
-            await self.nextcloud_client.add_user(
-                attributes.localpart,
-                attributes.display_name,
-                attributes.emails[0],
-                attributes.is_admin,
-                group,
-            )
         # +DLA:ComUE
 
         logger.debug("Mapped SSO user to local part %s", attributes.localpart)
+
+        # watcha+
+        # The Nextcloud account and the mapping must use the *same* identifier.
+        # This block used to create the account under `attributes.localpart` while
+        # the mapping below recorded `attributes.nextcloud_username`: the two are
+        # rendered from two independent templates, so as soon as a deployment sets
+        # `localpart_template` without also setting `nextcloud_username_template`
+        # (or vice versa) every group operation for that user failed with OCS 103
+        # "user does not exist" — and the failure was swallowed. That is what left
+        # 67 accounts on this deployment with a valid mapping and no reachable
+        # Nextcloud account, at a rate of about seven a month.
+        #
+        # `nextcloud_username` is the authoritative one because it is what
+        # `get_username()` returns to every consumer afterwards.
+        nextcloud_username = attributes.nextcloud_username or remote_user_id
+
+        async def provision_nextcloud_and_mapping(registered_user_id: str) -> None:
+            """Persist the mapping, and the account it points at, before auto-join.
+
+            Ordering matters: an auto-join room holding a shared folder triggers a
+            group synchronisation during `register_user`. Recording the mapping
+            afterwards meant `get_username()` returned None and Synapse issued a
+            literal `POST /cloud/users/None/groups` on every first SSO login.
+            """
+            await self._store.record_user_external_id(
+                auth_provider_id,
+                remote_user_id,
+                registered_user_id,
+                nextcloud_username,
+            )
+            await self._hs.get_nextcloud_handler().provision_account(
+                nextcloud_username=nextcloud_username,
+                displayname=attributes.display_name,
+                email=attributes.emails[0] if attributes.emails else None,
+                is_admin=bool(attributes.is_admin),
+                is_partner=bool(attributes.is_partner),
+                groups=group,
+            )
+
         registered_user_id = await self._registration_handler.register_user(
             localpart=attributes.localpart,
             default_display_name=attributes.display_name,
             bind_emails=attributes.emails,
             user_agent_ips=[(user_agent, ip_address)],
             auth_provider_id=auth_provider_id,
-            admin=attributes.is_admin,  # watcha+
+            admin=attributes.is_admin,
             make_partner=attributes.is_partner,  # DLA : ComUE
+            before_auto_join=provision_nextcloud_and_mapping,
         )
+        # +watcha
 
         """watcha!
         await self._store.record_user_external_id(
             auth_provider_id, remote_user_id, registered_user_id
         )
         !watcha"""
-        # watcha+
-        await self._store.record_user_external_id(
-            auth_provider_id,
-            remote_user_id,
-            registered_user_id,
-            attributes.nextcloud_username,
-        )
-        # +watcha
 
         # Set avatar, if available
         if attributes.picture:

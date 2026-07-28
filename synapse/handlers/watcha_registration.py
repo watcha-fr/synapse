@@ -52,7 +52,9 @@ class RegistrationHandler:
         keycloak_username: Optional[str] = None,
         keycloak_as_broker: Optional[bool] = False,
         localpart_id: Optional[str] = None,
-        register_kc_user: Optional[bool] = False, #DLA : Villeurbanne-Synchronisation
+        # watcha+ `register_kc_user` used to be a parameter here, but it was
+        # unconditionally reassigned from the configuration a few lines below
+        # before ever being read: dead code, removed. No caller passed it.
     ):
         """Registers a new user on the server.
 
@@ -122,10 +124,20 @@ class RegistrationHandler:
             localpart = str(uuid.uuid4())
             local_password_hash = password_hash
 
+        # watcha+
+        # Same single implementation as the SSO path. Here `localpart` *is* the
+        # identifier recorded in the mapping below, so the two agree by
+        # construction — unlike the SSO path, where they were rendered from two
+        # independent templates and could diverge.
         if register_nc_user:
-            await self.nextcloud_client.add_user(
-                localpart, default_display_name, email_address, is_admin
+            await self.hs.get_nextcloud_handler().provision_account(
+                nextcloud_username=localpart,
+                displayname=default_display_name,
+                email=email_address,
+                is_admin=bool(is_admin),
+                is_partner=bool(is_partner),
             )
+        # +watcha
 
         user_id = await self.registration_handler.register_user(
             localpart=localpart,

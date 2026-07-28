@@ -15,6 +15,7 @@
 from synapse.http.server import JsonResource
 from synapse.rest.watcha.nextcloud import (
     GetCalendarRestServlet,
+    GetRoomFolderRestServlet,
     ListUsersOwnCalendarsRestServlet,
     ReorderCalendarsRestServlet,
 )
@@ -39,3 +40,4 @@ def register_servlets(hs, http_server):
     ListUsersOwnCalendarsRestServlet(hs).register(http_server)
     GetCalendarRestServlet(hs).register(http_server)
     ReorderCalendarsRestServlet(hs).register(http_server)
+    GetRoomFolderRestServlet(hs).register(http_server)

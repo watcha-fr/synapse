@@ -422,6 +422,17 @@ class RoomCreationHandler:
             old_room_id, new_room_id
         )
 
+        # watcha+
+        # The Nextcloud folder binding is keyed on the room id, so an upgraded
+        # room would otherwise lose its document space entirely: the new room has
+        # no share, and members joining it find nothing to synchronise.
+        # Resolved lazily: the Nextcloud handler is built on top of the event
+        # creation handler, so wiring it in __init__ would risk a cycle.
+        await self.hs.get_nextcloud_handler().transfer_share_on_room_upgrade(
+            requester, old_room_id, new_room_id
+        )
+        # +watcha
+
         # finally, shut down the PLs in the old room, and update them in the new
         # room.
         await self._update_upgraded_room_pls(
@@ -614,6 +625,12 @@ class RoomCreationHandler:
             (EventTypes.RoomEncryption, ""),
             (EventTypes.ServerACL, ""),
             (EventTypes.PowerLevels, ""),
+            # watcha+
+            # Carries `nextcloudShare`, the room's document space binding. Without
+            # it an upgraded room shows an empty document panel even though the
+            # share has been transferred server-side.
+            (EventTypes.VectorSetting, ""),
+            # +watcha
         ]
 
         room_type = old_room_create_event.content.get(EventContentFields.ROOM_TYPE)

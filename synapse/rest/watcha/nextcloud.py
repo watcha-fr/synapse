@@ -70,6 +70,40 @@ class GetCalendarRestServlet(RestServlet):
         return 200, response
 
 
+class GetRoomFolderRestServlet(RestServlet):
+    """Resolve a room's document folder for the current user.
+
+    Answers with the Nextcloud file id — stable — and the folder path as it is
+    currently mounted for the caller, so the client never resolves the folder by
+    name. A mount name is per-recipient: any member can rename their own mount,
+    and Nextcloud appends a suffix on collision, so the same folder is
+    `/Nouveau dossier` for one member and `/FACILITATEURS` for another.
+
+    `status` also tells the client *why* the folder is unreachable, so it can act
+    (`pending` -> request a member sync and retry) instead of showing one dead
+    end for every cause.
+    """
+
+    PATTERNS = nextcloud_patterns("/rooms/(?P<room_id>[^/]+)/folder$")
+
+    def __init__(self, hs: "HomeServer"):
+        self.auth = hs.get_auth()
+        self.nextcloud_handler = hs.get_nextcloud_handler()
+
+    async def on_GET(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
+        # Authorisation is room membership: the Nextcloud group mirrors the room,
+        # so without this check any user could probe the folder of any room.
+        await self.auth.check_user_in_room(room_id, requester)
+
+        response = await self.nextcloud_handler.get_room_folder(
+            room_id, requester.user.to_string()
+        )
+        return 200, response
+
+
 class ReorderCalendarsRestServlet(RestServlet):
     """Move up a calendar at the top of the list for the current user"""
 

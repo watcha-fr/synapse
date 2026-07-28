@@ -2,6 +2,7 @@ import logging
 import secrets
 from base64 import b64encode
 from typing import List, Optional, TYPE_CHECKING
+from urllib import parse as urlparse
 
 from jsonschema import validate
 
@@ -331,6 +332,31 @@ class NextcloudClient(SimpleHttpClient):
         self._raise_for_status(response["ocs"]["meta"])
 
         return response["ocs"]["data"]["id"]
+
+    async def get_room_folder(self, room_id: str, username: str):
+        """Resolve a room's document folder for a specific user.
+
+        Returns the Nextcloud file id — which is stable — and the folder path as
+        it is currently mounted *for that user*. Neither the client nor Synapse
+        may locate the folder by name: every recipient of a share can rename
+        their own mount, and Nextcloud appends a suffix on collision, so the same
+        folder has a different name for different members of the same room.
+
+        Args:
+            room_id: the id of the room
+            username: the Nextcloud username the folder is resolved for
+
+        Returns:
+            a dict with `status` (one of `ok`, `pending`, `not-member`,
+            `deleted`, `no-share`), `fileId`, `path` and `shareId`
+        """
+        quoted_room_id = urlparse.quote(room_id, safe="")
+
+        return await self.get_json(
+            uri=f"{self.base_url}/rooms/{quoted_room_id}/folder",
+            headers=self._headers,
+            args={"requester": username},
+        )
 
     async def unshare(self, requester: str, share_id: str):
         """Remove a given Nextcloud share

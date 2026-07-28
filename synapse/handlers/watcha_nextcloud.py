@@ -3,6 +3,7 @@ from typing import Iterable, List, Optional, Set
 from urllib import parse as urlparse
 
 from jsonschema.exceptions import SchemaError, ValidationError
+from prometheus_client import Counter
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
@@ -14,7 +15,7 @@ from synapse.api.errors import (
 from synapse.events import EventBase
 from synapse.push.presentable_names import calculate_room_name
 from synapse.types import Requester
-from synapse.util.watcha import build_log_message
+from synapse.util.watcha import ActionStatus, build_log_message
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +30,59 @@ NEXTCLOUD_CLIENT_ERRORS = (
     HttpResponseException,
 )
 
+NEXTCLOUD_RETRY_ATTEMPTS = 3
+NEXTCLOUD_RETRY_BASE_DELAY_SECONDS = 0.5
+
+# OCS status codes worth acting on rather than merely logging.
+NEXTCLOUD_ERROR_GROUP_NOT_FOUND = 102
+NEXTCLOUD_ERROR_USER_NOT_FOUND = 103
+
+# A member left without access to their room's documents is invisible in the
+# logs of a busy server, which is how dozens of accounts stayed broken for
+# months. Counted so it can be alerted on.
+nextcloud_sync_failures = Counter(
+    "synapse_watcha_nextcloud_sync_failures",
+    "Nextcloud synchronisation failures leaving a member without document access",
+    ["reason"],
+)
+
+# Nextcloud OCS status codes that describe a stable state rather than
+# contention: retrying them would fail identically every time.
+NEXTCLOUD_PERMANENT_ERROR_CODES = frozenset(
+    {
+        101,  # invalid input data / no group specified
+        102,  # group does not exist (or already exists, on creation)
+        103,  # user does not exist
+        104,  # insufficient privileges
+        404,  # file or folder not found
+    }
+)
+
+
+def _is_transient(error: Exception) -> bool:
+    """Whether a failed Nextcloud call is worth retrying.
+
+    A locked database, a timeout or a 5xx are transient. A malformed request or
+    a missing user is not.
+    """
+    if isinstance(error, NextcloudError):
+        return error.code not in NEXTCLOUD_PERMANENT_ERROR_CODES
+
+    if isinstance(error, HttpResponseException):
+        # Retry server-side failures only; a 4xx will not fix itself.
+        return error.code >= 500
+
+    # A schema violation means Nextcloud answered something unexpected, which a
+    # retry can legitimately resolve (e.g. a truncated response under load).
+    return True
+
 
 class NextcloudHandler:
     def __init__(self, hs: "Homeserver"):
         self.config = hs.config
         self.auth = hs.get_auth()
+        self.auth_handler = hs.get_auth_handler()
+        self.clock = hs.get_clock()
         self.store = hs.get_datastores().main
         self.administration_handler = hs.get_watcha_administration_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -51,8 +100,15 @@ class NextcloudHandler:
         ):
         !watcha """
         # watcha+
+        # The role that matters is the *target's*, not the requester's: the point
+        # of this guard is that a partner has no Nextcloud account to add to the
+        # room group. Testing the requester instead meant that a member who
+        # accepted their own invitation was their own requester, so a partner
+        # joining was skipped entirely — and, symmetrically, that a collaborator
+        # invited by a partner was skipped too. Both left the member out of the
+        # Nextcloud group, with no document space and nothing in the logs.
         if (
-            await self.administration_handler.get_user_role(requester) == "partner"
+            await self.auth_handler.is_partner(user_id)
             and not self.config.watcha.external_authentication_for_partners
         ):
         # +watcha
@@ -297,6 +353,79 @@ class NextcloudHandler:
 
         await self.store.register_share(room_id, new_share_id)
 
+    async def transfer_share_on_room_upgrade(
+        self, requester: Requester, old_room_id: str, new_room_id: str
+    ):
+        """Carry a room's Nextcloud folder binding over to its upgraded room.
+
+        The binding is keyed on the room id, both in `watcha_nextcloud_shares`
+        and in the group name, so an upgrade would otherwise orphan the document
+        space: the old room is tombstoned and the new one has no share at all.
+
+        Best effort by design — an upgrade must not fail because Nextcloud is
+        unavailable — but never silent: the failure is logged with both room ids
+        so the binding can be recreated from the room settings.
+        """
+        if not await self.store.get_share_id(old_room_id):
+            return
+
+        folder_path = await self._get_bound_folder_path(old_room_id)
+        if folder_path is None:
+            logger.warning(
+                build_log_message(
+                    log_vars={
+                        "old_room_id": old_room_id,
+                        "new_room_id": new_room_id,
+                        "reason": "no Nextcloud folder path found in the old room state",
+                    }
+                )
+            )
+            return
+
+        try:
+            await self.bind(requester.user.to_string(), new_room_id, folder_path)
+        except Exception as error:
+            logger.error(
+                build_log_message(
+                    log_vars={
+                        "old_room_id": old_room_id,
+                        "new_room_id": new_room_id,
+                        "folder_path": folder_path,
+                        "error": error,
+                    }
+                )
+            )
+            return
+
+        logger.info(
+            build_log_message(
+                status=ActionStatus.SUCCESS,
+                log_vars={
+                    "old_room_id": old_room_id,
+                    "new_room_id": new_room_id,
+                    "folder_path": folder_path,
+                },
+            )
+        )
+
+    async def _get_bound_folder_path(self, room_id: str) -> Optional[str]:
+        """The Nextcloud folder path a room is bound to, from its room state."""
+        event = await self._storage_controllers.state.get_current_state_event(
+            room_id, EventTypes.VectorSetting, ""
+        )
+        if event is None:
+            return None
+
+        nextcloud_url = event.content.get("nextcloudShare")
+        if not nextcloud_url:
+            return None
+
+        url_query = urlparse.parse_qs(urlparse.urlparse(nextcloud_url).query)
+        if "dir" not in url_query:
+            return None
+
+        return url_query["dir"][0]
+
     async def unbind(self, requester_id: str, room_id: str):
         """Unbind a Nextcloud folder from a room.
 
@@ -333,33 +462,306 @@ class NextcloudHandler:
     async def update_group(self, user_id: str, room_id: str, membership: str):
         """Update a Nextcloud group by adding or removing users.
 
+        Repairs the two states that used to make a member lose access to the
+        room's documents for good, silently:
+
+        - the member has a `nextcloud_username` mapping but no Nextcloud account
+          under that name (OCS 103). This is what happens to every account whose
+          Nextcloud user was created under a *different* identifier than the one
+          recorded in the mapping;
+        - the room has a share but its Nextcloud group is gone (OCS 102).
+
+        Both are retried once after provisioning, respectively, the account and
+        the group. A failure that survives that is logged at `error` level with
+        every identifier needed to act on it, and counted in a metric — the point
+        being that such a failure can no longer stay invisible for months.
+
         Args:
             user_id: The mxid whose membership has been updated
             room_id: The id of the room where the membership event was sent
             membership: The type of membership event
         """
-        nextcloud_username = await self.store.get_username(user_id)
         group_id = await self.build_group_id(room_id)
+        nextcloud_username = await self.store.get_username(user_id)
+
+        log_vars = {
+            "user_id": user_id,
+            "room_id": room_id,
+            "membership": membership,
+            "nextcloud_username": nextcloud_username,
+            "group_id": group_id,
+        }
+
+        # Guard: never issue a request whose path contains "None" or an empty
+        # identifier. That produced literal `POST /cloud/users/None/groups` calls
+        # on every first SSO login, because the membership was processed before
+        # the mapping had been persisted.
+        if not nextcloud_username:
+            nextcloud_sync_failures.labels(reason="no_mapping").inc()
+            logger.error(
+                build_log_message(
+                    log_vars={
+                        **log_vars,
+                        "reason": "no nextcloud_username recorded for this user; "
+                        "cannot be inferred, use the reconciliation command",
+                    }
+                )
+            )
+            return
+
+        if membership == Membership.JOIN:
+            await self._add_user_to_group(user_id, nextcloud_username, group_id, log_vars)
+            return
 
         try:
-            if membership == Membership.JOIN:
-                await self.nextcloud_client.add_user_to_group(
+            await self._with_retry(
+                lambda: self.nextcloud_client.remove_user_from_group(
                     nextcloud_username, group_id
-                )
-            else:
-                await self.nextcloud_client.remove_user_from_group(
-                    nextcloud_username, group_id
-                )
+                ),
+                log_vars,
+            )
         except NEXTCLOUD_CLIENT_ERRORS as error:
-            log_vars = {
-                "user_id": user_id,
-                "room_id": room_id,
-                "membership": membership,
-                "nextcloud_username": nextcloud_username,
-                "group_id": group_id,
-                "error": error,
-            }
-            logger.warn(build_log_message(log_vars=log_vars))
+            # Losing this is benign: the member keeps a group membership they no
+            # longer should have, which the reconciliation command settles.
+            logger.warning(build_log_message(log_vars={**log_vars, "error": error}))
+
+    async def _add_user_to_group(
+        self, user_id: str, nextcloud_username: str, group_id: str, log_vars: dict
+    ):
+        """Add a member to a room group, repairing the two recoverable causes.
+
+        Idempotent: Nextcloud accepts adding a user who is already a member.
+        """
+        try:
+            await self._with_retry(
+                lambda: self.nextcloud_client.add_user_to_group(
+                    nextcloud_username, group_id
+                ),
+                log_vars,
+            )
+            return
+        except NEXTCLOUD_CLIENT_ERRORS as error:
+            code = getattr(error, "code", None)
+            if code == NEXTCLOUD_ERROR_USER_NOT_FOUND:
+                repaired = await self._repair_missing_account(user_id, nextcloud_username)
+                reason = "nextcloud_account_missing"
+            elif code == NEXTCLOUD_ERROR_GROUP_NOT_FOUND:
+                repaired = await self._repair_missing_group(log_vars["room_id"])
+                reason = "nextcloud_group_missing"
+            else:
+                nextcloud_sync_failures.labels(reason="add_to_group_failed").inc()
+                logger.error(build_log_message(log_vars={**log_vars, "error": error}))
+                return
+
+        if not repaired:
+            nextcloud_sync_failures.labels(reason=reason).inc()
+            logger.error(
+                build_log_message(
+                    log_vars={**log_vars, "reason": f"could not repair: {reason}"}
+                )
+            )
+            return
+
+        try:
+            await self._with_retry(
+                lambda: self.nextcloud_client.add_user_to_group(
+                    nextcloud_username, group_id
+                ),
+                log_vars,
+            )
+        except NEXTCLOUD_CLIENT_ERRORS as error:
+            nextcloud_sync_failures.labels(reason=reason).inc()
+            logger.error(
+                build_log_message(
+                    log_vars={
+                        **log_vars,
+                        "reason": f"still failing after repairing {reason}",
+                        "error": error,
+                    }
+                )
+            )
+            return
+
+        logger.info(
+            build_log_message(
+                action=f"repair {reason} and add user to group",
+                status=ActionStatus.SUCCESS,
+                log_vars=log_vars,
+            )
+        )
+
+    async def _repair_missing_account(self, user_id: str, nextcloud_username: str) -> bool:
+        """Create the Nextcloud account a mapping points at but which is absent."""
+        is_partner = await self.auth_handler.is_partner(user_id)
+        return await self.provision_account(
+            nextcloud_username=nextcloud_username,
+            is_partner=is_partner,
+        )
+
+    async def _repair_missing_group(self, room_id: str) -> bool:
+        """Recreate the Nextcloud group of a room that still holds a share."""
+        try:
+            await self.create_group(room_id)
+            return True
+        except Exception as error:
+            logger.error(
+                build_log_message(log_vars={"room_id": room_id, "error": error})
+            )
+            return False
+
+    async def provision_account(
+        self,
+        nextcloud_username: str,
+        displayname: Optional[str] = None,
+        email: Optional[str] = None,
+        is_admin: bool = False,
+        is_partner: bool = False,
+        groups: Optional[list] = None,
+    ) -> bool:
+        """Create the Nextcloud account of a Watcha user, if the deployment wants one.
+
+        Single implementation for every path a user can arrive through — the
+        Watcha invitation flow and SSO alike. Both used to provision separately,
+        and SSO created the account under the Matrix localpart while recording
+        `nextcloud_username` in the mapping: whenever those two differ, every
+        later group operation fails with OCS 103 and the member never sees a
+        document space.
+
+        `nextcloud_username` must therefore be the *same* identifier that is
+        recorded in `user_external_ids.nextcloud_username`.
+
+        Idempotent: an account that already exists is a success (the client maps
+        OCS 102 "username already exists" to a warning, not an error).
+
+        Returns:
+            True when the deployment provisions accounts and this one now exists.
+        """
+        if not self.should_provision_account(is_partner):
+            return False
+
+        if not nextcloud_username:
+            logger.error(
+                build_log_message(
+                    log_vars={"reason": "refusing to provision an empty username"}
+                )
+            )
+            return False
+
+        try:
+            await self._with_retry(
+                lambda: self.nextcloud_client.add_user(
+                    nextcloud_username, displayname, email, is_admin, groups
+                ),
+                {"nextcloud_username": nextcloud_username},
+            )
+        except NEXTCLOUD_CLIENT_ERRORS as error:
+            logger.error(
+                build_log_message(
+                    log_vars={
+                        "nextcloud_username": nextcloud_username,
+                        "error": error,
+                    }
+                )
+            )
+            return False
+
+        logger.info(
+            build_log_message(
+                status=ActionStatus.SUCCESS,
+                log_vars={"nextcloud_username": nextcloud_username},
+            )
+        )
+        return True
+
+    def should_provision_account(self, is_partner: bool) -> bool:
+        """Whether this deployment gives this kind of user a Nextcloud account."""
+        return bool(
+            self.config.watcha.managed_idp
+            and self.config.watcha.nextcloud_integration
+            and (
+                not is_partner
+                or self.config.watcha.external_authentication_for_partners
+            )
+        )
+
+    async def get_room_folder(self, room_id: str, user_id: str):
+        """Resolve a room's document folder for a member, by stable identifier.
+
+        Returns the Nextcloud file id and the path as currently mounted for that
+        member, so the client never has to guess a folder name — a mount can be
+        renamed by each recipient, and Nextcloud appends a suffix on collision.
+
+        Unlike the write paths, failure is raised rather than swallowed: the
+        caller is a user waiting in front of the document panel, and it needs to
+        tell "not accepted yet" apart from "folder deleted" to say anything
+        useful.
+        """
+        nextcloud_username = await self.store.get_username(user_id)
+        if not nextcloud_username:
+            raise SynapseError(
+                404,
+                build_log_message(
+                    log_vars={
+                        "user_id": user_id,
+                        "room_id": room_id,
+                        "reason": "no Nextcloud account registered for this user",
+                    }
+                ),
+                Codes.NOT_FOUND,
+            )
+
+        log_vars = {
+            "user_id": user_id,
+            "room_id": room_id,
+            "nextcloud_username": nextcloud_username,
+        }
+
+        try:
+            return await self._with_retry(
+                lambda: self.nextcloud_client.get_room_folder(
+                    room_id, nextcloud_username
+                ),
+                log_vars,
+            )
+        except NEXTCLOUD_CLIENT_ERRORS as error:
+            logger.error(build_log_message(log_vars={**log_vars, "error": error}))
+            raise SynapseError(
+                502,
+                build_log_message(log_vars={**log_vars, "error": error}),
+                Codes.UNKNOWN,
+            )
+
+    async def _with_retry(self, operation, log_vars: dict):
+        """Run a Nextcloud call, retrying transient failures with backoff.
+
+        Watcha deployments may still run on SQLite, where a single writer lock
+        makes contention — not misuse — the usual cause of failure. Retrying
+        turns an intermittent user-visible breakage into a slower success.
+
+        Client errors that describe a stable state (a missing user, a missing
+        group) are not retried: they would fail identically every time.
+        """
+        for attempt in range(1, NEXTCLOUD_RETRY_ATTEMPTS + 1):
+            try:
+                return await operation()
+            except NEXTCLOUD_CLIENT_ERRORS as error:
+                is_last_attempt = attempt == NEXTCLOUD_RETRY_ATTEMPTS
+                if is_last_attempt or not _is_transient(error):
+                    raise
+
+                delay = NEXTCLOUD_RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1))
+                logger.warning(
+                    build_log_message(
+                        action="retry Nextcloud call",
+                        log_vars={
+                            **log_vars,
+                            "attempt": attempt,
+                            "retry_in_seconds": delay,
+                            "error": error,
+                        },
+                    )
+                )
+                await self.clock.sleep(delay)
 
     # calendar sharing
     # ================

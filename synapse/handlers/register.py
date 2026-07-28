@@ -25,6 +25,8 @@
 import logging
 from typing import (
     TYPE_CHECKING,
+    Awaitable,  # watcha+
+    Callable,  # watcha+
     Iterable,
     TypedDict,
 )
@@ -241,6 +243,14 @@ class RegistrationHandler:
         user_agent_ips: list[tuple[str, str]] | None = None,
         auth_provider_id: str | None = None,
         make_partner: bool = False,  # watcha+
+        # watcha+
+        # Called with the new user id once the account exists but *before* any
+        # auto-join. Watcha needs the Nextcloud mapping persisted at that point:
+        # joining an auto-join room that has a shared folder triggers a group
+        # synchronisation, and a mapping written afterwards means the sync runs
+        # with no username at all.
+        before_auto_join: Callable[[str], Awaitable[None]] | None = None,
+        # +watcha
         approved: bool = False,
     ) -> str:
         """Registers a new client on the server.
@@ -383,6 +393,12 @@ class RegistrationHandler:
             auth_provider=(auth_provider_id or ""),
             **{SERVER_NAME_LABEL: self.server_name},
         ).inc()
+
+        # watcha+
+        # Must run before the auto-join below, see the parameter's docstring.
+        if before_auto_join is not None:
+            await before_auto_join(user_id)
+        # +watcha
 
         # If the user does not need to consent at registration, auto-join any
         # configured rooms.
