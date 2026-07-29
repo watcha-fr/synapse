@@ -21,6 +21,13 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.keycloak_client = self.nextcloud_handler.keycloak_client
         self.nextcloud_client = self.nextcloud_handler.nextcloud_client
 
+        # `default_config()` declares none of the Watcha flags, so the handler
+        # would consider Nextcloud provisioning disabled and skip everything.
+        # Mirror the deployments this code targets, where all three are on.
+        self.nextcloud_handler.config.watcha.managed_idp = True
+        self.nextcloud_handler.config.watcha.nextcloud_integration = True
+        self.nextcloud_handler.config.watcha.external_authentication_for_partners = True
+
         self.creator = self.register_user("creator", "pass", admin=True)
         self.creator_tok = self.login("creator", "pass")
         self.inviter = self.register_user("inviter", "pass")
@@ -38,6 +45,7 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
             self.nextcloud_handler.build_group_id(self.room_id)
         )
 
+        self.nextcloud_client.add_user = AsyncMock()
         self.nextcloud_client.add_group = AsyncMock()
         self.nextcloud_client.delete_group = AsyncMock()
         self.nextcloud_client.add_user_to_group = AsyncMock()
@@ -435,7 +443,8 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         )
 
         # The new room is bound to the same folder, through its own group.
-        self.nextcloud_client.share.assert_called_once()
+        # Not `assert_called_once`: writing the `im.vector.web.settings` state
+        # event above re-binds the *old* room, so the transfer is the last call.
         _, path, group_id = self.nextcloud_client.share.call_args.args
         self.assertEqual(path, "/folder")
         self.assertEqual(

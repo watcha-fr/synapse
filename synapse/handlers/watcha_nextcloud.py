@@ -15,6 +15,7 @@ from synapse.api.errors import (
 from synapse.events import EventBase
 from synapse.push.presentable_names import calculate_room_name
 from synapse.types import Requester
+from synapse.util.duration import Duration
 from synapse.util.watcha import ActionStatus, build_log_message
 
 logger = logging.getLogger(__name__)
@@ -654,7 +655,11 @@ class NextcloudHandler:
                 ),
                 {"nextcloud_username": nextcloud_username},
             )
-        except NEXTCLOUD_CLIENT_ERRORS as error:
+        except Exception as error:
+            # Deliberately broader than NEXTCLOUD_CLIENT_ERRORS: this runs on the
+            # membership path, where an unexpected failure (a DNS error, an
+            # unreachable host) must not make the join itself fail. The member is
+            # in the room either way; the reconciliation command repairs the rest.
             logger.error(
                 build_log_message(
                     log_vars={
@@ -761,7 +766,8 @@ class NextcloudHandler:
                         },
                     )
                 )
-                await self.clock.sleep(delay)
+                # Duration, not a float: `Clock.sleep` calls `duration.as_secs()`.
+                await self.clock.sleep(Duration(seconds=delay))
 
     # calendar sharing
     # ================
