@@ -600,15 +600,38 @@ class NextcloudHandler:
         )
 
     async def _repair_missing_group(self, room_id: str) -> bool:
-        """Recreate the Nextcloud group of a room that still holds a share."""
+        """Recreate the Nextcloud group of a room that still holds a share.
+
+        Recreating the group restores *membership*, not the folder share: Nextcloud
+        deleted the group's shares along with the group, and a same-named group
+        starts empty. So this is only half a repair, and the caller must not be led
+        to believe access is restored — hence the explicit warning below.
+        """
         try:
             await self.create_group(room_id)
-            return True
         except Exception as error:
             logger.error(
                 build_log_message(log_vars={"room_id": room_id, "error": error})
             )
             return False
+
+        # The room still claims a folder share while its group had vanished: the
+        # share rows went with the group and cannot be recreated from here. Say so
+        # loudly rather than reporting a success that users will not experience.
+        if await self.store.get_share_id(room_id):
+            nextcloud_sync_failures.labels(reason="group_share_lost").inc()
+            logger.error(
+                build_log_message(
+                    action="recreate room group whose folder share was lost",
+                    log_vars={
+                        "room_id": room_id,
+                        "reason": "the group was deleted, taking its folder share "
+                        "with it; the folder must be shared with the room again",
+                    },
+                )
+            )
+
+        return True
 
     async def provision_account(
         self,
@@ -820,8 +843,9 @@ class NextcloudHandler:
                     Codes.BAD_STATE,
                 )
             calendar_ids = [calendar_event.content["id"]]
-            # FIXME: infer delete_group also from share_state
-            delete_group = len(await self._get_calendar_events(room_id)) == 1
+            delete_group = await self._may_delete_room_group(
+                room_id, len(await self._get_calendar_events(room_id)) == 1
+            )
             await self.nextcloud_client.unshare_calendar(
                 calendar_ids, room_id, delete_group
             )
@@ -907,9 +931,9 @@ class NextcloudHandler:
                     requester, event_dict
                 )
 
-        # FIXME: infer delete_group also from share_state
-        delete_group = all(
-            self._is_own_calendar(user_id, event) for event in calendar_events
+        delete_group = await self._may_delete_room_group(
+            room_id,
+            all(self._is_own_calendar(user_id, event) for event in calendar_events),
         )
 
         if own_calendar_ids:
@@ -922,6 +946,39 @@ class NextcloudHandler:
             await self.nextcloud_client.remove_user_access_to_calendars(
                 nextcloud_username, room_id
             )
+
+    async def _may_delete_room_group(
+        self, room_id: str, no_calendar_left: bool
+    ) -> bool:
+        """Whether removing the last calendar may also delete the room group.
+
+        A room has ONE Nextcloud group, deliberately shared between its calendars
+        and its document folder (see `RoomGroup` in the Nextcloud app). Deleting it
+        because the last calendar went away therefore destroys the folder share
+        too: Nextcloud removes the shares held by a group when the group is
+        deleted, and recreating a group with the same name does **not** bring them
+        back. The document space is then unreachable for every member, and
+        kicking and re-inviting them does not help — they are re-added to a group
+        that grants nothing.
+
+        This is the `FIXME: infer delete_group also from share_state` the original
+        authors left at both call sites.
+        """
+        if not no_calendar_left:
+            return False
+
+        share_id = await self.store.get_share_id(room_id)
+        if share_id:
+            logger.info(
+                build_log_message(
+                    action="keep room group despite removing its last calendar",
+                    status=ActionStatus.SUCCESS,
+                    log_vars={"room_id": room_id, "share_id": share_id},
+                )
+            )
+            return False
+
+        return True
 
     def _is_own_calendar(self, user_id: str, calendar_event: EventBase):
         return (

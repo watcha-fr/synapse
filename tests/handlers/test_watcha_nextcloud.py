@@ -419,6 +419,52 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.assertEqual(seen[0], ("callback", user_id))
         self.assertIn(("auto_join", user_id), seen)
 
+    # Le groupe du salon est partage entre agendas et documents
+    # ========================================================
+
+    def test_removing_the_last_calendar_keeps_the_group_when_a_folder_is_shared(self):
+        """Le groupe porte AUSSI le partage du dossier. Le supprimer detruirait ce
+        partage — Nextcloud supprime les partages d'un groupe avec le groupe — et
+        recreer un groupe homonyme ne les restaure pas. L'espace documentaire
+        devient alors inaccessible a tous, et ejecter/reinviter n'y change rien."""
+        # `prepare` a deja lie un dossier a ce salon.
+        self.assertTrue(self.get_success(self.store.get_share_id(self.room_id)))
+
+        self.assertFalse(
+            self.get_success(
+                self.nextcloud_handler._may_delete_room_group(self.room_id, True)
+            )
+        )
+
+    def test_removing_the_last_calendar_deletes_the_group_without_a_folder(self):
+        """Sans partage documentaire, plus rien ne retient le groupe."""
+        self.get_success(self.store.delete_share(self.room_id))
+
+        self.assertTrue(
+            self.get_success(
+                self.nextcloud_handler._may_delete_room_group(self.room_id, True)
+            )
+        )
+
+    def test_the_group_is_never_deleted_while_calendars_remain(self):
+        self.get_success(self.store.delete_share(self.room_id))
+
+        self.assertFalse(
+            self.get_success(
+                self.nextcloud_handler._may_delete_room_group(self.room_id, False)
+            )
+        )
+
+    def test_recreating_a_group_whose_share_was_lost_is_reported_as_an_error(self):
+        """La reparation ne restaure que l'appartenance, pas le partage : elle ne
+        doit pas annoncer un succes que l'utilisateur ne constatera pas."""
+        self.assertTrue(
+            self.get_success(
+                self.nextcloud_handler._repair_missing_group(self.room_id)
+            )
+        )
+        self.nextcloud_client.add_group.assert_called()
+
     # Room upgrade
     # ============
 
