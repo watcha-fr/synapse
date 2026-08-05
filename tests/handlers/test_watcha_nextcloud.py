@@ -75,6 +75,21 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
         self.nextcloud_client.delete_group.assert_called_once_with(self.group_id)
         self.assertIsNone(share_id)
 
+    def test_unbind_keeps_group_when_calendars_remain(self):
+        """Unsharing the folder must not delete the room group while calendars are
+        still shared with it: folder and calendars share the same group, so
+        deleting it would take the shared calendars down too."""
+        self.nextcloud_handler._get_calendar_events = AsyncMock(
+            return_value=[object()]
+        )
+
+        self.get_success(self.nextcloud_handler.unbind(self.creator, self.room_id))
+
+        self.nextcloud_client.delete_group.assert_not_called()
+        # the folder share itself is still removed
+        self.assertIsNone(self.get_success(self.store.get_share_id(self.room_id)))
+        self.nextcloud_client.unshare.assert_called_once()
+
     def test_unbind_with_unexisting_group(self):
         self.nextcloud_client.delete_group = AsyncMock(
             side_effect=NextcloudError(code=101, msg="")

@@ -450,13 +450,27 @@ class NextcloudHandler:
                     )
                 )
 
-        group_id = await self.build_group_id(room_id)
-        try:
-            await self.nextcloud_client.delete_group(group_id)
-        except NEXTCLOUD_CLIENT_ERRORS as error:
-            logger.error(
-                build_log_message(log_vars={"group_id": group_id, "error": error})
+        # The room group is shared between the folder and the calendars. Deleting
+        # it when the folder is unshared would take the shared calendars down with
+        # it — the mirror image of the calendar-removal case guarded by
+        # `_may_delete_room_group`. So keep the group while calendars still rely on
+        # it; only its folder share has been removed above.
+        if await self._get_calendar_events(room_id):
+            logger.info(
+                build_log_message(
+                    action="keep room group after unsharing the folder",
+                    status=ActionStatus.SUCCESS,
+                    log_vars={"room_id": room_id},
+                )
             )
+        else:
+            group_id = await self.build_group_id(room_id)
+            try:
+                await self.nextcloud_client.delete_group(group_id)
+            except NEXTCLOUD_CLIENT_ERRORS as error:
+                logger.error(
+                    build_log_message(log_vars={"group_id": group_id, "error": error})
+                )
 
         await self.store.delete_share(room_id)
 
