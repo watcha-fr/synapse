@@ -8,7 +8,7 @@ from twisted.web.resource import Resource
 from synapse.rest import admin
 from synapse.rest.client import login
 from synapse.server import HomeServer
-from synapse.util import Clock
+from synapse.util.clock import Clock
 
 from tests import unittest
 from tests.server import FakeChannel
