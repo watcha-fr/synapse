@@ -76,7 +76,6 @@ from synapse.util.async_helpers import Linearizer
 from synapse.util.duration import Duration
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import random_string
-from synapse.util.watcha_upload_names import UPLOAD_NAMES  # watcha+
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -341,11 +340,14 @@ class MediaRepository:
         if media_id is None:
             media_id = random_string(24)
 
-        file_info = FileInfo(server_name=None, file_id=media_id)
-        # watcha+
-        if upload_name:
-            UPLOAD_NAMES[media_id] = upload_name
-        # +watcha
+        file_info = FileInfo(
+            server_name=None,
+            file_id=media_id,
+            # watcha+ carry what the client declared, for the file type filter
+            upload_name=upload_name,
+            media_type=media_type,
+            # +watcha
+        )
         sha256reader = SHA256TransparentIOReader(content)
         # This implements all of IO as it has a passthrough
         fname = await self.media_storage.store_file(sha256reader.wrap(), file_info)

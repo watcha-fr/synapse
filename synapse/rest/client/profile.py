@@ -26,7 +26,12 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING
 
 from synapse.api.constants import ProfileFields
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    InvalidClientCredentialsError,
+    SynapseError,
+)
 from synapse.handlers.profile import MAX_CUSTOM_FIELD_LEN
 from synapse.http.server import HttpServer
 from synapse.http.servlet import (
@@ -36,7 +41,7 @@ from synapse.http.servlet import (
 )
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
-from synapse.types import JsonDict, JsonValue, UserID
+from synapse.types import JsonDict, JsonValue, Requester, UserID
 from synapse.util.stringutils import is_namedspaced_grammar
 
 if TYPE_CHECKING:
@@ -68,9 +73,37 @@ class ProfileRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.account_activity_handler = hs.get_account_validity_handler()  # watcha+
 
+    # watcha+
+    async def _try_get_requester(self, request: SynapseRequest) -> Requester | None:
+        """Identify the caller, without rejecting anonymous requests.
+
+        This endpoint is anonymous unless `require_auth_for_profile_requests` is
+        set, so authentication failures must not turn a previously valid request
+        into a 401.
+        """
+        try:
+            return await self.auth.get_user_by_req(request)
+        except (InvalidClientCredentialsError, AuthError):
+            return None
+
+    async def _may_see_email(self, requester: Requester | None, user: UserID) -> bool:
+        """Whether `requester` is allowed to see `user`'s email address.
+
+        Email addresses are personal data, so they are only disclosed to the
+        owner of the profile and to server administrators.
+        """
+        if requester is None:
+            return False
+        if requester.user == user:
+            return True
+        return await self.auth.is_server_admin(requester)
+
+    # +watcha
+
     async def on_GET(
         self, request: SynapseRequest, user_id: str
     ) -> tuple[int, JsonDict]:
+        requester = None  # watcha+
         requester_user = None
 
         if self.hs.config.server.require_auth_for_profile_requests:
@@ -88,11 +121,21 @@ class ProfileRestServlet(RestServlet):
         ret = await self.profile_handler.get_profile(user_id)
 
         # watcha+
-        addresses = await self.account_activity_handler._get_email_addresses_for_user(
-            user_id
-        )
-        if addresses:
-            ret["email"] = addresses[0]
+        # The email address is not part of the Matrix profile: never disclose it
+        # to an unauthenticated caller, nor to a third party. The check is done
+        # here rather than relying on `require_auth_for_profile_requests` so that
+        # the field stays protected whatever the deployment configuration.
+        if requester is None:
+            requester = await self._try_get_requester(request)
+
+        if await self._may_see_email(requester, user):
+            addresses = (
+                await self.account_activity_handler._get_email_addresses_for_user(
+                    user_id
+                )
+            )
+            if addresses:
+                ret["email"] = addresses[0]
         # +watcha
 
         return 200, ret

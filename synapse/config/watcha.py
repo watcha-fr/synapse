@@ -3,12 +3,12 @@ import re
 from urllib.parse import urljoin
 
 from synapse.util.watcha import build_log_message
+from synapse.util.watcha_blocked_extensions import BLOCKED_EXT_FILE  # watcha+
 
 from ._base import Config, ConfigError
 
 
 class WatchaConfig(Config):
-
     section = "watcha"
 
     def __init__(self, *args):
@@ -26,6 +26,7 @@ class WatchaConfig(Config):
         self.external_authentication_for_partners = False
         self.user_audit_log_path = None
         self.retention_config_path = None  # watcha+
+        self.blocked_extensions_path = None  # watcha+
         # watcha+
         # Mapping ville -> domaines email pour le filtre "par ville" du dashboard.
         # Présent uniquement sur l'instance sitiv ; absent => pas de label `ville`.
@@ -42,10 +43,9 @@ class WatchaConfig(Config):
         # Path of the JSON file in which user lifecycle actions (CREATE, DELETE,
         # DEACTIVATE, REACTIVATE) are recorded. Enabled by default so the audit
         # log is produced out of the box.
-        self.user_audit_log_path = (
-            (watcha_config or {}).get("user_audit_log_path")
-            or os.path.join(data_dir_path, "watcha_user_audit_log.json")
-        )
+        self.user_audit_log_path = (watcha_config or {}).get(
+            "user_audit_log_path"
+        ) or os.path.join(data_dir_path, "watcha_user_audit_log.json")
 
         # watcha+
         # Path of the JSON file holding the server-wide "message depth" settings
@@ -54,6 +54,13 @@ class WatchaConfig(Config):
         self.retention_config_path = (watcha_config or {}).get(
             "retention_config_path"
         ) or os.path.join(data_dir_path, "watcha_retention_config.json")
+
+        # Path of the JSON file holding the list of file extensions whose upload
+        # is rejected, editable at runtime from the admin console. Defaults to
+        # the historical location so existing instances keep their list.
+        self.blocked_extensions_path = (watcha_config or {}).get(
+            "blocked_extensions_path"
+        ) or BLOCKED_EXT_FILE
         # +watcha
 
         if watcha_config is None:
@@ -64,7 +71,6 @@ class WatchaConfig(Config):
             self.managed_idp = managed_idp
 
         if self.managed_idp:
-
             oidc_providers = config.get("oidc_providers")
             if not oidc_providers or oidc_providers[0].get("idp_id") != "oidc":
                 raise ConfigError('the first idp_id must be "oidc"')
@@ -95,7 +101,6 @@ class WatchaConfig(Config):
             self.nextcloud_integration = nextcloud_integration
 
         if nextcloud_integration:
-
             service_account_name = watcha_config.get("nextcloud_service_account_name")
             if service_account_name:
                 self.nextcloud_service_account_name = service_account_name
@@ -185,6 +190,13 @@ class WatchaConfig(Config):
           # Optional, defaults to "watcha_retention_config.json" in the data directory.
           #
           #retention_config_path: "/etc/opt/matrix-synapse/watcha_retention_config.json"
+
+          # Path of the JSON file holding the list of file extensions whose
+          # upload is rejected, editable from the admin console.
+          # Optional, defaults to
+          # "/etc/opt/matrix-synapse/blocked_extensions.json".
+          #
+          #blocked_extensions_path: "/etc/opt/matrix-synapse/blocked_extensions.json"
 
           # watcha+
           # Mapping ville -> domaines email pour le filtre "par ville" du dashboard

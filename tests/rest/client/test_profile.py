@@ -42,7 +42,6 @@ from tests import unittest
 from tests.utils import USE_POSTGRES_FOR_TESTS
 
 from urllib.parse import quote  # watcha+
-from synapse.api.errors import SynapseError  # watcha+
 
 
 class ProfileTestCase(unittest.HomeserverTestCase):
@@ -807,6 +806,13 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             )
 
     # watcha+
+    def _get_profile(self, user_id: str, access_token: str | None = None):
+        return self.make_request(
+            "GET",
+            "/profile/%s" % (quote(user_id, safe="")),
+            access_token=access_token,
+        )
+
     def test_get_email_threepids(self):
 
         # Addition of email as a threepids :
@@ -814,7 +820,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             self.auth.add_threepid(self.owner, "email", "example@email.com", self.time)
         )
 
-        channel = self.make_request("GET", "/profile/%s" % (quote(self.owner, safe="")))
+        channel = self._get_profile(self.owner, self.owner_tok)
 
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body["email"], "example@email.com")
@@ -826,10 +832,10 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             self.auth.add_threepid(self.owner, "msisdn", "0612345678", self.time)
         )
 
-        channel = self.make_request("GET", "/profile/%s" % (quote(self.owner, safe="")))
+        channel = self._get_profile(self.owner, self.owner_tok)
 
         self.assertEqual(channel.code, 200)
-        self.assertRaises(SynapseError)
+        self.assertNotIn("email", channel.json_body)
 
     def test_get_only_one_email_threepids(self):
 
@@ -843,10 +849,50 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        channel = self.make_request("GET", "/profile/%s" % (quote(self.owner, safe="")))
+        channel = self._get_profile(self.owner, self.owner_tok)
 
         self.assertEqual(channel.code, 200)
-        self.assertRaises(SynapseError)
+        self.assertEqual(channel.json_body["email"], "example@email.com")
+
+    def test_do_not_get_email_threepids_without_auth(self):
+        """An unauthenticated caller must not be able to read an email address."""
+
+        self.get_success(
+            self.auth.add_threepid(self.owner, "email", "example@email.com", self.time)
+        )
+
+        channel = self._get_profile(self.owner)
+
+        # The profile itself stays public, only the email address is withheld.
+        self.assertEqual(channel.code, 200)
+        self.assertNotIn("email", channel.json_body)
+
+    def test_do_not_get_email_threepids_of_another_user(self):
+        """A third party must not be able to read someone else's email address."""
+
+        self.get_success(
+            self.auth.add_threepid(self.owner, "email", "example@email.com", self.time)
+        )
+        other_tok = self.login("other", "pass")
+
+        channel = self._get_profile(self.owner, other_tok)
+
+        self.assertEqual(channel.code, 200)
+        self.assertNotIn("email", channel.json_body)
+
+    def test_admin_gets_email_threepids_of_another_user(self):
+        """Server administrators keep access to the email address."""
+
+        self.get_success(
+            self.auth.add_threepid(self.owner, "email", "example@email.com", self.time)
+        )
+        self.register_user("adm", "pass", admin=True)
+        admin_tok = self.login("adm", "pass")
+
+        channel = self._get_profile(self.owner, admin_tok)
+
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.json_body["email"], "example@email.com")
 
     # +watcha
 

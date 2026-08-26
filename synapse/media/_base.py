@@ -534,6 +534,13 @@ class FileInfo:
     url_cache: bool = False
     # Whether the file is a thumbnail or not.
     thumbnail: ThumbnailInfo | None = None
+    # watcha+
+    # The name and content type declared by the uploader, when known. Carried
+    # here so spam checker callbacks (which only receive a `FileInfo`) can act
+    # on them without any process-wide shared state.
+    upload_name: str | None = None
+    media_type: str | None = None
+    # +watcha
 
     # The below properties exist to maintain compatibility with third-party modules.
     @property
