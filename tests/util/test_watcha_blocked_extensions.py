@@ -135,6 +135,41 @@ class ExtensionsForContentTestCase(unittest.TestCase):
     def test_shebang_unknown_interpreter(self) -> None:
         self.assertEqual(extensions_for_content(b"#!/opt/weird\n"), {"sh"})
 
+    def test_shebang_behind_utf8_bom(self) -> None:
+        # A script saved by a Windows editor starts with a BOM.
+        self.assertEqual(
+            extensions_for_content(b"\xef\xbb\xbf#!/bin/bash\necho x\n"),
+            {"sh", "bash"},
+        )
+        self.assertEqual(
+            extensions_for_content(b"\xef\xbb\xbf#!/usr/bin/env python3\n"), {"py"}
+        )
+
+    def test_php_opening_tag(self) -> None:
+        self.assertEqual(extensions_for_content(b"<?php\necho 1;\n"), {"php"})
+        self.assertEqual(extensions_for_content(b"\xef\xbb\xbf<?PHP\n"), {"php"})
+
+    def test_batch_file(self) -> None:
+        self.assertEqual(
+            extensions_for_content(b"@echo off\r\ndel target\r\n"), {"bat", "cmd"}
+        )
+
+    def test_document_quoting_php_is_not_matched(self) -> None:
+        # The signature is only looked for at the very beginning: a text file
+        # showing PHP code further down stays acceptable.
+        self.assertEqual(
+            extensions_for_content(b"Exemple de code :\n<?php echo 1; ?>\n"), set()
+        )
+
+    def test_xml_is_not_php(self) -> None:
+        self.assertEqual(extensions_for_content(b'<?xml version="1.0"?>\n'), set())
+
+    def test_script_without_shebang_is_not_detectable(self) -> None:
+        # Known limit: a shell or python script carrying no shebang is a plain
+        # text file, and nothing in its content gives it away.
+        self.assertEqual(extensions_for_content(b"echo coucou\n"), set())
+        self.assertEqual(extensions_for_content(b"import os\nprint(1)\n"), set())
+
     def test_plain_text_is_not_executable(self) -> None:
         self.assertEqual(
             extensions_for_content(b"Bonjour, ceci est un texte.\n"), set()

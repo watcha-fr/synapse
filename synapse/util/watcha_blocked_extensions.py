@@ -121,6 +121,23 @@ _SHEBANG_INTERPRETERS: tuple[tuple[str, set[str]], ...] = (
     ("sh", {"sh"}),
 )
 
+# Byte order marks that a Windows editor may write before the shebang. They are
+# skipped before looking at text signatures, so `notepad`-saved scripts are not
+# a free pass.
+_BOMS: tuple[bytes, ...] = (
+    b"\xef\xbb\xbf",  # UTF-8
+    b"\xff\xfe",  # UTF-16 LE
+    b"\xfe\xff",  # UTF-16 BE
+)
+
+# Text signatures that only a script starts with. Matched at the very beginning
+# of the file (BOM aside): a document merely *quoting* PHP or batch code does
+# not start with it, so this stays free of false positives.
+_TEXT_SIGNATURES: tuple[tuple[bytes, set[str]], ...] = (
+    (b"<?php", {"php"}),
+    (b"@echo off", {"bat", "cmd"}),
+)
+
 # Cache of the parsed list, keyed by path; value is (mtime, extensions).
 _cache: dict = {}
 
@@ -241,7 +258,12 @@ def extensions_for_media_type(media_type: Optional[str]) -> set[str]:
 
 
 def extensions_for_content(header: Optional[bytes]) -> set[str]:
-    """Extensions implied by the first bytes of the file itself."""
+    """Extensions implied by the first bytes of the file itself.
+
+    Only signatures that a legitimate document never starts with are used. A
+    script carrying no signature at all -- a ``.sh`` or ``.py`` with no shebang
+    -- is indistinguishable from a text file and cannot be recognised here.
+    """
     if not header:
         return set()
 
@@ -251,9 +273,21 @@ def extensions_for_content(header: Optional[bytes]) -> set[str]:
         if header.startswith(magic):
             extensions |= exts
 
-    if header.startswith(b"#!"):
+    # Text signatures are looked up past any byte order mark, so a script saved
+    # by a Windows editor is not treated as a plain document.
+    text = header
+    for bom in _BOMS:
+        if text.startswith(bom):
+            text = text[len(bom) :]
+            break
+
+    for signature, exts in _TEXT_SIGNATURES:
+        if text[: len(signature)].lower() == signature:
+            extensions |= exts
+
+    if text.startswith(b"#!"):
         # A shebang means the file is meant to be run by an interpreter.
-        first_line = header.split(b"\n", 1)[0][:256].decode("ascii", "replace").lower()
+        first_line = text.split(b"\n", 1)[0][:256].decode("ascii", "replace").lower()
         matched = False
         for interpreter, exts in _SHEBANG_INTERPRETERS:
             if interpreter in first_line:
