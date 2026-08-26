@@ -30,6 +30,24 @@ class FileTypeFilter:
     client, or the actual first bytes of the stored file. The last one is what
     makes the filter meaningful: renaming ``payload.exe`` into ``notes.txt``,
     or uploading it with no filename at all, no longer gets through.
+
+    Known and accepted limit
+    ------------------------
+    Content detection only recognises signatures that a legitimate document
+    never starts with: executables (PE, ELF, Mach-O, ``.class``, ``.lnk``), a
+    shebang line, ``<?php`` and ``@echo off``. A shell or python script saved
+    *without* a shebang carries no such signature -- it is a text file, and
+    nothing tells it apart from a genuine ``.txt``. Renaming such a script to
+    ``notes.txt`` therefore still gets through.
+
+    This is deliberate: the alternatives are to guess from keywords (which
+    rejects real documents quoting code, and is trivially defeated by
+    rewriting the script) or to move to a whitelist of recognised types (which
+    rejects every unlisted business format). Note that a renamed script is not
+    executable as-is either: the recipient has to save it *and* rename it back.
+    For these files the extension filter is a hygiene measure, not a barrier;
+    blocking malicious content itself is the job of an antivirus, not of this
+    module.
     """
 
     def __init__(self, config: dict, api: ModuleApi):
