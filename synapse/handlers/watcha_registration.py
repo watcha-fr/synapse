@@ -7,7 +7,12 @@ from synapse.api.errors import HttpResponseException
 from synapse.config.emailconfig import ThreepidBehaviour
 !watcha"""
 from synapse.push.mailer import Mailer
-from synapse.util.watcha import ActionStatus, Secrets, build_log_message
+from synapse.util.watcha import (
+    ActionStatus,
+    Secrets,
+    build_log_message,
+    email_domain_matches,  # watcha+
+)
 from synapse.util.watcha_user_log import UserAuditAction, append_user_audit_log # watcha+
 from synapse.types import UserID # watcha+
 
@@ -69,11 +74,16 @@ class RegistrationHandler:
             user_id: the mxid of the new user
         """
 
-        """DLA : ComUE
-        mail_domaian_available = ["universite-lyon.fr", "access-check.renater.fr"] #DLA : ComUE
-        if is_partner and any(domain in email_address for domain in mail_domaian_available): #DLA : ComUE
-            is_partner = False #DLA : ComUE
-        DLA : ComUE"""
+        # watcha+
+        # Un invité marqué partenaire mais dont l'adresse relève d'un domaine de
+        # l'organisation est enregistré comme membre de plein droit. Piloté par
+        # `watcha.partner_email_whitelist`, vide par défaut.
+        if is_partner and email_domain_matches(
+            email_address, self.config.watcha.partner_email_whitelist
+        ):
+            is_partner = False
+        # +watcha
+
         password = self.secrets.gen_password()
         password_hash = await self.auth_handler.hash(password)
 
@@ -100,7 +110,7 @@ class RegistrationHandler:
                 response = await self.keycloak_client.add_user(
                     password_hash,
                     email_address,
-                    is_partner, #DLA : ComUE
+                    is_partner,  # watcha+
                     is_admin,
                     keycloak_username,
                     keycloak_as_broker,

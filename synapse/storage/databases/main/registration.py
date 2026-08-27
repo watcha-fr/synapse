@@ -965,7 +965,12 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
             values={},
             insertion_values={
                 "user_id": user_id,
-                "nextcloud_username": nextcloud_username,  # watcha+
+                # watcha+
+                # Repli sur l'identifiant externe quand l'IdP ne fournit pas de
+                # nom Nextcloud : la colonne sert à retrouver le compte NC, une
+                # valeur nulle le rend introuvable.
+                "nextcloud_username": nextcloud_username or external_id,
+                # +watcha
             },
         )
 

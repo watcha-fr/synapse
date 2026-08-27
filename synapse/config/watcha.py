@@ -24,6 +24,17 @@ class WatchaConfig(Config):
         self.nextcloud_service_account_password = None
         self.nextcloud_url = None
         self.external_authentication_for_partners = False
+        # watcha+
+        # Domaines de messagerie de l'organisation. Un utilisateur invité comme
+        # partenaire dont l'adresse relève de l'un d'eux est finalement
+        # enregistré comme membre de plein droit. Vide => aucun déclassement,
+        # ce qui est le comportement de toutes les instances sauf ComUE.
+        self.partner_email_whitelist = []
+        # Actions imposées par Keycloak à la première connexion d'un compte
+        # créé par Synapse. Les instances dont les comptes proviennent d'une
+        # fédération d'identité (ComUE / Renater) mettent une liste vide.
+        self.keycloak_required_actions = ["UPDATE_PASSWORD", "UPDATE_PROFILE"]
+        # +watcha
         self.user_audit_log_path = None
         self.retention_config_path = None  # watcha+
         self.blocked_extensions_path = None  # watcha+
@@ -95,6 +106,34 @@ class WatchaConfig(Config):
                 self.external_authentication_for_partners = (
                     external_authentication_for_partners
                 )
+
+        # watcha+
+        partner_email_whitelist = watcha_config.get("partner_email_whitelist")
+        if partner_email_whitelist is not None:
+            if isinstance(partner_email_whitelist, str):
+                partner_email_whitelist = [partner_email_whitelist]
+            if not isinstance(partner_email_whitelist, list) or not all(
+                isinstance(domain, str) for domain in partner_email_whitelist
+            ):
+                raise ConfigError(
+                    "watcha.partner_email_whitelist must be a list of domain names"
+                )
+            self.partner_email_whitelist = [
+                domain.strip().lower().lstrip("@").rstrip(".")
+                for domain in partner_email_whitelist
+                if domain and domain.strip()
+            ]
+
+        keycloak_required_actions = watcha_config.get("keycloak_required_actions")
+        if keycloak_required_actions is not None:
+            if not isinstance(keycloak_required_actions, list) or not all(
+                isinstance(action, str) for action in keycloak_required_actions
+            ):
+                raise ConfigError(
+                    "watcha.keycloak_required_actions must be a list of strings"
+                )
+            self.keycloak_required_actions = keycloak_required_actions
+        # +watcha
 
         nextcloud_integration = watcha_config.get("nextcloud_integration")
         if isinstance(nextcloud_integration, bool):
@@ -177,6 +216,26 @@ class WatchaConfig(Config):
           # Note: The value is ignored when managed_idp is false
           #
           #external_authentication_for_partners: true
+
+          # watcha+
+          # Domaines de messagerie de l'organisation. Un utilisateur invité
+          # comme partenaire dont l'adresse relève de l'un de ces domaines (ou
+          # d'un sous-domaine) est finalement enregistré comme membre de plein
+          # droit, aussi bien à l'invitation qu'à l'inscription par SSO.
+          # Optional, defaults to none (aucun déclassement).
+          #
+          #partner_email_whitelist:
+          #  - universite-lyon.fr
+          #  - access-check.renater.fr
+
+          # Actions imposées par Keycloak à la première connexion d'un compte
+          # créé par Synapse. Mettre une liste vide sur les instances dont les
+          # comptes proviennent d'une fédération d'identité, où l'utilisateur
+          # n'a ni mot de passe ni profil à renseigner côté Keycloak.
+          # Optional, defaults to ["UPDATE_PASSWORD", "UPDATE_PROFILE"].
+          #
+          #keycloak_required_actions: []
+          # +watcha
 
           # Path of the JSON file in which user lifecycle actions (CREATE,
           # DELETE, DEACTIVATE, REACTIVATE) are recorded.

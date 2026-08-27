@@ -60,7 +60,10 @@ from synapse.util.stringutils import random_string
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
-from synapse.util.watcha import build_log_message  # watcha+
+from synapse.util.watcha import (  # watcha+
+    build_log_message,
+    email_domain_matches,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +161,7 @@ class UserAttributes:
     # mypy thinks these are incompatible for some reason.
     emails: StrCollection = attr.Factory(list)
     is_admin: bool | None = False  # watcha+
-    is_partner: bool | None = False  # DLA : ComUE
+    is_partner: bool | None = False  # watcha+
     nextcloud_username: str | None = None  # watcha+
 
 
@@ -244,7 +247,7 @@ class SsoHandler:
 
         self._consent_at_registration = hs.config.consent.user_consent_at_registration
 
-        self.config = hs.config  # DLA:ComUE
+        self.config = hs.config  # watcha+
         # watcha+
         # Kept as the homeserver rather than the handler: the Nextcloud handler is
         # built on top of the event creation handler, so resolving it here would
@@ -761,14 +764,20 @@ class SsoHandler:
         ):
             raise MappingException("localpart is invalid: %s" % (attributes.localpart,))
 
-        # DLA:ComUE+
-        mail_domaian_available = ["universite-lyon.fr", "access-check.renater.fr"]
+        # watcha+
+        # Même règle qu'à l'invitation : un partenaire dont l'adresse relève
+        # d'un domaine de l'organisation devient membre de plein droit. Piloté
+        # par `watcha.partner_email_whitelist`, vide par défaut.
+        # NB : la version précédente testait `domain in attributes.emails`, une
+        # appartenance à la liste d'adresses, et ne pouvait donc jamais être
+        # vraie. La règle est ici réellement appliquée.
+        whitelist = self.config.watcha.partner_email_whitelist
         if attributes.is_partner and any(
-            domain in attributes.emails for domain in mail_domaian_available
+            email_domain_matches(email, whitelist) for email in attributes.emails
         ):
             attributes.is_partner = False
         group = ["partner"] if attributes.is_partner else []
-        # +DLA:ComUE
+        # +watcha
 
         logger.debug("Mapped SSO user to local part %s", attributes.localpart)
 
@@ -817,7 +826,7 @@ class SsoHandler:
             user_agent_ips=[(user_agent, ip_address)],
             auth_provider_id=auth_provider_id,
             admin=attributes.is_admin,
-            make_partner=attributes.is_partner,  # DLA : ComUE
+            make_partner=attributes.is_partner,
             before_auto_join=provision_nextcloud_and_mapping,
         )
         # +watcha

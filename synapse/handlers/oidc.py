@@ -1647,7 +1647,7 @@ class UserAttributeDict(TypedDict):
     display_name: str | None
     picture: str | None  # may be omitted by older `OidcMappingProviders`
     emails: list[str]
-    is_partner: bool | None  # DLA : ComUE
+    is_partner: bool | None  # watcha+
     is_admin: bool | None  # watcha+
     nextcloud_username: str | None  # watcha+
 
@@ -1866,7 +1866,6 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         nextcloud_username = render_template_field(
             self._config.nextcloud_username_template
         )
-        # DLA : ComUE
         is_partner: bool | None = userinfo.get("is_partner")
         if not isinstance(is_partner, bool) and is_partner is not None:
             raise MappingException(
@@ -1876,7 +1875,6 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
                     },
                 )
             )
-        # DLA : ComUE
         # +watcha
 
         """watcha!
@@ -1895,7 +1893,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             emails=emails,
             picture=picture,
             confirm_localpart=self._config.confirm_localpart,
-            is_partner=is_partner,  # DLA : ComUE
+            is_partner=is_partner,  # watcha+
             is_admin=is_admin,
             nextcloud_username=nextcloud_username,
         )

@@ -49,12 +49,13 @@ class KeycloakClient(SimpleHttpClient):
         self.service_account_password = (
             hs.config.watcha.keycloak_service_account_password
         )
+        self.required_actions = hs.config.watcha.keycloak_required_actions  # watcha+
 
     async def add_user(
         self,
         password_hash: str,
         email_address: str,
-        is_partner: Optional[bool] = False, #DLA : ComUE
+        is_partner: Optional[bool] = False,  # watcha+
         is_admin: Optional[bool] = False,
         keycloak_username: Optional[str] = None,
         keycloak_as_broker: Optional[bool] = False,
@@ -86,15 +87,22 @@ class KeycloakClient(SimpleHttpClient):
                             "credentialData": '{"hashIterations":-1,"algorithm":"bcrypt"}',
                         }
                     ],
-                    "requiredActions": ["UPDATE_PASSWORD", "UPDATE_PROFILE"], #DLA : ComUE ligne à commenter
+                    # watcha+
+                    # Vide sur les instances dont les comptes proviennent d'une
+                    # fédération d'identité : l'utilisateur n'a ni mot de passe
+                    # ni profil à renseigner côté Keycloak.
+                    "requiredActions": self.required_actions,
+                    # +watcha
                 }
             )
 
         if is_admin:
             user["groups"] = ["/admin"]
 
-        if is_partner: #DLA : ComUE
-            user["groups"] = ["/partner"] #DLA : ComUE
+        # watcha+
+        if is_partner:
+            user["groups"] = ["/partner"]
+        # +watcha
 
         try:
             response = await self.post_json_get_response(

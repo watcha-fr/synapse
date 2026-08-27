@@ -4,7 +4,7 @@ import unicodedata
 from enum import Enum
 from inspect import stack
 from math import ceil, log2
-from typing import Dict
+from typing import Dict, Iterable, Optional
 
 
 class Secrets:
@@ -23,6 +23,43 @@ class Secrets:
         alphabet_length = len(self.alphabet)
         password_length = ceil(self.min_entropy / log2(alphabet_length))
         return "".join(secrets.choice(self.alphabet) for i in range(password_length))
+
+
+# watcha+
+def email_domain_matches(email_address: Optional[str], domains: Iterable[str]) -> bool:
+    """Whether an email address belongs to one of `domains`, or to a subdomain.
+
+    Used to decide whether a user invited as a partner actually belongs to the
+    organisation and must therefore be registered as a full member. The check is
+    deliberately anchored on the domain part: a plain substring test would let
+    `someone@evil-universite-lyon.fr.example` through, and that grants
+    membership.
+
+    Args:
+        email_address: the address to test. A missing or malformed address never
+            matches.
+        domains: the whitelisted domains. Comparison is case-insensitive.
+
+    Returns:
+        True if the address belongs to a whitelisted domain.
+    """
+    if not email_address or "@" not in email_address:
+        return False
+
+    domain = email_address.rpartition("@")[2].strip().lower().rstrip(".")
+    if not domain:
+        return False
+
+    for whitelisted in domains or ():
+        whitelisted = (whitelisted or "").strip().lower().lstrip("@").rstrip(".")
+        if not whitelisted:
+            continue
+        if domain == whitelisted or domain.endswith("." + whitelisted):
+            return True
+    return False
+
+
+# +watcha
 
 
 class ActionStatus(Enum):
