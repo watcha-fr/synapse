@@ -27,6 +27,23 @@ class NextcloudShareTestCase(unittest.HomeserverTestCase):
         self.creator_tok = self.login("creator", "pass")
         self.inviter = self.register_user("inviter", "pass")
         self.inviter_tok = self.login("inviter", "pass")
+
+        # watcha+
+        # `update_existing_nextcloud_share_for_user` sort sans rien faire quand
+        # l'utilisateur n'a pas de `nextcloud_username` — garde introduite pour
+        # supprimer les `POST /cloud/users/None/groups` émis quand l'adhésion
+        # était traitée avant l'enregistrement du mapping. Les comptes de test
+        # sont créés localement, sans identité externe : on leur en pose une,
+        # sans quoi ces tests ne valident plus rien.
+        for user_id in (self.creator, self.inviter):
+            localpart = user_id.split(":")[0].lstrip("@")
+            self.get_success(
+                self.store.record_user_external_id(
+                    "oidc", localpart, user_id, localpart
+                )
+            )
+        # +watcha
+
         self.room_id = self.helper.create_room_as(self.creator, tok=self.creator_tok)
         self.get_success(self.store.register_share(self.room_id, 1))
 
