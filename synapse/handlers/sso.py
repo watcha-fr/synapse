@@ -813,7 +813,10 @@ class SsoHandler:
             await self._hs.get_nextcloud_handler().provision_account(
                 nextcloud_username=nextcloud_username,
                 displayname=attributes.display_name,
-                email=attributes.emails[0] if attributes.emails else None,
+                # `emails` est un StrCollection : dans le parcours « choix du nom
+                # d'utilisateur » c'est un set (cf. `session.emails_to_use`), que
+                # l'on ne peut pas indexer.
+                email=next(iter(attributes.emails), None),
                 is_admin=bool(attributes.is_admin),
                 is_partner=bool(attributes.is_partner),
                 groups=group,
