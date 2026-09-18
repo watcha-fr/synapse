@@ -118,6 +118,29 @@ class KeycloakClient(SimpleHttpClient):
         logger.info(build_log_message(status=ActionStatus.SUCCESS))
         return response
 
+    async def set_user_enabled(self, user_id: str, enabled: bool):
+        """Enable or disable an existing user, without touching anything else.
+
+        Args:
+            user_id: the Keycloak user id
+            enabled: True to let the user log in again, False to lock the account
+        """
+
+        await self.put_json_get_response(
+            uri=self._get_endpoint(
+                "admin/realms/{}/users/{}", self.realm_name, user_id
+            ),
+            headers=await self._get_header(),
+            json_body={"enabled": enabled},
+        )
+
+        logger.info(
+            build_log_message(
+                status=ActionStatus.SUCCESS,
+                log_vars={"user_id": user_id, "enabled": enabled},
+            )
+        )
+
     async def delete_user(self, user_id):
         """Delete an existing user
 

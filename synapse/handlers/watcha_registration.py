@@ -149,6 +149,7 @@ class RegistrationHandler:
             )
         # +watcha
 
+        """ watcha!
         user_id = await self.registration_handler.register_user(
             localpart=localpart,
             password_hash=local_password_hash,
@@ -157,8 +158,42 @@ class RegistrationHandler:
             bind_emails=[email_address],
             make_partner=is_partner,
         )
+        !watcha """
+        # watcha+
+        # A deactivated account keeps its localpart forever, so registering it
+        # again fails with "User ID already taken" and the whole invitation
+        # errors out. Bring the existing account back instead: this is what
+        # keeps an address that once had an account invitable.
+        user_id = UserID(localpart, self.hs.hostname).to_string()
+        existing_user = await self.store.get_user_by_id(user_id)
 
+        if existing_user is not None:
+            await self._reactivate_account(
+                user_id,
+                existing_user,
+                email_address,
+                default_display_name,
+                is_partner,
+                is_admin,
+            )
+            send_registration_mail = False
+        else:
+            user_id = await self.registration_handler.register_user(
+                localpart=localpart,
+                password_hash=local_password_hash,
+                admin=is_admin,
+                default_display_name=default_display_name,
+                bind_emails=[email_address],
+                make_partner=is_partner,
+            )
+        # +watcha
+
+        """ watcha!
         if register_kc_user:
+        !watcha """
+        # The mapping already exists on a reactivated account, and recording it
+        # twice raises ExternalIDReuseException.
+        if register_kc_user and existing_user is None:  # watcha+
             idp_ids = list(self.hs.get_oidc_handler()._providers)
             idp_id = idp_ids[0] if len(idp_ids) == 1 else "nextcloud"
             await self.store.record_user_external_id(
@@ -197,7 +232,63 @@ class RegistrationHandler:
             self.config.watcha.user_audit_log_path,
             user_id=user_id,
             display_name=default_display_name,
-            action=UserAuditAction.CREATE,
+            action=(
+                UserAuditAction.REACTIVATE  # watcha+
+                if existing_user is not None  # watcha+
+                else UserAuditAction.CREATE
+            ),
         )
 
         return user_id
+
+    # watcha+
+    async def _reactivate_account(
+        self,
+        user_id: str,
+        existing_user,
+        email_address: str,
+        default_display_name: str,
+        is_partner: bool,
+        is_admin: bool,
+    ):
+        """Bring back an account that already holds this localpart.
+
+        Reactivating also unlocks the Keycloak and Nextcloud accounts, so the
+        person comes back under the identity they already had.
+        """
+
+        if existing_user.is_deactivated:
+            await self.hs.get_deactivate_account_handler().activate_account(user_id)
+
+        # The role carried by this invitation wins over the one the account had
+        # before it was deactivated.
+        if is_admin:
+            role = "administrator"
+        elif is_partner:
+            role = "partner"
+        else:
+            role = "collaborator"
+        await self.store.update_user_role(user_id, role)
+
+        threepids = await self.store.user_get_threepids(user_id)
+        if not any(
+            threepid.medium == "email" and threepid.address == email_address
+            for threepid in threepids
+        ):
+            now = self.hs.get_clock().time_msec()
+            await self.store.user_add_threepid(
+                user_id, "email", email_address, now, now
+            )
+
+        # Erasing the account cleared the profile.
+        await self.store.set_profile_displayname(
+            UserID.from_string(user_id), default_display_name
+        )
+
+        logger.info(
+            build_log_message(
+                status=ActionStatus.SUCCESS,
+                log_vars={"user_id": user_id, "email_address": email_address},
+            )
+        )
+    # +watcha

@@ -136,6 +136,16 @@ class DeactivateAccountHandler:
 
             identity_server_supports_unbinding &= result
 
+        # watcha+
+        # Lock the Keycloak and Nextcloud accounts before touching anything
+        # locally: a failure here leaves the user active everywhere, which the
+        # administrator can retry, rather than locked out of Synapse but still
+        # able to reach their documents.
+        await self.hs.get_account_lifecycle_handler().set_account_enabled(
+            user_id, False
+        )
+        # +watcha
+
         # Remove any local threepid associations for this account.
         local_threepids = await self.store.user_get_threepids(user_id)
         for local_threepid in local_threepids:
@@ -351,6 +361,13 @@ class DeactivateAccountHandler:
 
         # Mark the user as active.
         await self.store.set_user_deactivated_status(user_id, False)
+
+        # watcha+
+        # Unlock the same accounts, under the identity they already had.
+        await self.hs.get_account_lifecycle_handler().set_account_enabled(
+            user_id, True
+        )
+        # +watcha
 
         await self._third_party_rules.on_user_deactivation_status_changed(
             user_id, False, True

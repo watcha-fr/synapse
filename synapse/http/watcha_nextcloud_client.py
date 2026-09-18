@@ -156,6 +156,35 @@ class NextcloudClient(SimpleHttpClient):
             self._raise_for_status(meta)
             logger.info(build_log_message(status=ActionStatus.SUCCESS))
 
+    async def set_user_enabled(self, username: str, enabled: bool):
+        """Enable or disable an existing user, keeping files and shares untouched.
+
+        Args:
+            username: The username of the user.
+            enabled: True to let the user log in again, False to lock the account.
+
+        Status codes:
+            100 - successful
+            101 - failure
+            997 - unauthorised
+        """
+        action = "enable" if enabled else "disable"
+        response = await self.put_json(
+            uri=f"{self.nextcloud_url}/ocs/v1.php/cloud/users/{username}/{action}",
+            headers=self._headers_for_ocs_api,
+            json_body={},
+        )
+
+        validate(response, WITHOUT_DATA_SCHEMA)
+        self._raise_for_status(response["ocs"]["meta"])
+
+        logger.info(
+            build_log_message(
+                status=ActionStatus.SUCCESS,
+                log_vars={"username": username, "enabled": enabled},
+            )
+        )
+
     async def delete_user(self, username: str):
         """Delete an existing user.
 

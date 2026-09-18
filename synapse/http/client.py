@@ -850,6 +850,59 @@ class BaseHttpClient:
                 response.code, response.phrase.decode("ascii", errors="replace"), body
             )
 
+    async def put_json_get_response(
+        self, uri: str, json_body: Any, headers: RawHeaders | None = None
+    ) -> IResponse:
+        """PUT to a given URL and get the raw response object.
+
+        Unlike `put_json`, tolerates an empty response body: Keycloak answers
+        204 No Content to its user update endpoint.
+
+        Args:
+            uri: URI to query.
+            json_body: request body, to be encoded as json
+            headers: a map from header name to a list of values for that header
+
+        Returns:
+            Response object
+
+        Raises:
+            RequestTimedOutError: if there is a timeout before the response headers
+               are received.
+
+            HttpResponseException: On a non-2xx HTTP response.
+        """
+        json_str = encode_canonical_json(json_body)
+
+        logger.debug("HTTP PUT %s -> %s", json_str, uri)
+
+        actual_headers = {
+            b"Content-Type": [b"application/json"],
+            b"User-Agent": [self.user_agent],
+            b"Accept": [b"application/json"],
+        }
+        if headers:
+            actual_headers.update(headers)  # type: ignore
+
+        response = await self.request(
+            "PUT", uri, headers=Headers(actual_headers), data=json_str
+        )
+
+        body = await make_deferred_yieldable(readBody(response))
+
+        if 200 <= response.code < 300:
+            return response
+        else:
+            logger.error(
+                "HTTP Response Error %s: %s",
+                response.code,
+                response.phrase.decode("ascii", errors="replace"),
+            )
+
+            raise HttpResponseException(
+                response.code, response.phrase.decode("ascii", errors="replace"), body
+            )
+
     async def delete_get_json(
         self,
         uri: str,

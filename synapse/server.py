@@ -187,6 +187,7 @@ from synapse.util.stringutils import random_string
 from synapse.util.task_scheduler import TaskScheduler
 
 # watcha+
+from synapse.handlers.watcha_account_lifecycle import AccountLifecycleHandler
 from synapse.handlers.watcha_administration import AdministrationHandler as WatchaAdministrationHandler
 from synapse.handlers.watcha_registration import RegistrationHandler as WatchaRegistrationHandler
 from synapse.handlers.watcha_nextcloud import NextcloudHandler
@@ -1274,6 +1275,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_nextcloud_handler(self) -> NextcloudHandler:
         return NextcloudHandler(self)
+
+    @cache_in_self
+    def get_account_lifecycle_handler(self) -> AccountLifecycleHandler:
+        return AccountLifecycleHandler(self)
 
     # +watcha
 
