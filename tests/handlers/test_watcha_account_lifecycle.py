@@ -134,6 +134,12 @@ class ReinviteDeactivatedAccountTestCase(HomeserverTestCase):
         hs.get_nextcloud_client().set_user_enabled = AsyncMock()
         hs.get_nextcloud_handler().provision_account = AsyncMock()
 
+        # The registration path reads the configured providers to name the one
+        # the mapping is recorded against; `default_config()` declares none.
+        oidc_handler = Mock()
+        oidc_handler._providers = {"keycloak": Mock()}
+        hs._oidc_handler = oidc_handler
+
         self.admin_id = self.register_user("admin", "pass", admin=True)
 
     def _deactivated_account(self):

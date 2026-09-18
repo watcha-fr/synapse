@@ -346,6 +346,13 @@ class ProfileWorkerStore(SQLBaseStore):
             )
         row = cast(tuple[int | None, int | None, int | None], txn.fetchone())
 
+        # watcha+
+        # The row is gone when the account was erased, and setting a display
+        # name on such an account is exactly what reactivating it does.
+        if row is None:
+            row = (None, None, None)
+        # +watcha
+
         # The values return null if the column is null.
         total_bytes = (
             # Discount the opening and closing braces to avoid double counting,
