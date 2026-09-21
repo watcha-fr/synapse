@@ -159,6 +159,10 @@ class WatchaRegisterRestServlet(RestServlet):
             # Le connecteur Nextcloud le renseigne : le compte y existe déjà
             # sous ce nom, et en dériver un autre en créerait un second.
             nextcloud_username=params.get("nextcloud_username"),
+            # La console d'administration laisse le choix d'envoyer ou non le
+            # courriel de bienvenue. Absent, on l'envoie : c'est ce que fait
+            # l'invitation, et c'est le comportement d'avant.
+            send_email=params.get("send_email", True),
             # +watcha
         )
 

@@ -100,6 +100,28 @@ class NextcloudUsernameTestCase(HomeserverTestCase):
 
         self.assertEqual(self.get_success(self.store.get_username(user_id)), "user")
 
+    def test_the_welcome_email_can_be_suppressed(self):
+        """La console laisse le choix ; l'invitation, elle, l'envoie toujours."""
+        self.handler.mailer = Mock()
+        self.handler.mailer.send_watcha_registration_mail = AsyncMock()
+
+        self._register("avec.mail@example.com")
+        self.assertEqual(
+            self.handler.mailer.send_watcha_registration_mail.await_count, 1
+        )
+
+        self.get_success(
+            self.handler.register(
+                sender_id=self.admin_id,
+                email_address="sans.mail@example.com",
+                send_email=False,
+            )
+        )
+        # Toujours une seule : la seconde création n'a rien envoyé.
+        self.assertEqual(
+            self.handler.mailer.send_watcha_registration_mail.await_count, 1
+        )
+
     def test_an_imposed_name_wins_over_the_derivation(self):
         """The Nextcloud connector imposes it: the account already exists there
         under that name, and deriving another would create a second one."""

@@ -59,6 +59,7 @@ class RegistrationHandler:
         keycloak_as_broker: Optional[bool] = False,
         localpart_id: Optional[str] = None,
         nextcloud_username: Optional[str] = None,  # watcha+
+        send_email: Optional[bool] = True,  # watcha+
         # watcha+ `register_kc_user` used to be a parameter here, but it was
         # unconditionally reassigned from the configuration a few lines below
         # before ever being read: dead code, removed. No caller passed it.
@@ -106,6 +107,14 @@ class RegistrationHandler:
         )
 
         send_registration_mail = is_partner or register_kc_user and not keycloak_as_broker
+
+        # watcha+
+        # L'appelant peut supprimer le courriel, jamais le forcer : une
+        # instance qui n'en envoie pas ne doit pas se mettre à en envoyer parce
+        # qu'un client l'a demandé.
+        if not send_email:
+            send_registration_mail = False
+        # +watcha
 
         # watcha+
         # Nom lisible du compte Nextcloud. L'UUID reste le pivot d'identité ;
