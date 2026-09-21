@@ -33,6 +33,10 @@ class NextcloudUsernameTestCase(HomeserverTestCase):
         self.provision_account = AsyncMock()
         hs.get_nextcloud_handler().provision_account = self.provision_account
 
+        # Désactiver un compte verrouille aussi Keycloak et Nextcloud.
+        self.keycloak_client.set_user_enabled = AsyncMock()
+        hs.get_nextcloud_client().set_user_enabled = AsyncMock()
+
         oidc_handler = Mock()
         oidc_handler._providers = {"keycloak": Mock()}
         hs._oidc_handler = oidc_handler
