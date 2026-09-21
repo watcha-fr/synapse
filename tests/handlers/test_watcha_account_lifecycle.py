@@ -172,7 +172,9 @@ class ReinviteDeactivatedAccountTestCase(HomeserverTestCase):
             return_value={"id": self.KEYCLOAK_ID, "username": self.EMAIL}
         )
         self.keycloak_client.set_user_enabled = AsyncMock()
+        self.keycloak_client.delete_user = AsyncMock()
         hs.get_nextcloud_client().set_user_enabled = AsyncMock()
+        hs.get_nextcloud_client().delete_user = AsyncMock()
         hs.get_nextcloud_handler().provision_account = AsyncMock()
 
         # The registration path reads the configured providers to name the one
@@ -184,6 +186,10 @@ class ReinviteDeactivatedAccountTestCase(HomeserverTestCase):
         self.admin_id = self.register_user("admin", "pass", admin=True)
 
     def _deactivated_account(self):
+        """Une désactivation, pas un effacement. C'est le geste réversible :
+        Keycloak garde le compte, et c'est ce qui permet de le retrouver. Un
+        effacement supprimerait l'identité, et la personne qui revient
+        recevrait un compte neuf."""
         user_id = self.register_user(self.KEYCLOAK_ID, "pass")
         self.get_success(
             self.store.record_user_external_id(
@@ -193,7 +199,7 @@ class ReinviteDeactivatedAccountTestCase(HomeserverTestCase):
         self.get_success(
             self.deactivate_handler.deactivate_account(
                 user_id,
-                erase_data=True,
+                erase_data=False,
                 requester=create_requester(user_id),
                 by_admin=True,
             )
@@ -244,6 +250,43 @@ class ReinviteDeactivatedAccountTestCase(HomeserverTestCase):
         self.keycloak_client.set_user_enabled.assert_called_once_with(
             self.KEYCLOAK_ID, True
         )
+
+    def test_an_erased_account_comes_back_as_a_fresh_one(self):
+        """Un effacement supprime l'identité Keycloak : la personne qui revient
+        n'est plus la même, et reçoit un compte neuf. C'est la contrepartie
+        assumée de la symétrie du geste de suppression."""
+        old_user_id = self.register_user(self.KEYCLOAK_ID, "pass")
+        self.get_success(
+            self.store.record_user_external_id(
+                "oidc", self.KEYCLOAK_ID, old_user_id, "caroline"
+            )
+        )
+        self.get_success(
+            self.deactivate_handler.deactivate_account(
+                old_user_id,
+                erase_data=True,
+                requester=create_requester(old_user_id),
+                by_admin=True,
+            )
+        )
+        self.keycloak_client.delete_user.assert_called_once_with(self.KEYCLOAK_ID)
+
+        # Le compte Keycloak n'existe plus : la création réussit, sans 409.
+        response = Mock()
+        response.headers.getRawHeaders.return_value = [
+            "https://auth.example.com/admin/realms/watcha/users/uuid-neuf"
+        ]
+        self.keycloak_client.add_user = AsyncMock(return_value=response)
+
+        new_user_id = self.get_success(
+            self.handler.register(sender_id=self.admin_id, email_address=self.EMAIL)
+        )
+
+        self.assertEqual(new_user_id, "@uuid-neuf:test")
+        self.assertNotEqual(new_user_id, old_user_id)
+        # L'ancien reste là, effacé : un localpart ne se réutilise jamais.
+        old = self.get_success(self.store.get_user_by_id(old_user_id))
+        self.assertTrue(old.is_deactivated)
 
     def test_unknown_address_still_registers_a_new_account(self):
         """The reactivation branch must not disturb the ordinary path."""
