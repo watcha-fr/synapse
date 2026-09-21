@@ -543,6 +543,31 @@ class UserRestServletV2(UserRestServletV2Get):
                         HTTPStatus.CONFLICT, "External id is already in use."
                     )
 
+            # watcha+
+            # Jusqu'ici la création depuis l'administration ne produisait qu'un
+            # compte Synapse isolé : ni Keycloak, ni Nextcloud. Le compte garde
+            # le localpart choisi par l'administrateur ; l'UUID Keycloak est
+            # enregistré comme identité externe, ce que le login résout seul.
+            # Sans fournisseur d'identité géré, cet appel ne fait rien.
+            # `new_threepids` n'est lié que si le corps en contenait.
+            email_address = next(
+                (
+                    threepid["address"]
+                    for threepid in (threepids or ())
+                    if threepid.get("medium") == "email"
+                ),
+                None,
+            )
+            await self.hs.get_watcha_registration_handler().provision_external_accounts(
+                user_id=user_id,
+                localpart=target_user.localpart,
+                email_address=email_address,
+                password_hash=password_hash,
+                displayname=displayname,
+                is_admin=bool(set_admin_to),
+            )
+            # +watcha
+
             if "avatar_url" in body and isinstance(body["avatar_url"], str):
                 await self.profile_handler.set_avatar_url(
                     target_user, requester, body["avatar_url"], by_admin=True

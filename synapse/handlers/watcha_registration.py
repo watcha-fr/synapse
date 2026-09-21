@@ -2,7 +2,7 @@ import logging
 import uuid
 from typing import Optional, TYPE_CHECKING
 
-from synapse.api.errors import HttpResponseException
+from synapse.api.errors import HttpResponseException, SynapseError  # watcha+
 """ watcha!
 from synapse.config.emailconfig import ThreepidBehaviour
 !watcha"""
@@ -242,6 +242,85 @@ class RegistrationHandler:
         return user_id
 
     # watcha+
+    async def provision_external_accounts(
+        self,
+        user_id: str,
+        localpart: str,
+        email_address: Optional[str],
+        password_hash: Optional[str],
+        displayname: Optional[str],
+        is_admin: bool = False,
+    ) -> None:
+        """Give an already registered Synapse account its Keycloak and Nextcloud
+        counterparts.
+
+        Used by the admin API, whose accounts were until now created in Synapse
+        only. Unlike `register()`, the Synapse account already exists and keeps
+        the localpart the administrator chose: the Keycloak UUID is recorded as
+        the external id, which the login path resolves on its own, so the two
+        need not be equal.
+
+        Does nothing on an instance without a managed identity provider.
+        """
+
+        if not self.config.watcha.managed_idp:
+            return
+
+        if not email_address:
+            raise SynapseError(
+                400,
+                build_log_message(
+                    action="check that an email address is set",
+                    log_vars={"user_id": user_id},
+                ),
+            )
+
+        try:
+            response = await self.keycloak_client.add_user(
+                password_hash,
+                email_address,
+                False,
+                is_admin,
+                localpart,
+                # Sans mot de passe, ne pas poser de bloc d'identifiants :
+                # `add_user` y écrirait la chaîne « None » comme secret.
+                keycloak_as_broker=password_hash is None,
+            )
+            keycloak_id = response.headers.getRawHeaders("location")[0].split("/")[-1]
+        except HttpResponseException as error:
+            if error.code != 409:
+                raise
+            keycloak_user = await self.keycloak_client.get_user_by_email(email_address)
+            keycloak_id = keycloak_user["id"]
+
+        if (
+            self.config.watcha.nextcloud_integration
+            and self.config.watcha.managed_idp
+        ):
+            await self.hs.get_nextcloud_handler().provision_account(
+                nextcloud_username=localpart,
+                displayname=displayname or localpart,
+                email=email_address,
+                is_admin=is_admin,
+                is_partner=False,
+            )
+
+        idp_ids = list(self.hs.get_oidc_handler()._providers)
+        idp_id = idp_ids[0] if len(idp_ids) == 1 else "nextcloud"
+        await self.store.record_user_external_id(
+            idp_id,
+            keycloak_id,
+            user_id,
+            localpart,
+        )
+
+        logger.info(
+            build_log_message(
+                status=ActionStatus.SUCCESS,
+                log_vars={"user_id": user_id, "keycloak_id": keycloak_id},
+            )
+        )
+
     async def _reactivate_account(
         self,
         user_id: str,
