@@ -217,6 +217,58 @@ class NextcloudHandlerTestCase(HomeserverTestCase):
             self.creator, self.room_id
         )
 
+    # Re-sharing the same folder is destructive
+    # =========================================
+
+    def _bind_folder(self, url):
+        self.helper.send_state(
+            self.room_id,
+            "im.vector.web.settings",
+            {"nextcloudShare": url},
+            tok=self.creator_tok,
+        )
+
+    def test_binding_the_same_folder_twice_does_not_reshare(self):
+        """Nextcloud re-creates the share, which resets `file_target` on every
+        recipient's mount: a member who renamed the room folder for themselves
+        loses that name. And the client does write the state event twice — same
+        folder, the second URL merely carrying the folder's file id, added once
+        the document panel has resolved it. That must cost members nothing."""
+        url = "https://nextcloud.example.org/apps/files?dir=/folder"
+        self._bind_folder(url)
+        self.nextcloud_client.share.assert_called_once()
+        self.nextcloud_client.share.reset_mock()
+        self.nextcloud_client.unshare.reset_mock()
+
+        self._bind_folder(f"{url}&fileid=59")
+
+        self.nextcloud_client.unshare.assert_not_called()
+        self.nextcloud_client.share.assert_not_called()
+
+    def test_binding_another_folder_still_reshares(self):
+        """The guard must not freeze the binding: choosing a different folder
+        still moves the share."""
+        self._bind_folder("https://nextcloud.example.org/apps/files?dir=/folder")
+        self.nextcloud_client.share.reset_mock()
+        self.nextcloud_client.unshare.reset_mock()
+
+        self._bind_folder("https://nextcloud.example.org/apps/files?dir=/other")
+
+        self.nextcloud_client.unshare.assert_called_once()
+        self.nextcloud_client.share.assert_called_once()
+
+    def test_binding_is_not_skipped_when_the_room_has_no_share(self):
+        """An upgraded room inherits the old room's state but owns no share yet,
+        so an unchanged folder path must still be bound."""
+        url = "https://nextcloud.example.org/apps/files?dir=/folder"
+        self._bind_folder(url)
+        self.get_success(self.store.delete_share(self.room_id))
+        self.nextcloud_client.share.reset_mock()
+
+        self._bind_folder(f"{url}&fileid=59")
+
+        self.nextcloud_client.share.assert_called_once()
+
     def test_add_user_to_unexisting_group(self):
         self.nextcloud_client.add_user_to_group = AsyncMock(
             side_effect=NextcloudError(code=102, msg="")

@@ -309,6 +309,39 @@ class NextcloudHandler:
             room_id: the id of the room to bind.
             path: the path of the Nextcloud folder to bind.
         """
+        # watcha+
+        # Re-sharing is destructive: Nextcloud drops the old share and creates a
+        # new one, which resets `oc_share.file_target` for every recipient. Each
+        # member may rename their own mount of the room folder, so a needless
+        # re-share silently takes those names away from them.
+        #
+        # And a needless re-share does happen. The client stores the bound folder
+        # as a URL in the `im.vector.web.settings` room state, then enriches that
+        # URL with the folder's Nextcloud file id the first time the document
+        # panel resolves it. That second write is a new state event, which lands
+        # here — same folder, different URL.
+        #
+        # So binding twice to the same folder is a no-op. This runs before the
+        # state event is persisted, so the lookup below reads the *previous*
+        # binding. `get_share_id` is tested first and on purpose: an upgraded room
+        # copies the old room's state but has no share of its own yet, and must
+        # still be bound. The one behaviour given up is repairing a share deleted
+        # directly in Nextcloud by re-emitting an identical state event — which no
+        # client can do anyway, the folder picker refusing an unchanged value.
+        if (
+            await self.store.get_share_id(room_id)
+            and await self._get_bound_folder_path(room_id) == path
+        ):
+            logger.info(
+                build_log_message(
+                    action="skip re-sharing a folder already bound to the room",
+                    status=ActionStatus.SUCCESS,
+                    log_vars={"room_id": room_id, "path": path},
+                )
+            )
+            return
+        # +watcha
+
         group_id = await self.build_group_id(room_id)
         nextcloud_username = await self.store.get_username(requester_id)
 
