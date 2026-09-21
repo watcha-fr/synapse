@@ -137,13 +137,20 @@ class DeactivateAccountHandler:
             identity_server_supports_unbinding &= result
 
         # watcha+
-        # Lock the Keycloak and Nextcloud accounts before touching anything
-        # locally: a failure here leaves the user active everywhere, which the
-        # administrator can retry, rather than locked out of Synapse but still
-        # able to reach their documents.
-        await self.hs.get_account_lifecycle_handler().set_account_enabled(
-            user_id, False
-        )
+        # Porter le geste aux deux autres systèmes avant de toucher à quoi que
+        # ce soit localement : un échec laisse l'utilisateur actif partout, ce
+        # que l'administrateur peut réessayer, plutôt que sorti de Synapse mais
+        # toujours dans ses documents.
+        #
+        # `erase_data` distingue déjà les deux gestes, et le comportement est le
+        # même quel que soit le système d'où part la demande : un effacement
+        # supprime les comptes Keycloak et Nextcloud, une simple désactivation
+        # se contente de les verrouiller.
+        lifecycle_handler = self.hs.get_account_lifecycle_handler()
+        if erase_data:
+            await lifecycle_handler.delete_external_accounts(user_id)
+        else:
+            await lifecycle_handler.set_account_enabled(user_id, False)
         # +watcha
 
         # Remove any local threepid associations for this account.

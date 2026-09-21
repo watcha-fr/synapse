@@ -37,6 +37,7 @@ class WatchaNextcloudUserTestCase(HomeserverTestCase):
         self.keycloak_client.delete_user = AsyncMock()
         self.nextcloud_client = self.lifecycle.nextcloud_client
         self.nextcloud_client.set_user_enabled = AsyncMock()
+        self.nextcloud_client.delete_user = AsyncMock()
 
         self.admin_id = self.register_user("admin", "pass", admin=True)
         self.admin_tok = self.login("admin", "pass")
@@ -96,11 +97,11 @@ class WatchaNextcloudUserTestCase(HomeserverTestCase):
         self.assertTrue(self.get_success(self.store.is_user_erased(self.user_id)))
         self.keycloak_client.delete_user.assert_called_once_with(self.KEYCLOAK_ID)
 
-    def test_a_deleted_nextcloud_account_does_not_abort_the_deactivation(self):
+    def test_a_deleted_nextcloud_account_does_not_abort_the_deletion(self):
         """The account is gone there — that is the whole point of the call — so
-        locking it answers 101. Treating that as a failure would leave the
+        deleting it answers 101. Treating that as a failure would leave the
         Matrix account untouched."""
-        self.nextcloud_client.set_user_enabled = AsyncMock(
+        self.nextcloud_client.delete_user = AsyncMock(
             side_effect=NextcloudError(101, "user does not exist")
         )
 
@@ -108,6 +109,7 @@ class WatchaNextcloudUserTestCase(HomeserverTestCase):
 
         self.assertEqual(channel.code, 200, channel.json_body)
         self.assertTrue(self.get_success(self.store.is_user_erased(self.user_id)))
+        self.keycloak_client.delete_user.assert_called_once_with(self.KEYCLOAK_ID)
 
     def test_another_nextcloud_failure_still_aborts(self):
         """A permission or transport problem must not pass for success."""

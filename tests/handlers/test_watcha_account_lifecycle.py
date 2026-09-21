@@ -1,6 +1,6 @@
 from unittest.mock import AsyncMock, Mock
 
-from synapse.api.errors import HttpResponseException
+from synapse.api.errors import HttpResponseException, NextcloudError
 from synapse.rest import admin
 from synapse.rest.client import login
 from synapse.types import UserID, create_requester
@@ -28,6 +28,8 @@ class AccountLifecycleTestCase(HomeserverTestCase):
         self.nextcloud_client = self.handler.nextcloud_client
         self.keycloak_client.set_user_enabled = AsyncMock()
         self.nextcloud_client.set_user_enabled = AsyncMock()
+        self.keycloak_client.delete_user = AsyncMock()
+        self.nextcloud_client.delete_user = AsyncMock()
 
         self.user_id = self.register_user("8b1f3c", "pass")
         self.get_success(
@@ -57,6 +59,45 @@ class AccountLifecycleTestCase(HomeserverTestCase):
 
         self.keycloak_client.set_user_enabled.assert_called_once_with("8b1f3c", True)
         self.nextcloud_client.set_user_enabled.assert_called_once_with("jdupont", True)
+
+    def test_erasing_deletes_both_accounts_instead_of_locking_them(self):
+        """Le geste est le même d'où qu'il parte : un effacement supprime les
+        comptes Keycloak et Nextcloud, là où une simple désactivation se
+        contente de les verrouiller."""
+        self.get_success(
+            self.deactivate_handler.deactivate_account(
+                self.user_id,
+                erase_data=True,
+                requester=create_requester(self.user_id),
+                by_admin=True,
+            )
+        )
+
+        self.nextcloud_client.delete_user.assert_called_once_with("jdupont")
+        self.keycloak_client.delete_user.assert_called_once_with("8b1f3c")
+        self.keycloak_client.set_user_enabled.assert_not_called()
+        self.nextcloud_client.set_user_enabled.assert_not_called()
+
+    def test_a_failed_nextcloud_deletion_spares_the_keycloak_identity(self):
+        """Nextcloud passe en premier parce que c'est la moitié irréversible :
+        si elle échoue, l'identité doit rester intacte et réessayable."""
+        self.nextcloud_client.delete_user = AsyncMock(
+            side_effect=NextcloudError(997, "unauthorised")
+        )
+
+        self.get_failure(
+            self.deactivate_handler.deactivate_account(
+                self.user_id,
+                erase_data=True,
+                requester=create_requester(self.user_id),
+                by_admin=True,
+            ),
+            NextcloudError,
+        )
+
+        self.keycloak_client.delete_user.assert_not_called()
+        user = self.get_success(self.store.get_user_by_id(self.user_id))
+        self.assertFalse(user.is_deactivated)
 
     def test_local_account_is_skipped(self):
         """An account with no external identity has nothing to lock elsewhere."""

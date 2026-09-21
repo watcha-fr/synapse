@@ -1,7 +1,7 @@
 import logging
 from typing import Optional, TYPE_CHECKING
 
-from synapse.api.errors import NextcloudError
+from synapse.api.errors import HttpResponseException, NextcloudError
 from synapse.util.watcha import ActionStatus, build_log_message
 
 if TYPE_CHECKING:
@@ -36,6 +36,22 @@ class AccountLifecycleHandler:
         """
         await self._set_keycloak_enabled(user_id, enabled)
         await self._set_nextcloud_enabled(user_id, enabled)
+
+    async def delete_external_accounts(self, user_id: str) -> None:
+        """Delete the Keycloak and Nextcloud accounts bound to a user.
+
+        The destructive counterpart of `set_account_enabled`, for when the
+        gesture is a deletion rather than a deactivation. Whichever of the three
+        systems it starts from, the outcome is the same: Keycloak and Nextcloud
+        are deleted, Synapse is deactivated and erased — it cannot delete, a
+        localpart stays taken for good.
+
+        Nextcloud goes first on purpose: it is the irreversible half, since it
+        destroys the person's files, so a failure there must leave the Keycloak
+        identity — and therefore the whole account — intact and retryable.
+        """
+        await self._delete_nextcloud_account(user_id)
+        await self._delete_keycloak_account(user_id)
 
     async def _set_keycloak_enabled(self, user_id: str, enabled: bool) -> None:
         if not self.config.watcha.managed_idp:
@@ -124,10 +140,12 @@ class AccountLifecycleHandler:
                 user_id, erase_data=False, requester=requester, by_admin=True
             )
         elif action == "delete":
+            # La suppression des comptes Keycloak et Nextcloud est portée par
+            # le fan-out de `deactivate_account`, sur le drapeau d'effacement :
+            # le geste est le même d'où qu'il parte.
             await deactivate_handler.deactivate_account(
                 user_id, erase_data=True, requester=requester, by_admin=True
             )
-            await self._delete_keycloak_account(user_id)
         else:
             raise ValueError(f"unknown action {action!r}")
 
@@ -150,7 +168,49 @@ class AccountLifecycleHandler:
         if keycloak_id is None:
             return
 
-        await self.keycloak_client.delete_user(keycloak_id)
+        try:
+            await self.keycloak_client.delete_user(keycloak_id)
+        except HttpResponseException as error:
+            # Déjà supprimé, par exemple quand la demande vient de Keycloak
+            # lui-même : l'état voulu est atteint.
+            if error.code != 404:
+                raise
+            logger.warning(
+                build_log_message(
+                    action="Keycloak account already gone",
+                    status=ActionStatus.SUCCESS,
+                    log_vars={"keycloak_id": keycloak_id},
+                )
+            )
+
+    async def _delete_nextcloud_account(self, user_id: str) -> None:
+        """Détruit le compte et **ses fichiers**, dossiers documentaires de
+        salons compris. C'est la moitié irréversible du geste."""
+
+        if not (
+            self.config.watcha.managed_idp
+            and self.config.watcha.nextcloud_integration
+        ):
+            return
+
+        nextcloud_username = await self.store.get_username(user_id)
+        if not nextcloud_username:
+            return
+
+        try:
+            await self.nextcloud_client.delete_user(nextcloud_username)
+        except NextcloudError as error:
+            # 101 : le compte n'existe plus, ce qui est le cas quand la demande
+            # vient justement de sa suppression là-bas.
+            if error.code != 101:
+                raise
+            logger.warning(
+                build_log_message(
+                    action="Nextcloud account already gone",
+                    status=ActionStatus.SUCCESS,
+                    log_vars={"nextcloud_username": nextcloud_username},
+                )
+            )
 
     async def _get_keycloak_id(self, user_id: str) -> Optional[str]:
         """The Keycloak UUID recorded as the OIDC subject of this user, if any."""
