@@ -1,4 +1,5 @@
 import logging
+import re  # watcha+
 import uuid
 from typing import Optional, TYPE_CHECKING
 
@@ -105,6 +106,12 @@ class RegistrationHandler:
 
         send_registration_mail = is_partner or register_kc_user and not keycloak_as_broker
 
+        # watcha+
+        # Nom lisible du compte Nextcloud. L'UUID reste le pivot d'identité ;
+        # ce nom vient à côté, pour que l'espace documentaire soit exploitable.
+        nextcloud_username = await self._derive_nextcloud_username(email_address)
+        # +watcha
+
         if register_kc_user:
             try:
                 response = await self.keycloak_client.add_user(
@@ -114,6 +121,7 @@ class RegistrationHandler:
                     is_admin,
                     keycloak_username,
                     keycloak_as_broker,
+                    nextcloud_username,  # watcha+
                 )
                 location = response.headers.getRawHeaders("location")[0]
                 localpart = location.split("/")[-1]
@@ -135,13 +143,29 @@ class RegistrationHandler:
             local_password_hash = password_hash
 
         # watcha+
-        # Same single implementation as the SSO path. Here `localpart` *is* the
-        # identifier recorded in the mapping below, so the two agree by
+        # A deactivated account keeps its localpart forever, so registering it
+        # again fails with "User ID already taken" and the whole invitation
+        # errors out. Bring the existing account back instead: this is what
+        # keeps an address that once had an account invitable.
+        user_id = UserID(localpart, self.hs.hostname).to_string()
+        existing_user = await self.store.get_user_by_id(user_id)
+
+        # Un compte déjà connu garde le nom Nextcloud enregistré : en dériver un
+        # nouveau lui fabriquerait un second compte à côté du sien.
+        if existing_user is not None:
+            nextcloud_username = (
+                await self.store.get_username(user_id) or nextcloud_username
+            )
+        # +watcha
+
+        # watcha+
+        # Same single implementation as the SSO path. The name provisioned here
+        # is the one recorded in the mapping below, so the two agree by
         # construction — unlike the SSO path, where they were rendered from two
         # independent templates and could diverge.
         if register_nc_user:
             await self.hs.get_nextcloud_handler().provision_account(
-                nextcloud_username=localpart,
+                nextcloud_username=nextcloud_username,
                 displayname=default_display_name,
                 email=email_address,
                 is_admin=bool(is_admin),
@@ -160,13 +184,6 @@ class RegistrationHandler:
         )
         !watcha """
         # watcha+
-        # A deactivated account keeps its localpart forever, so registering it
-        # again fails with "User ID already taken" and the whole invitation
-        # errors out. Bring the existing account back instead: this is what
-        # keeps an address that once had an account invitable.
-        user_id = UserID(localpart, self.hs.hostname).to_string()
-        existing_user = await self.store.get_user_by_id(user_id)
-
         if existing_user is not None:
             await self._reactivate_account(
                 user_id,
@@ -200,7 +217,7 @@ class RegistrationHandler:
                 idp_id,
                 localpart,
                 user_id,
-                localpart,
+                nextcloud_username,  # watcha+ : le nom lisible, plus l'UUID
             )
 
         if is_partner:
@@ -242,6 +259,25 @@ class RegistrationHandler:
         return user_id
 
     # watcha+
+    async def _derive_nextcloud_username(self, email_address: str) -> str:
+        """A readable Nextcloud name derived from the address, deduplicated.
+
+        `jean.dupont@example.com` gives `jean.dupont`, then `jean.dupont2` if
+        that one is already mapped to someone.
+        """
+
+        base = re.sub(
+            r"[^a-z0-9._-]", "", email_address.split("@")[0].lower()
+        ) or "user"
+
+        candidate = base
+        suffix = 1
+        while await self.store.is_nextcloud_username_taken(candidate):
+            suffix += 1
+            candidate = f"{base}{suffix}"
+
+        return candidate
+
     async def provision_external_accounts(
         self,
         user_id: str,
@@ -285,6 +321,9 @@ class RegistrationHandler:
                 # Sans mot de passe, ne pas poser de bloc d'identifiants :
                 # `add_user` y écrirait la chaîne « None » comme secret.
                 keycloak_as_broker=password_hash is None,
+                # Le localpart choisi par l'administrateur est déjà lisible :
+                # c'est lui que porte le compte Nextcloud.
+                nextcloud_username=localpart,
             )
             keycloak_id = response.headers.getRawHeaders("location")[0].split("/")[-1]
         except HttpResponseException as error:

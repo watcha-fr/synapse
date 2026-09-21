@@ -59,6 +59,7 @@ class KeycloakClient(SimpleHttpClient):
         is_admin: Optional[bool] = False,
         keycloak_username: Optional[str] = None,
         keycloak_as_broker: Optional[bool] = False,
+        nextcloud_username: Optional[str] = None,  # watcha+
     ):
         """Create a new user
 
@@ -66,6 +67,8 @@ class KeycloakClient(SimpleHttpClient):
             password_hash: The bcrypt hash of the user's password, as for Synapse.
             email_address: The user's email address.
             is_admin: Whether the user is a synapse administrator or not.
+            nextcloud_username: readable name to carry in the `nextcloudUsername`
+                attribute, which the `nextcloud_username` claim reads at login.
         """
 
         user = {
@@ -74,6 +77,13 @@ class KeycloakClient(SimpleHttpClient):
             "email": email_address,
             "attributes": {"locale": ["fr"]},
         }
+
+        # watcha+
+        # Sans cet attribut, le gabarit `nextcloud_username_template` retombe
+        # sur `sub`, et le compte Nextcloud porte l'UUID pour nom.
+        if nextcloud_username:
+            user["attributes"]["nextcloudUsername"] = [nextcloud_username]
+        # +watcha
 
         if not keycloak_as_broker:
             user.update(

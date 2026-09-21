@@ -46,6 +46,20 @@ class NextcloudStore(SQLBaseStore):
             desc="delete_nextcloud_share",
         )
 
+    async def is_nextcloud_username_taken(self, nextcloud_username: str) -> bool:
+        """Whether a Nextcloud username is already mapped to someone.
+
+        Args:
+            nextcloud_username: the name to check
+        """
+        rows = await self.db_pool.simple_select_onecol(
+            table="user_external_ids",
+            keyvalues={"nextcloud_username": nextcloud_username},
+            retcol="user_id",
+            desc="is_nextcloud_username_taken",
+        )
+        return bool(rows)
+
     async def get_username(self, user_id: str):
         """Look up a Nextcloud username by their user_id
 
