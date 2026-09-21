@@ -119,6 +119,22 @@ class RegisterTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 400)
 
+    # watcha+
+    def test_register_user_with_no_email_field(self):
+        channel = self.make_request(
+            "POST",
+            self.url,
+            {"admin": False, "displayname": "Sans adresse"},
+            self.owner_tok,
+        )
+
+        self.keycloak_client.add_user.assert_not_called()
+        self.nextcloud_client.add_user.assert_not_called()
+
+        self.assertEqual(channel.code, 400, channel.json_body)
+
+    # +watcha
+
     def test_register_user_with_displayname(self):
         channel = self.make_request(
             "POST",

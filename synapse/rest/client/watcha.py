@@ -137,7 +137,12 @@ class WatchaRegisterRestServlet(RestServlet):
 
         params = parse_json_object_from_request(request)
 
-        email_address = params["email"].lower().strip()
+        # watcha+
+        # Le champ absent est le même refus que le champ vide : y accéder
+        # directement remontait une KeyError, donc une 500 là où le client
+        # attend une 400.
+        email_address = (params.get("email") or "").lower().strip()
+        # +watcha
         if not email_address:
             raise SynapseError(
                 400,
