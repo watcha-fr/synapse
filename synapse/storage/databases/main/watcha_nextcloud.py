@@ -46,6 +46,26 @@ class NextcloudStore(SQLBaseStore):
             desc="delete_nextcloud_share",
         )
 
+    async def get_user_id_by_nextcloud_username(self, nextcloud_username: str):
+        """Look up a Matrix user by their Nextcloud name.
+
+        The Nextcloud connector only knows that name: it has no way of guessing
+        the mxid, which the mapping alone relates to it.
+
+        Args:
+            nextcloud_username: the Nextcloud account name
+
+        Returns:
+            the matrix ID, or None if no account is mapped to that name
+        """
+        return await self.db_pool.simple_select_one_onecol(
+            table="user_external_ids",
+            keyvalues={"nextcloud_username": nextcloud_username},
+            retcol="user_id",
+            allow_none=True,
+            desc="get_user_id_by_nextcloud_username",
+        )
+
     async def is_nextcloud_username_taken(self, nextcloud_username: str) -> bool:
         """Whether a Nextcloud username is already mapped to someone.
 

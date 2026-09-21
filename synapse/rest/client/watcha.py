@@ -164,6 +164,48 @@ class WatchaRegisterRestServlet(RestServlet):
 
         return 200, {"user_id": user_id}
 
+# watcha+
+class WatchaNextcloudUserRestServlet(RestServlet):
+    """Ce que le connecteur Nextcloud signale sur un compte de son côté.
+
+    Il ne connaît que le nom Nextcloud : le mxid n'est retrouvable que par le
+    mapping, d'où ce point d'entrée plutôt qu'un appel à l'API d'administration.
+    """
+
+    PATTERNS = client_patterns("/watcha_nextcloud_user", v1=True)
+
+    ACTIONS = ("disable", "enable", "delete")
+
+    def __init__(self, hs):
+        super().__init__()
+        self.auth = hs.get_auth()
+        self.lifecycle_handler = hs.get_account_lifecycle_handler()
+
+    async def on_POST(self, request):
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester)
+
+        params = parse_json_object_from_request(request)
+        nextcloud_username = (params.get("nextcloud_username") or "").strip()
+        action = params.get("action")
+
+        if not nextcloud_username or action not in self.ACTIONS:
+            raise SynapseError(
+                400,
+                build_log_message(
+                    action="check the Nextcloud name and the action",
+                    log_vars={"params": params},
+                ),
+            )
+
+        user_id = await self.lifecycle_handler.handle_nextcloud_change(
+            nextcloud_username, action, requester
+        )
+
+        return 200, {"user_id": user_id}
+# +watcha
+
+
 class WatchaSygnalPingServlet(RestServlet):
     PATTERNS = client_patterns("/watcha_sygnal_ping", v1=True)
 
@@ -386,3 +428,4 @@ def register_servlets(hs, http_server):
     WatchaUserlistRestServlet(hs).register(http_server)
     WatchaSygnalPingServlet(hs).register(http_server)
     WatchaDeleteUserMessagesRestServlet(hs).register(http_server)
+    WatchaNextcloudUserRestServlet(hs).register(http_server)  # watcha+

@@ -1,6 +1,7 @@
 import logging
 from typing import Optional, TYPE_CHECKING
 
+from synapse.api.errors import NextcloudError
 from synapse.util.watcha import ActionStatus, build_log_message
 
 if TYPE_CHECKING:
@@ -19,6 +20,7 @@ class AccountLifecycleHandler:
     """
 
     def __init__(self, hs: "HomeServer"):
+        self.hs = hs
         self.config = hs.config
         self.store = hs.get_datastores().main
         self.keycloak_client = hs.get_keycloak_client()
@@ -70,7 +72,85 @@ class AccountLifecycleHandler:
             )
             return
 
-        await self.nextcloud_client.set_user_enabled(nextcloud_username, enabled)
+        try:
+            await self.nextcloud_client.set_user_enabled(nextcloud_username, enabled)
+        except NextcloudError as error:
+            # 101 : le compte n'existe plus côté Nextcloud. C'est le cas quand
+            # la désactivation vient justement de sa suppression là-bas : il n'y
+            # a rien à verrouiller, et l'état voulu est déjà atteint. Toute
+            # autre défaillance, transport ou authentification, remonte.
+            if error.code != 101:
+                raise
+            logger.warning(
+                build_log_message(
+                    action="Nextcloud account already gone, nothing to lock",
+                    status=ActionStatus.SUCCESS,
+                    log_vars={"nextcloud_username": nextcloud_username},
+                )
+            )
+
+    async def handle_nextcloud_change(
+        self, nextcloud_username: str, action: str, requester
+    ) -> Optional[str]:
+        """Carry over to Matrix and Keycloak what just happened in Nextcloud.
+
+        Deleting an account there is an explicit, destructive gesture: it takes
+        the Keycloak account with it and erases the Synapse one, short-circuiting
+        the retention period. Merely disabling it is the reversible path.
+
+        Returns:
+            the matrix ID the name pointed at, or None if nothing is mapped.
+        """
+
+        user_id = await self.store.get_user_id_by_nextcloud_username(
+            nextcloud_username
+        )
+        if user_id is None:
+            logger.info(
+                build_log_message(
+                    action="no Matrix account mapped to that Nextcloud name",
+                    status=ActionStatus.SUCCESS,
+                    log_vars={"nextcloud_username": nextcloud_username},
+                )
+            )
+            return None
+
+        deactivate_handler = self.hs.get_deactivate_account_handler()
+
+        if action == "enable":
+            await deactivate_handler.activate_account(user_id)
+        elif action == "disable":
+            await deactivate_handler.deactivate_account(
+                user_id, erase_data=False, requester=requester, by_admin=True
+            )
+        elif action == "delete":
+            await deactivate_handler.deactivate_account(
+                user_id, erase_data=True, requester=requester, by_admin=True
+            )
+            await self._delete_keycloak_account(user_id)
+        else:
+            raise ValueError(f"unknown action {action!r}")
+
+        logger.info(
+            build_log_message(
+                status=ActionStatus.SUCCESS,
+                log_vars={"user_id": user_id, "action": action},
+            )
+        )
+        return user_id
+
+    async def _delete_keycloak_account(self, user_id: str) -> None:
+        """Point de non-retour : l'UUID disparaît, la personne ne peut plus
+        revenir sous la même identité."""
+
+        if not self.config.watcha.managed_idp:
+            return
+
+        keycloak_id = await self._get_keycloak_id(user_id)
+        if keycloak_id is None:
+            return
+
+        await self.keycloak_client.delete_user(keycloak_id)
 
     async def _get_keycloak_id(self, user_id: str) -> Optional[str]:
         """The Keycloak UUID recorded as the OIDC subject of this user, if any."""
