@@ -155,6 +155,11 @@ class WatchaRegisterRestServlet(RestServlet):
             keycloak_username=params.get("keycloak_username"),
             keycloak_as_broker=params.get("keycloak_as_broker", False),
             localpart_id=params.get("localpart_id"),
+            # watcha+
+            # Le connecteur Nextcloud le renseigne : le compte y existe déjà
+            # sous ce nom, et en dériver un autre en créerait un second.
+            nextcloud_username=params.get("nextcloud_username"),
+            # +watcha
         )
 
         return 200, {"user_id": user_id}

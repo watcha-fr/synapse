@@ -58,6 +58,7 @@ class RegistrationHandler:
         keycloak_username: Optional[str] = None,
         keycloak_as_broker: Optional[bool] = False,
         localpart_id: Optional[str] = None,
+        nextcloud_username: Optional[str] = None,  # watcha+
         # watcha+ `register_kc_user` used to be a parameter here, but it was
         # unconditionally reassigned from the configuration a few lines below
         # before ever being read: dead code, removed. No caller passed it.
@@ -109,7 +110,11 @@ class RegistrationHandler:
         # watcha+
         # Nom lisible du compte Nextcloud. L'UUID reste le pivot d'identité ;
         # ce nom vient à côté, pour que l'espace documentaire soit exploitable.
-        nextcloud_username = await self._derive_nextcloud_username(email_address)
+        # L'appelant peut l'imposer — le connecteur Nextcloud le fait, puisque
+        # le compte y existe déjà sous ce nom.
+        nextcloud_username = nextcloud_username or await self._derive_nextcloud_username(
+            email_address
+        )
         # +watcha
 
         if register_kc_user:

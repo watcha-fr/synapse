@@ -100,6 +100,25 @@ class NextcloudUsernameTestCase(HomeserverTestCase):
 
         self.assertEqual(self.get_success(self.store.get_username(user_id)), "user")
 
+    def test_an_imposed_name_wins_over_the_derivation(self):
+        """The Nextcloud connector imposes it: the account already exists there
+        under that name, and deriving another would create a second one."""
+        user_id = self.get_success(
+            self.handler.register(
+                sender_id=self.admin_id,
+                email_address="jean.dupont@example.com",
+                nextcloud_username="jdupont-nc",
+            )
+        )
+
+        self.assertEqual(
+            self.get_success(self.store.get_username(user_id)), "jdupont-nc"
+        )
+        self.assertEqual(
+            self.provision_account.call_args.kwargs["nextcloud_username"],
+            "jdupont-nc",
+        )
+
     def test_a_reactivated_account_keeps_the_name_it_had(self):
         """Deriving a fresh name for a returning person would leave them a second
         Nextcloud account beside their own."""
