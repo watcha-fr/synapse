@@ -1034,6 +1034,25 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
         def _replace_user_external_id_txn(
             txn: LoggingTransaction,
         ) -> None:
+            # watcha+
+            # L'API d'administration réécrit les rattachements en bloc et ne
+            # connaît pas le nom Nextcloud : le relire avant d'effacer. Sans
+            # cela, le repli sur l'identifiant externe le remplace par l'UUID
+            # Keycloak, le compte Nextcloud devient introuvable, et la
+            # désactivation qui suit dans la même requête le laisse ouvert.
+            preserved_nextcloud_username = nextcloud_username
+            if preserved_nextcloud_username is None:
+                preserved_nextcloud_username = (
+                    self.db_pool.simple_select_one_onecol_txn(
+                        txn,
+                        table="user_external_ids",
+                        keyvalues={"user_id": user_id},
+                        retcol="nextcloud_username",
+                        allow_none=True,
+                    )
+                )
+            # +watcha
+
             self.db_pool.simple_delete_txn(
                 txn,
                 table="user_external_ids",
@@ -1050,7 +1069,7 @@ class RegistrationWorkerStore(StatsStore, CacheInvalidationWorkerStore):
                     auth_provider,
                     external_id,
                     user_id,
-                    nextcloud_username,  # watcha+
+                    preserved_nextcloud_username,  # watcha+
                 )
 
         try:

@@ -84,6 +84,57 @@ class AdminCreateUserProvisioningTestCase(HomeserverTestCase):
             self.get_success(self.store.get_username(user_id)), "jdupont"
         )
 
+    # watcha+
+    def test_editing_the_account_keeps_the_nextcloud_mapping(self):
+        """The console sends the whole record back, `external_ids` included, so
+        every edit replaces the mappings. Losing the Nextcloud name there made
+        the column fall back to the Keycloak UUID: the Nextcloud account became
+        unreachable, and the deactivation carried in the same request left the
+        person's files wide open while every other system showed them locked."""
+        self._create()
+        user_id = "@jdupont:test"
+
+        channel = self.make_request(
+            "PUT",
+            f"/_synapse/admin/v2/users/{user_id}",
+            {
+                "displayname": "Jean Dupont",
+                "external_ids": [
+                    {"auth_provider": "keycloak", "external_id": self.KEYCLOAK_ID}
+                ],
+            },
+            access_token=self.admin_tok,
+        )
+
+        self.assertEqual(channel.code, 200, channel.json_body)
+        self.assertEqual(
+            self.get_success(self.store.get_username(user_id)), "jdupont"
+        )
+
+    def test_deactivating_from_the_console_locks_the_right_nextcloud_account(self):
+        """The deactivation travels in the same request as `external_ids`, and
+        reads the mapping after it has been rewritten."""
+        self._create()
+        user_id = "@jdupont:test"
+
+        self.make_request(
+            "PUT",
+            f"/_synapse/admin/v2/users/{user_id}",
+            {
+                "deactivated": True,
+                "external_ids": [
+                    {"auth_provider": "keycloak", "external_id": self.KEYCLOAK_ID}
+                ],
+            },
+            access_token=self.admin_tok,
+        )
+
+        self.assertEqual(
+            self.get_success(self.store.get_username(user_id)), "jdupont"
+        )
+
+    # +watcha
+
     def test_login_resolves_the_account_from_the_keycloak_uuid(self):
         """A localpart different from the subject must still resolve at login."""
         self._create()
