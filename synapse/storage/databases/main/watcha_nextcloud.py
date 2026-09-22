@@ -1,5 +1,7 @@
+from typing import Optional  # watcha+
+
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import DatabasePool, LoggingTransaction  # watcha+
 
 
 class NextcloudStore(SQLBaseStore):
@@ -79,6 +81,58 @@ class NextcloudStore(SQLBaseStore):
             desc="is_nextcloud_username_taken",
         )
         return bool(rows)
+
+    async def get_room_folder_heir(
+        self, room_id: str, leaving_user_id: str
+    ) -> Optional[str]:
+        """Qui reprend le dossier d'un salon quand son propriétaire s'en va.
+
+        Le plus ancien membre encore présent, à trois conditions : qu'il ait
+        rejoint le salon, qu'il soit membre de plein droit, et qu'il ait un
+        compte Nextcloud pour recevoir les fichiers.
+
+        « Le plus ancien » se lit dans le salon, pas dans l'annuaire : c'est
+        celui dont l'adhésion courante est la plus ancienne. Quelqu'un qui est
+        parti puis revenu compte donc depuis son retour.
+
+        Les partenaires sont écartés : ce sont des externes à l'organisation, et
+        les documents d'un salon ne leur reviennent pas. Si seuls des partenaires
+        restent, personne n'hérite — comme si le salon était vide.
+
+        Args:
+            room_id: le salon dont le dossier cherche un propriétaire
+            leaving_user_id: la personne qui part, à ne pas désigner
+
+        Returns:
+            le nom Nextcloud de l'héritier, ou None si personne ne peut l'être
+        """
+
+        def _get_room_folder_heir_txn(txn: LoggingTransaction) -> Optional[str]:
+            sql = """
+                SELECT e.nextcloud_username
+                FROM current_state_events c
+                JOIN room_memberships m ON m.event_id = c.event_id
+                JOIN events ev ON ev.event_id = c.event_id
+                JOIN users u ON u.name = m.user_id
+                JOIN user_external_ids e ON e.user_id = m.user_id
+                WHERE c.room_id = ?
+                  AND c.type = 'm.room.member'
+                  AND m.membership = 'join'
+                  AND m.user_id != ?
+                  AND u.deactivated = 0
+                  AND COALESCE(u.is_partner, 0) = 0
+                  AND e.nextcloud_username IS NOT NULL
+                  AND e.nextcloud_username != ''
+                ORDER BY ev.stream_ordering ASC
+                LIMIT 1
+            """
+            txn.execute(sql, (room_id, leaving_user_id))
+            row = txn.fetchone()
+            return row[0] if row else None
+
+        return await self.db_pool.runInteraction(
+            "get_room_folder_heir", _get_room_folder_heir_txn
+        )
 
     async def release_nextcloud_username(self, user_id: str) -> None:
         """Give the Nextcloud name back once the account it designated is gone.

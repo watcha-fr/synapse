@@ -212,6 +212,63 @@ class WatchaNextcloudUserRestServlet(RestServlet):
         )
 
         return 200, {"user_id": user_id}
+
+
+class WatchaRoomFolderHeirRestServlet(RestServlet):
+    """Qui reprend le dossier d'un salon quand son propriétaire est supprimé.
+
+    Le connecteur Nextcloud sait quels dossiers la personne possède, mais pas
+    qui peut en hériter : l'appartenance aux salons et l'ancienneté n'existent
+    que dans Synapse. Il pose donc la question ici, juste avant de détruire le
+    compte, et transfère le dossier au nom qu'on lui rend.
+
+    Une réponse à `null` n'est pas une erreur : elle dit qu'aucun membre ne peut
+    hériter — salon vide, ou n'y restent que des partenaires.
+    """
+
+    PATTERNS = client_patterns("/watcha_room_folder_heir", v1=True)
+
+    def __init__(self, hs):
+        super().__init__()
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastores().main
+
+    async def on_POST(self, request):
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester)
+
+        params = parse_json_object_from_request(request)
+        room_id = (params.get("room_id") or "").strip()
+        leaving = (params.get("nextcloud_username") or "").strip()
+
+        if not room_id or not leaving:
+            raise SynapseError(
+                400,
+                build_log_message(
+                    action="check the room and the departing Nextcloud name",
+                    log_vars={"params": params},
+                ),
+            )
+
+        leaving_user_id = await self.store.get_user_id_by_nextcloud_username(leaving)
+        if leaving_user_id is None:
+            # Un compte Nextcloud sans rattachement : rien à hériter de lui, et
+            # surtout rien à refuser au connecteur.
+            return 200, {"nextcloud_username": None}
+
+        heir = await self.store.get_room_folder_heir(room_id, leaving_user_id)
+
+        logger.info(
+            build_log_message(
+                action="designate the room folder heir",
+                log_vars={
+                    "room_id": room_id,
+                    "leaving": leaving,
+                    "heir": heir,
+                },
+            )
+        )
+        return 200, {"nextcloud_username": heir}
 # +watcha
 
 
@@ -437,4 +494,7 @@ def register_servlets(hs, http_server):
     WatchaUserlistRestServlet(hs).register(http_server)
     WatchaSygnalPingServlet(hs).register(http_server)
     WatchaDeleteUserMessagesRestServlet(hs).register(http_server)
-    WatchaNextcloudUserRestServlet(hs).register(http_server)  # watcha+
+    # watcha+
+    WatchaNextcloudUserRestServlet(hs).register(http_server)
+    WatchaRoomFolderHeirRestServlet(hs).register(http_server)
+    # +watcha
