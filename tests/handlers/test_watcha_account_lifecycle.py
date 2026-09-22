@@ -100,6 +100,47 @@ class AccountLifecycleTestCase(HomeserverTestCase):
         self.assertFalse(user.is_deactivated)
 
     # watcha+
+    def test_erasing_gives_the_nextcloud_name_back(self):
+        """Le rattachement survit au compte — un localpart Matrix reste pris à
+        vie — mais le nom Nextcloud n'a plus rien à désigner. Le garder le
+        réservait pour rien, et la même personne revenue ramassait un suffixe à
+        chaque passage : `dupont`, puis `dupont2`, puis `dupont3`."""
+        self.get_success(
+            self.deactivate_handler.deactivate_account(
+                self.user_id,
+                erase_data=True,
+                requester=create_requester(self.user_id),
+                by_admin=True,
+            )
+        )
+
+        self.assertIsNone(self.get_success(self.store.get_username(self.user_id)))
+        self.assertFalse(
+            self.get_success(self.store.is_nextcloud_username_taken("jdupont"))
+        )
+
+    def test_a_failed_deletion_keeps_the_nextcloud_name(self):
+        """Le nom n'est rendu qu'une fois le compte réellement supprimé : sinon
+        un échec laisserait un rattachement amputé, et le geste ne serait plus
+        réessayable."""
+        self.nextcloud_client.delete_user = AsyncMock(
+            side_effect=NextcloudError(997, "unauthorised")
+        )
+
+        self.get_failure(
+            self.deactivate_handler.deactivate_account(
+                self.user_id,
+                erase_data=True,
+                requester=create_requester(self.user_id),
+                by_admin=True,
+            ),
+            NextcloudError,
+        )
+
+        self.assertEqual(
+            self.get_success(self.store.get_username(self.user_id)), "jdupont"
+        )
+
     def test_an_already_deleted_nextcloud_account_does_not_abort_the_deletion(self):
         """La suppression partie de Nextcloud y trouve forcément le compte déjà
         disparu. `delete` répond 998 là où `enable`/`disable` répondent 101 : ne

@@ -216,6 +216,21 @@ class AccountLifecycleHandler:
                 )
             )
 
+        # Le compte est parti : rendre son nom, que rien ne désigne plus. On ne
+        # l'atteint qu'après la suppression, jamais avant, pour qu'un échec
+        # laisse le rattachement intact et le geste réessayable.
+        await self.store.release_nextcloud_username(user_id)
+        logger.info(
+            build_log_message(
+                action="Nextcloud name released",
+                status=ActionStatus.SUCCESS,
+                log_vars={
+                    "user_id": user_id,
+                    "nextcloud_username": nextcloud_username,
+                },
+            )
+        )
+
     async def _get_keycloak_id(self, user_id: str) -> Optional[str]:
         """The Keycloak UUID recorded as the OIDC subject of this user, if any."""
         external_ids = await self.store.get_external_ids_by_user(user_id)

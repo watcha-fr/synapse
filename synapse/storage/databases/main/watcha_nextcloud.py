@@ -80,6 +80,28 @@ class NextcloudStore(SQLBaseStore):
         )
         return bool(rows)
 
+    async def release_nextcloud_username(self, user_id: str) -> None:
+        """Give the Nextcloud name back once the account it designated is gone.
+
+        The mapping row outlives the account: a Matrix localpart stays taken for
+        good, so erasing keeps the row and only empties the readable name. Left
+        in place it kept reserving a name nothing answered to any more, and the
+        same person coming back collected a suffix at each return — `dupont`,
+        then `dupont2`, then `dupont3`.
+
+        Only ever called once the Nextcloud account has actually been deleted,
+        so nothing can collide with the freed name.
+
+        Args:
+            user_id: the matrix ID whose Nextcloud name is released
+        """
+        await self.db_pool.simple_update(
+            table="user_external_ids",
+            keyvalues={"user_id": user_id},
+            updatevalues={"nextcloud_username": None},
+            desc="release_nextcloud_username",
+        )
+
     async def get_username(self, user_id: str):
         """Look up a Nextcloud username by their user_id
 
