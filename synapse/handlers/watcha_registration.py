@@ -121,8 +121,14 @@ class RegistrationHandler:
         # ce nom vient à côté, pour que l'espace documentaire soit exploitable.
         # L'appelant peut l'imposer — le connecteur Nextcloud le fait, puisque
         # le compte y existe déjà sous ce nom.
+        #
+        # Une seule règle, quel que soit le chemin de création : le nom Nextcloud
+        # est dérivé du nom d'utilisateur Keycloak. C'est le même repli que
+        # `add_user`, qui nomme le compte `keycloak_username or email_address` —
+        # dériver de l'adresse seule donnait deux noms lisibles différents pour
+        # une même personne dès que l'appelant en imposait un à Keycloak.
         nextcloud_username = nextcloud_username or await self._derive_nextcloud_username(
-            email_address
+            keycloak_username or email_address
         )
         # +watcha
 

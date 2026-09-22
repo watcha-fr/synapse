@@ -71,6 +71,39 @@ class NextcloudUsernameTestCase(HomeserverTestCase):
             "jean.dupont",
         )
 
+    # watcha+
+    def test_the_name_follows_the_keycloak_username(self):
+        """One rule for every creation path: the Nextcloud name is derived from
+        the Keycloak username. `add_user` names the account
+        `keycloak_username or email_address`, so deriving from the address alone
+        gave a person two different readable names as soon as the caller imposed
+        one on Keycloak — the import does exactly that."""
+        user_id = self.get_success(
+            self.handler.register(
+                sender_id=self.admin_id,
+                email_address="d.lamarche+ri04@teamnet-fr.com",
+                keycloak_username="recette-kc-01",
+            )
+        )
+
+        self.assertEqual(
+            self.get_success(self.store.get_username(user_id)), "recette-kc-01"
+        )
+        self.assertEqual(
+            self.provision_account.call_args.kwargs["nextcloud_username"],
+            "recette-kc-01",
+        )
+
+    def test_the_address_still_decides_without_a_keycloak_username(self):
+        """The invitation path passes none, and must keep deriving as before."""
+        user_id = self._register("d.lamarche+rc14@teamnet-fr.com")
+
+        self.assertEqual(
+            self.get_success(self.store.get_username(user_id)), "d.lamarcherc14"
+        )
+
+    # +watcha
+
     def test_the_mxid_stays_an_uuid(self):
         """Only the Nextcloud name becomes readable; the Matrix identity does not."""
         user_id = self._register("jean.dupont@example.com")
