@@ -99,6 +99,31 @@ class AccountLifecycleTestCase(HomeserverTestCase):
         user = self.get_success(self.store.get_user_by_id(self.user_id))
         self.assertFalse(user.is_deactivated)
 
+    # watcha+
+    def test_an_already_deleted_nextcloud_account_does_not_abort_the_deletion(self):
+        """La suppression partie de Nextcloud y trouve forcément le compte déjà
+        disparu. `delete` répond 998 là où `enable`/`disable` répondent 101 : ne
+        tolérer que 101 faisait remonter une 500, et Keycloak comme Matrix
+        survivaient à un compte pourtant supprimé."""
+        self.nextcloud_client.delete_user = AsyncMock(
+            side_effect=NextcloudError(998, "The requested user could not be found")
+        )
+
+        self.get_success(
+            self.deactivate_handler.deactivate_account(
+                self.user_id,
+                erase_data=True,
+                requester=create_requester(self.user_id),
+                by_admin=True,
+            )
+        )
+
+        self.keycloak_client.delete_user.assert_called_once_with("8b1f3c")
+        user = self.get_success(self.store.get_user_by_id(self.user_id))
+        self.assertTrue(user.is_deactivated)
+
+    # +watcha
+
     def test_local_account_is_skipped(self):
         """An account with no external identity has nothing to lock elsewhere."""
         local_user = self.register_user("local", "pass")

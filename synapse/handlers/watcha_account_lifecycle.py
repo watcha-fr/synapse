@@ -200,9 +200,13 @@ class AccountLifecycleHandler:
         try:
             await self.nextcloud_client.delete_user(nextcloud_username)
         except NextcloudError as error:
-            # 101 : le compte n'existe plus, ce qui est le cas quand la demande
-            # vient justement de sa suppression là-bas.
-            if error.code != 101:
+            # Le compte n'existe plus, ce qui est précisément le cas quand la
+            # demande vient de sa suppression là-bas. Les deux codes valent
+            # « inconnu » : `enable`/`disable` répondent 101, mais `delete`
+            # répond 998. Ne tolérer que 101 faisait échouer la suppression
+            # partie de Nextcloud — le geste le plus courant — et Keycloak
+            # comme Matrix survivaient à un compte pourtant supprimé.
+            if error.code not in (101, 998):
                 raise
             logger.warning(
                 build_log_message(
