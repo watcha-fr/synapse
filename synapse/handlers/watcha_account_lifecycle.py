@@ -37,6 +37,40 @@ class AccountLifecycleHandler:
         await self._set_keycloak_enabled(user_id, enabled)
         await self._set_nextcloud_enabled(user_id, enabled)
 
+    async def set_account_locked(self, user_id: str, locked: bool) -> None:
+        """Suspend or restore an account, in the three systems at once.
+
+        This is the reversible gesture, and it is the one an administrator means
+        by « désactiver ». Synapse is *locked*, not deactivated: deactivating
+        parts the user from every room and drops their threepids, devices and
+        password hash, and `activate_account` puts none of it back — the person
+        would come back to an empty account. Locking is a single boolean: the
+        rooms, the address, the password and even the open sessions survive it,
+        and unlocking restores the lot.
+
+        Pushers are the one thing locking does not stop by itself, so we drop
+        them here: a suspended person would otherwise keep receiving
+        notifications on their phone for messages they cannot open.
+
+        The external accounts are done first, as everywhere else in this
+        handler: a failure then leaves the person able to work, which an
+        administrator can retry, rather than half suspended.
+        """
+        await self.set_account_enabled(user_id, not locked)
+
+        if locked:
+            await self.hs.get_pusherpool().delete_all_pushers_for_user(user_id)
+
+        await self.store.set_user_locked_status(user_id, locked)
+
+        logger.info(
+            build_log_message(
+                action="lock account" if locked else "unlock account",
+                status=ActionStatus.SUCCESS,
+                log_vars={"user_id": user_id, "locked": locked},
+            )
+        )
+
     async def delete_external_accounts(self, user_id: str) -> None:
         """Delete the Keycloak and Nextcloud accounts bound to a user.
 
@@ -134,11 +168,18 @@ class AccountLifecycleHandler:
         deactivate_handler = self.hs.get_deactivate_account_handler()
 
         if action == "enable":
-            await deactivate_handler.activate_account(user_id)
+            # watcha+
+            # Le pendant de `disable` : on lève le verrou, on ne « réactive »
+            # pas — `activate_account` ne rendrait ni les salons ni l'adresse.
+            await self.set_account_locked(user_id, False)
+            # +watcha
         elif action == "disable":
-            await deactivate_handler.deactivate_account(
-                user_id, erase_data=False, requester=requester, by_admin=True
-            )
+            # watcha+
+            # Désactiver dans Nextcloud verrouille le compte Matrix, sans le
+            # désactiver : la désactivation le sortirait de tous ses salons et
+            # effacerait son adresse, et rien ne les lui rendrait au retour.
+            await self.set_account_locked(user_id, True)
+            # +watcha
         elif action == "delete":
             # La suppression des comptes Keycloak et Nextcloud est portée par
             # le fan-out de `deactivate_account`, sur le drapeau d'effacement :

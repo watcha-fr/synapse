@@ -60,6 +60,102 @@ class AccountLifecycleTestCase(HomeserverTestCase):
         self.keycloak_client.set_user_enabled.assert_called_once_with("8b1f3c", True)
         self.nextcloud_client.set_user_enabled.assert_called_once_with("jdupont", True)
 
+    # watcha+
+    def _lock(self, locked):
+        self.get_success(self.handler.set_account_locked(self.user_id, locked))
+
+    def test_locking_suspends_the_three_systems(self):
+        self._lock(True)
+
+        self.keycloak_client.set_user_enabled.assert_called_once_with("8b1f3c", False)
+        self.nextcloud_client.set_user_enabled.assert_called_once_with("jdupont", False)
+        self.assertTrue(self.get_success(self.store.get_user_locked_status(self.user_id)))
+
+    def test_unlocking_restores_the_three_systems(self):
+        self._lock(True)
+        self.keycloak_client.set_user_enabled.reset_mock()
+        self.nextcloud_client.set_user_enabled.reset_mock()
+
+        self._lock(False)
+
+        self.keycloak_client.set_user_enabled.assert_called_once_with("8b1f3c", True)
+        self.nextcloud_client.set_user_enabled.assert_called_once_with("jdupont", True)
+        self.assertFalse(
+            self.get_success(self.store.get_user_locked_status(self.user_id))
+        )
+
+    def test_locking_destroys_nothing(self):
+        """Tout l'intérêt du verrou : il se lève sans rien avoir à reconstruire.
+        La désactivation, elle, sort la personne de ses salons et efface son
+        adresse comme son mot de passe, et rien ne les lui rend au retour."""
+        self.get_success(
+            self.store.user_add_threepid(
+                self.user_id, "email", "jdupont@example.org", 0, 0
+            )
+        )
+
+        self._lock(True)
+
+        user = self.get_success(self.store.get_user_by_id(self.user_id))
+        self.assertFalse(user.is_deactivated)
+        self.assertIsNotNone(
+            self.get_success(self.store.get_user_by_id(self.user_id))
+        )
+        self.assertEqual(
+            len(self.get_success(self.store.user_get_threepids(self.user_id))), 1
+        )
+        self.assertIsNotNone(
+            self.get_success(self.store.get_user_by_id(self.user_id)).password_hash
+        )
+
+    def test_locking_drops_the_pushers(self):
+        """Le verrou n'arrête pas les notifications de lui-même : une personne
+        suspendue continuerait d'être notifiée de messages qu'elle ne peut pas
+        ouvrir."""
+        pusher_pool = self.hs.get_pusherpool()
+        pusher_pool.delete_all_pushers_for_user = AsyncMock()
+
+        self._lock(True)
+
+        pusher_pool.delete_all_pushers_for_user.assert_called_once_with(self.user_id)
+
+    def test_unlocking_leaves_the_pushers_alone(self):
+        pusher_pool = self.hs.get_pusherpool()
+        pusher_pool.delete_all_pushers_for_user = AsyncMock()
+
+        self._lock(False)
+
+        pusher_pool.delete_all_pushers_for_user.assert_not_called()
+
+    def test_disabling_in_nextcloud_locks_rather_than_deactivates(self):
+        """Le geste venu de Nextcloud doit être réversible lui aussi."""
+        self.get_success(
+            self.handler.handle_nextcloud_change(
+                "jdupont", "disable", create_requester(self.user_id)
+            )
+        )
+
+        user = self.get_success(self.store.get_user_by_id(self.user_id))
+        self.assertTrue(
+            self.get_success(self.store.get_user_locked_status(self.user_id))
+        )
+        self.assertFalse(user.is_deactivated)
+
+    def test_enabling_in_nextcloud_lifts_the_lock(self):
+        self._lock(True)
+
+        self.get_success(
+            self.handler.handle_nextcloud_change(
+                "jdupont", "enable", create_requester(self.user_id)
+            )
+        )
+
+        self.assertFalse(
+            self.get_success(self.store.get_user_locked_status(self.user_id))
+        )
+
+    # +watcha
+
     def test_erasing_deletes_both_accounts_instead_of_locking_them(self):
         """Le geste est le même d'où qu'il parte : un effacement supprime les
         comptes Keycloak et Nextcloud, là où une simple désactivation se

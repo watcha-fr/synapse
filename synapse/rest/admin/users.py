@@ -240,6 +240,7 @@ class UserRestServletV2Get(RestServlet):
         self._msc3866_enabled = hs.config.experimental.msc3866.enabled
         self._all_user_types = hs.config.user_types.all_user_types
         self._user_audit_log_path = hs.config.watcha.user_audit_log_path  # watcha+
+        self.account_lifecycle_handler = hs.get_account_lifecycle_handler()  # watcha+
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
@@ -458,12 +459,28 @@ class UserRestServletV2(UserRestServletV2Get):
 
             audit_action: UserAuditAction | None = None  # watcha+
             if "locked" in body:
+                # watcha!
+                # if lock and not user["locked"]:
+                #     await self.store.set_user_locked_status(user_id, True)
+                # elif not lock and user["locked"]:
+                #     await self.store.set_user_locked_status(user_id, False)
+                # !watcha
+                # watcha+
+                # Le verrou est la suspension réversible, et il vaut pour les
+                # trois systèmes : on passe par le handler de cycle de vie, qui
+                # verrouille aussi le compte Keycloak et le compte Nextcloud,
+                # plutôt que d'écrire le booléen tout seul.
                 if lock and not user["locked"]:
-                    await self.store.set_user_locked_status(user_id, True)
-                    audit_action = UserAuditAction.DEACTIVATE  # watcha+
+                    await self.account_lifecycle_handler.set_account_locked(
+                        user_id, True
+                    )
+                    audit_action = UserAuditAction.DEACTIVATE
                 elif not lock and user["locked"]:
-                    await self.store.set_user_locked_status(user_id, False)
-                    audit_action = UserAuditAction.REACTIVATE  # watcha+
+                    await self.account_lifecycle_handler.set_account_locked(
+                        user_id, False
+                    )
+                    audit_action = UserAuditAction.REACTIVATE
+                # +watcha
 
             if "user_type" in body:
                 await self.store.set_user_type(target_user, user_type)
