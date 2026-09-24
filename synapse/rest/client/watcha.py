@@ -164,6 +164,11 @@ class WatchaRegisterRestServlet(RestServlet):
             # Le connecteur Nextcloud le renseigne : le compte y existe déjà
             # sous ce nom, et en dériver un autre en créerait un second.
             nextcloud_username=params.get("nextcloud_username"),
+            # Le connecteur lit le groupe `partner` de Nextcloud et le rapporte
+            # ici : un compte créé là-bas dans ce groupe devient partenaire.
+            # Absent, on crée un membre de plein droit — c'est le comportement
+            # de la console d'administration et de l'import.
+            is_partner=params.get("is_partner", False),
             # La console d'administration laisse le choix d'envoyer ou non le
             # courriel de bienvenue. Absent, on l'envoie : c'est ce que fait
             # l'invitation, et c'est le comportement d'avant.
