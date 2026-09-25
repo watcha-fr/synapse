@@ -316,6 +316,11 @@ class RegistrationHandler:
         the external id, which the login path resolves on its own, so the two
         need not be equal.
 
+        Aucun courriel de bienvenue n'est envoyé ici, et c'est voulu : ce chemin
+        sert à rattacher un compte qui existe déjà chez le fournisseur
+        d'identité. La personne a donc déjà ses identifiants, et il n'y a ni mot
+        de passe à fabriquer ni rien à lui annoncer.
+
         Does nothing on an instance without a managed identity provider.
         """
 

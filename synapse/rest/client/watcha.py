@@ -130,6 +130,7 @@ class WatchaRegisterRestServlet(RestServlet):
         super().__init__()
         self.auth = hs.get_auth()
         self.registration_handler = hs.get_watcha_registration_handler()
+        self.store = hs.get_datastores().main  # watcha+
 
     async def on_POST(self, request):
         requester = await self.auth.get_user_by_req(request)
@@ -152,8 +153,31 @@ class WatchaRegisterRestServlet(RestServlet):
                 ),
             )
 
+        # watcha+
+        # Qui invite. Le connecteur Nextcloud ne connaît que le nom Nextcloud
+        # de la personne qui partage un fichier ; on le résout ici, puisque la
+        # correspondance vit dans `user_external_ids`. Sans lui, le courriel de
+        # bienvenue serait attribué au compte de service, et la personne lirait
+        # « invitation de watcha-connector » plutôt que le nom d'un collègue.
+        sender_id = requester.user.to_string()
+        inviter = params.get("inviter_nextcloud_username")
+        if inviter:
+            resolved = await self.store.get_user_id_by_nextcloud_username(inviter)
+            if resolved is not None:
+                sender_id = resolved
+            else:
+                # Ne pas refuser pour si peu : le compte doit être créé même si
+                # l'invitant n'est pas résolu. On retombe sur le demandeur.
+                logger.warning(
+                    build_log_message(
+                        action="resolve the inviter's Nextcloud name",
+                        log_vars={"inviter_nextcloud_username": inviter},
+                    )
+                )
+        # +watcha
+
         user_id = await self.registration_handler.register(
-            sender_id=requester.user.to_string(),
+            sender_id=sender_id,
             email_address=email_address,
             is_admin=params.get("admin", False),
             default_display_name=params.get("displayname", "").strip() or None,
@@ -176,7 +200,15 @@ class WatchaRegisterRestServlet(RestServlet):
             # +watcha
         )
 
-        return 200, {"user_id": user_id}
+        # watcha+
+        # Le nom Nextcloud est rendu à l'appelant : le connecteur en a besoin
+        # pour transformer un partage par courriel en partage utilisateur, et
+        # il ne peut pas le deviner — Synapse le dérive ou le déduplique.
+        return 200, {
+            "user_id": user_id,
+            "nextcloud_username": await self.store.get_username(user_id),
+        }
+        # +watcha
 
 # watcha+
 class WatchaNextcloudUserRestServlet(RestServlet):
