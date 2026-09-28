@@ -256,11 +256,30 @@ class RegistrationHandler:
             )
 
         if send_registration_mail and self.mailer is not None: # watcha+ : mailer None si email non configuré
+            """ watcha!
             await self.mailer.send_watcha_registration_mail(
                 sender_id=sender_id,
                 email_address=email_address,
                 password=password,
                 is_partner=is_partner,
+            )
+            !watcha"""
+            # Le courriel part en tâche de fond. Mesure du 2026-09-25 sur
+            # watchatest : 1,44 s sur les 6,4 s d'une invitation, soit 22 %
+            # passés à attendre le serveur SMTP. Rien de la suite n'en
+            # dépend, et l'invitant attendait pour rien.
+            #
+            # `hs.run_as_background_process` et non `run_in_background` : il
+            # ouvre son propre contexte de journalisation — sinon la tâche
+            # hériterait de celui de la requête, qui se termine avant elle —
+            # et compte la tâche dans les métriques.
+            self.hs.run_as_background_process(
+                "watcha_send_registration_mail",
+                self._send_registration_mail,
+                sender_id,
+                email_address,
+                password,
+                bool(is_partner),
             )
 
         logger.info(build_log_message(status=ActionStatus.SUCCESS))
@@ -434,4 +453,38 @@ class RegistrationHandler:
                 log_vars={"user_id": user_id, "email_address": email_address},
             )
         )
+
+    # watcha+
+    async def _send_registration_mail(
+        self,
+        sender_id: str,
+        email_address: str,
+        password: str,
+        is_partner: bool,
+    ) -> None:
+        """Envoie le courriel d'inscription, hors du chemin de l'invitation.
+
+        Détaché, l'échec ne remonte plus à l'invitant : il est journalisé
+        ici, avec l'adresse, pour qu'un envoi manquant reste retrouvable.
+        Avant, une panne SMTP faisait échouer l'invitation *après* création
+        du compte — l'adresse était rapportée en erreur alors que le compte
+        existait déjà.
+        """
+        assert self.mailer is not None
+
+        try:
+            await self.mailer.send_watcha_registration_mail(
+                sender_id=sender_id,
+                email_address=email_address,
+                password=password,
+                is_partner=is_partner,
+            )
+        except Exception:
+            logger.exception(
+                build_log_message(
+                    action="send registration mail",
+                    status=ActionStatus.FAILED,
+                    log_vars={"email_address": email_address},
+                )
+            )
     # +watcha
