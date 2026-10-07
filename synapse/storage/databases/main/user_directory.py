@@ -1135,14 +1135,14 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                         OR tpid.address ILIKE ?
                         OR ud.user_id ILIKE ?
                     )
-                    AND (
-                        users.is_partner = 0
-                        OR pi.invited_by = ?
-                    )
+                    AND %(partner_visibility)s
                 LIMIT ?;
-            """
+            """ % {"partner_visibility": _WATCHA_PARTNER_VISIBILITY}
+            exact_address = search_term.strip()
             search_term = f"%{search_term}%"
-            args = (search_term,) * 3 + (user_id,) + (limit + 1,)
+            args = (
+                (search_term,) * 3 + (user_id, exact_address, user_id) + (limit + 1,)
+            )
             # +watcha
         elif isinstance(self.database_engine, Sqlite3Engine):
             search_query = _parse_query_sqlite(search_term)
@@ -1220,15 +1220,14 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                         OR address LIKE ?
                         OR ud.user_id LIKE ?
                     )
-                    AND
-                    (
-                        is_partner = 0
-                        OR invited_by = ?
-                    )
+                    AND %(partner_visibility)s
                 LIMIT ?
-            """
+            """ % {"partner_visibility": _WATCHA_PARTNER_VISIBILITY}
+            exact_address = search_term.strip()
             search_term = f"%{search_term}%"
-            args = (search_term,) * 3 + (user_id,) + (limit + 1,)
+            args = (
+                (search_term,) * 3 + (user_id, exact_address, user_id) + (limit + 1,)
+            )
             # +watcha
         else:
             # This should be unreachable.
@@ -1248,6 +1247,37 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 for r in results[0:limit]
             ],
         }
+
+
+# watcha+
+# Visibilité d'un compte dans la recherche Watcha de l'annuaire. Un membre de
+# l'organisation est visible de tous. Un partenaire ne l'est que de celui qui
+# l'a invité — on ne doit pas pouvoir parcourir les externes des autres — sauf
+# quand on tape son adresse exacte et qu'il est membre ou invité d'un salon dont
+# on est soi-même membre : on le connaît déjà, et il figure déjà dans la liste
+# des membres de ce salon. Sans cette exception, le réinviter faisait partir son
+# adresse comme celle d'un inconnu, refusée ensuite par le serveur.
+# Paramètres, dans l'ordre : demandeur, adresse exacte, demandeur.
+_WATCHA_PARTNER_VISIBILITY = """
+    (
+        users.is_partner = 0
+        OR pi.invited_by = ?
+        OR (
+            LOWER(tpid.address) = LOWER(?)
+            AND EXISTS (
+                SELECT 1
+                FROM local_current_membership AS partner_membership
+                JOIN local_current_membership AS own_membership
+                    ON own_membership.room_id = partner_membership.room_id
+                WHERE partner_membership.user_id = ud.user_id
+                    AND partner_membership.membership IN ('join', 'invite')
+                    AND own_membership.user_id = ?
+                    AND own_membership.membership = 'join'
+            )
+        )
+    )
+"""
+# +watcha
 
 
 def _filter_text_for_index(text: str) -> str:
