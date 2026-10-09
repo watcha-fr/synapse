@@ -48,18 +48,17 @@ class AccountLifecycleHandler:
         rooms, the address, the password and even the open sessions survive it,
         and unlocking restores the lot.
 
-        Pushers are the one thing locking does not stop by itself, so we drop
-        them here: a suspended person would otherwise keep receiving
-        notifications on their phone for messages they cannot open.
+        Pushers are kept too: the HTTP and email pushers send nothing while the
+        account is locked and move their cursor on as if they had, so
+        notifications resume on unlocking without a backlog. Dropping them
+        instead left the person without notifications until their app happened
+        to register again.
 
         The external accounts are done first, as everywhere else in this
         handler: a failure then leaves the person able to work, which an
         administrator can retry, rather than half suspended.
         """
         await self.set_account_enabled(user_id, not locked)
-
-        if locked:
-            await self.hs.get_pusherpool().delete_all_pushers_for_user(user_id)
 
         await self.store.set_user_locked_status(user_id, locked)
 

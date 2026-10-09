@@ -169,6 +169,19 @@ class EmailPusher(Pusher):
         up logging, measures and guards against multiple instances of it
         being run.
         """
+        # watcha+
+        # Même règle que le pusher HTTP : aucun courriel de notification
+        # pendant la suspension, et rien à rattraper au déverrouillage.
+        if await self.store.get_user_locked_status(self.user_id):
+            self.last_stream_ordering = max(
+                self.last_stream_ordering, self.max_stream_ordering
+            )
+            await self.store.update_pusher_last_stream_ordering(
+                self.app_id, self.email, self.user_id, self.last_stream_ordering
+            )
+            return
+        # +watcha
+
         start = 0 if INCLUDE_ALL_UNREAD_NOTIFS else self.last_stream_ordering
         unprocessed = (
             await self.store.get_unread_push_actions_for_user_in_range_for_email(

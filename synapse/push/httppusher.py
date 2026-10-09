@@ -246,6 +246,20 @@ class HttpPusher(Pusher):
         Never call this directly: use _process which will only allow this to
         run once per pusher.
         """
+        # watcha+
+        # Compte verrouillé : rien n'est envoyé, mais le curseur avance comme
+        # si c'était fait, pour qu'au déverrouillage le téléphone ne reçoive
+        # pas d'un coup tout ce qui s'est dit pendant la suspension.
+        if await self.store.get_user_locked_status(self.user_id):
+            self.last_stream_ordering = max(
+                self.last_stream_ordering, self.max_stream_ordering
+            )
+            await self.store.update_pusher_last_stream_ordering(
+                self.app_id, self.pushkey, self.user_id, self.last_stream_ordering
+            )
+            return
+        # +watcha
+
         unprocessed = (
             await self.store.get_unread_push_actions_for_user_in_range_for_http(
                 self.user_id, self.last_stream_ordering, self.max_stream_ordering

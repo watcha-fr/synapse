@@ -108,21 +108,15 @@ class AccountLifecycleTestCase(HomeserverTestCase):
             self.get_success(self.store.get_user_by_id(self.user_id)).password_hash
         )
 
-    def test_locking_drops_the_pushers(self):
-        """Le verrou n'arrête pas les notifications de lui-même : une personne
-        suspendue continuerait d'être notifiée de messages qu'elle ne peut pas
-        ouvrir."""
+    def test_locking_keeps_the_pushers(self):
+        """Les pushers se taisent d'eux-mêmes pendant le verrou (voir
+        tests/push/test_watcha_locked_pusher.py) : les supprimer privait la
+        personne de notifications au retour, jusqu'à ce que son application
+        se réinscrive."""
         pusher_pool = self.hs.get_pusherpool()
         pusher_pool.delete_all_pushers_for_user = AsyncMock()
 
         self._lock(True)
-
-        pusher_pool.delete_all_pushers_for_user.assert_called_once_with(self.user_id)
-
-    def test_unlocking_leaves_the_pushers_alone(self):
-        pusher_pool = self.hs.get_pusherpool()
-        pusher_pool.delete_all_pushers_for_user = AsyncMock()
-
         self._lock(False)
 
         pusher_pool.delete_all_pushers_for_user.assert_not_called()
