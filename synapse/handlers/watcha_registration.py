@@ -222,6 +222,12 @@ class RegistrationHandler:
             # rôle et le nom rétrogradait un administrateur et renommait la
             # personne de son UUID. On n'ajoute que l'adresse si elle manque.
             await self._ensure_email(user_id, email_address)
+            # Ce compte Nextcloud vient d'être créé par la connexion SSO, qui ne
+            # recopie que le groupe `partner` : un administrateur Watcha y
+            # arrivait simple utilisateur. Synapse décide des statuts ; il
+            # porte donc celui-ci jusqu'à Nextcloud.
+            if existing_user.is_admin and register_nc_user:
+                await self._grant_nextcloud_admin(nextcloud_username)
             send_registration_mail = False
         else:
             user_id = await self.registration_handler.register_user(
@@ -452,6 +458,34 @@ class RegistrationHandler:
             build_log_message(
                 status=ActionStatus.SUCCESS,
                 log_vars={"user_id": user_id, "email_address": email_address},
+            )
+        )
+
+    async def _grant_nextcloud_admin(self, nextcloud_username: str) -> None:
+        """Put the Nextcloud account in the `admin` group.
+
+        A failure is logged, not raised: the person already has their account
+        and their Watcha role, and an administrator can still add the group by
+        hand. Failing here would turn a missing right into a failed login.
+        """
+        try:
+            await self.hs.get_nextcloud_client().add_user_to_group(
+                nextcloud_username, "admin"
+            )
+        except Exception as error:
+            logger.warning(
+                build_log_message(
+                    action="grant Nextcloud admin",
+                    log_vars={"nextcloud_username": nextcloud_username, "error": error},
+                )
+            )
+            return
+
+        logger.info(
+            build_log_message(
+                action="grant Nextcloud admin",
+                status=ActionStatus.SUCCESS,
+                log_vars={"nextcloud_username": nextcloud_username},
             )
         )
 

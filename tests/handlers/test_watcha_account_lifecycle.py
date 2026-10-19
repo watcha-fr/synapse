@@ -493,6 +493,37 @@ class ReinviteDeactivatedAccountTestCase(HomeserverTestCase):
         )
         self.assertEqual(profile.display_name, "Marie")
 
+    def test_active_admin_becomes_nextcloud_admin(self):
+        """La connexion SSO ne recopie que le groupe `partner` : sans Synapse,
+        l'administrateur arrivait simple utilisateur dans Nextcloud."""
+        self._active_account(admin=True)
+        client = self.hs.get_nextcloud_client()
+        client.add_user_to_group = AsyncMock()
+
+        self._declared_by_nextcloud()
+
+        client.add_user_to_group.assert_called_once_with("caroline", "admin")
+
+    def test_active_member_is_not_made_nextcloud_admin(self):
+        self._active_account()
+        client = self.hs.get_nextcloud_client()
+        client.add_user_to_group = AsyncMock()
+
+        self._declared_by_nextcloud()
+
+        client.add_user_to_group.assert_not_called()
+
+    def test_nextcloud_refusing_the_group_does_not_fail_the_declaration(self):
+        user_id = self._active_account(admin=True)
+        client = self.hs.get_nextcloud_client()
+        client.add_user_to_group = AsyncMock(side_effect=Exception("OCS 104"))
+
+        returned = self._declared_by_nextcloud()
+
+        self.assertEqual(returned, user_id)
+        user = self.get_success(self.store.get_user_by_id(user_id))
+        self.assertTrue(user.is_admin)
+
     def test_active_partner_stays_partner(self):
         user_id = self._active_account()
         self.get_success(self.store.update_user_role(user_id, "partner"))
