@@ -444,6 +444,98 @@ class ReinviteDeactivatedAccountTestCase(HomeserverTestCase):
         old = self.get_success(self.store.get_user_by_id(old_user_id))
         self.assertTrue(old.is_deactivated)
 
+    def _active_account(self, admin=False):
+        """Un compte en service, rattaché à Keycloak, qui n'a pas encore de
+        compte Nextcloud : le cas d'une première ouverture de Nextcloud."""
+        user_id = self.register_user(self.KEYCLOAK_ID, "pass", admin=admin)
+        self.get_success(
+            self.store.record_user_external_id(
+                "oidc", self.KEYCLOAK_ID, user_id, "caroline"
+            )
+        )
+        self.get_success(
+            self.store.user_add_threepid(user_id, "email", self.EMAIL, 0, 0)
+        )
+        self.get_success(
+            self.store.set_profile_displayname(UserID.from_string(user_id), "Marie")
+        )
+        return user_id
+
+    def _declared_by_nextcloud(self, is_partner=False):
+        """Ce que le connecteur envoie pour un compte que la connexion SSO vient
+        de créer : aucun statut encore, et l'uid en guise de nom."""
+        return self.get_success(
+            self.handler.register(
+                sender_id=self.admin_id,
+                email_address=self.EMAIL,
+                is_partner=is_partner,
+                is_admin=False,
+                default_display_name=self.KEYCLOAK_ID,
+                nextcloud_username="caroline",
+                send_email=False,
+            )
+        )
+
+    def test_active_admin_keeps_its_role_and_name(self):
+        """Reproduit le 19/10 sur watchatest : un administrateur qui ouvrait
+        Nextcloud pour la première fois redevenait collaborateur et prenait son
+        UUID pour nom."""
+        user_id = self._active_account(admin=True)
+
+        returned = self._declared_by_nextcloud()
+
+        self.assertEqual(returned, user_id)
+        user = self.get_success(self.store.get_user_by_id(user_id))
+        self.assertTrue(user.is_admin)
+        self.assertFalse(user.is_deactivated)
+        profile = self.get_success(
+            self.store.get_profileinfo(UserID.from_string(user_id))
+        )
+        self.assertEqual(profile.display_name, "Marie")
+
+    def test_active_partner_stays_partner(self):
+        user_id = self._active_account()
+        self.get_success(self.store.update_user_role(user_id, "partner"))
+
+        self._declared_by_nextcloud(is_partner=False)
+
+        self.assertTrue(self.get_success(self.store.is_partner(user_id)))
+
+    def test_active_member_is_not_made_partner(self):
+        user_id = self._active_account()
+
+        self._declared_by_nextcloud(is_partner=True)
+
+        self.assertFalse(self.get_success(self.store.is_partner(user_id)))
+
+    def test_active_account_is_not_unlocked_nor_relinked(self):
+        """Rien à réactiver : ni Keycloak ni Nextcloud ne sont touchés, et le
+        rattachement existant n'est pas réenregistré."""
+        user_id = self._active_account()
+        self.keycloak_client.set_user_enabled.reset_mock()
+
+        self._declared_by_nextcloud()
+
+        self.keycloak_client.set_user_enabled.assert_not_called()
+        external_ids = self.get_success(self.store.get_external_ids_by_user(user_id))
+        self.assertEqual(len(external_ids), 1)
+
+    def test_active_account_gains_its_missing_address(self):
+        user_id = self.register_user(self.KEYCLOAK_ID, "pass")
+        self.get_success(
+            self.store.record_user_external_id(
+                "oidc", self.KEYCLOAK_ID, user_id, "caroline"
+            )
+        )
+
+        self._declared_by_nextcloud()
+
+        threepids = self.get_success(self.store.user_get_threepids(user_id))
+        self.assertEqual(
+            [(threepid.medium, threepid.address) for threepid in threepids],
+            [("email", self.EMAIL)],
+        )
+
     def test_unknown_address_still_registers_a_new_account(self):
         """The reactivation branch must not disturb the ordinary path."""
         response = Mock()

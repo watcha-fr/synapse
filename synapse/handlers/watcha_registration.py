@@ -204,7 +204,7 @@ class RegistrationHandler:
         )
         !watcha """
         # watcha+
-        if existing_user is not None:
+        if existing_user is not None and existing_user.is_deactivated:
             await self._reactivate_account(
                 user_id,
                 existing_user,
@@ -213,6 +213,15 @@ class RegistrationHandler:
                 is_partner,
                 is_admin,
             )
+            send_registration_mail = False
+        elif existing_user is not None:
+            # Un compte actif arrive ici quand le connecteur déclare le compte
+            # Nextcloud qu'une première connexion SSO vient de créer : Keycloak
+            # répond 409 et l'UUID désigne la personne elle-même. Ce compte
+            # Nextcloud tout neuf n'a encore ni groupe ni nom ; en recopier le
+            # rôle et le nom rétrogradait un administrateur et renommait la
+            # personne de son UUID. On n'ajoute que l'adresse si elle manque.
+            await self._ensure_email(user_id, email_address)
             send_registration_mail = False
         else:
             user_id = await self.registration_handler.register_user(
@@ -240,7 +249,7 @@ class RegistrationHandler:
                 nextcloud_username,  # watcha+ : le nom lisible, plus l'UUID
             )
 
-        if is_partner:
+        if is_partner and (existing_user is None or existing_user.is_deactivated):  # watcha+
             await self.store.add_partner_invitation(
                 sender_id=sender_id,
                 partner_id=user_id,
@@ -432,15 +441,7 @@ class RegistrationHandler:
             role = "collaborator"
         await self.store.update_user_role(user_id, role)
 
-        threepids = await self.store.user_get_threepids(user_id)
-        if not any(
-            threepid.medium == "email" and threepid.address == email_address
-            for threepid in threepids
-        ):
-            now = self.hs.get_clock().time_msec()
-            await self.store.user_add_threepid(
-                user_id, "email", email_address, now, now
-            )
+        await self._ensure_email(user_id, email_address)
 
         # Erasing the account cleared the profile.
         await self.store.set_profile_displayname(
@@ -453,6 +454,18 @@ class RegistrationHandler:
                 log_vars={"user_id": user_id, "email_address": email_address},
             )
         )
+
+    async def _ensure_email(self, user_id: str, email_address: str) -> None:
+        """Bind the address to the account unless it already is."""
+        threepids = await self.store.user_get_threepids(user_id)
+        if not any(
+            threepid.medium == "email" and threepid.address == email_address
+            for threepid in threepids
+        ):
+            now = self.hs.get_clock().time_msec()
+            await self.store.user_add_threepid(
+                user_id, "email", email_address, now, now
+            )
 
     # watcha+
     async def _send_registration_mail(
