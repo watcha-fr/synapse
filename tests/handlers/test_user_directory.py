@@ -1198,6 +1198,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
     test_spam_checker.skip = skip_reason
     test_legacy_spam_checker.skip = skip_reason
     test_initial_share_all_users.skip = skip_reason
+    test_prefer_local_users.skip = skip_reason
     # +watcha
 
     def test_search_punctuation(self) -> None:

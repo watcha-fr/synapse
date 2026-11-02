@@ -1120,7 +1120,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                     GROUP BY user_id, address
                 ) AS tpid
                     ON ud.user_id = tpid.user_id
-                LEFT JOIN (
+                %(join_type)s (
                     SELECT
                         name,
                         is_partner
@@ -1137,7 +1137,10 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                     )
                     AND %(partner_visibility)s
                 LIMIT ?;
-            """ % {"partner_visibility": _WATCHA_PARTNER_VISIBILITY}
+            """ % {
+                "join_type": join_type,
+                "partner_visibility": _WATCHA_PARTNER_VISIBILITY,
+            }
             exact_address = search_term.strip()
             search_term = f"%{search_term}%"
             args = (
@@ -1201,7 +1204,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                         )
                         AS tpid
                         ON ud.user_id = tpid.user_id
-                    LEFT OUTER JOIN
+                    %(join_type)s
                         (
                             SELECT
                                 name,
@@ -1222,7 +1225,10 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                     )
                     AND %(partner_visibility)s
                 LIMIT ?
-            """ % {"partner_visibility": _WATCHA_PARTNER_VISIBILITY}
+            """ % {
+                "join_type": join_type,
+                "partner_visibility": _WATCHA_PARTNER_VISIBILITY,
+            }
             exact_address = search_term.strip()
             search_term = f"%{search_term}%"
             args = (
@@ -1257,10 +1263,13 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
 # on est soi-même membre : on le connaît déjà, et il figure déjà dans la liste
 # des membres de ce salon. Sans cette exception, le réinviter faisait partir son
 # adresse comme celle d'un inconnu, refusée ensuite par le serveur.
+# Un compte d'un serveur fédéré n'a pas de ligne dans `users` : `is_partner` y
+# est NULL, et sans `users.name IS NULL` il disparaissait de la recherche.
 # Paramètres, dans l'ordre : demandeur, adresse exacte, demandeur.
 _WATCHA_PARTNER_VISIBILITY = """
     (
         users.is_partner = 0
+        OR users.name IS NULL
         OR pi.invited_by = ?
         OR (
             LOWER(tpid.address) = LOWER(?)

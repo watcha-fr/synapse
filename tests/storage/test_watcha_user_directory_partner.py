@@ -45,6 +45,10 @@ class WatchaPartnerDirectorySearchTestCase(unittest.HomeserverTestCase):
         for partner in (self.partner, self.pending, self.outsider):
             self.get_success(self.store.add_partner_invitation(partner, self.inviter))
 
+        # Un agent d'un serveur fédéré : présent dans l'annuaire, absent de `users`.
+        self.remote = "@remote:other.example.org"
+        self.get_success(self.store.update_profile_in_user_dir(self.remote, "Remote", None))
+
         # Le partenaire a rejoint le salon que partagent l'inviteur et le membre ;
         # `pending` y est seulement invité ; `outsider` n'y est pas.
         room_id = self.helper.create_room_as(self.inviter, tok=self.inviter_tok)
@@ -77,3 +81,6 @@ class WatchaPartnerDirectorySearchTestCase(unittest.HomeserverTestCase):
 
     def test_members_stay_visible_to_everyone(self) -> None:
         self.assertIn(self.member, self._search(self.partner, "member"))
+
+    def test_federated_users_are_visible(self) -> None:
+        self.assertIn(self.remote, self._search(self.member, "remote"))
