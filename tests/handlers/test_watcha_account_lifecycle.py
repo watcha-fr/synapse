@@ -329,6 +329,7 @@ class ReinviteDeactivatedAccountTestCase(HomeserverTestCase):
         )
         self.keycloak_client.set_user_enabled = AsyncMock()
         self.keycloak_client.delete_user = AsyncMock()
+        self.keycloak_client.is_member_of_group = AsyncMock(return_value=False)
         hs.get_nextcloud_client().set_user_enabled = AsyncMock()
         hs.get_nextcloud_client().delete_user = AsyncMock()
         hs.get_nextcloud_handler().provision_account = AsyncMock()
@@ -566,6 +567,53 @@ class ReinviteDeactivatedAccountTestCase(HomeserverTestCase):
             [(threepid.medium, threepid.address) for threepid in threepids],
             [("email", self.EMAIL)],
         )
+
+    def test_keycloak_partner_declared_by_nextcloud_is_created_partner(self):
+        """Constaté le 06/11 sur la ComUE : sept externes ouvraient Nextcloud
+        avant la messagerie. Le connecteur les déclarait avant que `user_oidc`
+        ne leur ait posé le groupe `partner`, et Synapse en faisait des membres,
+        inscrits d'office au salon réservé aux internes."""
+        self.keycloak_client.is_member_of_group = AsyncMock(return_value=True)
+
+        user_id = self._declared_by_nextcloud(is_partner=False)
+
+        self.assertEqual(user_id, f"@{self.KEYCLOAK_ID}:test")
+        self.assertTrue(self.get_success(self.store.is_partner(user_id)))
+        self.keycloak_client.is_member_of_group.assert_called_once_with(
+            self.KEYCLOAK_ID, "partner"
+        )
+
+    def test_keycloak_member_declared_by_nextcloud_stays_member(self):
+        user_id = self._declared_by_nextcloud(is_partner=False)
+
+        self.assertFalse(self.get_success(self.store.is_partner(user_id)))
+
+    def test_whitelisted_keycloak_partner_is_created_member(self):
+        """La liste blanche garde le dernier mot, comme sur les autres chemins."""
+        self.handler.config.watcha.partner_email_whitelist = ["example.com"]
+        self.keycloak_client.is_member_of_group = AsyncMock(return_value=True)
+
+        user_id = self._declared_by_nextcloud(is_partner=False)
+
+        self.assertFalse(self.get_success(self.store.is_partner(user_id)))
+
+    def test_caller_saying_partner_is_not_overruled_by_keycloak(self):
+        """Le statut ne fait que monter : Keycloak n'est pas consulté pour
+        rétrograder un externe annoncé comme tel."""
+        user_id = self._declared_by_nextcloud(is_partner=True)
+
+        self.assertTrue(self.get_success(self.store.is_partner(user_id)))
+        self.keycloak_client.is_member_of_group.assert_not_called()
+
+    def test_active_member_is_not_made_partner_by_keycloak(self):
+        """Un compte déjà en service garde son statut : la régularisation d'un
+        compte existant reste un geste d'administration."""
+        user_id = self._active_account()
+        self.keycloak_client.is_member_of_group = AsyncMock(return_value=True)
+
+        self._declared_by_nextcloud(is_partner=False)
+
+        self.assertFalse(self.get_success(self.store.is_partner(user_id)))
 
     def test_unknown_address_still_registers_a_new_account(self):
         """The reactivation branch must not disturb the ordinary path."""

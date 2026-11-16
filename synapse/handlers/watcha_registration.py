@@ -152,6 +152,20 @@ class RegistrationHandler:
                         email_address
                     )
                     localpart = kc_user["id"]
+                    # watcha+
+                    # Le compte Keycloak existe déjà : c'est lui qui sait si la
+                    # personne est externe. Le connecteur Nextcloud, qui arrive
+                    # ici après une première connexion SSO, déclare le compte
+                    # avant que `user_oidc` ne lui ait posé ses groupes, donc
+                    # toujours en membre. Le statut ne fait que monter : un
+                    # appelant qui dit « externe » reste écouté.
+                    if not is_partner and await self.keycloak_client.is_member_of_group(
+                        localpart, "partner"
+                    ):
+                        is_partner = not email_domain_matches(
+                            email_address, self.config.watcha.partner_email_whitelist
+                        )
+                    # +watcha
                 else:
                     raise
             local_password_hash = None

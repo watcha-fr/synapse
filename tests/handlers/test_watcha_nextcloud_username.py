@@ -28,6 +28,7 @@ class NextcloudUsernameTestCase(HomeserverTestCase):
         self.keycloak_client.add_user = AsyncMock(
             side_effect=self._mint_keycloak_user
         )
+        self.keycloak_client.is_member_of_group = AsyncMock(return_value=False)
         self.minted = []
 
         self.provision_account = AsyncMock()

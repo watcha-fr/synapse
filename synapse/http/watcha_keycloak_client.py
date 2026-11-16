@@ -183,6 +183,28 @@ class KeycloakClient(SimpleHttpClient):
 
         return response[0]
 
+    # watcha+
+    async def is_member_of_group(self, user_id: str, group_name: str) -> bool:
+        """Whether a Keycloak user belongs to a top-level group.
+
+        Args:
+            user_id: the Keycloak user id
+            group_name: the group name, without the leading slash
+        """
+
+        groups = await self.get_json(
+            uri=self._get_endpoint(
+                "admin/realms/{}/users/{}/groups", self.realm_name, user_id
+            ),
+            headers=await self._get_header(),
+            args={"briefRepresentation": "true"},
+        )
+
+        return any(
+            group.get("path") == "/" + group_name for group in groups or []
+        )
+    # +watcha
+
     async def get_users(self) -> List[dict]:
         """Get a list of Keycloak users.
 
