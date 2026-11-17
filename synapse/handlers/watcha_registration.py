@@ -182,6 +182,21 @@ class RegistrationHandler:
         # errors out. Bring the existing account back instead: this is what
         # keeps an address that once had an account invitable.
         user_id = UserID(localpart, self.hs.hostname).to_string()
+
+        # Le compte Synapse d'une personne connue de Keycloak ne s'appelle pas
+        # forcément `@<uuid>` : un compte né par SSO avant les comptes en UUID
+        # (trigramme à Villeurbanne) ou créé depuis la console d'administration
+        # porte un autre localpart, rattaché à l'UUID par `user_external_ids`.
+        # C'est ce rattachement que suit la connexion SSO ; l'ignorer ici
+        # fabriquait un second compte `@<uuid>` à chaque première visite dans
+        # Nextcloud, puis échouait en 500 sur ExternalIDReuseException.
+        if register_kc_user:
+            linked_user_id = await self.store.get_user_by_external_id(
+                self._idp_id(), localpart
+            )
+            if linked_user_id is not None:
+                user_id = linked_user_id
+
         existing_user = await self.store.get_user_by_id(user_id)
 
         # Un compte déjà connu garde le nom Nextcloud enregistré : en dériver un
@@ -260,10 +275,8 @@ class RegistrationHandler:
         # The mapping already exists on a reactivated account, and recording it
         # twice raises ExternalIDReuseException.
         if register_kc_user and existing_user is None:  # watcha+
-            idp_ids = list(self.hs.get_oidc_handler()._providers)
-            idp_id = idp_ids[0] if len(idp_ids) == 1 else "nextcloud"
             await self.store.record_user_external_id(
-                idp_id,
+                self._idp_id(),  # watcha+
                 localpart,
                 user_id,
                 nextcloud_username,  # watcha+ : le nom lisible, plus l'UUID
@@ -327,6 +340,11 @@ class RegistrationHandler:
         return user_id
 
     # watcha+
+    def _idp_id(self) -> str:
+        """Le fournisseur sous lequel les UUID Keycloak sont rattachés."""
+        idp_ids = list(self.hs.get_oidc_handler()._providers)
+        return idp_ids[0] if len(idp_ids) == 1 else "nextcloud"
+
     async def _derive_nextcloud_username(self, email_address: str) -> str:
         """A readable Nextcloud name derived from the address, deduplicated.
 
